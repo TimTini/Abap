@@ -11,6 +11,7 @@ Option Explicit
 
 Private mName As String
 Private mKind As String
+Private mDescription As String
 Private mCallings As Collection
 Private mCalledBy As Collection
 Private mParameters As Collection
@@ -28,20 +29,28 @@ Private Sub Class_Initialize()
     mIsProcessed = False
 End Sub
 
-Public Property Get Name() As String
-    Name = mName
+Public Property Get name() As String
+    name = mName
 End Property
 
-Public Property Let Name(ByVal value As String)
+Public Property Let name(ByVal value As String)
     mName = value
 End Property
 
-Public Property Get Kind() As String
-    Kind = mKind
+Public Property Get kind() As String
+    kind = mKind
 End Property
 
-Public Property Let Kind(ByVal value As String)
+Public Property Let kind(ByVal value As String)
     mKind = value
+End Property
+
+Public Property Get Description() As String
+    Description = mDescription
+End Property
+
+Public Property Let Description(ByVal value As String)
+    mDescription = value
 End Property
 
 Public Property Get Callings() As Collection

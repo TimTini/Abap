@@ -22,11 +22,11 @@ Public Property Let VariableName(ByVal value As String)
     mVariableName = value
 End Property
 
-Public Property Get DataType() As String
-    DataType = mDataType
+Public Property Get dataType() As String
+    dataType = mDataType
 End Property
 
-Public Property Let DataType(ByVal value As String)
+Public Property Let dataType(ByVal value As String)
     mDataType = value
 End Property
 
@@ -38,11 +38,11 @@ Public Property Let DeclarationType(ByVal value As String)
     mDeclarationType = value
 End Property
 
-Public Property Get Value() As String
-    Value = mValue
+Public Property Get value() As String
+    value = mValue
 End Property
 
-Public Property Let Value(ByVal value As String)
+Public Property Let value(ByVal value As String)
     mValue = value
 End Property
 

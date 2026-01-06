@@ -12,27 +12,36 @@ Option Explicit
 Private mParamType As String
 Private mName As String
 Private mDataType As String
+Private mDescription As String
 
-Public Property Get ParamType() As String
-    ParamType = mParamType
+Public Property Get paramType() As String
+    paramType = mParamType
 End Property
 
-Public Property Let ParamType(ByVal value As String)
+Public Property Let paramType(ByVal value As String)
     mParamType = value
 End Property
 
-Public Property Get Name() As String
-    Name = mName
+Public Property Get name() As String
+    name = mName
 End Property
 
-Public Property Let Name(ByVal value As String)
+Public Property Let name(ByVal value As String)
     mName = value
 End Property
 
-Public Property Get DataType() As String
-    DataType = mDataType
+Public Property Get dataType() As String
+    dataType = mDataType
 End Property
 
-Public Property Let DataType(ByVal value As String)
+Public Property Let dataType(ByVal value As String)
     mDataType = value
+End Property
+
+Public Property Get Description() As String
+    Description = mDescription
+End Property
+
+Public Property Let Description(ByVal value As String)
+    mDescription = value
 End Property

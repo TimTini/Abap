@@ -46,6 +46,16 @@ AT USER-COMMAND.
 TOP-OF-PAGE DURING LINE-SELECTION.
   PERFORM step_c.
 
+*&--------------------------------------------------------------------*
+*&    Forms main
+*&--------------------------------------------------------------------*
+*     Main processing routine                                          *
+*---------------------------------------------------------------------*
+*  --> it_tab     internal table description
+*  --> iv_user    user
+*  --> iv_opt     optional
+*  <-- cv_count   count
+*---------------------------------------------------------------------*
 FORM main
   TABLES it_tab
   USING VALUE(iv_user) TYPE syuname iv_opt TYPE i OPTIONAL
@@ -84,11 +94,26 @@ FORM main
 
 ENDFORM.
 
+*&--------------------------------------------------------------------*
+*&    Forms step_a
+*&--------------------------------------------------------------------*
+*     Simple subroutine                                                *
+*---------------------------------------------------------------------*
+*  --> iv_in      input value
+*---------------------------------------------------------------------*
 FORM step_a USING iv_in TYPE i.
   DATA lv_local TYPE i.
   PERFORM step_cycle_1.
 ENDFORM.
 
+*&--------------------------------------------------------------------*
+*&    Forms step_b
+*&--------------------------------------------------------------------*
+*     Routine with USING + CHANGING                                   *
+*---------------------------------------------------------------------*
+*  --> iv_in      input value
+*  <-- cv_out     output text
+*---------------------------------------------------------------------*
 FORM step_b
   USING iv_in TYPE i
   CHANGING cv_out TYPE string.
@@ -112,3 +137,4 @@ ENDFORM.
 FORM self_call.
   PERFORM self_call. " self-cycle
 ENDFORM.
+
