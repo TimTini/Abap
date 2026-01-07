@@ -104,9 +104,11 @@
     const userNote = String(options?.userNote || "").trim();
 
     const lines = [];
+    // Always show Desc if available (codeDesc OR userDesc)
     if (userDesc) {
       lines.push(`<div><span class="anno-summary__k">Desc:</span> ${utils.escapeHtml(userDesc)}</div>`);
-    } else if (codeDesc) {
+    }
+    if (codeDesc) {
       lines.push(`<div><span class="anno-summary__k">Desc:</span> ${utils.escapeHtml(codeDesc)}</div>`);
     }
     if (userNote) {
@@ -131,7 +133,7 @@
       const valuePart = decl?.value ? ` VALUE ${decl.value}` : "";
       const desc = shownDesc ? ` - ${shownDesc}` : "";
 
-      const summary = renderAnnoSummaryHtml({ userNote });
+      const summary = renderAnnoSummaryHtml({ codeDesc, userDesc, userNote });
 
       const edit = key
         ? `<details class="param-notes">
@@ -221,7 +223,7 @@
         const userNote = String(p.userNote || "").trim();
         const shownDesc = userDesc || codeDesc;
         const desc = shownDesc ? ` - ${shownDesc}` : "";
-        const summary = renderAnnoSummaryHtml({ userNote });
+        const summary = renderAnnoSummaryHtml({ codeDesc, userDesc, userNote });
 
         const edit = key
           ? `<details class="param-notes">
@@ -268,7 +270,7 @@
         const shownDesc = userDesc || codeDesc;
         const desc = shownDesc ? ` - ${shownDesc}` : "";
         const dt = d?.dataType ? ` TYPE ${d.dataType}` : "";
-        const summary = renderAnnoSummaryHtml({ userNote });
+        const summary = renderAnnoSummaryHtml({ codeDesc, userDesc, userNote });
 
         const edit = key
           ? `<details class="param-notes">
@@ -316,7 +318,7 @@
         const desc = shownDesc ? ` - ${shownDesc}` : "";
         const dt = c?.dataType ? ` TYPE ${c.dataType}` : "";
         const valuePart = c?.value ? ` VALUE ${c.value}` : "";
-        const summary = renderAnnoSummaryHtml({ userNote });
+        const summary = renderAnnoSummaryHtml({ codeDesc, userDesc, userNote });
 
         const edit = key
           ? `<details class="param-notes">
@@ -546,10 +548,10 @@
     wireInlineAnnoEditors();
   }
 
-  function wireInlineAnnoEditors() {
+  function wireInlineAnnoEditors(rootEl) {
     const model = state.model;
     if (!model || !ns.notes) return;
-    const root = $("objectDetails");
+    const root = rootEl || $("objectDetails");
     if (!root) return;
     const inputs = Array.from(root.querySelectorAll("textarea.param-notes__input[data-anno-key][data-anno-field]"));
     if (inputs.length === 0) return;
@@ -868,7 +870,8 @@
       const declStmtText = declStmt ? ` — ${utils.escapeHtml(declStmt)}` : "";
       const meta = `<div class="trace-node__meta" style="padding-left:${pad}px">Scope: ${utils.escapeHtml(scope)}${utils.escapeHtml(declLine)}${declText}${declStmtText}</div>`;
 
-      const routine = state.model?.nodes?.get(node.routineKey) || null;
+      const routineKey = String(node.routineKey || "");
+      const routine = state.model?.nodes?.get(routineKey) || null;
       const codeRoutineDesc = String(routine?.description || "").trim();
       const userRoutineDesc = String(routine?.userDescription || "").trim();
       const userRoutineNote = String(routine?.userNote || "").trim();
@@ -876,7 +879,133 @@
       if (userRoutineDesc) noteLines.push(`<div><span class="trace-note__k">Your description:</span> ${utils.escapeHtml(userRoutineDesc)}</div>`);
       if (userRoutineNote) noteLines.push(`<div><span class="trace-note__k">Your note:</span> ${utils.escapeHtml(userRoutineNote)}</div>`);
       if (codeRoutineDesc) noteLines.push(`<div><span class="trace-note__k">From code:</span> ${utils.escapeHtml(codeRoutineDesc)}</div>`);
-      const notesHtml = noteLines.length ? `<div class="trace-node__notes" style="padding-left:${pad}px">${noteLines.join("")}</div>` : "";
+      const routineSummary = renderAnnoSummaryHtml({
+        codeDesc: codeRoutineDesc,
+        userDesc: userRoutineDesc,
+        userNote: userRoutineNote,
+      });
+
+      const routineNotesBlock =
+        noteLines.length || routineSummary
+          ? `<div class="trace-node__notes" style="padding-left:${pad}px">${noteLines.join("")}${routineSummary}</div>`
+          : "";
+
+      const routineEdit =
+        routineKey && ns.notes
+          ? `<details class="param-notes" style="padding-left:${pad}px">
+              <summary class="param-notes__summary">Edit object notes</summary>
+              <div class="param-notes__body">
+                <div class="anno-grid">
+                  <div class="anno-label">Description (from code)</div>
+                  <div class="anno-code${codeRoutineDesc ? "" : " anno-code--empty"}">${utils.escapeHtml(
+                    codeRoutineDesc || "(none)",
+                  )}</div>
+
+                  <div class="anno-label">Your description</div>
+                  <textarea class="textarea param-notes__input" rows="2" data-anno-type="routine" data-anno-key="${utils.escapeHtml(
+                    routineKey,
+                  )}" data-anno-field="description" data-routine-key="${utils.escapeHtml(
+                    routineKey,
+                  )}" placeholder="Add your description (stored locally)...">${utils.escapeHtml(userRoutineDesc)}</textarea>
+
+                  <div class="anno-label">Your note</div>
+                  <textarea class="textarea param-notes__input" rows="3" data-anno-type="routine" data-anno-key="${utils.escapeHtml(
+                    routineKey,
+                  )}" data-anno-field="note" data-routine-key="${utils.escapeHtml(
+                    routineKey,
+                  )}" placeholder="Add notes (stored locally)...">${utils.escapeHtml(userRoutineNote)}</textarea>
+                </div>
+              </div>
+            </details>`
+          : "";
+
+      let varSummary = "";
+      let varEdit = "";
+
+      if (decl && ns.notes) {
+        const scopeName = String(node.resolution?.scope || "").toLowerCase();
+
+        if (scopeName === "parameter" && decl.name && ns.notes.makeParamKey) {
+          const paramKey = ns.notes.makeParamKey(routineKey, decl.name);
+          const codeDesc = String(decl.description || "").trim();
+          const userDesc = String(decl.userDescription || "").trim();
+          const userNote = String(decl.userNote || "").trim();
+          varSummary = renderAnnoSummaryHtml({ codeDesc, userDesc, userNote });
+
+          if (paramKey) {
+            varEdit = `<details class="param-notes" style="padding-left:${pad}px">
+              <summary class="param-notes__summary">Edit variable notes (${utils.escapeHtml(decl.name)})</summary>
+              <div class="param-notes__body">
+                <div class="anno-grid">
+                  <div class="anno-label">Description (from code)</div>
+                  <div class="anno-code${codeDesc ? "" : " anno-code--empty"}">${utils.escapeHtml(codeDesc || "(none)")}</div>
+
+                  <div class="anno-label">Your description</div>
+                  <textarea class="textarea param-notes__input" rows="2" data-anno-type="param" data-anno-key="${utils.escapeHtml(
+                    paramKey,
+                  )}" data-anno-field="description" data-routine-key="${utils.escapeHtml(
+              routineKey,
+            )}" data-param-name="${utils.escapeHtml(decl.name)}" placeholder="Add your description (stored locally)...">${utils.escapeHtml(
+              userDesc,
+            )}</textarea>
+
+                  <div class="anno-label">Your note</div>
+                  <textarea class="textarea param-notes__input" rows="3" data-anno-type="param" data-anno-key="${utils.escapeHtml(
+                    paramKey,
+                  )}" data-anno-field="note" data-routine-key="${utils.escapeHtml(
+              routineKey,
+            )}" data-param-name="${utils.escapeHtml(decl.name)}" placeholder="Add notes (stored locally)...">${utils.escapeHtml(
+              userNote,
+            )}</textarea>
+                </div>
+              </div>
+            </details>`;
+          }
+        } else if ((scopeName === "local" || scopeName === "global") && decl.declKind && decl.variableName && ns.notes.makeDeclKey) {
+          const scopeKey = scopeName === "global" ? "PROGRAM" : routineKey;
+          const declKey = ns.notes.makeDeclKey(scopeKey, decl.declKind, decl.variableName);
+          const codeDesc = String(decl.description || "").trim();
+          const userDesc = String(decl.userDescription || "").trim();
+          const userNote = String(decl.userNote || "").trim();
+          varSummary = renderAnnoSummaryHtml({ codeDesc, userDesc, userNote });
+
+          if (declKey) {
+            varEdit = `<details class="param-notes" style="padding-left:${pad}px">
+              <summary class="param-notes__summary">Edit variable notes (${utils.escapeHtml(decl.variableName)})</summary>
+              <div class="param-notes__body">
+                <div class="anno-grid">
+                  <div class="anno-label">Description (from code)</div>
+                  <div class="anno-code${codeDesc ? "" : " anno-code--empty"}">${utils.escapeHtml(codeDesc || "(none)")}</div>
+
+                  <div class="anno-label">Your description</div>
+                  <textarea class="textarea param-notes__input" rows="2" data-anno-type="decl" data-anno-key="${utils.escapeHtml(
+                    declKey,
+                  )}" data-anno-field="description" data-scope-key="${utils.escapeHtml(
+              scopeKey,
+            )}" data-decl-kind="${utils.escapeHtml(decl.declKind)}" data-var-name="${utils.escapeHtml(
+              decl.variableName,
+            )}" placeholder="Add your description (stored locally)...">${utils.escapeHtml(userDesc)}</textarea>
+
+                  <div class="anno-label">Your note</div>
+                  <textarea class="textarea param-notes__input" rows="3" data-anno-type="decl" data-anno-key="${utils.escapeHtml(
+                    declKey,
+                  )}" data-anno-field="note" data-scope-key="${utils.escapeHtml(
+              scopeKey,
+            )}" data-decl-kind="${utils.escapeHtml(decl.declKind)}" data-var-name="${utils.escapeHtml(
+              decl.variableName,
+            )}" placeholder="Add notes (stored locally)...">${utils.escapeHtml(userNote)}</textarea>
+                </div>
+              </div>
+            </details>`;
+          }
+        }
+      }
+
+      const varNotesBlock = varSummary
+        ? `<div class="trace-node__notes" style="padding-left:${pad}px">${varSummary}</div>`
+        : "";
+
+      const notesHtml = `${routineNotesBlock}${routineEdit}${varNotesBlock}${varEdit}`;
 
       const writes = (node.writes || [])
         .map((w) => `<li>${sourceLink(`${w.variableName} ⇐ ${w.statement}`, w.sourceRef)}</li>`)
@@ -899,6 +1028,7 @@
     }
 
     el.innerHTML = renderNode(root, 0);
+    wireInlineAnnoEditors(el);
   }
 
   function runTrace() {
