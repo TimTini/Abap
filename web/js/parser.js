@@ -5,22 +5,145 @@
   const doc = ns.doc;
   const { ProgramModel, SourceRef, AbapParameter, AbapDataDeclaration, AbapWrite, AbapCallEdge } = ns.model;
 
-  function findFormBlocks(lines) {
+  function defaultParserConfig() {
+    const IDENT = String.raw`[A-Za-z_][A-Za-z0-9_\/]*`;
+    const IDENT_PATH = String.raw`${IDENT}(?:[-~][A-Za-z0-9_\/]+)*`;
+
+    return {
+      version: 1,
+      routineBlocks: [
+        {
+          kind: "FORM",
+          start: /^FORM\b/i,
+          end: /^ENDFORM\b/i,
+          endRequiresPeriod: true,
+          header: {
+            name: new RegExp(String.raw`^FORM\s+(${IDENT})\b\s*(.*)$`, "i"),
+            clauseOrder: ["TABLES", "USING", "CHANGING", "RAISING"],
+            paramIgnoreTokens: ["OPTIONAL", "DEFAULT", "TYPE", "LIKE"],
+          },
+        },
+      ],
+      events: {
+        exact: ["INITIALIZATION", "START-OF-SELECTION", "END-OF-SELECTION", "AT LINE-SELECTION", "AT USER-COMMAND"],
+        prefixes: ["AT SELECTION-SCREEN", "TOP-OF-PAGE", "END-OF-PAGE"],
+      },
+      statements: {
+        calls: [
+          {
+            kind: "PERFORM",
+            pattern: new RegExp(String.raw`^PERFORM\s+(${IDENT})\b\s*(.*)$`, "i"),
+            calleeKind: "FORM",
+            clauseOrder: ["TABLES", "USING", "CHANGING"],
+          },
+        ],
+        declarations: {
+          globalKinds: ["DATA", "CONSTANTS"],
+          localKinds: ["DATA", "CONSTANTS"],
+          ignorePatterns: {
+            DATA: [/^DATA\(/i, /\bBEGIN\s+OF\b/i, /\bEND\s+OF\b/i],
+            CONSTANTS: [/\bBEGIN\s+OF\b/i, /\bEND\s+OF\b/i],
+          },
+        },
+        writes: {
+          rules: [
+            { regex: new RegExp(String.raw`^(${IDENT_PATH})\s*=\s*`) },
+            { regex: new RegExp(String.raw`^CLEAR\s+(${IDENT_PATH})\b`, "i") },
+            { whenStartsWith: "APPEND", regex: new RegExp(String.raw`\bTO\b\s+(${IDENT_PATH})\b`, "i") },
+            { whenStartsWith: "CONCATENATE", regex: new RegExp(String.raw`\bINTO\b\s+(${IDENT_PATH})\b`, "i") },
+          ],
+        },
+      },
+    };
+  }
+
+  function asRegex(value, flags) {
+    if (!value) return null;
+    if (value instanceof RegExp) return value;
+    if (typeof value === "string") return new RegExp(value, flags || "i");
+    return null;
+  }
+
+  function regexTest(re, text) {
+    if (!re) return false;
+    re.lastIndex = 0;
+    return re.test(text);
+  }
+
+  function regexExec(re, text) {
+    if (!re) return null;
+    re.lastIndex = 0;
+    return re.exec(text);
+  }
+
+  function getParserConfig() {
+    const base = defaultParserConfig();
+    const user = ns.parserConfig;
+    if (!user || typeof user !== "object") return base;
+
+    const statements = user.statements && typeof user.statements === "object" ? user.statements : {};
+    const decls = statements.declarations && typeof statements.declarations === "object" ? statements.declarations : {};
+    const writes = statements.writes && typeof statements.writes === "object" ? statements.writes : {};
+
+    return {
+      ...base,
+      ...user,
+      routineBlocks: Array.isArray(user.routineBlocks) ? user.routineBlocks : base.routineBlocks,
+      events: { ...base.events, ...(user.events || {}) },
+      statements: {
+        ...base.statements,
+        ...statements,
+        calls: Array.isArray(statements.calls) ? statements.calls : base.statements.calls,
+        declarations: {
+          ...base.statements.declarations,
+          ...decls,
+          ignorePatterns: { ...base.statements.declarations.ignorePatterns, ...(decls.ignorePatterns || {}) },
+        },
+        writes: {
+          ...base.statements.writes,
+          ...writes,
+          rules: Array.isArray(writes.rules) ? writes.rules : base.statements.writes.rules,
+        },
+      },
+    };
+  }
+
+  function findRoutineBlocks(lines, cfg) {
+    const defs = Array.isArray(cfg?.routineBlocks) ? cfg.routineBlocks : [];
     const blocks = [];
     let i = 0;
+
     while (i < lines.length) {
       const raw = lines[i] || "";
       if (utils.isFullLineComment(raw)) {
         i++;
         continue;
       }
+
       const code = utils.stripInlineComment(raw).trim();
-      if (!/^FORM\b/i.test(code)) {
+      if (!code) {
+        i++;
+        continue;
+      }
+
+      let matchedDef = null;
+      for (const def of defs) {
+        const startRe = asRegex(def?.start);
+        if (startRe && regexTest(startRe, code)) {
+          matchedDef = def;
+          break;
+        }
+      }
+
+      if (!matchedDef) {
         i++;
         continue;
       }
 
       const startLine = i + 1;
+      const endRe = asRegex(matchedDef.end);
+      const endRequiresPeriod = matchedDef.endRequiresPeriod !== false;
+
       let j = i;
       while (j < lines.length) {
         const raw2 = lines[j] || "";
@@ -29,33 +152,44 @@
           continue;
         }
         const code2 = utils.stripInlineComment(raw2).trim();
-        if (/^ENDFORM\b/i.test(code2) && code2.includes(".")) break;
+        if (endRe && regexTest(endRe, code2) && (!endRequiresPeriod || code2.includes("."))) break;
         j++;
       }
+
       const endLine = Math.min(lines.length, j + 1);
-      blocks.push({ startLine, endLine });
+      blocks.push({
+        kind: String(matchedDef.kind || "ROUTINE").trim().toUpperCase(),
+        startLine,
+        endLine,
+        def: matchedDef,
+      });
       i = endLine;
     }
+
     return blocks;
   }
 
-  function buildFormLineMask(lines, formBlocks) {
+  function buildLineMask(lines, blocks) {
     const mask = new Array(lines.length).fill(false);
-    for (const b of formBlocks) {
+    for (const b of blocks) {
       for (let ln = b.startLine; ln <= b.endLine; ln++) mask[ln - 1] = true;
     }
     return mask;
   }
 
-  function parseFormHeader(stmtText, paramDescriptions, headerSourceRef) {
+  function parseRoutineHeader(blockDef, stmtText, paramDescriptions, headerSourceRef) {
     const statement = utils.normalizeSpaces(utils.stripTrailingPeriod(stmtText));
-    const m = /^FORM\s+([A-Za-z_][A-Za-z0-9_\/]*)\b\s*(.*)$/i.exec(statement);
+    const header = blockDef?.header || {};
+    const nameRe = asRegex(header.name);
+    const m = regexExec(nameRe, statement);
     if (!m) return null;
 
     const name = m[1];
     const rest = m[2] || "";
 
-    const clauseOrder = ["TABLES", "USING", "CHANGING", "RAISING"];
+    const clauseOrder = Array.isArray(header.clauseOrder) ? header.clauseOrder : [];
+    if (clauseOrder.length === 0) return { name, params: [] };
+
     const u = rest.toUpperCase();
     const indices = clauseOrder
       .map((k) => ({ k, idx: u.search(new RegExp(`\\b${k}\\b`)) }))
@@ -72,6 +206,8 @@
       clauses[cur.k] = clauses[cur.k].replace(/\s+/g, " ").trim();
       if (clauses[cur.k].startsWith(cur.k)) clauses[cur.k] = clauses[cur.k].slice(cur.k.length).trim();
     }
+
+    const ignore = new Set((header.paramIgnoreTokens || []).map((t) => String(t || "").trim().toUpperCase()).filter(Boolean));
 
     function parseParams(kind, text) {
       const out = [];
@@ -91,10 +227,11 @@
       while (i < tokens.length) {
         const raw0 = String(tokens[i] || "").trim();
         const rawUpper = utils.cleanIdentifierToken(raw0).toUpperCase();
-        if (rawUpper === "OPTIONAL" || rawUpper === "DEFAULT" || rawUpper === "TYPE" || rawUpper === "LIKE") {
+        if (ignore.has(rawUpper)) {
           i++;
           continue;
         }
+
         const token = utils.cleanIdentifierToken(utils.unwrapValueToken(raw0));
         if (!utils.isIdentifier(token)) {
           i++;
@@ -103,7 +240,7 @@
 
         const pName = token;
         let dataType = "";
-        if (i + 2 < tokens.length && /^TYPE$/i.test(tokens[i + 1])) {
+        if (i + 2 < tokens.length && /^(TYPE|LIKE)$/i.test(tokens[i + 1])) {
           dataType = utils.cleanIdentifierToken(tokens[i + 2]);
           i += 3;
         } else {
@@ -117,19 +254,21 @@
     }
 
     const params = [];
-    params.push(...parseParams("TABLES", clauses.TABLES));
-    params.push(...parseParams("USING", clauses.USING));
-    params.push(...parseParams("CHANGING", clauses.CHANGING));
-    params.push(...parseParams("RAISING", clauses.RAISING));
+    for (const clause of clauseOrder) {
+      const k = String(clause || "").toUpperCase();
+      params.push(...parseParams(k, clauses[k]));
+    }
 
     return { name, params };
   }
 
-  function parseDataOrConstants(stmt, declKind, description, sourceRef) {
+  function parseDataOrConstants(stmt, declKind, description, sourceRef, options) {
     const s = utils.normalizeSpaces(utils.stripTrailingPeriod(stmt));
-    if (declKind === "DATA" && /^DATA\(/i.test(s)) return [];
-    if (/\bBEGIN\s+OF\b/i.test(s)) return [];
-    if (/\bEND\s+OF\b/i.test(s)) return [];
+    const ignorePatterns = Array.isArray(options?.ignorePatterns) ? options.ignorePatterns : [];
+    for (const p of ignorePatterns) {
+      const re = asRegex(p);
+      if (re && regexTest(re, s)) return [];
+    }
 
     let body = s.replace(new RegExp(`^${declKind}\\b`, "i"), "").trim();
     if (body.startsWith(":")) body = body.slice(1).trim();
@@ -144,7 +283,7 @@
       const typeMatch = /\bTYPE\b\s+([^\s]+)/i.exec(p);
       const dataType = typeMatch ? utils.cleanIdentifierToken(typeMatch[1]) : "";
       let value = "";
-      if (declKind === "CONSTANTS") {
+      if (options?.supportsValue === true || declKind === "CONSTANTS") {
         const valueMatch = /\bVALUE\b\s+(.+)$/i.exec(p);
         value = valueMatch ? valueMatch[1].trim() : "";
       }
@@ -155,21 +294,18 @@
     return out;
   }
 
-  function parsePerform(stmtText) {
-    const statement = utils.normalizeSpaces(utils.stripTrailingPeriod(stmtText));
-    const m = /^PERFORM\s+([A-Za-z_][A-Za-z0-9_\/]*)\b\s*(.*)$/i.exec(statement);
-    if (!m) return null;
-    const target = m[1];
-    const rest = m[2] || "";
+  function parseClauseArgs(rest, clauseOrder) {
+    const args = { tables: [], using: [], changing: [] };
+    const keys = Array.isArray(clauseOrder) ? clauseOrder.map((k) => String(k || "").toUpperCase()) : [];
+    if (!rest || keys.length === 0) return args;
 
     const u = rest.toUpperCase();
-    const keys = ["TABLES", "USING", "CHANGING"];
     const indices = keys
       .map((k) => ({ k, idx: u.search(new RegExp(`\\b${k}\\b`)) }))
       .filter((x) => x.idx >= 0)
       .sort((a, b) => a.idx - b.idx);
 
-    const clauses = { TABLES: "", USING: "", CHANGING: "" };
+    const clauses = {};
     for (let i = 0; i < indices.length; i++) {
       const cur = indices[i];
       const next = indices[i + 1];
@@ -188,113 +324,134 @@
         .filter(Boolean);
     }
 
-    return {
-      target,
-      args: {
-        tables: tokensOf(clauses.TABLES),
-        using: tokensOf(clauses.USING),
-        changing: tokensOf(clauses.CHANGING),
-      },
-    };
+    if (clauses.TABLES != null) args.tables = tokensOf(clauses.TABLES);
+    if (clauses.USING != null) args.using = tokensOf(clauses.USING);
+    if (clauses.CHANGING != null) args.changing = tokensOf(clauses.CHANGING);
+    return args;
   }
 
-  function parseWriteTargets(stmtText) {
+  function parseCallByRule(stmtText, rule) {
+    const statement = utils.normalizeSpaces(utils.stripTrailingPeriod(stmtText));
+    const pattern = asRegex(rule?.pattern);
+    const m = regexExec(pattern, statement);
+    if (!m) return null;
+
+    const target = String(m[1] || "").trim();
+    if (!target) return null;
+
+    const rest = String(m[2] || "").trim();
+    const args = parseClauseArgs(rest, rule?.clauseOrder);
+    return { target, args };
+  }
+
+  function parseWriteTargets(stmtText, cfg) {
     const s = utils.normalizeSpaces(utils.stripTrailingPeriod(stmtText));
     const u = s.toUpperCase();
 
     const out = [];
+    const rules = cfg?.statements?.writes?.rules || [];
 
-    let m = /^([A-Za-z_][A-Za-z0-9_\/]*(?:-[A-Za-z0-9_\/]+)*)\s*=\s*/.exec(s);
-    if (m) out.push(m[1]);
+    for (const rule of rules) {
+      const when = String(rule?.whenStartsWith || "").trim();
+      if (when) {
+        const w = when.toUpperCase();
+        if (!(u === w || u.startsWith(`${w} `))) continue;
+      }
 
-    m = /^CLEAR\s+([A-Za-z_][A-Za-z0-9_\/]*(?:-[A-Za-z0-9_\/]+)*)\b/i.exec(s);
-    if (m) out.push(m[1]);
-
-    if (u.startsWith("APPEND ")) {
-      m = /\bTO\b\s+([A-Za-z_][A-Za-z0-9_\/]*(?:-[A-Za-z0-9_\/]+)*)\b/i.exec(s);
-      if (m) out.push(m[1]);
-    }
-
-    if (u.startsWith("CONCATENATE ")) {
-      m = /\bINTO\b\s+([A-Za-z_][A-Za-z0-9_\/]*(?:-[A-Za-z0-9_\/]+)*)\b/i.exec(s);
-      if (m) out.push(m[1]);
+      const re = asRegex(rule?.regex);
+      const m = regexExec(re, s);
+      if (m && m[1]) out.push(m[1]);
     }
 
     return out;
   }
 
-  function eventNameFromStatement(stmtText) {
+  function eventNameFromStatement(stmtText, cfg) {
     const t = utils.normalizeSpaces(utils.stripTrailingPeriod(stmtText));
     const u = t.toUpperCase();
 
-    const exact = ["INITIALIZATION", "START-OF-SELECTION", "END-OF-SELECTION", "AT LINE-SELECTION", "AT USER-COMMAND"];
-    if (exact.includes(u)) return t;
+    const exact = Array.isArray(cfg?.events?.exact) ? cfg.events.exact : [];
+    for (const e of exact) {
+      if (u === String(e || "").trim().toUpperCase()) return t;
+    }
 
-    if (u.startsWith("AT SELECTION-SCREEN")) return t;
-    if (u.startsWith("TOP-OF-PAGE")) return t;
-    if (u.startsWith("END-OF-PAGE")) return t;
+    const prefixes = Array.isArray(cfg?.events?.prefixes) ? cfg.events.prefixes : [];
+    for (const p of prefixes) {
+      const pu = String(p || "").trim().toUpperCase();
+      if (pu && u.startsWith(pu)) return t;
+    }
 
     return null;
   }
 
-  function parseRoutineStatement(model, routine, statement, originalLines) {
+  function parseRoutineStatement(model, routine, statement, originalLines, cfg) {
     const text = statement.text;
-    const normalized = utils.normalizeSpaces(text);
+    const normalized = utils.normalizeSpaces(utils.stripTrailingPeriod(text));
     if (!normalized) return;
 
     const inlineComment = doc.extractInlineCommentFromStatement(originalLines, statement.startLine, statement.endLine);
     const src = new SourceRef(statement.startLine, statement.endLine);
 
-    if (/^PERFORM\b/i.test(normalized)) {
-      const p = parsePerform(normalized);
-      if (!p) return;
-      const callee = model.ensureForm(p.target);
-      const edge = new AbapCallEdge(routine.key, callee.key, p.target, p.args, src);
+    const callRules = Array.isArray(cfg?.statements?.calls) ? cfg.statements.calls : [];
+    for (const rule of callRules) {
+      const parsed = parseCallByRule(normalized, rule);
+      if (!parsed) continue;
+
+      const calleeKind = String(rule?.calleeKind || "FORM").trim().toUpperCase();
+      const callee = model.ensureRoutine(calleeKind, parsed.target);
+      const edge = new AbapCallEdge(routine.key, callee.key, parsed.target, parsed.args, src);
       model.addEdge(edge);
       return;
     }
 
-    if (/^DATA\b/i.test(normalized)) {
-      const decls = parseDataOrConstants(normalized, "DATA", inlineComment, src);
-      routine.localData.push(...decls);
+    const declCfg = cfg?.statements?.declarations || {};
+    const localKinds = Array.isArray(declCfg.localKinds) ? declCfg.localKinds : [];
+
+    for (const kind of localKinds) {
+      const dk = String(kind || "").trim().toUpperCase();
+      if (!dk) continue;
+      if (!new RegExp(`^${dk}\\b`, "i").test(normalized)) continue;
+
+      const decls = parseDataOrConstants(normalized, dk, inlineComment, src, {
+        ignorePatterns: declCfg.ignorePatterns?.[dk] || [],
+        supportsValue: dk === "CONSTANTS",
+      });
+
+      if (dk === "DATA") routine.localData.push(...decls);
+      else if (dk === "CONSTANTS") routine.localConstants.push(...decls);
       return;
     }
 
-    if (/^CONSTANTS\b/i.test(normalized)) {
-      const decls = parseDataOrConstants(normalized, "CONSTANTS", inlineComment, src);
-      routine.localConstants.push(...decls);
-      return;
-    }
-
-    const writes = parseWriteTargets(normalized);
+    const writes = parseWriteTargets(normalized, cfg);
     for (const v of writes) routine.writes.push(new AbapWrite(v, normalized, src));
   }
 
-  function parseForms(model, lines, formBlocks) {
-    for (const block of formBlocks) {
+  function parseRoutineBlocks(model, lines, blocks, cfg) {
+    for (const block of blocks) {
       const statements = utils.collectStatements(lines, block.startLine, block.endLine);
       if (statements.length === 0) continue;
 
       const header = statements[0];
       const headerRef = new SourceRef(block.startLine, header.endLine);
-      const formDoc = doc.extractLeadingComment(lines, block.startLine);
+      const leadingDoc = doc.extractLeadingComment(lines, block.startLine);
 
-      const headerInfo = parseFormHeader(header.text, formDoc.paramDescriptions, headerRef);
+      const headerInfo = parseRoutineHeader(block.def, header.text, leadingDoc.paramDescriptions, headerRef);
       if (!headerInfo) continue;
 
-      const routine = model.defineForm(headerInfo.name, new SourceRef(block.startLine, block.endLine), formDoc.description, headerInfo.params);
+      const routine = model.defineRoutine(block.kind, headerInfo.name, new SourceRef(block.startLine, block.endLine), leadingDoc.description, headerInfo.params);
 
       for (let i = 1; i < statements.length; i++) {
         const st = statements[i];
-        const normalized = utils.normalizeSpaces(st.text);
-        if (/^ENDFORM\b/i.test(normalized)) break;
-        parseRoutineStatement(model, routine, st, lines);
+        const normalized = utils.normalizeSpaces(utils.stripTrailingPeriod(st.text));
+        const endRe = asRegex(block.def?.end);
+        if (endRe && regexTest(endRe, normalized)) break;
+        parseRoutineStatement(model, routine, st, lines, cfg);
       }
     }
   }
 
-  function parseTopLevel(model, lines, formMask) {
-    const masked = lines.map((l, idx) => (formMask[idx] ? "" : l));
+  function parseTopLevel(model, lines, routineMask, cfg) {
+    const masked = lines.map((l, idx) => (routineMask[idx] ? "" : l));
     const statements = utils.collectStatements(masked, 1, masked.length);
 
     let currentEvent = null;
@@ -302,10 +459,10 @@
 
     for (const st of statements) {
       lastStmt = st;
-      const normalized = utils.normalizeSpaces(st.text);
+      const normalized = utils.normalizeSpaces(utils.stripTrailingPeriod(st.text));
       if (!normalized) continue;
 
-      const ev = eventNameFromStatement(normalized);
+      const ev = eventNameFromStatement(normalized, cfg);
       if (ev) {
         currentEvent = model.ensureEvent(ev, new SourceRef(st.startLine, st.endLine));
         continue;
@@ -315,20 +472,28 @@
         const inlineComment = doc.extractInlineCommentFromStatement(lines, st.startLine, st.endLine);
         const src = new SourceRef(st.startLine, st.endLine);
 
-        if (/^DATA\b/i.test(normalized)) {
-          const decls = parseDataOrConstants(normalized, "DATA", inlineComment, src);
-          model.globalData.push(...decls);
-          continue;
+        const declCfg = cfg?.statements?.declarations || {};
+        const globalKinds = Array.isArray(declCfg.globalKinds) ? declCfg.globalKinds : [];
+
+        for (const kind of globalKinds) {
+          const dk = String(kind || "").trim().toUpperCase();
+          if (!dk) continue;
+          if (!new RegExp(`^${dk}\\b`, "i").test(normalized)) continue;
+
+          const decls = parseDataOrConstants(normalized, dk, inlineComment, src, {
+            ignorePatterns: declCfg.ignorePatterns?.[dk] || [],
+            supportsValue: dk === "CONSTANTS",
+          });
+
+          if (dk === "DATA") model.globalData.push(...decls);
+          else if (dk === "CONSTANTS") model.globalConstants.push(...decls);
+          break;
         }
-        if (/^CONSTANTS\b/i.test(normalized)) {
-          const decls = parseDataOrConstants(normalized, "CONSTANTS", inlineComment, src);
-          model.globalConstants.push(...decls);
-          continue;
-        }
+
         continue;
       }
 
-      parseRoutineStatement(model, currentEvent, st, lines);
+      parseRoutineStatement(model, currentEvent, st, lines, cfg);
       if (currentEvent.sourceRef) currentEvent.sourceRef.endLine = st.endLine;
     }
 
@@ -343,11 +508,12 @@
     const offsets = utils.computeLineStartOffsets(normalized);
     const model = new ProgramModel(normalized, lines, offsets);
 
-    const formBlocks = findFormBlocks(lines);
-    const formMask = buildFormLineMask(lines, formBlocks);
+    const cfg = getParserConfig();
+    const routineBlocks = findRoutineBlocks(lines, cfg);
+    const routineMask = buildLineMask(lines, routineBlocks);
 
-    parseForms(model, lines, formBlocks);
-    parseTopLevel(model, lines, formMask);
+    parseRoutineBlocks(model, lines, routineBlocks, cfg);
+    parseTopLevel(model, lines, routineMask, cfg);
 
     ns.graph.build(model);
     return model;

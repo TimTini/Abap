@@ -101,7 +101,7 @@
     }
 
     static formKey(name) {
-      return `FORM:${String(name || "").trim().toLowerCase()}`;
+      return ProgramModel.routineKey("FORM", name);
     }
 
     static eventKey(name) {
@@ -109,25 +109,49 @@
       return `EVENT:${n}`;
     }
 
-    ensureForm(name) {
-      const key = ProgramModel.formKey(name);
+    static normalizeRoutineKind(kind) {
+      return String(kind || "").trim().toUpperCase() || "FORM";
+    }
+
+    static routineKey(kind, name) {
+      const k = ProgramModel.normalizeRoutineKind(kind);
+      if (k === "EVENT") return ProgramModel.eventKey(name);
+      return `${k}:${String(name || "").trim().toLowerCase()}`;
+    }
+
+    ensureRoutine(kind, name) {
+      const k = ProgramModel.normalizeRoutineKind(kind);
+      if (k === "EVENT") return this.ensureEvent(name);
+
+      const key = ProgramModel.routineKey(k, name);
       let node = this.nodes.get(key);
       if (!node) {
-        node = new AbapRoutine(key, "FORM", String(name || "").trim());
+        node = new AbapRoutine(key, k, String(name || "").trim());
         this.nodes.set(key, node);
+      } else {
+        node.kind = k;
+        node.name = node.name || String(name || "").trim();
       }
       return node;
     }
 
-    defineForm(name, sourceRef, description, params) {
-      const node = this.ensureForm(name);
-      node.kind = "FORM";
+    defineRoutine(kind, name, sourceRef, description, params) {
+      const node = this.ensureRoutine(kind, name);
+      node.kind = ProgramModel.normalizeRoutineKind(kind);
       node.name = String(name || "").trim();
       node.isDefined = true;
       node.sourceRef = sourceRef || node.sourceRef;
       node.description = description || node.description;
       node.params = params || node.params;
       return node;
+    }
+
+    ensureForm(name) {
+      return this.ensureRoutine("FORM", name);
+    }
+
+    defineForm(name, sourceRef, description, params) {
+      return this.defineRoutine("FORM", name, sourceRef, description, params);
     }
 
     ensureEvent(name, sourceRef) {
@@ -189,4 +213,3 @@
     ProgramModel,
   };
 })(window.AbapFlow);
-
