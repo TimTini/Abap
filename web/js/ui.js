@@ -98,21 +98,104 @@
     return `<a href="#" class="source-link" data-start="${start}" data-end="${end}">${utils.escapeHtml(label)}</a>`;
   }
 
+  function renderAnnoSummaryHtml(options) {
+    const codeDesc = String(options?.codeDesc || "").trim();
+    const userDesc = String(options?.userDesc || "").trim();
+    const userNote = String(options?.userNote || "").trim();
+
+    const lines = [];
+    if (userDesc) {
+      lines.push(`<div><span class="anno-summary__k">Desc:</span> ${utils.escapeHtml(userDesc)}</div>`);
+    } else if (codeDesc) {
+      lines.push(`<div><span class="anno-summary__k">Desc:</span> ${utils.escapeHtml(codeDesc)}</div>`);
+    }
+    if (userNote) {
+      lines.push(`<div><span class="anno-summary__k">Note:</span> ${utils.escapeHtml(userNote)}</div>`);
+    }
+
+    if (!lines.length) return "";
+    return `<div class="anno-summary">${lines.join("")}</div>`;
+  }
+
   function renderProgramDetails(model) {
-    const globalsData = model.globalData
-      .map((d) => `<li>${sourceLink(`${d.variableName} TYPE ${d.dataType || "?"} ${d.description ? "- " + d.description : ""}`, d.sourceRef)}</li>`)
-      .join("");
-    const globalsConst = model.globalConstants
-      .map((c) =>
-        `<li>${sourceLink(
-          `${c.variableName} TYPE ${c.dataType || "?"}${c.value ? " VALUE " + c.value : ""} ${c.description ? "- " + c.description : ""}`,
-          c.sourceRef,
-        )}</li>`,
-      )
-      .join("");
+    function renderGlobalDecl(decl) {
+      const name = String(decl?.variableName || "").trim();
+      const declKind = String(decl?.declKind || "").trim();
+      const key = ns.notes?.makeDeclKey ? ns.notes.makeDeclKey("PROGRAM", declKind, name) : "";
+      const codeDesc = String(decl?.description || "").trim();
+      const userDesc = String(decl?.userDescription || "").trim();
+      const userNote = String(decl?.userNote || "").trim();
+      const shownDesc = userDesc || codeDesc;
+
+      const dt = decl?.dataType ? ` TYPE ${decl.dataType}` : " TYPE ?";
+      const valuePart = decl?.value ? ` VALUE ${decl.value}` : "";
+      const desc = shownDesc ? ` - ${shownDesc}` : "";
+
+      const summary = renderAnnoSummaryHtml({ userNote });
+
+      const edit = key
+        ? `<details class="param-notes">
+            <summary class="param-notes__summary">Edit notes</summary>
+            <div class="param-notes__body">
+              <div class="anno-grid">
+                <div class="anno-label">Description (from code)</div>
+                <div class="anno-code${codeDesc ? "" : " anno-code--empty"}">${utils.escapeHtml(codeDesc || "(none)")}</div>
+
+                <div class="anno-label">Your description</div>
+                <textarea class="textarea param-notes__input" rows="2" data-anno-type="decl" data-anno-key="${utils.escapeHtml(
+                  key,
+                )}" data-anno-field="description" data-scope-key="PROGRAM" data-decl-kind="${utils.escapeHtml(
+                  declKind,
+                )}" data-var-name="${utils.escapeHtml(name)}" placeholder="Add your description (stored locally)...">${utils.escapeHtml(
+                  userDesc,
+                )}</textarea>
+
+                <div class="anno-label">Your note</div>
+                <textarea class="textarea param-notes__input" rows="3" data-anno-type="decl" data-anno-key="${utils.escapeHtml(
+                  key,
+                )}" data-anno-field="note" data-scope-key="PROGRAM" data-decl-kind="${utils.escapeHtml(
+                  declKind,
+                )}" data-var-name="${utils.escapeHtml(name)}" placeholder="Add notes (stored locally)...">${utils.escapeHtml(
+                  userNote,
+                )}</textarea>
+              </div>
+            </div>
+          </details>`
+        : "";
+
+      return `<li class="param-item">${sourceLink(`${name}${dt}${valuePart}${desc}`, decl?.sourceRef)}${summary}${edit}</li>`;
+    }
+
+    const globalsData = (model.globalData || []).map(renderGlobalDecl).join("");
+    const globalsConst = (model.globalConstants || []).map(renderGlobalDecl).join("");
+
+    const userDesc = String(model.userDescription || "").trim();
+    const userNote = String(model.userNote || "").trim();
+    const notesSection = `
+      <div class="section">
+        <div class="section__title">Notes</div>
+        <div class="anno-grid">
+          <div class="anno-label">Your description</div>
+          <textarea id="annoDesc" class="textarea" rows="2" placeholder="Add your description (stored locally)...">${utils.escapeHtml(
+            userDesc,
+          )}</textarea>
+
+          <div class="anno-label">Your note</div>
+          <textarea id="annoNote" class="textarea" rows="4" placeholder="Add notes (stored locally)...">${utils.escapeHtml(
+            userNote,
+          )}</textarea>
+
+          <div class="anno-actions">
+            <button id="btnAnnoClear" class="btn" type="button">Clear</button>
+            <span id="annoSaveState" class="anno-status"></span>
+          </div>
+        </div>
+      </div>
+    `;
 
     return `
       <h3>PROGRAM (Globals)</h3>
+      ${notesSection}
       <div class="meta">Global DATA: ${model.globalData.length} • Global CONSTANTS: ${model.globalConstants.length}</div>
       <div class="section">
         <div class="section__title">Global DATA</div>
@@ -132,29 +215,180 @@
     const params = r.params
       .map((p) => {
         const dt = p.dataType ? ` TYPE ${p.dataType}` : "";
-        const desc = p.description ? ` - ${p.description}` : "";
-        return `<li>${sourceLink(`${p.kind} ${p.name}${dt}${desc}`, p.sourceRef || r.sourceRef)}</li>`;
+        const key = ns.notes?.makeParamKey ? ns.notes.makeParamKey(r.key, p.name) : "";
+        const codeDesc = String(p.description || "").trim();
+        const userDesc = String(p.userDescription || "").trim();
+        const userNote = String(p.userNote || "").trim();
+        const shownDesc = userDesc || codeDesc;
+        const desc = shownDesc ? ` - ${shownDesc}` : "";
+        const summary = renderAnnoSummaryHtml({ userNote });
+
+        const edit = key
+          ? `<details class="param-notes">
+              <summary class="param-notes__summary">Edit notes</summary>
+              <div class="param-notes__body">
+                <div class="anno-grid">
+                  <div class="anno-label">Description (from code)</div>
+                  <div class="anno-code${codeDesc ? "" : " anno-code--empty"}">${utils.escapeHtml(codeDesc || "(none)")}</div>
+
+                  <div class="anno-label">Your description</div>
+                  <textarea class="textarea param-notes__input" rows="2" data-anno-key="${utils.escapeHtml(
+                    key,
+                  )}" data-anno-type="param" data-anno-field="description" data-routine-key="${utils.escapeHtml(
+                    r.key,
+                  )}" data-param-name="${utils.escapeHtml(String(p.name || ""))}" placeholder="Add your description (stored locally)...">${utils.escapeHtml(
+                    userDesc,
+                  )}</textarea>
+
+                  <div class="anno-label">Your note</div>
+                  <textarea class="textarea param-notes__input" rows="3" data-anno-key="${utils.escapeHtml(
+                    key,
+                  )}" data-anno-type="param" data-anno-field="note" data-routine-key="${utils.escapeHtml(
+                    r.key,
+                  )}" data-param-name="${utils.escapeHtml(String(p.name || ""))}" placeholder="Add notes (stored locally)...">${utils.escapeHtml(
+                    userNote,
+                  )}</textarea>
+                </div>
+              </div>
+            </details>`
+          : "";
+
+        return `<li class="param-item">${sourceLink(`${p.kind} ${p.name}${dt}${desc}`, p.sourceRef || r.sourceRef)}${summary}${edit}</li>`;
       })
       .join("");
 
     const localsData = r.localData
-      .map((d) => `<li>${sourceLink(`${d.variableName}${d.dataType ? " TYPE " + d.dataType : ""}${d.description ? " - " + d.description : ""}`, d.sourceRef)}</li>`)
+      .map((d) => {
+        const name = String(d?.variableName || "").trim();
+        const declKind = String(d?.declKind || "").trim();
+        const key = ns.notes?.makeDeclKey ? ns.notes.makeDeclKey(r.key, declKind, name) : "";
+        const codeDesc = String(d?.description || "").trim();
+        const userDesc = String(d?.userDescription || "").trim();
+        const userNote = String(d?.userNote || "").trim();
+        const shownDesc = userDesc || codeDesc;
+        const desc = shownDesc ? ` - ${shownDesc}` : "";
+        const dt = d?.dataType ? ` TYPE ${d.dataType}` : "";
+        const summary = renderAnnoSummaryHtml({ userNote });
+
+        const edit = key
+          ? `<details class="param-notes">
+              <summary class="param-notes__summary">Edit notes</summary>
+              <div class="param-notes__body">
+                <div class="anno-grid">
+                  <div class="anno-label">Description (from code)</div>
+                  <div class="anno-code${codeDesc ? "" : " anno-code--empty"}">${utils.escapeHtml(codeDesc || "(none)")}</div>
+
+                  <div class="anno-label">Your description</div>
+                  <textarea class="textarea param-notes__input" rows="2" data-anno-type="decl" data-anno-key="${utils.escapeHtml(
+                    key,
+                  )}" data-anno-field="description" data-scope-key="${utils.escapeHtml(r.key)}" data-decl-kind="${utils.escapeHtml(
+                    declKind,
+                  )}" data-var-name="${utils.escapeHtml(name)}" placeholder="Add your description (stored locally)...">${utils.escapeHtml(
+                    userDesc,
+                  )}</textarea>
+
+                  <div class="anno-label">Your note</div>
+                  <textarea class="textarea param-notes__input" rows="3" data-anno-type="decl" data-anno-key="${utils.escapeHtml(
+                    key,
+                  )}" data-anno-field="note" data-scope-key="${utils.escapeHtml(r.key)}" data-decl-kind="${utils.escapeHtml(
+                    declKind,
+                  )}" data-var-name="${utils.escapeHtml(name)}" placeholder="Add notes (stored locally)...">${utils.escapeHtml(
+                    userNote,
+                  )}</textarea>
+                </div>
+              </div>
+            </details>`
+          : "";
+
+        return `<li class="param-item">${sourceLink(`${name}${dt}${desc}`, d?.sourceRef)}${summary}${edit}</li>`;
+      })
       .join("");
 
     const localsConst = r.localConstants
-      .map((c) =>
-        `<li>${sourceLink(
-          `${c.variableName}${c.dataType ? " TYPE " + c.dataType : ""}${c.value ? " VALUE " + c.value : ""}${c.description ? " - " + c.description : ""}`,
-          c.sourceRef,
-        )}</li>`,
-      )
+      .map((c) => {
+        const name = String(c?.variableName || "").trim();
+        const declKind = String(c?.declKind || "").trim();
+        const key = ns.notes?.makeDeclKey ? ns.notes.makeDeclKey(r.key, declKind, name) : "";
+        const codeDesc = String(c?.description || "").trim();
+        const userDesc = String(c?.userDescription || "").trim();
+        const userNote = String(c?.userNote || "").trim();
+        const shownDesc = userDesc || codeDesc;
+        const desc = shownDesc ? ` - ${shownDesc}` : "";
+        const dt = c?.dataType ? ` TYPE ${c.dataType}` : "";
+        const valuePart = c?.value ? ` VALUE ${c.value}` : "";
+        const summary = renderAnnoSummaryHtml({ userNote });
+
+        const edit = key
+          ? `<details class="param-notes">
+              <summary class="param-notes__summary">Edit notes</summary>
+              <div class="param-notes__body">
+                <div class="anno-grid">
+                  <div class="anno-label">Description (from code)</div>
+                  <div class="anno-code${codeDesc ? "" : " anno-code--empty"}">${utils.escapeHtml(codeDesc || "(none)")}</div>
+
+                  <div class="anno-label">Your description</div>
+                  <textarea class="textarea param-notes__input" rows="2" data-anno-type="decl" data-anno-key="${utils.escapeHtml(
+                    key,
+                  )}" data-anno-field="description" data-scope-key="${utils.escapeHtml(r.key)}" data-decl-kind="${utils.escapeHtml(
+                    declKind,
+                  )}" data-var-name="${utils.escapeHtml(name)}" placeholder="Add your description (stored locally)...">${utils.escapeHtml(
+                    userDesc,
+                  )}</textarea>
+
+                  <div class="anno-label">Your note</div>
+                  <textarea class="textarea param-notes__input" rows="3" data-anno-type="decl" data-anno-key="${utils.escapeHtml(
+                    key,
+                  )}" data-anno-field="note" data-scope-key="${utils.escapeHtml(r.key)}" data-decl-kind="${utils.escapeHtml(
+                    declKind,
+                  )}" data-var-name="${utils.escapeHtml(name)}" placeholder="Add notes (stored locally)...">${utils.escapeHtml(
+                    userNote,
+                  )}</textarea>
+                </div>
+              </div>
+            </details>`
+          : "";
+
+        return `<li class="param-item">${sourceLink(`${name}${dt}${valuePart}${desc}`, c?.sourceRef)}${summary}${edit}</li>`;
+      })
       .join("");
 
     const calls = r.calls
       .map((e) => {
         const callee = model.nodes.get(e.toKey);
         const name = callee ? `${callee.kind} ${callee.name}` : e.targetName;
-        return `<li>${sourceLink(`PERFORM ${name}`, e.sourceRef)}${e.isInCycle ? ' <span class="badge badge-danger">cycle</span>' : ""}</li>`;
+        const codeDesc = String(callee?.description || "").trim();
+        const userDesc = String(callee?.userDescription || "").trim();
+        const userNote = String(callee?.userNote || "").trim();
+        const summary = renderAnnoSummaryHtml({ codeDesc, userDesc, userNote });
+        const key = String(e.toKey || "");
+
+        const edit = key
+          ? `<details class="param-notes">
+              <summary class="param-notes__summary">Edit notes</summary>
+              <div class="param-notes__body">
+                <div class="anno-grid">
+                  <div class="anno-label">Description (from code)</div>
+                  <div class="anno-code${codeDesc ? "" : " anno-code--empty"}">${utils.escapeHtml(codeDesc || "(none)")}</div>
+
+                  <div class="anno-label">Your description</div>
+                  <textarea class="textarea param-notes__input" rows="2" data-anno-type="routine" data-anno-key="${utils.escapeHtml(
+                    key,
+                  )}" data-anno-field="description" data-routine-key="${utils.escapeHtml(
+                    key,
+                  )}" placeholder="Add your description (stored locally)...">${utils.escapeHtml(userDesc)}</textarea>
+
+                  <div class="anno-label">Your note</div>
+                  <textarea class="textarea param-notes__input" rows="3" data-anno-type="routine" data-anno-key="${utils.escapeHtml(
+                    key,
+                  )}" data-anno-field="note" data-routine-key="${utils.escapeHtml(
+                    key,
+                  )}" placeholder="Add notes (stored locally)...">${utils.escapeHtml(userNote)}</textarea>
+                </div>
+              </div>
+            </details>`
+          : "";
+
+        return `<li class="param-item">${sourceLink(`PERFORM ${name}`, e.sourceRef)}${e.isInCycle ? ' <span class="badge badge-danger">cycle</span>' : ""}${summary}${edit}</li>`;
       })
       .join("");
 
@@ -162,20 +396,77 @@
       .map((e) => {
         const caller = model.nodes.get(e.fromKey);
         const name = caller ? `${caller.kind} ${caller.name}` : e.fromKey;
-        return `<li>${sourceLink(`Called by ${name}`, e.sourceRef)}</li>`;
+        const codeDesc = String(caller?.description || "").trim();
+        const userDesc = String(caller?.userDescription || "").trim();
+        const userNote = String(caller?.userNote || "").trim();
+        const summary = renderAnnoSummaryHtml({ codeDesc, userDesc, userNote });
+        const key = String(e.fromKey || "");
+
+        const edit = key
+          ? `<details class="param-notes">
+              <summary class="param-notes__summary">Edit notes</summary>
+              <div class="param-notes__body">
+                <div class="anno-grid">
+                  <div class="anno-label">Description (from code)</div>
+                  <div class="anno-code${codeDesc ? "" : " anno-code--empty"}">${utils.escapeHtml(codeDesc || "(none)")}</div>
+
+                  <div class="anno-label">Your description</div>
+                  <textarea class="textarea param-notes__input" rows="2" data-anno-type="routine" data-anno-key="${utils.escapeHtml(
+                    key,
+                  )}" data-anno-field="description" data-routine-key="${utils.escapeHtml(
+                    key,
+                  )}" placeholder="Add your description (stored locally)...">${utils.escapeHtml(userDesc)}</textarea>
+
+                  <div class="anno-label">Your note</div>
+                  <textarea class="textarea param-notes__input" rows="3" data-anno-type="routine" data-anno-key="${utils.escapeHtml(
+                    key,
+                  )}" data-anno-field="note" data-routine-key="${utils.escapeHtml(
+                    key,
+                  )}" placeholder="Add notes (stored locally)...">${utils.escapeHtml(userNote)}</textarea>
+                </div>
+              </div>
+            </details>`
+          : "";
+
+        return `<li class="param-item">${sourceLink(`Called by ${name}`, e.sourceRef)}${summary}${edit}</li>`;
       })
       .join("");
 
     const writes = r.writes.map((w) => `<li>${sourceLink(`${w.variableName}  ⇐  ${w.statement}`, w.sourceRef)}</li>`).join("");
 
-    const desc = r.description
-      ? `<div class="section"><div class="section__title">Description</div><div>${utils.escapeHtml(r.description)}</div></div>`
-      : "";
+    const codeDesc = String(r.description || "").trim();
+    const userDesc = String(r.userDescription || "").trim();
+    const userNote = String(r.userNote || "").trim();
+
+    const notesSection = `
+      <div class="section">
+        <div class="section__title">Notes</div>
+        <div class="anno-grid">
+          <div class="anno-label">Description (from code)</div>
+          <div class="anno-code${codeDesc ? "" : " anno-code--empty"}">${utils.escapeHtml(codeDesc || "(none)")}</div>
+
+          <div class="anno-label">Your description</div>
+          <textarea id="annoDesc" class="textarea" rows="2" placeholder="Add your description (stored locally)...">${utils.escapeHtml(
+            userDesc,
+          )}</textarea>
+
+          <div class="anno-label">Your note</div>
+          <textarea id="annoNote" class="textarea" rows="4" placeholder="Add notes (stored locally)...">${utils.escapeHtml(
+            userNote,
+          )}</textarea>
+
+          <div class="anno-actions">
+            <button id="btnAnnoClear" class="btn" type="button">Clear</button>
+            <span id="annoSaveState" class="anno-status"></span>
+          </div>
+        </div>
+      </div>
+    `;
 
     return `
       <h3>${utils.escapeHtml(r.kind)} ${utils.escapeHtml(r.name)}</h3>
       <div class="meta">${utils.escapeHtml(lineInfo)} • Defined: ${r.isDefined ? "Yes" : "No"} • Cycle: ${r.isInCycle ? "Yes" : "No"} • Depth: ${r.depth}</div>
-      ${desc}
+      ${notesSection}
       <div class="section">
         <div class="section__title">Parameters</div>
         <ul class="list">${params || "<li>(none)</li>"}</ul>
@@ -221,6 +512,17 @@
     el.classList.remove("empty");
     if (state.selectedKey === "PROGRAM") {
       el.innerHTML = renderProgramDetails(model);
+      wireNotesEditorForKey(
+        "PROGRAM",
+        (description, note) => {
+          if (description) model.userDescription = description;
+          else delete model.userDescription;
+          if (note) model.userNote = note;
+          else delete model.userNote;
+        },
+        { rerenderSequence: false },
+      );
+      wireInlineAnnoEditors();
       return;
     }
 
@@ -231,6 +533,147 @@
     }
 
     el.innerHTML = renderRoutineDetails(r);
+    wireNotesEditorForKey(
+      r.key,
+      (description, note) => {
+        if (description) r.userDescription = description;
+        else delete r.userDescription;
+        if (note) r.userNote = note;
+        else delete r.userNote;
+      },
+      { rerenderSequence: true },
+    );
+    wireInlineAnnoEditors();
+  }
+
+  function wireInlineAnnoEditors() {
+    const model = state.model;
+    if (!model || !ns.notes) return;
+    const root = $("objectDetails");
+    if (!root) return;
+    const inputs = Array.from(root.querySelectorAll("textarea.param-notes__input[data-anno-key][data-anno-field]"));
+    if (inputs.length === 0) return;
+
+    for (const el of inputs) {
+      let saveTimer = null;
+
+      function saveNow() {
+        if (saveTimer) {
+          clearTimeout(saveTimer);
+          saveTimer = null;
+        }
+        const key = String(el.dataset.annoKey || "");
+        const field = String(el.dataset.annoField || "");
+        const annoType = String(el.dataset.annoType || "");
+        const routineKey = String(el.dataset.routineKey || "");
+        const paramName = String(el.dataset.paramName || "");
+        const scopeKey = String(el.dataset.scopeKey || "");
+        const declKind = String(el.dataset.declKind || "");
+        const varName = String(el.dataset.varName || "");
+        const value = String(el.value || "").trim();
+        if (!key) return;
+
+        if (field === "note") ns.notes.setEntry(key, { note: value });
+        else ns.notes.setEntry(key, { description: value });
+
+        function applyUserFields(target) {
+          if (!target) return;
+          if (field === "note") {
+            if (value) target.userNote = value;
+            else delete target.userNote;
+          } else {
+            if (value) target.userDescription = value;
+            else delete target.userDescription;
+          }
+        }
+
+        if (annoType === "param") {
+          const routine = model.nodes.get(routineKey);
+          const p =
+            routine?.params?.find((x) => String(x.name || "").toLowerCase() === String(paramName || "").toLowerCase()) || null;
+          applyUserFields(p);
+        } else if (annoType === "decl") {
+          const dk = String(declKind || "").toUpperCase();
+          const vnLower = String(varName || "").toLowerCase();
+          if (scopeKey === "PROGRAM") {
+            const list = dk === "CONSTANTS" ? model.globalConstants : model.globalData;
+            const d = list?.find((x) => String(x.variableName || "").toLowerCase() === vnLower) || null;
+            applyUserFields(d);
+          } else {
+            const routine = model.nodes.get(scopeKey);
+            const list = dk === "CONSTANTS" ? routine?.localConstants : routine?.localData;
+            const d = list?.find((x) => String(x.variableName || "").toLowerCase() === vnLower) || null;
+            applyUserFields(d);
+          }
+        } else if (annoType === "routine") {
+          const r = model.nodes.get(routineKey || key);
+          applyUserFields(r);
+        }
+
+        if (document.getElementById("tab-sequence").classList.contains("is-active")) {
+          renderSequence();
+        }
+      }
+
+      function scheduleSave() {
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = window.setTimeout(saveNow, 350);
+      }
+
+      el.addEventListener("input", scheduleSave);
+      el.addEventListener("blur", saveNow);
+    }
+  }
+
+  function wireNotesEditorForKey(objectKey, applyLocal, options) {
+    if (!objectKey || !ns.notes) return;
+    const descEl = $("annoDesc");
+    const noteEl = $("annoNote");
+    const clearBtn = $("btnAnnoClear");
+    const statusEl = $("annoSaveState");
+    if (!descEl || !noteEl || !statusEl) return;
+
+    let saveTimer = null;
+
+    function saveNow() {
+      if (saveTimer) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+      }
+      const description = String(descEl.value || "").trim();
+      const note = String(noteEl.value || "").trim();
+      ns.notes.setEntry(objectKey, { description, note });
+      if (applyLocal) applyLocal(description, note);
+
+      statusEl.textContent = "Saved.";
+      window.setTimeout(() => {
+        if (statusEl.textContent === "Saved.") statusEl.textContent = "";
+      }, 1200);
+
+      if (options?.rerenderSequence && document.getElementById("tab-sequence").classList.contains("is-active")) {
+        renderSequence();
+      }
+    }
+
+    function scheduleSave() {
+      statusEl.textContent = "Saving...";
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = window.setTimeout(saveNow, 350);
+    }
+
+    descEl.addEventListener("input", scheduleSave);
+    noteEl.addEventListener("input", scheduleSave);
+    descEl.addEventListener("blur", saveNow);
+    noteEl.addEventListener("blur", saveNow);
+
+    if (clearBtn) {
+      clearBtn.addEventListener("click", () => {
+        descEl.value = "";
+        noteEl.value = "";
+        saveNow();
+        renderDetails();
+      });
+    }
   }
 
   function highlightSource(startLine, endLine) {
@@ -425,6 +868,16 @@
       const declStmtText = declStmt ? ` — ${utils.escapeHtml(declStmt)}` : "";
       const meta = `<div class="trace-node__meta" style="padding-left:${pad}px">Scope: ${utils.escapeHtml(scope)}${utils.escapeHtml(declLine)}${declText}${declStmtText}</div>`;
 
+      const routine = state.model?.nodes?.get(node.routineKey) || null;
+      const codeRoutineDesc = String(routine?.description || "").trim();
+      const userRoutineDesc = String(routine?.userDescription || "").trim();
+      const userRoutineNote = String(routine?.userNote || "").trim();
+      const noteLines = [];
+      if (userRoutineDesc) noteLines.push(`<div><span class="trace-note__k">Your description:</span> ${utils.escapeHtml(userRoutineDesc)}</div>`);
+      if (userRoutineNote) noteLines.push(`<div><span class="trace-note__k">Your note:</span> ${utils.escapeHtml(userRoutineNote)}</div>`);
+      if (codeRoutineDesc) noteLines.push(`<div><span class="trace-note__k">From code:</span> ${utils.escapeHtml(codeRoutineDesc)}</div>`);
+      const notesHtml = noteLines.length ? `<div class="trace-node__notes" style="padding-left:${pad}px">${noteLines.join("")}</div>` : "";
+
       const writes = (node.writes || [])
         .map((w) => `<li>${sourceLink(`${w.variableName} ⇐ ${w.statement}`, w.sourceRef)}</li>`)
         .join("");
@@ -442,7 +895,7 @@
         })
         .join("");
 
-      return `<div class="trace-node">${header}${meta}${writesHtml}${children}</div>`;
+      return `<div class="trace-node">${header}${meta}${notesHtml}${writesHtml}${children}</div>`;
     }
 
     el.innerHTML = renderNode(root, 0);
@@ -457,6 +910,52 @@
     renderTraceResults(result);
   }
 
+  function downloadTextFile(filename, text, mimeType) {
+    const blob = new Blob([String(text || "")], { type: mimeType || "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function exportNotes() {
+    if (!ns.notes) {
+      setStatus("Notes module not loaded.", true);
+      return;
+    }
+    const pid = ns.notes.getActiveProgramId ? ns.notes.getActiveProgramId() : "default";
+    const stamp = new Date().toISOString().replace(/[:]/g, "-").slice(0, 19);
+    const filename = `abapflow-notes-${pid}-${stamp}.json`;
+    downloadTextFile(filename, ns.notes.exportJson(), "application/json");
+    setStatus("Notes exported.", false);
+  }
+
+  async function importNotesFromFile(file) {
+    if (!ns.notes) {
+      setStatus("Notes module not loaded.", true);
+      return;
+    }
+    if (!file) return;
+    const text = await file.text();
+    const res = ns.notes.importJson(text, { mode: "merge" });
+    if (!res.ok) {
+      setStatus(res.error || "Import failed.", true);
+      return;
+    }
+
+    if (state.model) ns.notes.applyToModel(state.model);
+    renderObjectsTable();
+    renderDetails();
+    if (document.getElementById("tab-sequence").classList.contains("is-active")) {
+      renderSequence();
+    }
+    setStatus("Notes imported.", false);
+  }
+
   function analyze() {
     const input = $("abapInput").value;
     if (!String(input || "").trim()) {
@@ -465,7 +964,9 @@
     }
 
     try {
+      if (ns.notes) ns.notes.setActiveProgramFromText(input);
       const model = ns.parser.parseProgram(input);
+      if (ns.notes) ns.notes.applyToModel(model);
       state.model = model;
       state.selectedKey = "PROGRAM";
 
@@ -531,6 +1032,15 @@
       $("traceVariable").innerHTML = "";
       $("seqRoot").innerHTML = "";
       setStatus("Cleared.", false);
+    });
+
+    $("btnExportNotes").addEventListener("click", exportNotes);
+    $("btnImportNotes").addEventListener("click", () => $("notesImportFile").click());
+    $("notesImportFile").addEventListener("change", async (ev) => {
+      const input = ev.target;
+      const file = input?.files?.[0] || null;
+      await importNotesFromFile(file);
+      if (input) input.value = "";
     });
 
     $("objectSearch").addEventListener("input", () => renderObjectsTable());

@@ -157,7 +157,8 @@
       b.dataset.key = routineKey;
       b.dataset.var = param.name;
       const dt = param.dataType ? ` TYPE ${param.dataType}` : "";
-      const desc = param.description ? ` - ${param.description}` : "";
+      const descText = String(param.userDescription || param.description || "").trim();
+      const desc = descText ? ` - ${descText}` : "";
       b.textContent = `${param.kind} ${param.name}${dt}${desc}`;
       b.title = "Jump to Trace";
       b.addEventListener("click", (ev) => {
@@ -180,10 +181,11 @@
       title.textContent = `${routine.kind} ${routine.name}${routine.isDefined ? "" : " (external)"}`;
       row.appendChild(title);
 
-      if (routine.description) {
+      const descText = String(routine.userDescription || routine.description || "").trim();
+      if (descText) {
         const desc = document.createElement("div");
         desc.className = "seq-row-desc";
-        desc.textContent = routine.description;
+        desc.textContent = descText;
         row.appendChild(desc);
       }
 
