@@ -25,3 +25,11 @@ Workbook mac dinh: `excel\\AbapFlowDiagram.xlsm`
 
 ## ABAP sample de test
 - File: `samples\\ZABAP_FLOW_PARSER_TEST.abap`
+
+## Web (Offline HTML/JS)
+- Mo `web\\index.html` bang Edge/Chrome (khong can server, khong can thu vien ngoai).
+- Paste ABAP vao o ben trai -> bam `Analyze`.
+- Tab `Objects`: xem danh sach FORM/EVENT + description/params/DATA/CONSTANTS/calls.
+- Tab `Diagram`: flow diagram (SVG) va highlight cycle (mau do).
+- Tab `Sequence`: sequence diagram theo luong chay (columns = steps, rows = event/form), click param -> `Trace`.
+- Tab `Trace`: truy vet bien (CHANGING/TABLES + global writes).

@@ -50,71 +50,6 @@ ContinueParam:
     Next p
 End Sub
 
-Public Function ParseDeclarationDescriptions(ByRef rawLines As Variant, ByVal startLineIdx As Long, ByVal endLineIdx As Long, ByVal declType As String) As Object
-    Dim dict As Object
-    Set dict = CreateObject("Scripting.Dictionary") ' key = UCase(varName), value = description
-
-    If startLineIdx < LBound(rawLines) Then startLineIdx = LBound(rawLines)
-    If endLineIdx > UBound(rawLines) Then endLineIdx = UBound(rawLines)
-
-    Dim lead As Collection
-    Set lead = CollectLeadingCommentLines(rawLines, startLineIdx)
-
-    Dim v As Variant
-    For Each v In lead
-        Dim t As String
-        t = CleanFullLineCommentText(CStr(v))
-        If Len(t) = 0 Then GoTo ContinueLead
-        If IsSeparatorCommentLine(t) Then GoTo ContinueLead
-
-        Dim varName As String
-        varName = ExtractFirstIdentifier(t)
-        If Len(varName) = 0 Then GoTo ContinueLead
-
-        Dim posName As Long
-        posName = InStr(1, t, varName, vbTextCompare)
-
-        Dim desc As String
-        desc = Trim$(Mid$(t, posName + Len(varName)))
-        desc = Trim$(Replace(desc, ":", " "))
-        desc = Trim$(Replace(desc, "-", " "))
-        If Len(desc) = 0 Then GoTo ContinueLead
-
-        Dim key As String
-        key = UCase$(varName)
-        If Not dict.Exists(key) Then dict(key) = desc
-
-ContinueLead:
-    Next v
-
-    Dim idx As Long
-    For idx = startLineIdx To endLineIdx
-        Dim line As String
-        line = CStr(rawLines(idx))
-
-        Dim pos As Long
-        pos = InStr(1, line, """")
-        If pos <= 0 Then GoTo ContinueLine
-
-        Dim commentText As String
-        commentText = Trim$(Mid$(line, pos + 1))
-        If Len(commentText) = 0 Then GoTo ContinueLine
-
-        Dim codePart As String
-        codePart = Left$(line, pos - 1)
-
-        Dim varName2 As String
-        varName2 = ExtractDeclVarNameFromCode(codePart, declType)
-        If Len(varName2) = 0 Then GoTo ContinueLine
-
-        dict(UCase$(varName2)) = commentText
-
-ContinueLine:
-    Next idx
-
-    Set ParseDeclarationDescriptions = dict
-End Function
-
 Private Function CollectLeadingCommentLines(ByRef rawLines As Variant, ByVal startLineIdx As Long) As Collection
     Dim temp As Collection
     Set temp = New Collection
@@ -156,7 +91,7 @@ Private Function IsFullLineComment(ByVal line As String) As Boolean
     Dim t As String
     t = LTrim$(line)
     If Len(t) = 0 Then Exit Function
-    IsFullLineComment = (Left$(t, 1) = "*" Or Left$(t, 1) = """")
+    IsFullLineComment = (left$(t, 1) = "*" Or left$(t, 1) = """")
 End Function
 
 Private Function CleanFullLineCommentText(ByVal line As String) As String
@@ -164,39 +99,22 @@ Private Function CleanFullLineCommentText(ByVal line As String) As String
     t = LTrim$(line)
     If Len(t) = 0 Then Exit Function
 
-    If Left$(t, 1) = "*" Or Left$(t, 1) = """" Then t = Mid$(t, 2)
+    If left$(t, 1) = "*" Or left$(t, 1) = """" Then t = Mid$(t, 2)
     t = LTrim$(t)
-    If Left$(t, 1) = "&" Then t = Mid$(t, 2)
+    If left$(t, 1) = "&" Then t = Mid$(t, 2)
     t = Trim$(t)
 
     If Len(t) > 0 Then
-        If Right$(t, 1) = "*" Then t = RTrim$(Left$(t, Len(t) - 1))
+        If Right$(t, 1) = "*" Then t = RTrim$(left$(t, Len(t) - 1))
     End If
 
     CleanFullLineCommentText = NormalizeSpaces(t)
 End Function
 
-Private Function ExtractDeclVarNameFromCode(ByVal codePart As String, ByVal declType As String) As String
-    Dim s As String
-    s = Trim$(codePart)
-    If Len(s) = 0 Then Exit Function
-
-    Dim dt As String
-    dt = UCase$(Trim$(declType))
-    If Len(dt) = 0 Then Exit Function
-
-    If StartsWithWord(s, dt) Then
-        s = Trim$(Mid$(s, Len(dt) + 1))
-        If Left$(s, 1) = ":" Then s = Trim$(Mid$(s, 2))
-    End If
-
-    ExtractDeclVarNameFromCode = ExtractFirstIdentifier(s)
-End Function
-
 Private Function IsParamDescriptionLine(ByVal text As String) As Boolean
     Dim t As String
     t = LTrim$(text)
-    IsParamDescriptionLine = (Left$(t, 3) = "-->" Or Left$(t, 3) = "<--")
+    IsParamDescriptionLine = (left$(t, 3) = "-->" Or left$(t, 3) = "<--")
 End Function
 
 Private Sub ParseParamDescriptionLine(ByVal text As String, ByVal paramDesc As Object)
@@ -206,7 +124,7 @@ Private Sub ParseParamDescriptionLine(ByVal text As String, ByVal paramDesc As O
     t = Trim$(text)
     If Len(t) < 3 Then Exit Sub
 
-    If Left$(t, 3) = "-->" Or Left$(t, 3) = "<--" Then
+    If left$(t, 3) = "-->" Or left$(t, 3) = "<--" Then
         t = Trim$(Mid$(t, 4))
     End If
     If Len(t) = 0 Then Exit Sub
@@ -254,3 +172,4 @@ Private Function JoinVariantCollection(ByVal col As Collection, ByVal delimiter 
 
     JoinVariantCollection = out
 End Function
+

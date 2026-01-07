@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ABAP Flow Analyzer (Offline)</title>
+    <link rel="stylesheet" href="css/app.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="app-header__title">
+        <h1>ABAP Flow Analyzer</h1>
+        <div class="app-header__subtitle">Offline - No external libraries</div>
+      </div>
+      <div class="app-header__actions">
+        <button id="btnAnalyze" class="btn btn-primary" type="button">Analyze</button>
+        <button id="btnLoadSample" class="btn" type="button">Load sample</button>
+        <button id="btnClear" class="btn" type="button">Clear</button>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <section class="panel panel-left">
+        <div class="panel__title">ABAP code</div>
+        <textarea id="abapInput" class="code-input" spellcheck="false" placeholder="Paste ABAP code here..."></textarea>
+        <div class="panel__footer">
+          <div id="statusBar" class="status-bar">Ready.</div>
+        </div>
+      </section>
+
+      <section class="panel panel-right">
+        <div class="tabs">
+          <button class="tab is-active" data-tab="objects" type="button">Objects</button>
+          <button class="tab" data-tab="diagram" type="button">Diagram</button>
+          <button class="tab" data-tab="sequence" type="button">Sequence</button>
+          <button class="tab" data-tab="trace" type="button">Trace</button>
+          <button class="tab" data-tab="json" type="button">JSON</button>
+        </div>
+
+        <div class="tab-panels">
+          <section class="tab-panel is-active" id="tab-objects">
+            <div class="split">
+              <div class="split__left">
+                <div class="toolbar">
+                  <input id="objectSearch" class="input" type="search" placeholder="Search (FORM, EVENT, name)..." />
+                </div>
+                <div class="table-wrap">
+                  <table class="table" id="objectsTable">
+                    <thead>
+                      <tr>
+                        <th>Kind</th>
+                        <th>Name</th>
+                        <th>Depth</th>
+                        <th>Params</th>
+                        <th>DATA</th>
+                        <th>CONST</th>
+                        <th>Writes</th>
+                        <th>Defined</th>
+                        <th>Cycle</th>
+                      </tr>
+                    </thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="split__right">
+                <div class="panel__title">Details</div>
+                <div id="objectDetails" class="details empty">Analyze to see details.</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="tab-panel" id="tab-diagram">
+            <div class="panel__title">Flow diagram</div>
+            <div id="diagramHost" class="diagram-host"></div>
+            <div class="hint">
+              Tip: click a node to open it in <b>Objects</b> and <b>Trace</b>.
+            </div>
+          </section>
+
+          <section class="tab-panel" id="tab-sequence">
+            <div class="panel__title">Sequence diagram (single-thread)</div>
+
+            <div class="form-grid">
+              <label>
+                View
+                <select id="seqRoot" class="input"></select>
+              </label>
+              <label>
+                Max steps
+                <input id="seqMaxSteps" class="input" type="number" min="10" max="2000" value="200" />
+              </label>
+              <div class="form-grid__actions">
+                <button id="btnSeqRender" class="btn btn-primary" type="button">Render</button>
+              </div>
+            </div>
+
+            <div id="sequenceHost" class="sequence-host empty">Analyze to see sequence.</div>
+            <div class="hint">Tip: click a parameter to jump to <b>Trace</b>.</div>
+          </section>
+
+          <section class="tab-panel" id="tab-trace">
+            <div class="panel__title">Data trace</div>
+
+            <div class="form-grid">
+              <label>
+                Subroutine
+                <select id="traceSubroutine" class="input"></select>
+              </label>
+              <label>
+                Variable
+                <select id="traceVariable" class="input"></select>
+              </label>
+              <div class="form-grid__actions">
+                <button id="btnTrace" class="btn btn-primary" type="button">Trace origin</button>
+              </div>
+            </div>
+
+            <div id="traceResults" class="trace-results empty">Select a subroutine + variable and run trace.</div>
+          </section>
+
+          <section class="tab-panel" id="tab-json">
+            <div class="panel__title">Model JSON</div>
+            <pre id="jsonOutput" class="json-output empty">Analyze to see JSON.</pre>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="js/namespace.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/model.js"></script>
+    <script src="js/doc.js"></script>
+    <script src="js/graph.js"></script>
+    <script src="js/lineage.js"></script>
+    <script src="js/diagram.js"></script>
+    <script src="js/sequence.js"></script>
+    <script src="js/parser.js"></script>
+    <script src="js/sample.js"></script>
+    <script src="js/ui.js"></script>
+  </body>
+</html>

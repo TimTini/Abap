@@ -13,7 +13,6 @@ Private mVariableName As String
 Private mDataType As String
 Private mDeclarationType As String
 Private mValue As String
-Private mDescription As String
 
 Public Property Get VariableName() As String
     VariableName = mVariableName
@@ -47,10 +46,3 @@ Public Property Let value(ByVal value As String)
     mValue = value
 End Property
 
-Public Property Get Description() As String
-    Description = mDescription
-End Property
-
-Public Property Let Description(ByVal value As String)
-    mDescription = value
-End Property

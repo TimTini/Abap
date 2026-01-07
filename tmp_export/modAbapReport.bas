@@ -18,46 +18,44 @@ Public Sub WriteObjectsReport(ByVal ws As Worksheet, ByVal subsDict As Object, B
     Dim rowIdx As Long
     rowIdx = 1
 
-    ws.Cells(rowIdx, 1).Value = "ABAP Objects Report"
+    ws.Cells(rowIdx, 1).value = "ABAP Objects Report"
     ws.Cells(rowIdx, 1).Font.Bold = True
     rowIdx = rowIdx + 2
 
     ' Global declarations
-    ws.Cells(rowIdx, 1).Value = "Global Declarations"
+    ws.Cells(rowIdx, 1).value = "Global Declarations"
     ws.Cells(rowIdx, 1).Font.Bold = True
     rowIdx = rowIdx + 1
 
-    ws.Range(ws.Cells(rowIdx, 1), ws.Cells(rowIdx, 5)).Value = Array("DeclarationType", "Name", "DataType", "Value", "Description")
-    ws.Range(ws.Cells(rowIdx, 1), ws.Cells(rowIdx, 5)).Font.Bold = True
+    ws.Range(ws.Cells(rowIdx, 1), ws.Cells(rowIdx, 4)).value = Array("DeclarationType", "Name", "DataType", "Value")
+    ws.Range(ws.Cells(rowIdx, 1), ws.Cells(rowIdx, 4)).Font.Bold = True
     rowIdx = rowIdx + 1
 
     Dim decl As clsDataDeclaration
     For Each decl In globalData
-        ws.Cells(rowIdx, 1).Value = decl.DeclarationType
-        ws.Cells(rowIdx, 2).Value = decl.VariableName
-        ws.Cells(rowIdx, 3).Value = decl.dataType
-        ws.Cells(rowIdx, 4).Value = decl.value
-        ws.Cells(rowIdx, 5).Value = decl.Description
+        ws.Cells(rowIdx, 1).value = decl.DeclarationType
+        ws.Cells(rowIdx, 2).value = decl.VariableName
+        ws.Cells(rowIdx, 3).value = decl.dataType
+        ws.Cells(rowIdx, 4).value = decl.value
         rowIdx = rowIdx + 1
     Next decl
 
     For Each decl In globalConstants
-        ws.Cells(rowIdx, 1).Value = decl.DeclarationType
-        ws.Cells(rowIdx, 2).Value = decl.VariableName
-        ws.Cells(rowIdx, 3).Value = decl.dataType
-        ws.Cells(rowIdx, 4).Value = decl.value
-        ws.Cells(rowIdx, 5).Value = decl.Description
+        ws.Cells(rowIdx, 1).value = decl.DeclarationType
+        ws.Cells(rowIdx, 2).value = decl.VariableName
+        ws.Cells(rowIdx, 3).value = decl.dataType
+        ws.Cells(rowIdx, 4).value = decl.value
         rowIdx = rowIdx + 1
     Next decl
 
     rowIdx = rowIdx + 2
 
     ' Objects table
-    ws.Cells(rowIdx, 1).Value = "Objects"
+    ws.Cells(rowIdx, 1).value = "Objects"
     ws.Cells(rowIdx, 1).Font.Bold = True
     rowIdx = rowIdx + 1
 
-    ws.Range(ws.Cells(rowIdx, 1), ws.Cells(rowIdx, 11)).Value = Array( _
+    ws.Range(ws.Cells(rowIdx, 1), ws.Cells(rowIdx, 11)).value = Array( _
         "Kind", "Name", "Depth", "Params", "LocalData", "LocalConst", "Defined", "InCycle", _
         "InfoType", "InfoValue", "Description" _
     )
@@ -113,18 +111,10 @@ Public Sub WriteObjectsReport(ByVal ws As Worksheet, ByVal subsDict As Object, B
         BuildParameterInfo subr.Parameters, paramValues, paramDescs
         WriteObjectInfoRows ws, rowIdx, kind, subr.name, depth, paramCount, localDataCount, localConstCount, defined, inCycle, "Parameters", paramValues, paramDescs
 
-        Dim dataValues As Collection
-        Dim dataDescs As Collection
-        BuildDeclarationInfo subr.LocalData, False, dataValues, dataDescs
-        WriteObjectInfoRows ws, rowIdx, kind, subr.name, depth, paramCount, localDataCount, localConstCount, defined, inCycle, "Local DATA", dataValues, dataDescs
-
-        Dim constValues As Collection
-        Dim constDescs As Collection
-        BuildDeclarationInfo subr.LocalConstants, True, constValues, constDescs
-        WriteObjectInfoRows ws, rowIdx, kind, subr.name, depth, paramCount, localDataCount, localConstCount, defined, inCycle, "Local CONSTANTS", constValues, constDescs
+        WriteObjectInfoRows ws, rowIdx, kind, subr.name, depth, paramCount, localDataCount, localConstCount, defined, inCycle, "Local DATA", GetDeclarationLines(subr.LocalData, False)
+        WriteObjectInfoRows ws, rowIdx, kind, subr.name, depth, paramCount, localDataCount, localConstCount, defined, inCycle, "Local CONSTANTS", GetDeclarationLines(subr.LocalConstants, True)
         WriteObjectInfoRows ws, rowIdx, kind, subr.name, depth, paramCount, localDataCount, localConstCount, defined, inCycle, "Callings", GetVariantLines(subr.Callings)
         WriteObjectInfoRows ws, rowIdx, kind, subr.name, depth, paramCount, localDataCount, localConstCount, defined, inCycle, "CalledBy", GetVariantLines(subr.CalledBy)
-        WriteObjectInfoRows ws, rowIdx, kind, subr.name, depth, paramCount, localDataCount, localConstCount, defined, inCycle, "Writes", GetVariantLines(subr.Writes)
 
 ContinueKey:
     Next idx
@@ -180,17 +170,17 @@ Private Sub WriteObjectInfoRows(ByVal ws As Worksheet, ByRef rowIdx As Long, ByV
 End Sub
 
 Private Sub WriteObjectInfoRow(ByVal ws As Worksheet, ByVal rowIdx As Long, ByVal kind As String, ByVal name As String, ByVal depth As Long, ByVal paramsCount As Long, ByVal localDataCount As Long, ByVal localConstCount As Long, ByVal defined As Boolean, ByVal inCycle As Boolean, ByVal infoType As String, ByVal infoValue As String, ByVal rowDescription As String)
-    ws.Cells(rowIdx, 1).Value = kind
-    ws.Cells(rowIdx, 2).Value = name
-    ws.Cells(rowIdx, 3).Value = depth
-    ws.Cells(rowIdx, 4).Value = paramsCount
-    ws.Cells(rowIdx, 5).Value = localDataCount
-    ws.Cells(rowIdx, 6).Value = localConstCount
-    ws.Cells(rowIdx, 7).Value = IIf(defined, "Yes", "No")
-    ws.Cells(rowIdx, 8).Value = IIf(inCycle, "Yes", "No")
-    ws.Cells(rowIdx, 9).Value = infoType
-    ws.Cells(rowIdx, 10).Value = infoValue
-    ws.Cells(rowIdx, 11).Value = rowDescription
+    ws.Cells(rowIdx, 1).value = kind
+    ws.Cells(rowIdx, 2).value = name
+    ws.Cells(rowIdx, 3).value = depth
+    ws.Cells(rowIdx, 4).value = paramsCount
+    ws.Cells(rowIdx, 5).value = localDataCount
+    ws.Cells(rowIdx, 6).value = localConstCount
+    ws.Cells(rowIdx, 7).value = IIf(defined, "Yes", "No")
+    ws.Cells(rowIdx, 8).value = IIf(inCycle, "Yes", "No")
+    ws.Cells(rowIdx, 9).value = infoType
+    ws.Cells(rowIdx, 10).value = infoValue
+    ws.Cells(rowIdx, 11).value = rowDescription
 
     Dim rowRange As Range
     Set rowRange = ws.Range(ws.Cells(rowIdx, 1), ws.Cells(rowIdx, 11))
@@ -237,11 +227,14 @@ Private Sub BuildParameterInfo(ByVal params As Collection, ByRef values As Colle
     Next p
 End Sub
 
-Private Sub BuildDeclarationInfo(ByVal decls As Collection, ByVal includeValue As Boolean, ByRef values As Collection, ByRef descriptions As Collection)
-    Set values = New Collection
-    Set descriptions = New Collection
+Private Function GetDeclarationLines(ByVal decls As Collection, ByVal includeValue As Boolean) As Collection
+    Dim result As Collection
+    Set result = New Collection
 
-    If decls Is Nothing Then Exit Sub
+    If decls Is Nothing Then
+        Set GetDeclarationLines = result
+        Exit Function
+    End If
 
     Dim decl As clsDataDeclaration
     For Each decl In decls
@@ -249,10 +242,11 @@ Private Sub BuildDeclarationInfo(ByVal decls As Collection, ByVal includeValue A
         part = decl.VariableName
         If Len(Trim$(decl.dataType)) > 0 Then part = part & " TYPE " & decl.dataType
         If includeValue And Len(Trim$(decl.value)) > 0 Then part = part & " VALUE " & decl.value
-        values.Add part
-        descriptions.Add decl.Description
+        result.Add part
     Next decl
-End Sub
+
+    Set GetDeclarationLines = result
+End Function
 
 Private Function GetTextLines(ByVal text As String) As Collection
     Dim result As Collection
@@ -273,3 +267,4 @@ Private Function GetTextLines(ByVal text As String) As Collection
 
     Set GetTextLines = result
 End Function
+

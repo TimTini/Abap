@@ -9,38 +9,25 @@ Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
 Option Explicit
 
-Private mSubKey As String
 Private mName As String
 Private mKind As String
 Private mDescription As String
 Private mCallings As Collection
 Private mCalledBy As Collection
-Private mCallEdges As Collection
 Private mParameters As Collection
 Private mLocalData As Collection
 Private mLocalConstants As Collection
-Private mWrites As Collection
 Private mIsProcessed As Boolean
 
 Private Sub Class_Initialize()
     Set mCallings = New Collection
     Set mCalledBy = New Collection
-    Set mCallEdges = New Collection
     Set mParameters = New Collection
     Set mLocalData = New Collection
     Set mLocalConstants = New Collection
-    Set mWrites = New Collection
     mKind = "FORM"
     mIsProcessed = False
 End Sub
-
-Public Property Get subKey() As String
-    subKey = mSubKey
-End Property
-
-Public Property Let subKey(ByVal value As String)
-    mSubKey = value
-End Property
 
 Public Property Get name() As String
     name = mName
@@ -74,10 +61,6 @@ Public Property Get CalledBy() As Collection
     Set CalledBy = mCalledBy
 End Property
 
-Public Property Get CallEdges() As Collection
-    Set CallEdges = mCallEdges
-End Property
-
 Public Property Get Parameters() As Collection
     Set Parameters = mParameters
 End Property
@@ -88,10 +71,6 @@ End Property
 
 Public Property Get LocalConstants() As Collection
     Set LocalConstants = mLocalConstants
-End Property
-
-Public Property Get Writes() As Collection
-    Set Writes = mWrites
 End Property
 
 Public Property Get IsProcessed() As Boolean
@@ -122,24 +101,9 @@ Public Sub AddCalledBy(ByVal callerName As String)
     On Error GoTo 0
 End Sub
 
-Public Sub AddCallEdge(ByVal edge As clsCallEdge)
-    If edge Is Nothing Then Exit Sub
-    mCallEdges.Add edge
-End Sub
-
 Public Sub AddParameter(ByVal param As clsParameter)
     If param Is Nothing Then Exit Sub
     mParameters.Add param
-End Sub
-
-Public Sub AddWrite(ByVal varName As String)
-    Dim key As String
-    key = UCase$(Trim$(varName))
-    If Len(key) = 0 Then Exit Sub
-
-    On Error Resume Next
-    mWrites.Add varName, key
-    On Error GoTo 0
 End Sub
 
 Public Sub AddLocalData(ByVal decl As clsDataDeclaration)

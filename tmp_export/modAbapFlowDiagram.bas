@@ -17,7 +17,7 @@ Public Sub BuildAbapFlowDiagram()
     Dim errDesc As String
     Dim errSrc As String
 
-    On Error GoTo ErrHandler
+'    On Error GoTo ErrHandler
 
     prevScreenUpdating = Application.ScreenUpdating
     prevEnableEvents = Application.EnableEvents
@@ -62,16 +62,10 @@ Public Sub BuildAbapFlowDiagram()
     Dim depths As Object
     Set depths = ComputeHierarchyDepths(subsDict, cycleEdges)
 
-    stepName = "Cache model"
-    CacheAbapModel subsDict, isDefined, orderKeys, globalData, globalConstants, cycleEdges, cycleNodes, depths
-
     stepName = "Draw diagram"
     DrawFlowDiagram wsOut, subsDict, depths, cycleEdges, cycleNodes, isDefined, orderKeys
     stepName = "Write objects report"
     WriteObjectsReport wsReport, subsDict, depths, cycleNodes, isDefined, orderKeys, globalData, globalConstants
-
-    stepName = "Setup trace UI"
-    SetupTraceSheet
 
 CleanExit:
     Application.ScreenUpdating = prevScreenUpdating

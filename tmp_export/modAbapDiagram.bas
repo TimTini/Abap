@@ -6,17 +6,18 @@ Option Explicit
 ' -----------------------------
 
 Public Sub DrawFlowDiagram(ByVal ws As Worksheet, ByVal subsDict As Object, ByVal depths As Object, ByVal cycleEdges As Object, ByVal cycleNodes As Object, ByVal isDefined As Object, ByVal orderKeys As Collection)
-    ' Some Shape/Connector operations require the workbook + sheet to be active,
+    ' Some Shape/Connector operations require the target sheet to be active,
     ' otherwise Excel may throw: "Expecting object to be local" (Err 1004).
-    ws.Parent.Activate
+    On Error Resume Next
     ws.Activate
+    On Error GoTo 0
 
     ClearSheet ws
 
     Dim key As Variant
 
     Dim shapesByKey As Object
-    Set shapesByKey = CreateObject("Scripting.Dictionary") ' key = UCase(name), value = Shape.Name (String)
+    Set shapesByKey = CreateObject("Scripting.Dictionary") ' key = UCase(name), value = Shape
 
     Const START_X As Single = 20
     Const START_Y As Single = 20
@@ -61,9 +62,7 @@ Public Sub DrawFlowDiagram(ByVal ws As Worksheet, ByVal subsDict As Object, ByVa
 
         Dim sh As Shape
         Set sh = AddSubroutineShape(ws, subr, left, top, BOX_W, BOX_H, defined, inCycle)
-        sh.AlternativeText = nodeKey
-        sh.OnAction = "AbapTrace_SelectFromDiagram"
-        shapesByKey(nodeKey) = sh.Name
+        Set shapesByKey(nodeKey) = sh
     Next idx
 
     Dim callerKey As Variant
@@ -74,7 +73,7 @@ Public Sub DrawFlowDiagram(ByVal ws As Worksheet, ByVal subsDict As Object, ByVa
         Set caller = subsDict(callerKey)
 
         Dim callerShape As Shape
-        Set callerShape = ws.Shapes(CStr(shapesByKey(CStr(callerKey))))
+        Set callerShape = shapesByKey(CStr(callerKey))
 
         Dim callee As Variant
         For Each callee In caller.Callings
@@ -83,33 +82,24 @@ Public Sub DrawFlowDiagram(ByVal ws As Worksheet, ByVal subsDict As Object, ByVa
             If Not shapesByKey.Exists(calleeKey) Then GoTo ContinueCallee
 
             Dim calleeShape As Shape
-            Set calleeShape = ws.Shapes(CStr(shapesByKey(calleeKey)))
-
-            Dim x1 As Single, y1 As Single, x2 As Single, y2 As Single
-            x1 = callerShape.Left + callerShape.Width
-            y1 = callerShape.Top + callerShape.Height / 2
-            x2 = calleeShape.Left
-            y2 = calleeShape.Top + calleeShape.Height / 2
-
-            ' Self-call: draw a short loop line
-            If UCase$(CStr(callerKey)) = calleeKey Then
-                x2 = x1 + 40
-                y2 = y1 + 40
-            End If
+            Set calleeShape = shapesByKey(calleeKey)
 
             Dim conn As Shape
-            Set conn = ws.Shapes.AddLine(x1, y1, x2, y2)
-            conn.Line.EndArrowheadStyle = msoArrowheadTriangle
+            Set conn = ws.Shapes.AddConnector(msoConnectorElbow, 0, 0, 0, 0)
+            conn.ConnectorFormat.BeginConnect callerShape, 2
+            conn.ConnectorFormat.EndConnect calleeShape, 4
+            conn.RerouteConnections
+            conn.line.EndArrowheadStyle = msoArrowheadTriangle
             conn.ZOrder msoSendToBack
             conn.Placement = xlFreeFloating
 
             If cycleEdges.Exists(EdgeKey(CStr(callerKey), calleeKey)) Then
-                conn.Line.ForeColor.RGB = RGB(192, 0, 0)
-                conn.Line.Weight = 2
-                conn.Line.DashStyle = msoLineDash
+                conn.line.ForeColor.RGB = RGB(192, 0, 0)
+                conn.line.Weight = 2
+                conn.line.DashStyle = msoLineDash
             Else
-                conn.Line.ForeColor.RGB = RGB(90, 90, 90)
-                conn.Line.Weight = 1.25
+                conn.line.ForeColor.RGB = RGB(90, 90, 90)
+                conn.line.Weight = 1.25
             End If
 
 ContinueCallee:
@@ -141,7 +131,7 @@ Private Function AddSubroutineShape(ByVal ws As Worksheet, ByVal subr As clsSubr
     Dim meta2 As String
     meta2 = "CONST: " & CStr(subr.LocalConstants.Count)
 
-    sh.TextFrame.Characters.Text = title & vbCrLf & meta & vbCrLf & meta2
+    sh.TextFrame.Characters.text = title & vbCrLf & meta & vbCrLf & meta2
     sh.TextFrame.HorizontalAlignment = xlHAlignCenter
     sh.TextFrame.VerticalAlignment = xlVAlignCenter
     sh.TextFrame.MarginLeft = 6
@@ -150,8 +140,8 @@ Private Function AddSubroutineShape(ByVal ws As Worksheet, ByVal subr As clsSubr
     sh.TextFrame.MarginBottom = 6
     sh.TextFrame.Characters.Font.Color = RGB(0, 0, 0)
 
-    sh.Line.ForeColor.RGB = RGB(60, 60, 60)
-    sh.Line.Weight = 1
+    sh.line.ForeColor.RGB = RGB(60, 60, 60)
+    sh.line.Weight = 1
 
     If inCycle Then
         sh.Fill.ForeColor.RGB = RGB(255, 199, 206) ' light red

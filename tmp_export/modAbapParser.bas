@@ -64,24 +64,20 @@ Public Function ParseAbapProgram(ByVal abapCode As String, ByRef isDefined As Ob
             endFormIdx = FindEndFormIndex(lines, headerEnd + 1)
             If endFormIdx < 0 Then endFormIdx = UBound(lines)
 
-            ParseFormBody lines, rawLines, headerEnd + 1, endFormIdx - 1, subr, subsDict, orderKeys
+            ParseFormBody lines, headerEnd + 1, endFormIdx - 1, subr, subsDict, orderKeys
 
             i = endFormIdx + 1
         ElseIf StartsWithWord(line, "DATA") And Not StartsWithInlineData(line) Then
             Dim stmtEndG1 As Long
             Dim stmtG1 As String
             stmtG1 = CollectStatement(lines, i, stmtEndG1)
-            Dim descG1 As Object
-            Set descG1 = ParseDeclarationDescriptions(rawLines, i, stmtEndG1, "DATA")
-            ParseGlobalDeclarationStatement stmtG1, "DATA", globalData, globalConstants, descG1
+            ParseGlobalDeclarationStatement stmtG1, "DATA", globalData, globalConstants
             i = stmtEndG1 + 1
         ElseIf StartsWithWord(line, "CONSTANTS") Then
             Dim stmtEndG2 As Long
             Dim stmtG2 As String
             stmtG2 = CollectStatement(lines, i, stmtEndG2)
-            Dim descG2 As Object
-            Set descG2 = ParseDeclarationDescriptions(rawLines, i, stmtEndG2, "CONSTANTS")
-            ParseGlobalDeclarationStatement stmtG2, "CONSTANTS", globalData, globalConstants, descG2
+            ParseGlobalDeclarationStatement stmtG2, "CONSTANTS", globalData, globalConstants
             i = stmtEndG2 + 1
         Else
             Dim headerEnd2 As Long
@@ -102,7 +98,7 @@ Public Function ParseAbapProgram(ByVal abapCode As String, ByRef isDefined As Ob
                 nextIdx = FindNextTopLevelBlockIndex(lines, headerEnd2 + 1)
                 If nextIdx < 0 Then nextIdx = UBound(lines) + 1
 
-                ParseFormBody lines, rawLines, headerEnd2 + 1, nextIdx - 1, evt, subsDict, orderKeys
+                ParseFormBody lines, headerEnd2 + 1, nextIdx - 1, evt, subsDict, orderKeys
                 i = nextIdx
             Else
                 i = i + 1
@@ -148,7 +144,7 @@ Private Function TryParseEventHeader(ByVal headerStmt As String, ByRef eventName
     s = NormalizeSpaces(Replace(headerStmt, vbLf, " "))
     s = NormalizeSpaces(Replace(s, vbCr, " "))
     s = Trim$(s)
-    If Right$(s, 1) = "." Then s = Left$(s, Len(s) - 1)
+    If Right$(s, 1) = "." Then s = left$(s, Len(s) - 1)
     s = Trim$(s)
     If Len(s) = 0 Then Exit Function
 
@@ -160,11 +156,11 @@ Private Function TryParseEventHeader(ByVal headerStmt As String, ByRef eventName
         Or u = "START-OF-SELECTION" _
         Or u = "END-OF-SELECTION" _
         Or u = "TOP-OF-PAGE" _
-        Or Left$(u, Len("TOP-OF-PAGE ")) = "TOP-OF-PAGE " _
+        Or left$(u, Len("TOP-OF-PAGE ")) = "TOP-OF-PAGE " _
         Or u = "END-OF-PAGE" _
         Or u = "AT LINE-SELECTION" _
         Or u = "AT USER-COMMAND" _
-        Or Left$(u, Len("AT SELECTION-SCREEN")) = "AT SELECTION-SCREEN" Then
+        Or left$(u, Len("AT SELECTION-SCREEN")) = "AT SELECTION-SCREEN" Then
         eventName = u
         TryParseEventHeader = True
     End If
@@ -175,7 +171,7 @@ Private Function ExtractFormName(ByVal headerStmt As String) As String
     stmt = NormalizeSpaces(Replace(headerStmt, vbLf, " "))
     stmt = NormalizeSpaces(Replace(stmt, vbCr, " "))
     stmt = Trim$(stmt)
-    If Right$(stmt, 1) = "." Then stmt = Left$(stmt, Len(stmt) - 1)
+    If Right$(stmt, 1) = "." Then stmt = left$(stmt, Len(stmt) - 1)
     If Not StartsWithWord(stmt, "FORM") Then Exit Function
 
     Dim afterForm As String
@@ -190,7 +186,7 @@ Private Sub ParseFormHeader(ByVal headerStmt As String, ByVal subr As clsSubrout
     stmt = NormalizeSpaces(stmt)
     stmt = Trim$(stmt)
 
-    If Right$(stmt, 1) = "." Then stmt = Left$(stmt, Len(stmt) - 1)
+    If Right$(stmt, 1) = "." Then stmt = left$(stmt, Len(stmt) - 1)
     stmt = Trim$(stmt)
 
     Dim formName As String
@@ -325,7 +321,7 @@ Private Sub ParseParameterSegment(ByVal paramType As String, ByVal segment As St
     Loop
 End Sub
 
-Private Sub ParseFormBody(ByRef lines() As String, ByRef rawLines As Variant, ByVal startIdx As Long, ByVal endIdx As Long, ByVal subr As clsSubroutine, ByVal subsDict As Object, ByVal orderKeys As Collection)
+Private Sub ParseFormBody(ByRef lines() As String, ByVal startIdx As Long, ByVal endIdx As Long, ByVal subr As clsSubroutine, ByVal subsDict As Object, ByVal orderKeys As Collection)
     If startIdx > endIdx Then Exit Sub
 
     Dim i As Long
@@ -340,17 +336,13 @@ Private Sub ParseFormBody(ByRef lines() As String, ByRef rawLines As Variant, By
             Dim stmtEnd As Long
             Dim stmt As String
             stmt = CollectStatement(lines, i, stmtEnd)
-            Dim descByVar As Object
-            Set descByVar = ParseDeclarationDescriptions(rawLines, i, stmtEnd, "DATA")
-            ParseDeclarationStatement stmt, "DATA", subr, descByVar
+            ParseDeclarationStatement stmt, "DATA", subr
             i = stmtEnd + 1
         ElseIf StartsWithWord(line, "CONSTANTS") Then
             Dim stmtEnd2 As Long
             Dim stmt2 As String
             stmt2 = CollectStatement(lines, i, stmtEnd2)
-            Dim descByVar2 As Object
-            Set descByVar2 = ParseDeclarationDescriptions(rawLines, i, stmtEnd2, "CONSTANTS")
-            ParseDeclarationStatement stmt2, "CONSTANTS", subr, descByVar2
+            ParseDeclarationStatement stmt2, "CONSTANTS", subr
             i = stmtEnd2 + 1
         ElseIf StartsWithWord(line, "PERFORM") Then
             Dim stmtEnd3 As Long
@@ -360,7 +352,6 @@ Private Sub ParseFormBody(ByRef lines() As String, ByRef rawLines As Variant, By
             i = stmtEnd3 + 1
         Else
             AddPerformCallings line, subr, subsDict, orderKeys
-            ParseWritesFromStatement line, subr
             i = i + 1
         End If
     Loop
@@ -394,51 +385,18 @@ Private Sub AddPerformCallings(ByVal stmt As String, ByVal subr As clsSubroutine
             calleeKey = UCase$(callee)
             subr.AddCalling callee
             Call GetOrCreateSubroutine(subsDict, orderKeys, calleeKey, callee)
-
-            idx = idx + Len(callee)
-
-            Dim nextPerform As Long
-            nextPerform = FindWordOutsideQuotesFrom(s, "PERFORM", idx)
-
-            Dim argsText As String
-            If nextPerform > 0 Then
-                argsText = Mid$(s, idx, nextPerform - idx)
-            Else
-                argsText = Mid$(s, idx)
-            End If
-
-            Dim edge As clsCallEdge
-            Set edge = New clsCallEdge
-            edge.calleeKey = calleeKey
-            edge.calleeName = callee
-            edge.rawText = Trim$(argsText)
-            ParsePerformArgs argsText, edge
-            subr.AddCallEdge edge
-
-            If nextPerform > 0 Then
-                searchPos = nextPerform
-            Else
-                Exit Do
-            End If
-        Else
-            searchPos = idx + 1
         End If
+
+        searchPos = idx + 1
     Loop
 End Sub
 
-Private Sub ParseDeclarationStatement(ByVal stmt As String, ByVal declType As String, ByVal subr As clsSubroutine, Optional ByVal descByVar As Object)
+Private Sub ParseDeclarationStatement(ByVal stmt As String, ByVal declType As String, ByVal subr As clsSubroutine)
     Dim decls As Collection
     Set decls = ParseDeclarationsFromStatement(stmt, declType)
 
     Dim decl As clsDataDeclaration
     For Each decl In decls
-        If Not descByVar Is Nothing Then
-            Dim k As String
-            k = UCase$(Trim$(decl.VariableName))
-            If Len(k) > 0 Then
-                If descByVar.Exists(k) Then decl.Description = CStr(descByVar(k))
-            End If
-        End If
         If UCase$(declType) = "DATA" Then
             subr.AddLocalData decl
         Else
@@ -447,212 +405,18 @@ Private Sub ParseDeclarationStatement(ByVal stmt As String, ByVal declType As St
     Next decl
 End Sub
 
-Private Sub ParseGlobalDeclarationStatement(ByVal stmt As String, ByVal declType As String, ByVal globalData As Collection, ByVal globalConstants As Collection, Optional ByVal descByVar As Object)
+Private Sub ParseGlobalDeclarationStatement(ByVal stmt As String, ByVal declType As String, ByVal globalData As Collection, ByVal globalConstants As Collection)
     Dim decls As Collection
     Set decls = ParseDeclarationsFromStatement(stmt, declType)
 
     Dim decl As clsDataDeclaration
     For Each decl In decls
-        If Not descByVar Is Nothing Then
-            Dim k As String
-            k = UCase$(Trim$(decl.VariableName))
-            If Len(k) > 0 Then
-                If descByVar.Exists(k) Then decl.Description = CStr(descByVar(k))
-            End If
-        End If
         If UCase$(declType) = "DATA" Then
             globalData.Add decl
         Else
             globalConstants.Add decl
         End If
     Next decl
-End Sub
-
-Private Sub ParsePerformArgs(ByVal argsText As String, ByVal edge As clsCallEdge)
-    If edge Is Nothing Then Exit Sub
-
-    Dim s As String
-    s = NormalizeSpaces(Replace(argsText, vbLf, " "))
-    s = NormalizeSpaces(Replace(s, vbCr, " "))
-    s = Trim$(s)
-    If Len(s) = 0 Then Exit Sub
-    If Right$(s, 1) = "." Then s = Left$(s, Len(s) - 1)
-    s = Trim$(s)
-    If Len(s) = 0 Then Exit Sub
-
-    Dim u As String
-    u = UCase$(s)
-
-    Dim posTables As Long, posUsing As Long, posChanging As Long
-    posTables = FindWordOutsideQuotesFrom(u, "TABLES", 1)
-    posUsing = FindWordOutsideQuotesFrom(u, "USING", 1)
-    posChanging = FindWordOutsideQuotesFrom(u, "CHANGING", 1)
-
-    Dim positions(1 To 3) As Long
-    positions(1) = posTables
-    positions(2) = posUsing
-    positions(3) = posChanging
-
-    Dim names(1 To 3) As String
-    names(1) = "TABLES"
-    names(2) = "USING"
-    names(3) = "CHANGING"
-
-    Dim i As Long
-    For i = 1 To 3
-        If positions(i) > 0 Then
-            Dim startPos As Long
-            startPos = positions(i) + Len(names(i))
-
-            Dim endPos As Long
-            endPos = Len(s) + 1
-
-            Dim j As Long
-            For j = 1 To 3
-                If j <> i Then
-                    If positions(j) > 0 And positions(j) > positions(i) Then
-                        If positions(j) < endPos Then endPos = positions(j)
-                    End If
-                End If
-            Next j
-
-            Dim segStart As Long
-            Dim segEnd As Long
-            segStart = startPos + 1
-            segEnd = endPos - 1
-
-            Dim seg As String
-            seg = vbNullString
-            If segStart <= Len(s) Then
-                If segEnd >= segStart Then
-                    seg = Trim$(Mid$(s, segStart, segEnd - segStart + 1))
-                End If
-            End If
-
-            If Len(seg) > 0 Then
-                ParsePerformArgSegment names(i), seg, edge
-            End If
-        End If
-    Next i
-End Sub
-
-Private Sub ParsePerformArgSegment(ByVal kind As String, ByVal segment As String, ByVal edge As clsCallEdge)
-    If edge Is Nothing Then Exit Sub
-
-    Dim tokens() As String
-    tokens = Split(NormalizeSpaces(segment), " ")
-    If UBound(tokens) < 0 Then Exit Sub
-
-    Dim idx As Long
-    For idx = LBound(tokens) To UBound(tokens)
-        Dim tok As String
-        tok = Trim$(tokens(idx))
-        If Len(tok) = 0 Then GoTo ContinueTok
-
-        Dim id As String
-        id = ExtractLeadingIdentifier(tok)
-        If Len(id) = 0 Then GoTo ContinueTok
-
-        Select Case UCase$(Trim$(kind))
-            Case "TABLES"
-                edge.AddTablesArg id
-            Case "USING"
-                edge.AddUsingArg id
-            Case "CHANGING"
-                edge.AddChangingArg id
-        End Select
-
-ContinueTok:
-    Next idx
-End Sub
-
-Private Sub ParseWritesFromStatement(ByVal stmt As String, ByVal subr As clsSubroutine)
-    If subr Is Nothing Then Exit Sub
-
-    Dim s As String
-    s = NormalizeSpaces(Replace(stmt, vbLf, " "))
-    s = NormalizeSpaces(Replace(s, vbCr, " "))
-    s = Trim$(s)
-    If Len(s) = 0 Then Exit Sub
-
-    If Right$(s, 1) = "." Then s = Left$(s, Len(s) - 1)
-    s = Trim$(s)
-    If Len(s) = 0 Then Exit Sub
-
-    Dim idx As Long
-    idx = 1
-    Do While idx <= Len(s) And Mid$(s, idx, 1) = " "
-        idx = idx + 1
-    Loop
-
-    Dim lhs As String
-    lhs = ReadIdentifierFrom(s, idx)
-    If Len(lhs) > 0 Then
-        Dim afterLhs As Long
-        afterLhs = idx + Len(lhs)
-        Do While afterLhs <= Len(s) And Mid$(s, afterLhs, 1) = " "
-            afterLhs = afterLhs + 1
-        Loop
-        If afterLhs <= Len(s) Then
-            If Mid$(s, afterLhs, 1) = "=" Then
-                subr.AddWrite lhs
-                Exit Sub
-            End If
-        End If
-    End If
-
-    Dim u As String
-    u = UCase$(s)
-
-    If StartsWithWord(u, "CLEAR") Or StartsWithWord(u, "REFRESH") Or StartsWithWord(u, "FREE") Or StartsWithWord(u, "SORT") Then
-        Dim rest As String
-        rest = Trim$(Mid$(s, InStr(1, s, " ") + 1))
-        Dim v As String
-        v = ExtractLeadingIdentifier(rest)
-        If Len(v) > 0 Then subr.AddWrite v
-        Exit Sub
-    End If
-
-    If StartsWithWord(u, "MODIFY") Or StartsWithWord(u, "DELETE") Then
-        Dim rest2 As String
-        rest2 = Trim$(Mid$(s, InStr(1, s, " ") + 1))
-        Dim tName As String
-        tName = ExtractLeadingIdentifier(rest2)
-        If Len(tName) > 0 Then subr.AddWrite tName
-        Exit Sub
-    End If
-
-    If StartsWithWord(u, "APPEND") Then
-        Dim posTo As Long
-        posTo = FindWordOutsideQuotesFrom(u, "TO", 1)
-        If posTo > 0 Then
-            Dim argStart As Long
-            argStart = posTo + Len("TO")
-            Do While argStart <= Len(s) And Mid$(s, argStart, 1) = " "
-                argStart = argStart + 1
-            Loop
-            Dim tab As String
-            tab = ReadIdentifierFrom(s, argStart)
-            If Len(tab) > 0 Then subr.AddWrite tab
-        End If
-        Exit Sub
-    End If
-
-    If StartsWithWord(u, "CONCATENATE") Or StartsWithWord(u, "COLLECT") Then
-        Dim posInto As Long
-        posInto = FindWordOutsideQuotesFrom(u, "INTO", 1)
-        If posInto > 0 Then
-            Dim aStart As Long
-            aStart = posInto + Len("INTO")
-            Do While aStart <= Len(s) And Mid$(s, aStart, 1) = " "
-                aStart = aStart + 1
-            Loop
-            Dim dest As String
-            dest = ReadIdentifierFrom(s, aStart)
-            If Len(dest) > 0 Then subr.AddWrite dest
-        End If
-        Exit Sub
-    End If
 End Sub
 
 Private Function ParseDeclarationsFromStatement(ByVal stmt As String, ByVal declType As String) As Collection
@@ -664,7 +428,7 @@ Private Function ParseDeclarationsFromStatement(ByVal stmt As String, ByVal decl
     s = NormalizeSpaces(Replace(s, vbCr, " "))
     s = Trim$(s)
 
-    If Right$(s, 1) = "." Then s = Left$(s, Len(s) - 1)
+    If Right$(s, 1) = "." Then s = left$(s, Len(s) - 1)
     s = Trim$(s)
     If Len(s) = 0 Then
         Set ParseDeclarationsFromStatement = result
@@ -680,13 +444,13 @@ Private Function ParseDeclarationsFromStatement(ByVal stmt As String, ByVal decl
 
     Dim u As String
     u = UCase$(s)
-    If Left$(u, Len(prefix)) <> prefix Then
+    If left$(u, Len(prefix)) <> prefix Then
         Set ParseDeclarationsFromStatement = result
         Exit Function
     End If
 
     s = Trim$(Mid$(s, Len(prefix) + 1))
-    If Left$(s, 1) = ":" Then s = Trim$(Mid$(s, 2))
+    If left$(s, 1) = ":" Then s = Trim$(Mid$(s, 2))
     If Len(s) = 0 Then
         Set ParseDeclarationsFromStatement = result
         Exit Function

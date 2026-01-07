@@ -1,8 +1,11 @@
-REPORT zabap_flow_parser_test.
+(function (ns) {
+  "use strict";
+
+  ns.sampleCode = `REPORT zabap_flow_parser_test.
 
 *---------------------------------------------------------------------*
-* Sample program to test the Excel VBA ABAP parser / flow diagram
-* Paste the FORM...ENDFORM part into Sheet1 (or the whole file)
+* Sample program to test the ABAP Flow Analyzer (offline HTML/JS)
+* Paste the FORM...ENDFORM part into the input (or the whole file)
 *---------------------------------------------------------------------*
 
 * Global DATA / CONSTANTS (outside FORM and outside events)
@@ -163,3 +166,6 @@ ENDFORM.
 FORM self_call.
   PERFORM self_call. " self-cycle
 ENDFORM.
+`;
+})(window.AbapFlow);
+

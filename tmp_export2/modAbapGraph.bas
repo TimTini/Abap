@@ -16,7 +16,7 @@ Public Sub BuildCalledByIndex(ByVal subsDict As Object)
             Dim calleeKey As String
             calleeKey = UCase$(CStr(callee))
             If subsDict.Exists(calleeKey) Then
-                subsDict(calleeKey).AddCalledBy CStr(callerKey)
+                subsDict(calleeKey).AddCalledBy caller.name
             End If
         Next callee
     Next callerKey
@@ -173,3 +173,4 @@ Private Function FindInStack(ByVal stack As Collection, ByVal key As String) As 
         End If
     Next i
 End Function
+

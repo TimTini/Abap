@@ -29,7 +29,7 @@ Public Function StripAbapComments(ByVal line As String) As String
     Dim t As String
     t = LTrim$(s)
     If Len(t) > 0 Then
-        If Left$(t, 1) = "*" Then
+        If left$(t, 1) = "*" Then
             StripAbapComments = vbNullString
             Exit Function
         End If
@@ -37,7 +37,7 @@ Public Function StripAbapComments(ByVal line As String) As String
 
     Dim pos As Long
     pos = InStr(1, s, """")
-    If pos > 0 Then s = Left$(s, pos - 1)
+    If pos > 0 Then s = left$(s, pos - 1)
 
     StripAbapComments = s
 End Function
@@ -56,7 +56,7 @@ Public Function CollectStatement(ByRef lines() As String, ByVal startIdx As Long
         dotPos = InStr(1, line, ".")
         If dotPos > 0 Then
             If Len(stmt) > 0 Then stmt = stmt & " "
-            stmt = stmt & Left$(line, dotPos)
+            stmt = stmt & left$(line, dotPos)
             endIdx = i
             CollectStatement = stmt
             Exit Function
@@ -89,7 +89,7 @@ Public Function StartsWithWord(ByVal text As String, ByVal word As String) As Bo
     Dim w As String
     w = UCase$(Trim$(word))
     If Len(w) = 0 Then Exit Function
-    If Left$(t, Len(w)) <> w Then Exit Function
+    If left$(t, Len(w)) <> w Then Exit Function
     If Len(t) = Len(w) Then
         StartsWithWord = True
         Exit Function
@@ -103,7 +103,7 @@ End Function
 Public Function StartsWithInlineData(ByVal line As String) As Boolean
     Dim t As String
     t = LCase$(Trim$(line))
-    StartsWithInlineData = (Left$(t, 5) = "data(")
+    StartsWithInlineData = (left$(t, 5) = "data(")
 End Function
 
 ' -----------------------------
@@ -123,10 +123,10 @@ Public Function ExtractParameterName(ByVal token As String) As String
     Dim s As String
     s = CleanToken(token)
 
-    If UCase$(Left$(s, 6)) = "VALUE(" Then
+    If UCase$(left$(s, 6)) = "VALUE(" Then
         Dim inside As String
         inside = Mid$(s, 7)
-        If Right$(inside, 1) = ")" Then inside = Left$(inside, Len(inside) - 1)
+        If Right$(inside, 1) = ")" Then inside = left$(inside, Len(inside) - 1)
         ExtractParameterName = ExtractIdentifier(inside)
         Exit Function
     End If
@@ -160,24 +160,6 @@ Public Function ReadIdentifierFrom(ByVal text As String, ByVal startAt As Long) 
     Loop
 
     ReadIdentifierFrom = Mid$(text, startAt, i - startAt)
-End Function
-
-Public Function ExtractLeadingIdentifier(ByVal token As String) As String
-    Dim s As String
-    s = Trim$(token)
-    If Len(s) = 0 Then Exit Function
-
-    Dim i As Long
-    i = 1
-    Do While i <= Len(s)
-        Dim ch As String
-        ch = Mid$(s, i, 1)
-        If ch Like "[A-Za-z_]" Then Exit Do
-        i = i + 1
-    Loop
-
-    If i > Len(s) Then Exit Function
-    ExtractLeadingIdentifier = ReadIdentifierFrom(s, i)
 End Function
 
 Public Function FindWordOutsideQuotesFrom(ByVal text As String, ByVal word As String, ByVal startAt As Long) As Long
@@ -337,7 +319,6 @@ Public Function GetOrCreateSubroutine(ByVal subsDict As Object, ByVal orderKeys 
 
     Dim subr As clsSubroutine
     Set subr = New clsSubroutine
-    subr.subKey = key
     subr.name = displayName
 
     ' Store object reference in Scripting.Dictionary: use Add/Set to avoid default-property coercion (Err 438)
