@@ -2,12 +2,17 @@
   "use strict";
 
   const IDENT_PATH_RE = /[A-Za-z_][A-Za-z0-9_\/]*(?:(?:->|=>|[-~])[A-Za-z0-9_\/]+)*/g;
+  const desc = ns.desc || null;
 
-  function pickDescription(entity) {
-    if (!entity) return "";
+  function pickDescription(entity, fallbackName) {
+    if (desc?.pickDescription) return desc.pickDescription(entity, fallbackName);
+
+    if (!entity) return String(fallbackName || "").trim();
     const user = String(entity.userDescription || "").trim();
     if (user) return user;
-    return String(entity.description || "").trim();
+    const code = String(entity.description || "").trim();
+    if (code) return code;
+    return String(fallbackName || entity.variableName || entity.name || "").trim();
   }
 
   function pickNote(entity) {
@@ -101,27 +106,34 @@
     return out;
   }
 
-  function buildArgMappings(actuals, formals) {
+  function buildArgMappings(model, callerKey, actuals, formals, options) {
     const a = Array.isArray(actuals) ? actuals : [];
     const f = Array.isArray(formals) ? formals : [];
     const len = a.length;
     if (len === 0) return [];
 
+    const callPath = Array.isArray(options?.callPath) ? options.callPath : null;
+
     const out = [];
     for (let i = 0; i < len; i++) {
       const formal = f[i] || null;
+      const actualText = a[i] != null ? String(a[i]) : "";
+      const described = desc?.describeExpressionWithOrigin
+        ? desc.describeExpressionWithOrigin(model, callerKey, actualText, { callPath })
+        : { text: "", originKey: "" };
       out.push({
-        actual: a[i] != null ? String(a[i]) : "",
+        actual: actualText,
         name: formal ? String(formal.name || "") : "",
         dataType: formal ? String(formal.dataType || "") : "",
-        description: formal ? pickDescription(formal) : "",
+        description: String(described.text || "").trim() || actualText.trim() || (formal ? String(formal.name || "") : ""),
+        originKey: String(described.originKey || ""),
         note: formal ? pickNote(formal) : "",
       });
     }
     return out;
   }
 
-  function buildPerformContext(model, edge) {
+  function buildPerformContext(model, edge, options) {
     const toKey = String(edge?.toKey || "");
     const fromKey = String(edge?.fromKey || "");
 
@@ -135,12 +147,14 @@
     const formalRaising = params.filter((p) => String(p?.kind || "").toUpperCase() === "RAISING");
 
     const args = edge?.args || {};
-    const tables = buildArgMappings(args.tables, formalTables);
-    const using = buildArgMappings(args.using, formalUsing);
-    const changing = buildArgMappings(args.changing, formalChanging);
+    const callPath = Array.isArray(options?.callPath) ? options.callPath : null;
+    const tables = buildArgMappings(model, fromKey, args.tables, formalTables, { callPath });
+    const using = buildArgMappings(model, fromKey, args.using, formalUsing, { callPath });
+    const changing = buildArgMappings(model, fromKey, args.changing, formalChanging, { callPath });
     const raising = formalRaising.map((p) => ({
       name: String(p?.name || ""),
-      description: pickDescription(p),
+      description: pickDescription(p, p?.name),
+      originKey: ns.notes?.makeParamKey ? ns.notes.makeParamKey(toKey, String(p?.name || "")) : "",
       note: pickNote(p),
     }));
 
@@ -157,8 +171,9 @@
       perform: {
         key: toKey,
         name: performName,
-        description: pickDescription(callee),
+        description: pickDescription(callee, performName),
         note: pickNote(callee),
+        originKey: toKey,
       },
       caller: {
         key: fromKey,
@@ -172,7 +187,7 @@
     };
   }
 
-  function buildAssignmentContext(model, routine, assignment) {
+  function buildAssignmentContext(model, routine, assignment, options) {
     const r = routine || null;
     const a = assignment || null;
 
@@ -182,6 +197,15 @@
     const routineKey = String(r?.key || "");
     const lhsResolved = resolveBestSymbol(model, routineKey, lhsText);
     const rhsResolved = resolveBestSymbol(model, routineKey, rhsText);
+    const callPath = Array.isArray(options?.callPath) ? options.callPath : null;
+
+    const lhsDesc = desc?.describeExpressionWithOrigin
+      ? desc.describeExpressionWithOrigin(model, routineKey, lhsText, { callPath })
+      : { text: pickDescription(lhsResolved.decl, lhsResolved.root || lhsText), originKey: "" };
+
+    const rhsDesc = desc?.describeExpressionWithOrigin
+      ? desc.describeExpressionWithOrigin(model, routineKey, rhsText, { callPath })
+      : { text: pickDescription(rhsResolved.decl, rhsResolved.root || rhsText), originKey: "" };
 
     return {
       routine: {
@@ -198,26 +222,29 @@
         text: lhsText,
         root: lhsResolved.root,
         scope: String(lhsResolved.scope || "unknown"),
-        description: pickDescription(lhsResolved.decl),
+        description: String(lhsDesc.text || "").trim() || lhsText.trim() || lhsResolved.root,
         note: pickNote(lhsResolved.decl),
+        originKey: String(lhsDesc.originKey || ""),
       },
       value: {
         text: rhsText,
         root: rhsResolved.root,
         scope: String(rhsResolved.scope || "unknown"),
-        description: pickDescription(rhsResolved.decl),
+        description: String(rhsDesc.text || "").trim() || rhsText.trim() || rhsResolved.root,
         note: pickNote(rhsResolved.decl),
+        originKey: String(rhsDesc.originKey || ""),
       },
     };
   }
 
-  function buildIfContext(model, routine, ifStatement) {
+  function buildIfContext(model, routine, ifStatement, options) {
     const r = routine || null;
     const st = ifStatement || null;
 
     const routineKey = String(r?.key || "");
     const kind = String(st?.kind || "IF").trim().toUpperCase() || "IF";
     const condition = String(st?.condition || "").trim();
+    const callPath = Array.isArray(options?.callPath) ? options.callPath : null;
 
     const parsed = typeof ns.logic?.parseIfExpression === "function" ? ns.logic.parseIfExpression(condition) : [{ item1: condition, operator: "", item2: "", association: "", raw: condition }];
 
@@ -228,24 +255,32 @@
       const item1Resolved = resolveBestSymbol(model, routineKey, item1Text);
       const item2Resolved = item2Text ? resolveBestSymbol(model, routineKey, item2Text) : { root: "", scope: "unknown", decl: null };
 
-      const item1Desc = pickDescription(item1Resolved.decl) || item1Text;
-      const item2Desc = pickDescription(item2Resolved.decl) || item2Text;
+      const item1Desc = desc?.describeExpressionWithOrigin
+        ? desc.describeExpressionWithOrigin(model, routineKey, item1Text, { callPath })
+        : { text: pickDescription(item1Resolved.decl, item1Text) || item1Text, originKey: "" };
+
+      const item2Desc =
+        item2Text && desc?.describeExpressionWithOrigin
+          ? desc.describeExpressionWithOrigin(model, routineKey, item2Text, { callPath })
+          : { text: pickDescription(item2Resolved.decl, item2Text) || item2Text, originKey: "" };
 
       return {
         item1: {
           text: item1Text,
           root: item1Resolved.root,
           scope: String(item1Resolved.scope || "unknown"),
-          description: item1Desc,
+          description: String(item1Desc.text || "").trim() || item1Text,
           note: pickNote(item1Resolved.decl),
+          originKey: String(item1Desc.originKey || ""),
         },
         operator: String(c?.operator || "").trim(),
         item2: {
           text: item2Text,
           root: item2Resolved.root,
           scope: String(item2Resolved.scope || "unknown"),
-          description: item2Desc,
+          description: String(item2Desc.text || "").trim() || item2Text,
           note: pickNote(item2Resolved.decl),
+          originKey: String(item2Desc.originKey || ""),
         },
         association: String(c?.association || "").trim().toUpperCase(),
         raw: String(c?.raw || "").trim(),

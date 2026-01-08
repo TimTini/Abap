@@ -844,13 +844,82 @@
     saveTemplateLocalOverrides();
   }
 
-  function applyOverridesToConfig(config, overridesMap) {
+  function resolveBindPath(obj, path) {
+    const raw = String(path || "").trim();
+    if (!raw) return undefined;
+
+    let cur = obj;
+    const parts = raw
+      .split(".")
+      .map((p) => p.trim())
+      .filter(Boolean);
+
+    for (const part of parts) {
+      if (cur == null) return undefined;
+      const m = /^([A-Za-z0-9_$]+)(.*)$/.exec(part);
+      if (!m) return undefined;
+      const prop = m[1];
+      let rest = m[2] || "";
+      cur = cur[prop];
+
+      while (rest) {
+        const m2 = /^\[(\d+)\](.*)$/.exec(rest);
+        if (!m2) return undefined;
+        const idx = Number(m2[1]);
+        if (!Number.isFinite(idx)) return undefined;
+        cur = cur == null ? undefined : cur[idx];
+        rest = m2[2] || "";
+      }
+    }
+
+    return cur;
+  }
+
+  function applyOverridesToConfig(config, overridesMap, meta) {
     if (!config || !Array.isArray(config.cells) || !overridesMap) return;
+
+    const model = meta?.model || null;
+    const context = meta?.context || null;
+    const callPath = Array.isArray(meta?.callPath) ? meta.callPath : null;
+
+    const desc = ns.desc;
+
     for (const cell of config.cells) {
       const bind = String(cell?.bind || "").trim();
       if (!bind) continue;
       if (!overridesMap.has(bind)) continue;
-      cell.text = overridesMap.get(bind);
+
+      const overrideValue = String(overridesMap.get(bind) ?? "");
+
+      if (
+        model &&
+        context &&
+        desc &&
+        typeof desc.describeExpression === "function" &&
+        bind.endsWith(".description") &&
+        bind.length > ".description".length
+      ) {
+        const basePath = bind.slice(0, -".description".length);
+        const base = resolveBindPath(context, basePath);
+        const originKey = String(base?.originKey || "").trim();
+        const exprText = String((typeof base?.text === "string" && base.text.trim()) || (typeof base?.actual === "string" && base.actual.trim()) || "");
+
+        const callerKey = String(context?.caller?.key || "").trim();
+        const routineKey = String(context?.routine?.key || "").trim();
+        const evalRoutineKey = callerKey && typeof base?.actual === "string" ? callerKey : routineKey || callerKey;
+
+        if (originKey && exprText && evalRoutineKey) {
+          const overrideByKey = new Map([[originKey, overrideValue]]);
+          const resolved = desc.describeExpression(model, evalRoutineKey, exprText, { callPath, overrideByKey });
+          const nextText = String(resolved?.text ?? "").trim();
+          if (nextText) {
+            cell.text = nextText;
+            continue;
+          }
+        }
+      }
+
+      cell.text = overrideValue;
     }
   }
 
@@ -979,14 +1048,14 @@
     const converter = ns.templateConverter;
     if (!converter) return { items: [], truncated: false };
 
-    function convertPerform(edge) {
+    function convertPerform(edge, callPath) {
       const entry = templatesBySource.get("performCalls");
       if (!entry?.config) return null;
-      const context = converter.buildPerformContext(model, edge);
+      const context = converter.buildPerformContext(model, edge, { callPath });
       const expanded = converter.expandExcelLikeTableTemplate(entry.config, context);
       const filled = converter.compactExcelLikeTableConfig(converter.fillTemplateConfig(expanded, context));
       const resultId = edgeIdFrom(edge);
-      applyOverridesToConfig(filled, getLocalTemplateOverrides(entry.id, resultId));
+      applyOverridesToConfig(filled, getLocalTemplateOverrides(entry.id, resultId), { model, context, callPath });
       return {
         kind: "perform",
         templateId: String(entry.id || ""),
@@ -999,13 +1068,13 @@
       };
     }
 
-    function convertAssignment(routine, assignment) {
+    function convertAssignment(routine, assignment, callPath) {
       const entry = templatesBySource.get("assignments");
       if (!entry?.config) return null;
-      const context = converter.buildAssignmentContext(model, routine, assignment);
+      const context = converter.buildAssignmentContext(model, routine, assignment, { callPath });
       const filled = converter.compactExcelLikeTableConfig(converter.fillTemplateConfig(entry.config, context));
       const resultId = assignmentIdFrom(routine?.key, assignment?.sourceRef);
-      applyOverridesToConfig(filled, getLocalTemplateOverrides(entry.id, resultId));
+      applyOverridesToConfig(filled, getLocalTemplateOverrides(entry.id, resultId), { model, context, callPath });
       return {
         kind: "assignment",
         templateId: String(entry.id || ""),
@@ -1019,16 +1088,16 @@
       };
     }
 
-    function convertIf(routine, ifStatement) {
+    function convertIf(routine, ifStatement, callPath) {
       const entry = templatesBySource.get("ifs");
       if (!entry?.config) return null;
       if (!converter.buildIfContext) return null;
 
-      const context = converter.buildIfContext(model, routine, ifStatement);
+      const context = converter.buildIfContext(model, routine, ifStatement, { callPath });
       const expanded = converter.expandExcelLikeTableTemplate(entry.config, context);
       const filled = converter.compactExcelLikeTableConfig(converter.fillTemplateConfig(expanded, context));
       const resultId = ifIdFrom(routine?.key, ifStatement?.sourceRef);
-      applyOverridesToConfig(filled, getLocalTemplateOverrides(entry.id, resultId));
+      applyOverridesToConfig(filled, getLocalTemplateOverrides(entry.id, resultId), { model, context, callPath });
 
       const k = String(context?.if?.kind || "IF").trim().toUpperCase() || "IF";
       const cond = String(context?.if?.condition || "").trim();
@@ -1047,7 +1116,7 @@
       };
     }
 
-    function walk(routineKey, depth, stack) {
+    function walk(routineKey, depth, stack, callPath) {
       const routine = model?.nodes?.get ? model.nodes.get(routineKey) : null;
       if (!routine) return;
 
@@ -1066,22 +1135,22 @@
         }
 
         if (step.kind === "if") {
-          const r = convertIf(step.routine, step.ifStatement);
+          const r = convertIf(step.routine, step.ifStatement, callPath);
           if (r) items.push({ kind: "template", depth, isRecursion: false, result: r });
           continue;
         }
 
         if (step.kind === "assignment") {
-          const r = convertAssignment(step.routine, step.assignment);
+          const r = convertAssignment(step.routine, step.assignment, callPath);
           if (r) items.push({ kind: "template", depth, isRecursion: false, result: r });
           continue;
         }
 
         if (step.kind === "perform") {
           const isRecursion = stack.has(step.edge?.toKey);
-          const r = convertPerform(step.edge);
+          const r = convertPerform(step.edge, callPath);
           if (r) items.push({ kind: "template", depth, isRecursion, result: r });
-          if (!isRecursion) walk(step.edge.toKey, depth + 1, stack);
+          if (!isRecursion) walk(step.edge.toKey, depth + 1, stack, (callPath || []).concat([step.edge]));
         }
       }
 
@@ -1092,7 +1161,7 @@
     for (const rootKey of roots) {
       const root = model.nodes.get(rootKey);
       items.push({ kind: "separator", label: root ? `${root.kind} ${root.name}` : rootKey, rootKey });
-      walk(rootKey, 0, new Set());
+      walk(rootKey, 0, new Set(), []);
       if (truncated) break;
     }
 
@@ -1159,19 +1228,26 @@
   }
 
   function resolveGlobalDescriptionKey(result, bind) {
-    if (!ns.notes?.makeParamKey) return null;
     const b = String(bind || "").trim();
     const ctx = result?.context;
     if (!ctx) return null;
 
+    if (b === "perform.description") {
+      const key = String(ctx.perform?.originKey || ctx.perform?.key || "").trim();
+      return key ? { key } : null;
+    }
+
     const condMatch = /^conditions\[(\d+)\]\.(item1|item2)\.description$/.exec(b);
     if (condMatch) {
+      const idx = Number(condMatch[1]);
+      const side = String(condMatch[2] || "").trim();
+      const k = String(ctx?.conditions?.[idx]?.[side]?.originKey || "").trim();
+      if (k) return { key: k };
+
       if (!ns.notes?.makeDeclKey || !ns.lineage?.resolveSymbol) return null;
 
       const model = state.model;
       const routineKey = String(result?.routineKey || ctx.routine?.key || "").trim();
-      const idx = Number(condMatch[1]);
-      const side = String(condMatch[2] || "").trim();
       const cond = ctx?.conditions?.[idx] || null;
       const root = side === "item2" ? String(cond?.item2?.root || "").trim() : String(cond?.item1?.root || "").trim();
       if (!model || !routineKey || !root) return null;
@@ -1196,6 +1272,12 @@
     }
 
     if (b === "item.description" || b === "value.description") {
+      const key =
+        b === "item.description"
+          ? String(ctx?.item?.originKey || "").trim()
+          : String(ctx?.value?.originKey || "").trim();
+      if (key) return { key };
+
       if (!ns.notes?.makeDeclKey || !ns.lineage?.resolveSymbol) return null;
 
       const model = state.model;
@@ -1222,20 +1304,18 @@
       return null;
     }
 
-    if (b === "perform.description") {
-      const key = String(ctx.perform?.key || "").trim();
-      return key ? { key } : null;
-    }
-
     const m = /^(tables|using|changing|raising)\[(\d+)\]\.description$/.exec(b);
     if (!m) return null;
 
     const list = m[1];
     const idx = Number(m[2]);
     const item = ctx?.[list]?.[idx] || null;
+    const originKey = String(item?.originKey || "").trim();
+    if (originKey) return { key: originKey };
+
     const formalName = String(item?.name || "").trim();
     const routineKey = String(ctx.perform?.key || "").trim();
-    if (!routineKey || !formalName) return null;
+    if (!ns.notes?.makeParamKey || !routineKey || !formalName) return null;
 
     const key = ns.notes.makeParamKey(routineKey, formalName);
     return key ? { key } : null;
@@ -1717,18 +1797,42 @@
       let varEdit = "";
 
       if (decl && ns.notes) {
-        const scopeName = String(node.resolution?.scope || "").toLowerCase();
+        let originNode = node;
+        let originDecl = decl;
+        let originScopeName = String(node.resolution?.scope || "").toLowerCase();
+        let originRoutineKey = routineKey;
 
-        if (scopeName === "parameter" && decl.name && ns.notes.makeParamKey) {
-          const paramKey = ns.notes.makeParamKey(routineKey, decl.name);
-          const codeDesc = String(decl.description || "").trim();
-          const userDesc = String(decl.userDescription || "").trim();
-          const userNote = String(decl.userNote || "").trim();
+        // If this variable is a PARAM, follow the first caller-chain until we reach a declared DATA/CONSTANTS/global.
+        if (originScopeName === "parameter") {
+          const seen = new Set();
+          for (let i = 0; i < 30; i++) {
+            const visitKey = `${originNode?.routineKey || ""}|${String(originNode?.varName || "").toLowerCase()}`;
+            if (seen.has(visitKey)) break;
+            seen.add(visitKey);
+
+            const s = String(originNode?.resolution?.scope || "").toLowerCase();
+            if (s !== "parameter") break;
+
+            const next = (originNode?.calls || []).find((c) => c?.direction === "fromCaller" && c?.child) || null;
+            if (!next?.child) break;
+            originNode = next.child;
+          }
+
+          originRoutineKey = String(originNode?.routineKey || routineKey);
+          originDecl = originNode?.resolution?.decl || null;
+          originScopeName = String(originNode?.resolution?.scope || "").toLowerCase();
+        }
+
+        if (originDecl && originScopeName === "parameter" && originDecl.name && ns.notes.makeParamKey) {
+          const paramKey = ns.notes.makeParamKey(originRoutineKey, originDecl.name);
+          const codeDesc = String(originDecl.description || "").trim();
+          const userDesc = String(originDecl.userDescription || "").trim();
+          const userNote = String(originDecl.userNote || "").trim();
           varSummary = renderAnnoSummaryHtml({ codeDesc, userDesc, userNote });
 
           if (paramKey) {
             varEdit = `<details class="param-notes" style="padding-left:${pad}px">
-              <summary class="param-notes__summary">Edit variable notes (${utils.escapeHtml(decl.name)})</summary>
+              <summary class="param-notes__summary">Edit variable notes (${utils.escapeHtml(originDecl.name)})</summary>
               <div class="param-notes__body">
                 <div class="anno-grid">
                   <div class="anno-label">Description (from code)</div>
@@ -1738,8 +1842,8 @@
                   <textarea class="textarea param-notes__input" rows="2" data-anno-type="param" data-anno-key="${utils.escapeHtml(
                     paramKey,
                   )}" data-anno-field="description" data-routine-key="${utils.escapeHtml(
-              routineKey,
-            )}" data-param-name="${utils.escapeHtml(decl.name)}" placeholder="Add your description (stored locally)...">${utils.escapeHtml(
+              originRoutineKey,
+            )}" data-param-name="${utils.escapeHtml(originDecl.name)}" placeholder="Add your description (stored locally)...">${utils.escapeHtml(
               userDesc,
             )}</textarea>
 
@@ -1747,25 +1851,31 @@
                   <textarea class="textarea param-notes__input" rows="3" data-anno-type="param" data-anno-key="${utils.escapeHtml(
                     paramKey,
                   )}" data-anno-field="note" data-routine-key="${utils.escapeHtml(
-              routineKey,
-            )}" data-param-name="${utils.escapeHtml(decl.name)}" placeholder="Add notes (stored locally)...">${utils.escapeHtml(
+              originRoutineKey,
+            )}" data-param-name="${utils.escapeHtml(originDecl.name)}" placeholder="Add notes (stored locally)...">${utils.escapeHtml(
               userNote,
             )}</textarea>
                 </div>
               </div>
             </details>`;
           }
-        } else if ((scopeName === "local" || scopeName === "global") && decl.declKind && decl.variableName && ns.notes.makeDeclKey) {
-          const scopeKey = scopeName === "global" ? "PROGRAM" : routineKey;
-          const declKey = ns.notes.makeDeclKey(scopeKey, decl.declKind, decl.variableName);
-          const codeDesc = String(decl.description || "").trim();
-          const userDesc = String(decl.userDescription || "").trim();
-          const userNote = String(decl.userNote || "").trim();
+        } else if (
+          originDecl &&
+          (originScopeName === "local" || originScopeName === "global") &&
+          originDecl.declKind &&
+          originDecl.variableName &&
+          ns.notes.makeDeclKey
+        ) {
+          const scopeKey = originScopeName === "global" ? "PROGRAM" : originRoutineKey;
+          const declKey = ns.notes.makeDeclKey(scopeKey, originDecl.declKind, originDecl.variableName);
+          const codeDesc = String(originDecl.description || "").trim();
+          const userDesc = String(originDecl.userDescription || "").trim();
+          const userNote = String(originDecl.userNote || "").trim();
           varSummary = renderAnnoSummaryHtml({ codeDesc, userDesc, userNote });
 
           if (declKey) {
             varEdit = `<details class="param-notes" style="padding-left:${pad}px">
-              <summary class="param-notes__summary">Edit variable notes (${utils.escapeHtml(decl.variableName)})</summary>
+              <summary class="param-notes__summary">Edit variable notes (${utils.escapeHtml(originDecl.variableName)})</summary>
               <div class="param-notes__body">
                 <div class="anno-grid">
                   <div class="anno-label">Description (from code)</div>
@@ -1776,8 +1886,8 @@
                     declKey,
                   )}" data-anno-field="description" data-scope-key="${utils.escapeHtml(
               scopeKey,
-            )}" data-decl-kind="${utils.escapeHtml(decl.declKind)}" data-var-name="${utils.escapeHtml(
-              decl.variableName,
+            )}" data-decl-kind="${utils.escapeHtml(originDecl.declKind)}" data-var-name="${utils.escapeHtml(
+              originDecl.variableName,
             )}" placeholder="Add your description (stored locally)...">${utils.escapeHtml(userDesc)}</textarea>
 
                   <div class="anno-label">Your note</div>
@@ -1785,8 +1895,8 @@
                     declKey,
                   )}" data-anno-field="note" data-scope-key="${utils.escapeHtml(
               scopeKey,
-            )}" data-decl-kind="${utils.escapeHtml(decl.declKind)}" data-var-name="${utils.escapeHtml(
-              decl.variableName,
+            )}" data-decl-kind="${utils.escapeHtml(originDecl.declKind)}" data-var-name="${utils.escapeHtml(
+              originDecl.variableName,
             )}" placeholder="Add notes (stored locally)...">${utils.escapeHtml(userNote)}</textarea>
                 </div>
               </div>
