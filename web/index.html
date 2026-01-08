@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ABAP Flow Analyzer (Offline)</title>
     <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="css/templates.css" />
   </head>
   <body>
     <header class="app-header">
@@ -37,6 +38,7 @@
           <button class="tab" data-tab="diagram" type="button">Diagram</button>
           <button class="tab" data-tab="sequence" type="button">Sequence</button>
           <button class="tab" data-tab="trace" type="button">Trace</button>
+          <button class="tab" data-tab="templates" type="button">Templates</button>
           <button class="tab" data-tab="json" type="button">JSON</button>
         </div>
 
@@ -58,6 +60,7 @@
                         <th>DATA</th>
                         <th>CONST</th>
                         <th>Writes</th>
+                        <th>Assign</th>
                         <th>Defined</th>
                         <th>Cycle</th>
                       </tr>
@@ -122,6 +125,12 @@
             <div id="traceResults" class="trace-results empty">Select a subroutine + variable and run trace.</div>
           </section>
 
+          <section class="tab-panel" id="tab-templates">
+            <div class="panel__title">Template output (flow order)</div>
+            <div id="templatesHost" class="trace-results empty">Analyze to see templates.</div>
+            <div class="hint">Tip: click a block to highlight the original statement in the editor.</div>
+          </section>
+
           <section class="tab-panel" id="tab-json">
             <div class="panel__title">Model JSON</div>
             <pre id="jsonOutput" class="json-output empty">Analyze to see JSON.</pre>
@@ -142,6 +151,9 @@
     <script src="js/parser_config.js"></script>
     <script src="js/parser.js"></script>
     <script src="js/sample.js"></script>
+    <script src="js/templates.js"></script>
+    <script src="js/table_renderer.js"></script>
+    <script src="js/template_converter.js"></script>
     <script src="js/ui.js"></script>
   </body>
 </html>

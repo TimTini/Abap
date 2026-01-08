@@ -2,12 +2,62 @@
   "use strict";
 
   const utils = ns.utils;
+  const IDENT_RE = /[A-Za-z_][A-Za-z0-9_\/]*(?:[-~][A-Za-z0-9_\/]+)*/g;
 
   function buildGlobalIndex(model) {
     const set = new Set();
     for (const d of model.globalData) set.add(String(d.variableName || "").toLowerCase());
     for (const c of model.globalConstants) set.add(String(c.variableName || "").toLowerCase());
     return set;
+  }
+
+  function buildGlobalDeclMap(model) {
+    const map = new Map();
+    for (const d of model.globalData || []) {
+      const name = String(d.variableName || "").toLowerCase();
+      if (name) map.set(name, { scope: "GLOBAL:DATA", decl: d });
+    }
+    for (const c of model.globalConstants || []) {
+      const name = String(c.variableName || "").toLowerCase();
+      if (name) map.set(name, { scope: "GLOBAL:CONSTANTS", decl: c });
+    }
+    return map;
+  }
+
+  function stripStrings(s) {
+    // ABAP strings: '...'; escaped by doubling: ''
+    return String(s || "").replace(/'(?:[^']|'')*'/g, " ");
+  }
+
+  function collectUsedGlobalNames(model, fromLine, toLine, globalDeclMap, stopAtNameLower) {
+    const used = new Set();
+    const lines = model?.lines || [];
+    const from = Math.max(1, Number(fromLine || 1));
+    const to = Math.min(lines.length, Number(toLine || from));
+    const stop = String(stopAtNameLower || "").toLowerCase();
+
+    for (let ln = from; ln <= to; ln++) {
+      const raw = String(lines[ln - 1] || "");
+      if (utils.isFullLineComment(raw)) continue;
+
+      const code = utils.stripInlineComment(raw);
+      if (!code.trim()) continue;
+
+      const sanitized = stripStrings(code);
+      IDENT_RE.lastIndex = 0;
+      let m = null;
+      while ((m = IDENT_RE.exec(sanitized))) {
+        const token = String(m[0] || "").trim();
+        if (!token) continue;
+        const root = token.toLowerCase().split(/[-~]/)[0];
+        if (!root) continue;
+        if (!globalDeclMap.has(root)) continue;
+        used.add(root);
+        if (stop && root === stop) return used;
+      }
+    }
+
+    return used;
   }
 
   function resolveSymbol(model, routineKey, varName) {
@@ -47,13 +97,16 @@
   }
 
   function mapThroughEdge(model, edge, callerVarName) {
-    const callerNameLower = String(callerVarName || "").toLowerCase();
+    const callerToken = utils.cleanIdentifierToken(callerVarName);
+    if (!utils.isIdentifier(callerToken)) return null;
+    const callerNameLower = String(callerToken || "").toLowerCase();
     const callee = model.nodes.get(edge.toKey);
     if (!callee) return null;
 
     const rules = [
       { edgeKey: "changing", paramKind: "CHANGING" },
       { edgeKey: "tables", paramKind: "TABLES" },
+      { edgeKey: "using", paramKind: "USING" },
     ];
 
     for (const rule of rules) {
@@ -151,6 +204,22 @@
       const isGlobal = resolution.scope === "global" && globalIndex.has(nameLower);
 
       const writes = routine.writes.filter((w) => matchesVariableName(w.variableName, currentVarName));
+      const decl = resolution.decl;
+      if (
+        decl &&
+        (resolution.scope === "local" || resolution.scope === "global") &&
+        decl.declKind &&
+        decl.variableName &&
+        decl.value &&
+        matchesVariableName(decl.variableName, currentVarName)
+      ) {
+        const dt = decl.dataType ? ` TYPE ${decl.dataType}` : "";
+        writes.unshift({
+          variableName: decl.variableName,
+          statement: `${decl.declKind} ${decl.variableName}${dt} VALUE ${decl.value}`,
+          sourceRef: decl.sourceRef || null,
+        });
+      }
 
       const calls = [];
 
@@ -216,7 +285,7 @@
     return { startKey, varName: startVar, root };
   }
 
-  function getVariablesForRoutine(model, routineKey) {
+  function getVariablesForRoutine(model, routineKey, options) {
     const routine = model.nodes.get(routineKey);
     if (!routine) return [];
 
@@ -226,11 +295,117 @@
     for (const c of routine.localConstants)
       vars.push({ name: c.variableName, scope: "LOCAL:CONSTANTS", dataType: c.dataType, description: c.description });
 
-    for (const d of model.globalData) vars.push({ name: d.variableName, scope: "GLOBAL:DATA", dataType: d.dataType, description: d.description });
-    for (const c of model.globalConstants) vars.push({ name: c.variableName, scope: "GLOBAL:CONSTANTS", dataType: c.dataType, description: c.description });
+    const globalMode = String(options?.globalMode || "all").toLowerCase();
+    if (globalMode === "all") {
+      for (const d of model.globalData) vars.push({ name: d.variableName, scope: "GLOBAL:DATA", dataType: d.dataType, description: d.description });
+      for (const c of model.globalConstants) vars.push({ name: c.variableName, scope: "GLOBAL:CONSTANTS", dataType: c.dataType, description: c.description });
+    } else if (globalMode === "used") {
+      const globalDeclMap = buildGlobalDeclMap(model);
+      const used = collectUsedGlobalNames(
+        model,
+        routine.sourceRef?.startLine,
+        routine.sourceRef?.endLine || routine.sourceRef?.startLine,
+        globalDeclMap,
+      );
+
+      const items = Array.from(used)
+        .map((nameLower) => globalDeclMap.get(nameLower))
+        .filter(Boolean)
+        .map((entry) => ({
+          name: entry.decl.variableName,
+          scope: entry.scope,
+          dataType: entry.decl.dataType,
+          description: entry.decl.description,
+        }))
+        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+
+      vars.push(...items);
+    }
 
     return vars;
   }
 
-  ns.lineage = { traceVariable, getVariablesForRoutine, resolveSymbol };
+  function getGlobalVariables(model) {
+    const out = [];
+    for (const d of model?.globalData || []) out.push({ name: d.variableName, scope: "GLOBAL:DATA", dataType: d.dataType, description: d.description });
+    for (const c of model?.globalConstants || [])
+      out.push({ name: c.variableName, scope: "GLOBAL:CONSTANTS", dataType: c.dataType, description: c.description });
+    out.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+    return out;
+  }
+
+  function getProgramEntrypoints(model) {
+    const nodes = Array.from(model?.nodes?.values?.() || []);
+    const events = nodes
+      .filter((n) => n.kind === "EVENT")
+      .sort((a, b) => (a.sourceRef?.startLine ?? 1e9) - (b.sourceRef?.startLine ?? 1e9))
+      .map((n) => n.key);
+
+    if (events.length > 0) return events;
+
+    const forms = nodes
+      .filter((n) => n.kind === "FORM" && n.isDefined && (n.calledBy?.length || 0) === 0)
+      .sort((a, b) => (a.sourceRef?.startLine ?? 1e9) - (b.sourceRef?.startLine ?? 1e9))
+      .map((n) => n.key);
+
+    return forms;
+  }
+
+  function traceGlobalVariable(model, varName, options) {
+    const startVar = String(varName || "").trim();
+    if (!startVar) return { error: "Variable name is empty." };
+
+    const globalDeclMap = buildGlobalDeclMap(model);
+    const startLower = startVar.toLowerCase();
+    const globalEntry = globalDeclMap.get(startLower) || null;
+    const decl = globalEntry?.decl || null;
+
+    const entrypoints = getProgramEntrypoints(model);
+    const calls = [];
+
+    for (const key of entrypoints) {
+      const routine = model.nodes.get(key);
+      if (!routine?.sourceRef) continue;
+      const used = collectUsedGlobalNames(
+        model,
+        routine.sourceRef.startLine,
+        routine.sourceRef.endLine || routine.sourceRef.startLine,
+        globalDeclMap,
+        startLower,
+      );
+      if (!used.has(startLower)) continue;
+
+      const childResult = traceVariable(model, key, startVar, options);
+      if (!childResult?.root) continue;
+
+      calls.push({
+        direction: "toCallee",
+        edge: { sourceRef: routine.sourceRef || null },
+        fromVar: startVar,
+        toVar: startVar,
+        mappingKind: "ENTRYPOINT",
+        label: `Entrypoint ${childResult.root.routineKind} ${childResult.root.routineName}: ${startVar}`,
+        child: childResult.root,
+      });
+    }
+
+    const resolution = decl ? { scope: "global", decl } : { scope: "unknown" };
+
+    return {
+      startKey: "PROGRAM",
+      varName: startVar,
+      root: {
+        routineKey: "PROGRAM",
+        routineName: "PROGRAM (Globals)",
+        routineKind: "PROGRAM",
+        varName: startVar,
+        resolution,
+        sourceRef: decl?.sourceRef || null,
+        writes: [],
+        calls,
+      },
+    };
+  }
+
+  ns.lineage = { traceVariable, traceGlobalVariable, getVariablesForRoutine, getGlobalVariables, resolveSymbol };
 })(window.AbapFlow);

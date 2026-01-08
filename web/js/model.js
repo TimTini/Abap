@@ -37,6 +37,15 @@
     }
   }
 
+  class AbapAssignment {
+    constructor(lhs, rhs, statement, sourceRef) {
+      this.lhs = lhs;
+      this.rhs = rhs;
+      this.statement = statement || "";
+      this.sourceRef = sourceRef || null;
+    }
+  }
+
   class AbapCallEdge {
     constructor(fromKey, toKey, targetName, args, sourceRef) {
       this.fromKey = fromKey;
@@ -60,6 +69,7 @@
       this.params = [];
       this.localData = [];
       this.localConstants = [];
+      this.assignments = [];
       this.writes = [];
 
       this.calls = [];
@@ -83,6 +93,10 @@
 
     get writesCount() {
       return this.writes.length;
+    }
+
+    get assignmentsCount() {
+      return this.assignments.length;
     }
   }
 
@@ -188,6 +202,7 @@
         params: n.params,
         localData: n.localData,
         localConstants: n.localConstants,
+        assignments: n.assignments,
         writes: n.writes,
         calls: n.calls.map((e) => ({ toKey: e.toKey, sourceRef: e.sourceRef, args: e.args, isInCycle: e.isInCycle })),
         calledBy: n.calledBy.map((e) => ({ fromKey: e.fromKey, sourceRef: e.sourceRef, args: e.args, isInCycle: e.isInCycle })),
@@ -209,6 +224,7 @@
     AbapParameter,
     AbapDataDeclaration,
     AbapWrite,
+    AbapAssignment,
     AbapCallEdge,
     ProgramModel,
   };

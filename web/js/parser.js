@@ -3,11 +3,11 @@
 
   const utils = ns.utils;
   const doc = ns.doc;
-  const { ProgramModel, SourceRef, AbapParameter, AbapDataDeclaration, AbapWrite, AbapCallEdge } = ns.model;
+  const { ProgramModel, SourceRef, AbapParameter, AbapDataDeclaration, AbapWrite, AbapAssignment, AbapCallEdge } = ns.model;
 
   function defaultParserConfig() {
     const IDENT = String.raw`[A-Za-z_][A-Za-z0-9_\/]*`;
-    const IDENT_PATH = String.raw`${IDENT}(?:[-~][A-Za-z0-9_\/]+)*`;
+    const IDENT_PATH = String.raw`${IDENT}(?:(?:[-~]|->|=>)[A-Za-z0-9_\/]+)*`;
 
     return {
       version: 1,
@@ -53,6 +53,9 @@
             { whenStartsWith: "CONCATENATE", regex: new RegExp(String.raw`\bINTO\b\s+(${IDENT_PATH})\b`, "i") },
           ],
         },
+        assignments: {
+          rules: [{ regex: new RegExp(String.raw`^(${IDENT_PATH})\s*=\s*(.+)$`) }],
+        },
       },
     };
   }
@@ -84,6 +87,7 @@
     const statements = user.statements && typeof user.statements === "object" ? user.statements : {};
     const decls = statements.declarations && typeof statements.declarations === "object" ? statements.declarations : {};
     const writes = statements.writes && typeof statements.writes === "object" ? statements.writes : {};
+    const assignments = statements.assignments && typeof statements.assignments === "object" ? statements.assignments : {};
 
     return {
       ...base,
@@ -103,6 +107,11 @@
           ...base.statements.writes,
           ...writes,
           rules: Array.isArray(writes.rules) ? writes.rules : base.statements.writes.rules,
+        },
+        assignments: {
+          ...base.statements.assignments,
+          ...assignments,
+          rules: Array.isArray(assignments.rules) ? assignments.rules : base.statements.assignments.rules,
         },
       },
     };
@@ -283,10 +292,8 @@
       const typeMatch = /\bTYPE\b\s+([^\s]+)/i.exec(p);
       const dataType = typeMatch ? utils.cleanIdentifierToken(typeMatch[1]) : "";
       let value = "";
-      if (options?.supportsValue === true || declKind === "CONSTANTS") {
-        const valueMatch = /\bVALUE\b\s+(.+)$/i.exec(p);
-        value = valueMatch ? valueMatch[1].trim() : "";
-      }
+      const valueMatch = /\bVALUE\b\s+(.+)$/i.exec(p);
+      value = valueMatch ? valueMatch[1].trim() : "";
 
       out.push(new AbapDataDeclaration(declKind, variableName, dataType, value, description, sourceRef));
     }
@@ -366,6 +373,18 @@
     return out;
   }
 
+  function parseAssignmentByRule(stmtText, rule) {
+    const statement = utils.normalizeSpaces(utils.stripTrailingPeriod(stmtText));
+    const re = asRegex(rule?.regex);
+    const m = regexExec(re, statement);
+    if (!m || !m[1]) return null;
+
+    const lhs = String(m[1] || "").trim();
+    const rhs = String(m[2] || "").trim();
+    if (!lhs || !rhs) return null;
+    return { lhs, rhs };
+  }
+
   function eventNameFromStatement(stmtText, cfg) {
     const t = utils.normalizeSpaces(utils.stripTrailingPeriod(stmtText));
     const u = t.toUpperCase();
@@ -420,6 +439,14 @@
       if (dk === "DATA") routine.localData.push(...decls);
       else if (dk === "CONSTANTS") routine.localConstants.push(...decls);
       return;
+    }
+
+    const assignmentRules = Array.isArray(cfg?.statements?.assignments?.rules) ? cfg.statements.assignments.rules : [];
+    for (const rule of assignmentRules) {
+      const parsed = parseAssignmentByRule(normalized, rule);
+      if (!parsed) continue;
+      routine.assignments.push(new AbapAssignment(parsed.lhs, parsed.rhs, normalized, src));
+      break;
     }
 
     const writes = parseWriteTargets(normalized, cfg);

@@ -9,7 +9,7 @@
   // - Regex values can be RegExp objects (recommended) or strings (compiled by the parser).
 
   const IDENT = String.raw`[A-Za-z_][A-Za-z0-9_\/]*`;
-  const IDENT_PATH = String.raw`${IDENT}(?:[-~][A-Za-z0-9_\/]+)*`;
+  const IDENT_PATH = String.raw`${IDENT}(?:(?:[-~]|->|=>)[A-Za-z0-9_\/]+)*`;
 
   ns.parserConfig = {
     version: 1,
@@ -105,6 +105,12 @@
           { whenStartsWith: "APPEND", regex: new RegExp(String.raw`\bTO\b\s+(${IDENT_PATH})\b`, "i") },
           { whenStartsWith: "CONCATENATE", regex: new RegExp(String.raw`\bINTO\b\s+(${IDENT_PATH})\b`, "i") },
         ],
+      },
+
+      assignments: {
+        // Assignment operator: <lhs> = <rhs>.
+        // Ref: https://help.sap.com/doc/abapdocu_751_index_htm/7.51/en-us/abenequals_operator.htm
+        rules: [{ regex: new RegExp(String.raw`^(${IDENT_PATH})\s*=\s*(.+)$`) }],
       },
     },
   };

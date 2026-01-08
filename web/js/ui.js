@@ -8,6 +8,8 @@
     selectedKey: null,
   };
 
+  const TRACE_ALL_GLOBALS_KEY = "TRACE:ALL_GLOBALS";
+
   function $(id) {
     return document.getElementById(id);
   }
@@ -38,6 +40,7 @@
       localDataCount: model.globalData.length,
       localConstCount: model.globalConstants.length,
       writesCount: 0,
+      assignmentsCount: 0,
     });
 
     const nodes = Array.from(model.nodes.values()).sort((a, b) => {
@@ -82,6 +85,7 @@
         <td>${utils.escapeHtml(String(obj.localDataCount ?? obj.localData?.length ?? 0))}</td>
         <td>${utils.escapeHtml(String(obj.localConstCount ?? obj.localConstants?.length ?? 0))}</td>
         <td>${utils.escapeHtml(String(obj.writesCount ?? obj.writes?.length ?? 0))}</td>
+        <td>${utils.escapeHtml(String(obj.assignmentsCount ?? obj.assignments?.length ?? 0))}</td>
         <td>${definedBadge}</td>
         <td>${cycleBadge}</td>
       `;
@@ -104,12 +108,10 @@
     const userNote = String(options?.userNote || "").trim();
 
     const lines = [];
-    // Always show Desc if available (codeDesc OR userDesc)
-    if (userDesc) {
-      lines.push(`<div><span class="anno-summary__k">Desc:</span> ${utils.escapeHtml(userDesc)}</div>`);
-    }
-    if (codeDesc) {
-      lines.push(`<div><span class="anno-summary__k">Desc:</span> ${utils.escapeHtml(codeDesc)}</div>`);
+    if (userDesc) lines.push(`<div><span class="anno-summary__k">Desc:</span> ${utils.escapeHtml(userDesc)}</div>`);
+    if (codeDesc && (!userDesc || codeDesc !== userDesc)) {
+      const label = userDesc ? "Desc (code)" : "Desc";
+      lines.push(`<div><span class="anno-summary__k">${label}:</span> ${utils.escapeHtml(codeDesc)}</div>`);
     }
     if (userNote) {
       lines.push(`<div><span class="anno-summary__k">Note:</span> ${utils.escapeHtml(userNote)}</div>`);
@@ -434,6 +436,9 @@
       })
       .join("");
 
+    const assignments = (r.assignments || [])
+      .map((a) => `<li>${sourceLink(`${a.lhs} = ${a.rhs}`, a.sourceRef)}</li>`)
+      .join("");
     const writes = r.writes.map((w) => `<li>${sourceLink(`${w.variableName}  ⇐  ${w.statement}`, w.sourceRef)}</li>`).join("");
 
     const codeDesc = String(r.description || "").trim();
@@ -484,6 +489,10 @@
       <div class="section">
         <div class="section__title">Writes</div>
         <ul class="list">${writes || "<li>(none)</li>"}</ul>
+      </div>
+      <div class="section">
+        <div class="section__title">Assignments</div>
+        <ul class="list">${assignments || "<li>(none)</li>"}</ul>
       </div>
       <div class="section">
         <div class="section__title">Calls (PERFORM)</div>
@@ -608,12 +617,16 @@
             applyUserFields(d);
           }
         } else if (annoType === "routine") {
-          const r = model.nodes.get(routineKey || key);
-          applyUserFields(r);
+          const rk = routineKey || key;
+          if (rk === "PROGRAM") applyUserFields(model);
+          else applyUserFields(model.nodes.get(rk));
         }
 
         if (document.getElementById("tab-sequence").classList.contains("is-active")) {
           renderSequence();
+        }
+        if (document.getElementById("tab-templates")?.classList.contains("is-active")) {
+          renderTemplates();
         }
       }
 
@@ -654,6 +667,9 @@
 
       if (options?.rerenderSequence && document.getElementById("tab-sequence").classList.contains("is-active")) {
         renderSequence();
+      }
+      if (document.getElementById("tab-templates")?.classList.contains("is-active")) {
+        renderTemplates();
       }
     }
 
@@ -699,6 +715,627 @@
 
     const approxLineHeight = 16;
     ta.scrollTop = Math.max(0, (startIdx - 3) * approxLineHeight);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Templates (official; execution-flow order)
+  // ---------------------------------------------------------------------------
+
+  const TEMPLATE_OVERRIDES_STORAGE_KEY = "abapFlow.templateLocalOverrides.v1";
+  const TEMPLATE_OVERRIDES_SCHEMA = "abapflow-template-local-overrides";
+  const TEMPLATE_OVERRIDES_VERSION = 1;
+
+  let templateLocalOverrides = loadTemplateLocalOverrides();
+  let templateResultById = new Map();
+  let selectedTemplateCard = null;
+
+  function nowIso() {
+    return new Date().toISOString();
+  }
+
+  function safeJsonParse(text) {
+    try {
+      return { ok: true, value: JSON.parse(text) };
+    } catch (err) {
+      return { ok: false, error: String(err?.message || err) };
+    }
+  }
+
+  function getActiveProgramId() {
+    if (ns.notes?.getActiveProgramId) return ns.notes.getActiveProgramId();
+    return "default";
+  }
+
+  function loadTemplateLocalOverrides() {
+    try {
+      const raw = localStorage.getItem(TEMPLATE_OVERRIDES_STORAGE_KEY);
+      if (!raw) return new Map();
+      const parsed = safeJsonParse(raw);
+      if (!parsed.ok) return new Map();
+      const obj = parsed.value;
+      if (obj?.schema !== TEMPLATE_OVERRIDES_SCHEMA || obj?.version !== TEMPLATE_OVERRIDES_VERSION) return new Map();
+
+      const out = new Map();
+      const overrides = obj?.overrides && typeof obj.overrides === "object" ? obj.overrides : {};
+      for (const [key, binds] of Object.entries(overrides)) {
+        if (!binds || typeof binds !== "object") continue;
+        const bindMap = new Map();
+        for (const [bind, value] of Object.entries(binds)) {
+          const v = String(value ?? "");
+          if (!v.trim()) continue;
+          bindMap.set(String(bind), v);
+        }
+        if (bindMap.size) out.set(String(key), bindMap);
+      }
+      return out;
+    } catch (_) {
+      return new Map();
+    }
+  }
+
+  function saveTemplateLocalOverrides() {
+    try {
+      const obj = {
+        schema: TEMPLATE_OVERRIDES_SCHEMA,
+        version: TEMPLATE_OVERRIDES_VERSION,
+        updatedAt: nowIso(),
+        overrides: {},
+      };
+
+      for (const [key, bindMap] of templateLocalOverrides.entries()) {
+        const bucket = {};
+        for (const [bind, value] of bindMap.entries()) {
+          const v = String(value ?? "");
+          if (!v.trim()) continue;
+          bucket[String(bind)] = v;
+        }
+        if (Object.keys(bucket).length) obj.overrides[String(key)] = bucket;
+      }
+
+      localStorage.setItem(TEMPLATE_OVERRIDES_STORAGE_KEY, JSON.stringify(obj, null, 2));
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  function templateBucketKey(templateId, resultId) {
+    const pid = String(getActiveProgramId() || "default");
+    const tid = String(templateId || "").trim() || "default";
+    const rid = String(resultId || "").trim();
+    return `${pid}::${tid}::${rid}`;
+  }
+
+  function getLocalTemplateOverrides(templateId, resultId) {
+    const key = templateBucketKey(templateId, resultId);
+    return templateLocalOverrides.get(key) || null;
+  }
+
+  function setLocalTemplateOverride(templateId, resultId, bind, value) {
+    const key = templateBucketKey(templateId, resultId);
+    const b = String(bind || "").trim();
+    if (!b) return;
+
+    const v = String(value ?? "");
+    const hasValue = Boolean(v.trim());
+
+    let bucket = templateLocalOverrides.get(key);
+    if (!bucket && hasValue) {
+      bucket = new Map();
+      templateLocalOverrides.set(key, bucket);
+    }
+    if (!bucket) return;
+
+    if (hasValue) bucket.set(b, v);
+    else bucket.delete(b);
+
+    if (bucket.size === 0) templateLocalOverrides.delete(key);
+    saveTemplateLocalOverrides();
+  }
+
+  function applyOverridesToConfig(config, overridesMap) {
+    if (!config || !Array.isArray(config.cells) || !overridesMap) return;
+    for (const cell of config.cells) {
+      const bind = String(cell?.bind || "").trim();
+      if (!bind) continue;
+      if (!overridesMap.has(bind)) continue;
+      cell.text = overridesMap.get(bind);
+    }
+  }
+
+  function listTemplateEntries() {
+    const templates =
+      ns.templateRegistry?.templates && typeof ns.templateRegistry.templates === "object" ? ns.templateRegistry.templates : {};
+    const order = Array.isArray(ns.templateRegistry?.order)
+      ? ns.templateRegistry.order
+      : Object.keys(templates).sort((a, b) => a.localeCompare(b));
+
+    const out = [];
+    for (const id of order) {
+      const t = templates[id];
+      if (!t || typeof t !== "object") continue;
+      const entry = { ...t, id: String(t.id || id) };
+      out.push(entry);
+    }
+
+    return out;
+  }
+
+  function pickAutoTemplatesBySource(entries) {
+    const out = new Map();
+    for (const e of entries || []) {
+      if (!e || typeof e !== "object") continue;
+      if (e.auto === false) continue;
+      const source = String(e.source || "").trim();
+      if (!source) continue;
+      if (!out.has(source)) out.set(source, e);
+    }
+    return out;
+  }
+
+  function getProgramEntrypoints(model) {
+    const nodes = Array.from(model?.nodes?.values ? model.nodes.values() : []);
+    const byLine = (a, b) => (a?.sourceRef?.startLine ?? 1e9) - (b?.sourceRef?.startLine ?? 1e9);
+
+    const events = nodes
+      .filter((n) => n && n.kind === "EVENT")
+      .slice()
+      .sort(byLine)
+      .map((n) => n.key);
+    if (events.length) return events;
+
+    const roots = nodes
+      .filter((n) => n && n.kind === "FORM" && n.isDefined && (n.calledBy?.length || 0) === 0)
+      .slice()
+      .sort(byLine)
+      .map((n) => n.key);
+    if (roots.length) return roots;
+
+    return nodes
+      .filter((n) => n && n.kind === "FORM" && n.isDefined)
+      .slice()
+      .sort(byLine)
+      .map((n) => n.key);
+  }
+
+  function extractSource(model, sourceRef) {
+    if (!model || !Array.isArray(model.lines) || !sourceRef) return "";
+    const start = Math.max(1, Math.floor(Number(sourceRef.startLine || 1)));
+    const end = Math.min(model.lines.length, Math.floor(Number(sourceRef.endLine || start)));
+    return model.lines.slice(start - 1, end).join("\n").trim();
+  }
+
+  function edgeIdFrom(edge) {
+    const fromKey = String(edge?.fromKey || "");
+    const toKey = String(edge?.toKey || "");
+    const start = Math.max(0, Math.floor(Number(edge?.sourceRef?.startLine || 0)));
+    const end = Math.max(start, Math.floor(Number(edge?.sourceRef?.endLine || start)));
+    return `${fromKey}->${toKey}@${start}-${end}`;
+  }
+
+  function assignmentIdFrom(routineKey, sourceRef) {
+    const rk = String(routineKey || "").trim() || "ASSIGNMENT";
+    const start = Math.max(0, Math.floor(Number(sourceRef?.startLine || 0)));
+    const end = Math.max(start, Math.floor(Number(sourceRef?.endLine || start)));
+    return `${rk}@${start}-${end}`;
+  }
+
+  function routineTemplateSteps(model, routineKey, templatesBySource) {
+    const routine = model?.nodes?.get ? model.nodes.get(routineKey) : null;
+    if (!routine) return [];
+
+    const steps = [];
+
+    if (templatesBySource.has("assignments") && Array.isArray(routine.assignments)) {
+      for (const a of routine.assignments) {
+        if (!a?.sourceRef) continue;
+        steps.push({ kind: "assignment", sourceRef: a.sourceRef, routineKey, routine, assignment: a });
+      }
+    }
+
+    if (templatesBySource.has("performCalls") && Array.isArray(routine.calls)) {
+      for (const edge of routine.calls) {
+        const toKey = String(edge?.toKey || "");
+        if (!toKey.toUpperCase().startsWith("FORM:")) continue;
+        if (!edge?.sourceRef) continue;
+        steps.push({ kind: "perform", sourceRef: edge.sourceRef, routineKey, routine, edge });
+      }
+    }
+
+    steps.sort((a, b) => Number(a?.sourceRef?.startLine || 0) - Number(b?.sourceRef?.startLine || 0));
+    return steps;
+  }
+
+  function buildTemplatesFlow(model, templatesBySource, options) {
+    const maxSteps = Math.max(50, Number(options?.maxSteps || 900));
+    const items = [];
+    let truncated = false;
+
+    const converter = ns.templateConverter;
+    if (!converter) return { items: [], truncated: false };
+
+    function convertPerform(edge) {
+      const entry = templatesBySource.get("performCalls");
+      if (!entry?.config) return null;
+      const context = converter.buildPerformContext(model, edge);
+      const expanded = converter.expandExcelLikeTableTemplate(entry.config, context);
+      const filled = converter.compactExcelLikeTableConfig(converter.fillTemplateConfig(expanded, context));
+      const resultId = edgeIdFrom(edge);
+      applyOverridesToConfig(filled, getLocalTemplateOverrides(entry.id, resultId));
+      return {
+        kind: "perform",
+        templateId: String(entry.id || ""),
+        resultId,
+        edge,
+        context,
+        sourceRef: edge?.sourceRef || null,
+        original: extractSource(model, edge?.sourceRef) || `PERFORM ${context.perform?.name || ""}`,
+        filledConfig: filled,
+      };
+    }
+
+    function convertAssignment(routine, assignment) {
+      const entry = templatesBySource.get("assignments");
+      if (!entry?.config) return null;
+      const context = converter.buildAssignmentContext(model, routine, assignment);
+      const filled = converter.compactExcelLikeTableConfig(converter.fillTemplateConfig(entry.config, context));
+      const resultId = assignmentIdFrom(routine?.key, assignment?.sourceRef);
+      applyOverridesToConfig(filled, getLocalTemplateOverrides(entry.id, resultId));
+      return {
+        kind: "assignment",
+        templateId: String(entry.id || ""),
+        resultId,
+        assignment,
+        routineKey: String(routine?.key || ""),
+        context,
+        sourceRef: assignment?.sourceRef || null,
+        original: extractSource(model, assignment?.sourceRef) || `${context.assignment?.lhs || ""} = ${context.assignment?.rhs || ""}`,
+        filledConfig: filled,
+      };
+    }
+
+    function walk(routineKey, depth, stack) {
+      const routine = model?.nodes?.get ? model.nodes.get(routineKey) : null;
+      if (!routine) return;
+
+      if (items.length >= maxSteps) {
+        truncated = true;
+        return;
+      }
+
+      stack.add(routineKey);
+
+      const steps = routineTemplateSteps(model, routineKey, templatesBySource);
+      for (const step of steps) {
+        if (items.length >= maxSteps) {
+          truncated = true;
+          break;
+        }
+
+        if (step.kind === "assignment") {
+          const r = convertAssignment(step.routine, step.assignment);
+          if (r) items.push({ kind: "template", depth, isRecursion: false, result: r });
+          continue;
+        }
+
+        if (step.kind === "perform") {
+          const isRecursion = stack.has(step.edge?.toKey);
+          const r = convertPerform(step.edge);
+          if (r) items.push({ kind: "template", depth, isRecursion, result: r });
+          if (!isRecursion) walk(step.edge.toKey, depth + 1, stack);
+        }
+      }
+
+      stack.delete(routineKey);
+    }
+
+    const roots = getProgramEntrypoints(model);
+    for (const rootKey of roots) {
+      const root = model.nodes.get(rootKey);
+      items.push({ kind: "separator", label: root ? `${root.kind} ${root.name}` : rootKey, rootKey });
+      walk(rootKey, 0, new Set());
+      if (truncated) break;
+    }
+
+    if (truncated) {
+      items.push({ kind: "note", text: `Truncated at ${maxSteps} steps.` });
+    }
+
+    return { items, truncated, maxSteps };
+  }
+
+  function isEditableDescriptionBind(bind) {
+    const b = String(bind || "").trim();
+    if (!b) return false;
+    if (b === "perform.description") return true;
+    return /^(tables|using|changing|raising)\[\d+\]\.description$/.test(b);
+  }
+
+  function labelForDescriptionBind(result, bind) {
+    const b = String(bind || "").trim();
+    const ctx = result?.context;
+    const performName = String(ctx?.perform?.name || "").trim();
+    if (!b) return "Mô tả";
+
+    if (b === "perform.description") return performName ? `Mô tả FORM ${performName}` : "Mô tả FORM";
+
+    const m = /^(tables|using|changing|raising)\[(\d+)\]\.description$/.exec(b);
+    if (!m) return "Mô tả";
+
+    const list = m[1];
+    const idx = Number(m[2]);
+    const item = ctx?.[list]?.[idx] || null;
+    const kind = String(list || "").toUpperCase();
+    const actual = String(item?.actual || "").trim();
+    const formal = String(item?.name || "").trim();
+
+    if (actual && formal) return `Mô tả ${kind}: ${actual} → ${formal}`;
+    if (formal) return `Mô tả ${kind}: ${formal}`;
+    if (actual) return `Mô tả ${kind}: ${actual}`;
+    return `Mô tả ${kind}`;
+  }
+
+  function resolveGlobalDescriptionKey(result, bind) {
+    if (!ns.notes?.makeParamKey) return null;
+    const b = String(bind || "").trim();
+    const ctx = result?.context;
+    if (!ctx) return null;
+
+    if (b === "perform.description") {
+      const key = String(ctx.perform?.key || "").trim();
+      return key ? { key } : null;
+    }
+
+    const m = /^(tables|using|changing|raising)\[(\d+)\]\.description$/.exec(b);
+    if (!m) return null;
+
+    const list = m[1];
+    const idx = Number(m[2]);
+    const item = ctx?.[list]?.[idx] || null;
+    const formalName = String(item?.name || "").trim();
+    const routineKey = String(ctx.perform?.key || "").trim();
+    if (!routineKey || !formalName) return null;
+
+    const key = ns.notes.makeParamKey(routineKey, formalName);
+    return key ? { key } : null;
+  }
+
+  function openDescriptionEditorDialog(options) {
+    const titleText = String(options?.title || "Edit description");
+    const initialValue = String(options?.value ?? "");
+
+    return new Promise((resolve) => {
+      const overlay = document.createElement("div");
+      overlay.className = "demo-modal";
+
+      const dialog = document.createElement("div");
+      dialog.className = "demo-modal__dialog";
+      overlay.appendChild(dialog);
+
+      const title = document.createElement("div");
+      title.className = "demo-modal__title";
+      title.textContent = titleText;
+      dialog.appendChild(title);
+
+      const textarea = document.createElement("textarea");
+      textarea.className = "input demo-modal__textarea";
+      textarea.value = initialValue;
+      textarea.placeholder = "Nhập mô tả...";
+      dialog.appendChild(textarea);
+
+      const hint = document.createElement("div");
+      hint.className = "demo-modal__hint";
+      hint.textContent = "Chọn phạm vi cập nhật:";
+      dialog.appendChild(hint);
+
+      const actions = document.createElement("div");
+      actions.className = "demo-modal__actions";
+      dialog.appendChild(actions);
+
+      const btnCancel = document.createElement("button");
+      btnCancel.type = "button";
+      btnCancel.className = "btn";
+      btnCancel.textContent = "Hủy";
+
+      const btnLocal = document.createElement("button");
+      btnLocal.type = "button";
+      btnLocal.className = "btn";
+      btnLocal.textContent = "Chỉ template hiện tại";
+
+      const btnGlobal = document.createElement("button");
+      btnGlobal.type = "button";
+      btnGlobal.className = "btn btn-primary";
+      btnGlobal.textContent = "Toàn bộ template";
+
+      actions.appendChild(btnCancel);
+      actions.appendChild(btnLocal);
+      actions.appendChild(btnGlobal);
+
+      function cleanup() {
+        window.removeEventListener("keydown", onKeyDown);
+        overlay.remove();
+      }
+
+      function close(action) {
+        const value = textarea.value;
+        cleanup();
+        resolve({ action, value });
+      }
+
+      function onKeyDown(e) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          close("cancel");
+        }
+      }
+
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) close("cancel");
+      });
+      btnCancel.addEventListener("click", () => close("cancel"));
+      btnLocal.addEventListener("click", () => close("local"));
+      btnGlobal.addEventListener("click", () => close("global"));
+      window.addEventListener("keydown", onKeyDown);
+
+      document.body.appendChild(overlay);
+      textarea.focus();
+      textarea.select();
+    });
+  }
+
+  function handleTemplatesDblClick(event) {
+    const t = event?.target && event.target.nodeType === 1 ? event.target : event?.target?.parentElement;
+    const td = t?.closest ? t.closest("td[data-bind]") : null;
+    if (!td) return;
+
+    const bind = String(td.dataset.bind || "").trim();
+    if (!isEditableDescriptionBind(bind)) return;
+
+    const card = td.closest(".template-block");
+    const resultId = String(card?.dataset?.resultId || "").trim();
+    const templateId = String(card?.dataset?.templateId || "").trim();
+    if (!resultId || !templateId) return;
+
+    const result = templateResultById.get(resultId) || null;
+    if (!result) return;
+
+    event.preventDefault();
+    if (card && typeof card.click === "function") card.click();
+
+    const title = labelForDescriptionBind(result, bind);
+    const initial = String(td.textContent ?? "");
+
+    openDescriptionEditorDialog({ title, value: initial }).then(({ action, value }) => {
+      const nextValue = String(value ?? "").trim();
+      if (action === "cancel") return;
+
+      if (action === "local") {
+        setLocalTemplateOverride(templateId, resultId, bind, nextValue);
+        renderTemplates({ autoSelectResultId: resultId });
+        setStatus("Đã lưu mô tả (chỉ template hiện tại).", false);
+        return;
+      }
+
+      if (action === "global") {
+        const target = resolveGlobalDescriptionKey(result, bind);
+        if (!target || !ns.notes?.setEntry) {
+          setStatus("Không thể cập nhật toàn bộ cho mục này.", true);
+          return;
+        }
+
+        setLocalTemplateOverride(templateId, resultId, bind, "");
+        ns.notes.setEntry(target.key, { description: nextValue });
+        if (state.model && ns.notes?.applyToModel) ns.notes.applyToModel(state.model);
+        renderTemplates({ autoSelectResultId: resultId });
+        setStatus("Đã lưu mô tả (toàn bộ template).", false);
+      }
+    });
+  }
+
+  function renderTemplates(options) {
+    const host = $("templatesHost");
+    if (!host) return;
+
+    const model = state.model;
+    if (!model) {
+      host.textContent = "Analyze to see templates.";
+      host.classList.add("empty");
+      return;
+    }
+
+    if (!ns.templateRegistry || !ns.templateConverter || !ns.tableRenderer) {
+      host.textContent = "Template modules not loaded.";
+      host.classList.add("empty");
+      return;
+    }
+
+    const entries = listTemplateEntries();
+    const templatesBySource = pickAutoTemplatesBySource(entries);
+    if (templatesBySource.size === 0) {
+      host.textContent = "No templates configured.";
+      host.classList.add("empty");
+      return;
+    }
+
+    const flow = buildTemplatesFlow(model, templatesBySource, { maxSteps: 900 });
+    if (!flow.items.length) {
+      host.textContent = "No template-mapped statements found.";
+      host.classList.add("empty");
+      return;
+    }
+
+    const autoSelectResultId = String(options?.autoSelectResultId || "");
+    let autoSelectCard = null;
+
+    host.classList.remove("empty");
+    host.textContent = "";
+    selectedTemplateCard = null;
+    templateResultById = new Map();
+
+    for (const item of flow.items) {
+      if (item.kind === "separator") {
+        const sep = document.createElement("div");
+        sep.className = "flow-separator";
+        sep.textContent = item.label;
+        host.appendChild(sep);
+        continue;
+      }
+
+      if (item.kind === "note") {
+        const note = document.createElement("div");
+        note.className = "flow-note";
+        note.textContent = item.text;
+        host.appendChild(note);
+        continue;
+      }
+
+      if (item.kind !== "template") continue;
+
+      const result = item.result;
+      templateResultById.set(result.resultId, result);
+
+      const card = document.createElement("div");
+      card.className = "template-block is-clickable";
+      card.dataset.resultId = String(result.resultId || "");
+      card.dataset.templateId = String(result.templateId || "");
+      card.style.marginLeft = `${Math.max(0, item.depth) * 18}px`;
+      if (item.isRecursion || result.edge?.isInCycle) card.classList.add("is-cycle");
+
+      const header = document.createElement("div");
+      header.className = "template-block__header";
+      const src = result.sourceRef;
+      const lineText = src?.startLine ? (src.endLine && src.endLine !== src.startLine ? ` (L${src.startLine}-L${src.endLine})` : ` (L${src.startLine})`) : "";
+      const loopText = item.isRecursion ? " ↻" : "";
+
+      if (result.kind === "perform") {
+        header.textContent = `PERFORM ${result.context?.perform?.name || ""}${lineText}${loopText}`;
+      } else if (result.kind === "assignment") {
+        const lhs = String(result.context?.assignment?.lhs || "").trim();
+        const rhs = String(result.context?.assignment?.rhs || "").trim();
+        const text = lhs && rhs ? `${lhs} = ${rhs}` : lhs ? `${lhs} = ...` : "Assignment";
+        header.textContent = `${text}${lineText}`;
+      } else {
+        header.textContent = `Template${lineText}`;
+      }
+
+      card.appendChild(header);
+
+      const tableWrap = document.createElement("div");
+      tableWrap.className = "template-block__table";
+      tableWrap.appendChild(ns.tableRenderer.renderExcelLikeTable(result.filledConfig));
+      card.appendChild(tableWrap);
+
+      card.addEventListener("click", () => {
+        if (selectedTemplateCard) selectedTemplateCard.classList.remove("is-selected");
+        selectedTemplateCard = card;
+        card.classList.add("is-selected");
+        highlightSource(result.sourceRef?.startLine, result.sourceRef?.endLine);
+      });
+
+      host.appendChild(card);
+      if (autoSelectResultId && result.resultId === autoSelectResultId) autoSelectCard = card;
+    }
+
+    if (autoSelectCard) autoSelectCard.click();
   }
 
   function selectObject(key, syncTrace) {
@@ -799,6 +1436,16 @@
     sel.innerHTML = "";
     if (!model) return;
 
+    const globalsOpt = document.createElement("option");
+    globalsOpt.value = TRACE_ALL_GLOBALS_KEY;
+    globalsOpt.textContent = "CUSTOMISE (All globals)";
+    sel.appendChild(globalsOpt);
+
+    const sep = document.createElement("option");
+    sep.disabled = true;
+    sep.textContent = "──────────────";
+    sel.appendChild(sep);
+
     const nodes = Array.from(model.nodes.values()).sort((a, b) => {
       const ka = a.kind === "EVENT" ? 0 : a.kind === "FORM" ? 1 : 2;
       const kb = b.kind === "EVENT" ? 0 : b.kind === "FORM" ? 1 : 2;
@@ -814,6 +1461,7 @@
     }
 
     if (nodes.length > 0) sel.value = nodes[0].key;
+    else sel.value = TRACE_ALL_GLOBALS_KEY;
     updateTraceVariables();
   }
 
@@ -824,7 +1472,10 @@
     sel.innerHTML = "";
     if (!model || !subKey) return;
 
-    const vars = ns.lineage.getVariablesForRoutine(model, subKey);
+    const vars =
+      subKey === TRACE_ALL_GLOBALS_KEY
+        ? ns.lineage.getGlobalVariables(model)
+        : ns.lineage.getVariablesForRoutine(model, subKey, { globalMode: "used" });
     for (const v of vars) {
       const opt = document.createElement("option");
       opt.value = v.name;
@@ -868,27 +1519,23 @@
         declStmt = `${decl.kind} ${decl.name}${decl.dataType ? ` TYPE ${decl.dataType}` : ""}`;
       }
       const declStmtText = declStmt ? ` — ${utils.escapeHtml(declStmt)}` : "";
-      const meta = `<div class="trace-node__meta" style="padding-left:${pad}px">Scope: ${utils.escapeHtml(scope)}${utils.escapeHtml(declLine)}${declText}${declStmtText}</div>`;
+      const declLinkText = declStmt ? ` | Decl: ${sourceLink(declStmt, decl?.sourceRef || null)}` : "";
+      const meta = `<div class="trace-node__meta" style="padding-left:${pad}px">Scope: ${utils.escapeHtml(scope)}${utils.escapeHtml(declLine)}${declText}${declLinkText}</div>`;
 
       const routineKey = String(node.routineKey || "");
-      const routine = state.model?.nodes?.get(routineKey) || null;
+      const model = state.model;
+      const routine = routineKey && routineKey !== "PROGRAM" ? model?.nodes?.get(routineKey) || null : null;
       const codeRoutineDesc = String(routine?.description || "").trim();
-      const userRoutineDesc = String(routine?.userDescription || "").trim();
-      const userRoutineNote = String(routine?.userNote || "").trim();
-      const noteLines = [];
-      if (userRoutineDesc) noteLines.push(`<div><span class="trace-note__k">Your description:</span> ${utils.escapeHtml(userRoutineDesc)}</div>`);
-      if (userRoutineNote) noteLines.push(`<div><span class="trace-note__k">Your note:</span> ${utils.escapeHtml(userRoutineNote)}</div>`);
-      if (codeRoutineDesc) noteLines.push(`<div><span class="trace-note__k">From code:</span> ${utils.escapeHtml(codeRoutineDesc)}</div>`);
+      const userRoutineDesc =
+        routineKey === "PROGRAM" ? String(model?.userDescription || "").trim() : String(routine?.userDescription || "").trim();
+      const userRoutineNote = routineKey === "PROGRAM" ? String(model?.userNote || "").trim() : String(routine?.userNote || "").trim();
       const routineSummary = renderAnnoSummaryHtml({
         codeDesc: codeRoutineDesc,
         userDesc: userRoutineDesc,
         userNote: userRoutineNote,
       });
 
-      const routineNotesBlock =
-        noteLines.length || routineSummary
-          ? `<div class="trace-node__notes" style="padding-left:${pad}px">${noteLines.join("")}${routineSummary}</div>`
-          : "";
+      const routineNotesBlock = routineSummary ? `<div class="trace-node__notes" style="padding-left:${pad}px">${routineSummary}</div>` : "";
 
       const routineEdit =
         routineKey && ns.notes
@@ -1016,9 +1663,12 @@
         .map((c) => {
           const dir = c.direction === "fromCaller" ? "from" : "via";
           const target = c.direction === "fromCaller" ? node.routineName : c.child.routineName;
+          const label =
+            c.label ||
+            `${dir} PERFORM ${target}: ${c.fromVar} -> ${c.toVar} (${c.mappingKind})`;
           const mapText = `<div class="trace-node__call" style="padding-left:${pad + 14}px">${sourceLink(
-            `${dir} PERFORM ${target}: ${c.fromVar} -> ${c.toVar} (${c.mappingKind})`,
-            c.edge.sourceRef,
+            label,
+            c.edge?.sourceRef || null,
           )}</div>`;
           return mapText + renderNode(c.child, indent + 1);
         })
@@ -1036,7 +1686,10 @@
     if (!model) return;
     const subKey = $("traceSubroutine").value;
     const varName = $("traceVariable").value;
-    const result = ns.lineage.traceVariable(model, subKey, varName, { maxNodes: 400 });
+    const result =
+      subKey === TRACE_ALL_GLOBALS_KEY
+        ? ns.lineage.traceGlobalVariable(model, varName, { maxNodes: 400 })
+        : ns.lineage.traceVariable(model, subKey, varName, { maxNodes: 400 });
     renderTraceResults(result);
   }
 
@@ -1083,6 +1736,9 @@
     if (document.getElementById("tab-sequence").classList.contains("is-active")) {
       renderSequence();
     }
+    if (document.getElementById("tab-templates")?.classList.contains("is-active")) {
+      renderTemplates();
+    }
     setStatus("Notes imported.", false);
   }
 
@@ -1111,6 +1767,7 @@
         host.textContent = "Open the Sequence tab (or click Render) to render.";
         host.classList.add("empty");
       }
+      renderTemplates();
       renderJson();
       renderTraceSubroutines();
       setStatus(`Parsed ${model.nodes.size} objects, ${model.edges.length} PERFORM calls.`, false);
@@ -1135,6 +1792,9 @@
         setActiveTab(name);
         if (name === "sequence") {
           requestAnimationFrame(() => renderSequence());
+        }
+        if (name === "templates") {
+          requestAnimationFrame(() => renderTemplates());
         }
       });
     });
@@ -1161,6 +1821,13 @@
       $("traceSubroutine").innerHTML = "";
       $("traceVariable").innerHTML = "";
       $("seqRoot").innerHTML = "";
+      const th = $("templatesHost");
+      if (th) {
+        th.textContent = "Analyze to see templates.";
+        th.classList.add("empty");
+      }
+      selectedTemplateCard = null;
+      templateResultById = new Map();
       setStatus("Cleared.", false);
     });
 
@@ -1178,6 +1845,8 @@
     $("btnTrace").addEventListener("click", runTrace);
     $("btnSeqRender").addEventListener("click", renderSequence);
     $("seqRoot").addEventListener("change", renderSequence);
+
+    $("templatesHost")?.addEventListener("dblclick", handleTemplatesDblClick);
 
     if (!$("abapInput").value.trim() && ns.sampleCode) {
       $("abapInput").value = ns.sampleCode;
