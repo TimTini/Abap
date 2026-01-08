@@ -72,9 +72,26 @@
     return comments.join(" ").trim();
   }
 
+  function extractInlineCommentsByLine(lines, startLine, endLine) {
+    const out = {};
+    const from = Math.max(1, startLine || 1);
+    const to = Math.min(lines.length, endLine || from);
+
+    for (let ln = from; ln <= to; ln++) {
+      const raw = String(lines[ln - 1] || "");
+      if (!raw) continue;
+      const parts = utils.splitInlineComment(raw);
+      const c = String(parts.comment || "").trim();
+      if (!c) continue;
+      out[ln] = c;
+    }
+
+    return out;
+  }
+
   ns.doc = {
     extractLeadingComment,
     extractInlineCommentFromStatement,
+    extractInlineCommentsByLine,
   };
 })(window.AbapFlow);
-

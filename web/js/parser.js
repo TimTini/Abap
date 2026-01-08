@@ -3,7 +3,7 @@
 
   const utils = ns.utils;
   const doc = ns.doc;
-  const { ProgramModel, SourceRef, AbapParameter, AbapDataDeclaration, AbapWrite, AbapAssignment, AbapCallEdge } = ns.model;
+  const { ProgramModel, SourceRef, AbapParameter, AbapDataDeclaration, AbapWrite, AbapAssignment, AbapIfStatement, AbapCallEdge } = ns.model;
 
   function defaultParserConfig() {
     const IDENT = String.raw`[A-Za-z_][A-Za-z0-9_\/]*`;
@@ -56,6 +56,12 @@
         assignments: {
           rules: [{ regex: new RegExp(String.raw`^(${IDENT_PATH})\s*=\s*(.+)$`) }],
         },
+        conditionals: {
+          rules: [
+            { kind: "IF", regex: /^IF\s+(.+)$/i },
+            { kind: "ELSEIF", regex: /^ELSEIF\s+(.+)$/i },
+          ],
+        },
       },
     };
   }
@@ -88,6 +94,7 @@
     const decls = statements.declarations && typeof statements.declarations === "object" ? statements.declarations : {};
     const writes = statements.writes && typeof statements.writes === "object" ? statements.writes : {};
     const assignments = statements.assignments && typeof statements.assignments === "object" ? statements.assignments : {};
+    const conditionals = statements.conditionals && typeof statements.conditionals === "object" ? statements.conditionals : {};
 
     return {
       ...base,
@@ -112,6 +119,11 @@
           ...base.statements.assignments,
           ...assignments,
           rules: Array.isArray(assignments.rules) ? assignments.rules : base.statements.assignments.rules,
+        },
+        conditionals: {
+          ...base.statements.conditionals,
+          ...conditionals,
+          rules: Array.isArray(conditionals.rules) ? conditionals.rules : base.statements.conditionals.rules,
         },
       },
     };
@@ -271,7 +283,46 @@
     return { name, params };
   }
 
-  function parseDataOrConstants(stmt, declKind, description, sourceRef, options) {
+  function extractDeclInlineDescriptionsByVar(lines, startLine, endLine, declKind) {
+    const byLine = doc.extractInlineCommentsByLine ? doc.extractInlineCommentsByLine(lines, startLine, endLine) : {};
+    const byVar = {};
+
+    const from = Math.max(1, startLine || 1);
+    const to = Math.min(lines.length, endLine || from);
+
+    for (let ln = from; ln <= to; ln++) {
+      const c = String(byLine?.[ln] || "").trim();
+      if (!c) continue;
+
+      const raw = String(lines[ln - 1] || "");
+      if (utils.isFullLineComment(raw)) continue;
+
+      let code = utils.stripInlineComment(raw).trim();
+      if (!code) continue;
+
+      const dk = String(declKind || "").trim();
+      if (dk) {
+        const re = new RegExp(`^${dk}\\b`, "i");
+        if (re.test(code)) {
+          code = code.replace(re, "").trim();
+          if (code.startsWith(":")) code = code.slice(1).trim();
+        }
+      }
+
+      code = code.replace(/^[,]+/, "").trim();
+      if (!code) continue;
+
+      const firstToken = utils.cleanIdentifierToken(code.split(/\s+/)[0] || "");
+      if (!utils.isIdentifier(firstToken)) continue;
+
+      const key = String(firstToken).toLowerCase();
+      if (!(key in byVar)) byVar[key] = c;
+    }
+
+    return byVar;
+  }
+
+  function parseDataOrConstants(stmt, declKind, descriptionsByVar, leadingDescription, sourceRef, options) {
     const s = utils.normalizeSpaces(utils.stripTrailingPeriod(stmt));
     const ignorePatterns = Array.isArray(options?.ignorePatterns) ? options.ignorePatterns : [];
     for (const p of ignorePatterns) {
@@ -295,7 +346,10 @@
       const valueMatch = /\bVALUE\b\s+(.+)$/i.exec(p);
       value = valueMatch ? valueMatch[1].trim() : "";
 
-      out.push(new AbapDataDeclaration(declKind, variableName, dataType, value, description, sourceRef));
+      const inlineDesc = String(descriptionsByVar?.[String(variableName).toLowerCase()] || "").trim();
+      const desc = inlineDesc || (out.length === 0 ? String(leadingDescription || "").trim() : "");
+
+      out.push(new AbapDataDeclaration(declKind, variableName, dataType, value, desc, sourceRef));
     }
 
     return out;
@@ -408,7 +462,6 @@
     const normalized = utils.normalizeSpaces(utils.stripTrailingPeriod(text));
     if (!normalized) return;
 
-    const inlineComment = doc.extractInlineCommentFromStatement(originalLines, statement.startLine, statement.endLine);
     const src = new SourceRef(statement.startLine, statement.endLine);
 
     const callRules = Array.isArray(cfg?.statements?.calls) ? cfg.statements.calls : [];
@@ -431,13 +484,28 @@
       if (!dk) continue;
       if (!new RegExp(`^${dk}\\b`, "i").test(normalized)) continue;
 
-      const decls = parseDataOrConstants(normalized, dk, inlineComment, src, {
+      const leadingDoc = doc.extractLeadingComment(originalLines, statement.startLine);
+      const inlineDescriptionsByVar = extractDeclInlineDescriptionsByVar(originalLines, statement.startLine, statement.endLine, dk);
+
+      const decls = parseDataOrConstants(normalized, dk, inlineDescriptionsByVar, leadingDoc.description, src, {
         ignorePatterns: declCfg.ignorePatterns?.[dk] || [],
         supportsValue: dk === "CONSTANTS",
       });
 
       if (dk === "DATA") routine.localData.push(...decls);
       else if (dk === "CONSTANTS") routine.localConstants.push(...decls);
+      return;
+    }
+
+    const conditionalRules = Array.isArray(cfg?.statements?.conditionals?.rules) ? cfg.statements.conditionals.rules : [];
+    for (const rule of conditionalRules) {
+      const re = asRegex(rule?.regex);
+      const m = regexExec(re, normalized);
+      if (!m) continue;
+
+      const kind = String(rule?.kind || "IF").trim().toUpperCase() || "IF";
+      const condition = String(m[1] || "").trim();
+      routine.ifStatements.push(new AbapIfStatement(kind, condition, src));
       return;
     }
 
@@ -496,7 +564,6 @@
       }
 
       if (!currentEvent) {
-        const inlineComment = doc.extractInlineCommentFromStatement(lines, st.startLine, st.endLine);
         const src = new SourceRef(st.startLine, st.endLine);
 
         const declCfg = cfg?.statements?.declarations || {};
@@ -507,7 +574,10 @@
           if (!dk) continue;
           if (!new RegExp(`^${dk}\\b`, "i").test(normalized)) continue;
 
-          const decls = parseDataOrConstants(normalized, dk, inlineComment, src, {
+          const leadingDoc = doc.extractLeadingComment(lines, st.startLine);
+          const inlineDescriptionsByVar = extractDeclInlineDescriptionsByVar(lines, st.startLine, st.endLine, dk);
+
+          const decls = parseDataOrConstants(normalized, dk, inlineDescriptionsByVar, leadingDoc.description, src, {
             ignorePatterns: declCfg.ignorePatterns?.[dk] || [],
             supportsValue: dk === "CONSTANTS",
           });

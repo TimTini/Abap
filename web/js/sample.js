@@ -44,6 +44,17 @@ FORM main
   DATA lv_a TYPE i VALUE 0.
   DATA lv_b TYPE string.
 
+  * Độ sâu
+  DATA lv_next_depth TYPE i.
+  DATA lv_msg        TYPE string.     " Message
+
+  DATA: lv_next_depth2 TYPE i,         " Độ sâu
+        lv_msg2        TYPE string.    " Message
+
+  IF lv_a = 0 AND lv_msg IS INITIAL OR iv_cycle = abap_true.
+    cv_count = cv_count.
+  ENDIF.
+
   cv_count = cv_count + 1.
 
   PERFORM step_a USING lv_a iv_maxd CHANGING cv_count.

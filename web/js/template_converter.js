@@ -1,6 +1,8 @@
 (function (ns) {
   "use strict";
 
+  const IDENT_PATH_RE = /[A-Za-z_][A-Za-z0-9_\/]*(?:(?:->|=>|[-~])[A-Za-z0-9_\/]+)*/g;
+
   function pickDescription(entity) {
     if (!entity) return "";
     const user = String(entity.userDescription || "").trim();
@@ -13,6 +15,48 @@
     const user = String(entity.userNote || "").trim();
     if (user) return user;
     return String(entity.note || "").trim();
+  }
+
+  function stripStringsAndTemplates(s) {
+    // ABAP strings: '...'; escaped by doubling: ''
+    const noStrings = String(s || "").replace(/'(?:[^']|'')*'/g, " ");
+    // ABAP string templates: |...|  (best-effort)
+    return noStrings.replace(/\|[^|]*\|/g, " ");
+  }
+
+  function rootFromPath(path) {
+    const s = String(path || "").trim();
+    if (!s) return "";
+    const root = s.split(/(?:->|=>|[-~])/)[0] || "";
+    const m = /^[A-Za-z_][A-Za-z0-9_\/]*/.exec(root.trim());
+    return m ? m[0] : "";
+  }
+
+  function resolveBestSymbol(model, routineKey, expr) {
+    const resolver = ns.lineage?.resolveSymbol;
+    const rk = String(routineKey || "").trim();
+    if (!resolver || !model || !rk) return { root: "", scope: "unknown", decl: null };
+
+    const sanitized = stripStringsAndTemplates(expr);
+    IDENT_PATH_RE.lastIndex = 0;
+    const tokens = [];
+    let m = null;
+    while ((m = IDENT_PATH_RE.exec(sanitized))) {
+      const token = String(m[0] || "").trim();
+      if (token) tokens.push(token);
+    }
+
+    for (const token of tokens) {
+      const root = rootFromPath(token);
+      if (!root) continue;
+      const res = resolver(model, rk, root);
+      if (res && String(res.scope || "").toLowerCase() !== "unknown") return { root, scope: res.scope, decl: res.decl || null };
+    }
+
+    const fallbackRoot = tokens.length ? rootFromPath(tokens[0]) : "";
+    if (!fallbackRoot) return { root: "", scope: "unknown", decl: null };
+    const fallback = resolver(model, rk, fallbackRoot);
+    return { root: fallbackRoot, scope: fallback?.scope || "unknown", decl: fallback?.decl || null };
   }
 
   function extractSource(model, sourceRef) {
@@ -39,6 +83,21 @@
     }
 
     out.sort((a, b) => Number(a?.assignment?.sourceRef?.startLine || 0) - Number(b?.assignment?.sourceRef?.startLine || 0));
+    return out;
+  }
+
+  function extractIfStatements(model) {
+    const out = [];
+    const nodes = Array.from(model?.nodes?.values ? model.nodes.values() : []);
+    for (const routine of nodes) {
+      const list = Array.isArray(routine?.ifStatements) ? routine.ifStatements : [];
+      for (const st of list) {
+        if (!st || !st.sourceRef) continue;
+        out.push({ routine, ifStatement: st });
+      }
+    }
+
+    out.sort((a, b) => Number(a?.ifStatement?.sourceRef?.startLine || 0) - Number(b?.ifStatement?.sourceRef?.startLine || 0));
     return out;
   }
 
@@ -116,6 +175,14 @@
   function buildAssignmentContext(model, routine, assignment) {
     const r = routine || null;
     const a = assignment || null;
+
+    const lhsText = String(a?.lhs || "");
+    const rhsText = String(a?.rhs || "");
+
+    const routineKey = String(r?.key || "");
+    const lhsResolved = resolveBestSymbol(model, routineKey, lhsText);
+    const rhsResolved = resolveBestSymbol(model, routineKey, rhsText);
+
     return {
       routine: {
         key: String(r?.key || ""),
@@ -123,10 +190,76 @@
         name: String(r?.name || ""),
       },
       assignment: {
-        lhs: String(a?.lhs || ""),
-        rhs: String(a?.rhs || ""),
+        lhs: lhsText,
+        rhs: rhsText,
         statement: String(a?.statement || ""),
       },
+      item: {
+        text: lhsText,
+        root: lhsResolved.root,
+        scope: String(lhsResolved.scope || "unknown"),
+        description: pickDescription(lhsResolved.decl),
+        note: pickNote(lhsResolved.decl),
+      },
+      value: {
+        text: rhsText,
+        root: rhsResolved.root,
+        scope: String(rhsResolved.scope || "unknown"),
+        description: pickDescription(rhsResolved.decl),
+        note: pickNote(rhsResolved.decl),
+      },
+    };
+  }
+
+  function buildIfContext(model, routine, ifStatement) {
+    const r = routine || null;
+    const st = ifStatement || null;
+
+    const routineKey = String(r?.key || "");
+    const kind = String(st?.kind || "IF").trim().toUpperCase() || "IF";
+    const condition = String(st?.condition || "").trim();
+
+    const parsed = typeof ns.logic?.parseIfExpression === "function" ? ns.logic.parseIfExpression(condition) : [{ item1: condition, operator: "", item2: "", association: "", raw: condition }];
+
+    const conditions = (parsed || []).map((c) => {
+      const item1Text = String(c?.item1 || "").trim();
+      const item2Text = String(c?.item2 || "").trim();
+
+      const item1Resolved = resolveBestSymbol(model, routineKey, item1Text);
+      const item2Resolved = item2Text ? resolveBestSymbol(model, routineKey, item2Text) : { root: "", scope: "unknown", decl: null };
+
+      const item1Desc = pickDescription(item1Resolved.decl) || item1Text;
+      const item2Desc = pickDescription(item2Resolved.decl) || item2Text;
+
+      return {
+        item1: {
+          text: item1Text,
+          root: item1Resolved.root,
+          scope: String(item1Resolved.scope || "unknown"),
+          description: item1Desc,
+          note: pickNote(item1Resolved.decl),
+        },
+        operator: String(c?.operator || "").trim(),
+        item2: {
+          text: item2Text,
+          root: item2Resolved.root,
+          scope: String(item2Resolved.scope || "unknown"),
+          description: item2Desc,
+          note: pickNote(item2Resolved.decl),
+        },
+        association: String(c?.association || "").trim().toUpperCase(),
+        raw: String(c?.raw || "").trim(),
+      };
+    });
+
+    return {
+      routine: {
+        key: routineKey,
+        kind: String(r?.kind || ""),
+        name: String(r?.name || ""),
+      },
+      if: { kind, condition },
+      conditions,
     };
   }
 
@@ -238,7 +371,7 @@
 
   function scanRepeatSections(cells) {
     const info = new Map();
-    const re = /\{(tables|using|changing|raising)\[(\d+)\]\.[^}]*\}/g;
+    const re = /\{(tables|using|changing|raising|conditions)\[(\d+)\]\.[^}]*\}/g;
 
     for (const cell of cells) {
       const a = parseCellAddr(cell?.addr);
@@ -279,6 +412,7 @@
       using: Array.isArray(context?.using) ? context.using.length : 0,
       changing: Array.isArray(context?.changing) ? context.changing.length : 0,
       raising: Array.isArray(context?.raising) ? context.raising.length : 0,
+      conditions: Array.isArray(context?.conditions) ? context.conditions.length : 0,
     };
 
     const info = scanRepeatSections(cfg.cells);
@@ -451,15 +585,38 @@
     });
   }
 
+  function convertIfStatements(model, templateConfig) {
+    const items = extractIfStatements(model);
+    return items.map(({ routine, ifStatement }) => {
+      const context = buildIfContext(model, routine, ifStatement);
+      const expanded = expandExcelLikeTableTemplate(templateConfig, context);
+      const filledConfig = compactExcelLikeTableConfig(fillTemplateConfig(expanded, context));
+      const original = extractSource(model, ifStatement.sourceRef) || `${context.if?.kind || "IF"} ${context.if?.condition || ""}`;
+      return {
+        routineKey: String(routine?.key || ""),
+        routineName: String(routine?.name || ""),
+        routineKind: String(routine?.kind || ""),
+        ifStatement,
+        context,
+        filledConfig,
+        original,
+        sourceRef: ifStatement?.sourceRef || null,
+      };
+    });
+  }
+
   ns.templateConverter = {
     extractPerformEdges,
     extractAssignments,
+    extractIfStatements,
     buildPerformContext,
     buildAssignmentContext,
+    buildIfContext,
     fillTemplateConfig,
     expandExcelLikeTableTemplate,
     compactExcelLikeTableConfig,
     convertPerforms,
     convertAssignments,
+    convertIfStatements,
   };
 })(window.AbapFlow);

@@ -46,6 +46,14 @@
     }
   }
 
+  class AbapIfStatement {
+    constructor(kind, condition, sourceRef) {
+      this.kind = String(kind || "").trim().toUpperCase() || "IF";
+      this.condition = String(condition || "").trim();
+      this.sourceRef = sourceRef || null;
+    }
+  }
+
   class AbapCallEdge {
     constructor(fromKey, toKey, targetName, args, sourceRef) {
       this.fromKey = fromKey;
@@ -71,6 +79,7 @@
       this.localConstants = [];
       this.assignments = [];
       this.writes = [];
+      this.ifStatements = [];
 
       this.calls = [];
       this.calledBy = [];
@@ -204,6 +213,7 @@
         localConstants: n.localConstants,
         assignments: n.assignments,
         writes: n.writes,
+        ifStatements: n.ifStatements,
         calls: n.calls.map((e) => ({ toKey: e.toKey, sourceRef: e.sourceRef, args: e.args, isInCycle: e.isInCycle })),
         calledBy: n.calledBy.map((e) => ({ fromKey: e.fromKey, sourceRef: e.sourceRef, args: e.args, isInCycle: e.isInCycle })),
       }));
@@ -225,6 +235,7 @@
     AbapDataDeclaration,
     AbapWrite,
     AbapAssignment,
+    AbapIfStatement,
     AbapCallEdge,
     ProgramModel,
   };

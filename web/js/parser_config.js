@@ -112,6 +112,15 @@
         // Ref: https://help.sap.com/doc/abapdocu_751_index_htm/7.51/en-us/abenequals_operator.htm
         rules: [{ regex: new RegExp(String.raw`^(${IDENT_PATH})\s*=\s*(.+)$`) }],
       },
+
+      conditionals: {
+        // IF/ELSEIF logical expressions (captured as "condition" text).
+        // Ref: https://help.sap.com/doc/abapdocu_751_index_htm/7.51/en-us/abapif.htm
+        rules: [
+          { kind: "IF", regex: /^IF\s+(.+)$/i },
+          { kind: "ELSEIF", regex: /^ELSEIF\s+(.+)$/i },
+        ],
+      },
     },
   };
 })(window.AbapFlow);

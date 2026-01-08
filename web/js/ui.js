@@ -439,6 +439,14 @@
     const assignments = (r.assignments || [])
       .map((a) => `<li>${sourceLink(`${a.lhs} = ${a.rhs}`, a.sourceRef)}</li>`)
       .join("");
+    const ifStatements = (r.ifStatements || [])
+      .map((st) => {
+        const kind = String(st?.kind || "IF").trim().toUpperCase() || "IF";
+        const cond = String(st?.condition || "").trim();
+        const label = cond ? `${kind} ${cond}` : kind;
+        return `<li>${sourceLink(label, st.sourceRef)}</li>`;
+      })
+      .join("");
     const writes = r.writes.map((w) => `<li>${sourceLink(`${w.variableName}  ⇐  ${w.statement}`, w.sourceRef)}</li>`).join("");
 
     const codeDesc = String(r.description || "").trim();
@@ -493,6 +501,10 @@
       <div class="section">
         <div class="section__title">Assignments</div>
         <ul class="list">${assignments || "<li>(none)</li>"}</ul>
+      </div>
+      <div class="section">
+        <div class="section__title">IF / ELSEIF</div>
+        <ul class="list">${ifStatements || "<li>(none)</li>"}</ul>
       </div>
       <div class="section">
         <div class="section__title">Calls (PERFORM)</div>
@@ -919,6 +931,13 @@
     return `${rk}@${start}-${end}`;
   }
 
+  function ifIdFrom(routineKey, sourceRef) {
+    const rk = String(routineKey || "").trim() || "IF";
+    const start = Math.max(0, Math.floor(Number(sourceRef?.startLine || 0)));
+    const end = Math.max(start, Math.floor(Number(sourceRef?.endLine || start)));
+    return `IF:${rk}@${start}-${end}`;
+  }
+
   function routineTemplateSteps(model, routineKey, templatesBySource) {
     const routine = model?.nodes?.get ? model.nodes.get(routineKey) : null;
     if (!routine) return [];
@@ -929,6 +948,13 @@
       for (const a of routine.assignments) {
         if (!a?.sourceRef) continue;
         steps.push({ kind: "assignment", sourceRef: a.sourceRef, routineKey, routine, assignment: a });
+      }
+    }
+
+    if (templatesBySource.has("ifs") && Array.isArray(routine.ifStatements)) {
+      for (const st of routine.ifStatements) {
+        if (!st?.sourceRef) continue;
+        steps.push({ kind: "if", sourceRef: st.sourceRef, routineKey, routine, ifStatement: st });
       }
     }
 
@@ -993,6 +1019,34 @@
       };
     }
 
+    function convertIf(routine, ifStatement) {
+      const entry = templatesBySource.get("ifs");
+      if (!entry?.config) return null;
+      if (!converter.buildIfContext) return null;
+
+      const context = converter.buildIfContext(model, routine, ifStatement);
+      const expanded = converter.expandExcelLikeTableTemplate(entry.config, context);
+      const filled = converter.compactExcelLikeTableConfig(converter.fillTemplateConfig(expanded, context));
+      const resultId = ifIdFrom(routine?.key, ifStatement?.sourceRef);
+      applyOverridesToConfig(filled, getLocalTemplateOverrides(entry.id, resultId));
+
+      const k = String(context?.if?.kind || "IF").trim().toUpperCase() || "IF";
+      const cond = String(context?.if?.condition || "").trim();
+      const fallback = cond ? `${k} ${cond}.` : `${k}.`;
+
+      return {
+        kind: "if",
+        templateId: String(entry.id || ""),
+        resultId,
+        ifStatement,
+        routineKey: String(routine?.key || ""),
+        context,
+        sourceRef: ifStatement?.sourceRef || null,
+        original: extractSource(model, ifStatement?.sourceRef) || fallback,
+        filledConfig: filled,
+      };
+    }
+
     function walk(routineKey, depth, stack) {
       const routine = model?.nodes?.get ? model.nodes.get(routineKey) : null;
       if (!routine) return;
@@ -1009,6 +1063,12 @@
         if (items.length >= maxSteps) {
           truncated = true;
           break;
+        }
+
+        if (step.kind === "if") {
+          const r = convertIf(step.routine, step.ifStatement);
+          if (r) items.push({ kind: "template", depth, isRecursion: false, result: r });
+          continue;
         }
 
         if (step.kind === "assignment") {
@@ -1047,6 +1107,8 @@
     const b = String(bind || "").trim();
     if (!b) return false;
     if (b === "perform.description") return true;
+    if (b === "item.description" || b === "value.description") return true;
+    if (/^conditions\[\d+\]\.(?:item1|item2)\.description$/.test(b)) return true;
     return /^(tables|using|changing|raising)\[\d+\]\.description$/.test(b);
   }
 
@@ -1054,6 +1116,28 @@
     const b = String(bind || "").trim();
     const ctx = result?.context;
     const performName = String(ctx?.perform?.name || "").trim();
+
+    if (b === "item.description") {
+      const item = String(ctx?.assignment?.lhs || "").trim();
+      return item ? `Desc Item: ${item}` : "Desc Item";
+    }
+
+    if (b === "value.description") {
+      const value = String(ctx?.assignment?.rhs || "").trim();
+      return value ? `Desc Value: ${value}` : "Desc Value";
+    }
+
+    const condMatch = /^conditions\[(\d+)\]\.(item1|item2)\.description$/.exec(b);
+    if (condMatch) {
+      const idx = Number(condMatch[1]);
+      const side = String(condMatch[2] || "").trim();
+      const cond = ctx?.conditions?.[idx] || null;
+      const itemText = side === "item2" ? String(cond?.item2?.text || "").trim() : String(cond?.item1?.text || "").trim();
+      const op = String(cond?.operator || "").trim();
+      const label = side === "item2" ? "Item 2" : "Item 1";
+      const tail = itemText ? `${itemText}${op ? ` (${op})` : ""}` : `#${idx + 1}`;
+      return `Desc ${label}: ${tail}`;
+    }
     if (!b) return "Mô tả";
 
     if (b === "perform.description") return performName ? `Mô tả FORM ${performName}` : "Mô tả FORM";
@@ -1079,6 +1163,64 @@
     const b = String(bind || "").trim();
     const ctx = result?.context;
     if (!ctx) return null;
+
+    const condMatch = /^conditions\[(\d+)\]\.(item1|item2)\.description$/.exec(b);
+    if (condMatch) {
+      if (!ns.notes?.makeDeclKey || !ns.lineage?.resolveSymbol) return null;
+
+      const model = state.model;
+      const routineKey = String(result?.routineKey || ctx.routine?.key || "").trim();
+      const idx = Number(condMatch[1]);
+      const side = String(condMatch[2] || "").trim();
+      const cond = ctx?.conditions?.[idx] || null;
+      const root = side === "item2" ? String(cond?.item2?.root || "").trim() : String(cond?.item1?.root || "").trim();
+      if (!model || !routineKey || !root) return null;
+
+      const resolution = ns.lineage.resolveSymbol(model, routineKey, root);
+      if (!resolution || resolution.scope === "unknown") return null;
+
+      if (resolution.scope === "parameter") {
+        const key = ns.notes.makeParamKey(routineKey, root);
+        return key ? { key } : null;
+      }
+
+      if (resolution.scope === "local" || resolution.scope === "global") {
+        const declKind = String(resolution.decl?.declKind || "").trim();
+        if (!declKind) return null;
+        const scopeKey = resolution.scope === "global" ? "PROGRAM" : routineKey;
+        const key = ns.notes.makeDeclKey(scopeKey, declKind, root);
+        return key ? { key } : null;
+      }
+
+      return null;
+    }
+
+    if (b === "item.description" || b === "value.description") {
+      if (!ns.notes?.makeDeclKey || !ns.lineage?.resolveSymbol) return null;
+
+      const model = state.model;
+      const routineKey = String(result?.routineKey || ctx.routine?.key || "").trim();
+      const root = b === "item.description" ? String(ctx?.item?.root || "").trim() : String(ctx?.value?.root || "").trim();
+      if (!model || !routineKey || !root) return null;
+
+      const resolution = ns.lineage.resolveSymbol(model, routineKey, root);
+      if (!resolution || resolution.scope === "unknown") return null;
+
+      if (resolution.scope === "parameter") {
+        const key = ns.notes.makeParamKey(routineKey, root);
+        return key ? { key } : null;
+      }
+
+      if (resolution.scope === "local" || resolution.scope === "global") {
+        const declKind = String(resolution.decl?.declKind || "").trim();
+        if (!declKind) return null;
+        const scopeKey = resolution.scope === "global" ? "PROGRAM" : routineKey;
+        const key = ns.notes.makeDeclKey(scopeKey, declKind, root);
+        return key ? { key } : null;
+      }
+
+      return null;
+    }
 
     if (b === "perform.description") {
       const key = String(ctx.perform?.key || "").trim();
@@ -1308,6 +1450,11 @@
 
       if (result.kind === "perform") {
         header.textContent = `PERFORM ${result.context?.perform?.name || ""}${lineText}${loopText}`;
+      } else if (result.kind === "if") {
+        const k = String(result.context?.if?.kind || "IF").trim().toUpperCase() || "IF";
+        const cond = String(result.context?.if?.condition || "").trim();
+        const text = cond ? `${k} ${cond}` : k;
+        header.textContent = `${text}${lineText}`;
       } else if (result.kind === "assignment") {
         const lhs = String(result.context?.assignment?.lhs || "").trim();
         const rhs = String(result.context?.assignment?.rhs || "").trim();
