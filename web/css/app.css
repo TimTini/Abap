@@ -596,6 +596,39 @@ select.input optgroup {
   margin-top: 12px;
   font-size: 13px;
   font-weight: 650;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.trace-node__toggle {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+  transition: transform 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.trace-node__toggle:hover {
+  border-color: rgba(96, 165, 250, 0.55);
+  color: var(--text);
+}
+
+.trace-node.is-collapsed > :not(.trace-node__header) {
+  display: none;
+}
+
+.trace-node.is-collapsed > .trace-node__header .trace-node__toggle {
+  transform: rotate(-90deg);
 }
 
 .trace-node__meta {
