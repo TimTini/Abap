@@ -8,6 +8,7 @@
 
   const sourceLink = ui.sourceLink;
   const renderAnnoSummaryHtml = ui.renderAnnoSummaryHtml;
+  const renderInlineAnnoEditorHtml = ui.renderInlineAnnoEditorHtml;
   const wireInlineAnnoEditors = ui.wireInlineAnnoEditors;
 
   function renderDiagram() {
@@ -207,29 +208,16 @@
 
       const routineEdit =
         routineKey && ns.notes
-          ? `<details class="param-notes" style="padding-left:${pad}px">
-              <summary class="param-notes__summary">Edit object notes</summary>
-              <div class="param-notes__body">
-                <div class="anno-grid">
-                  <div class="anno-label">Description (from code)</div>
-                  <div class="anno-code${codeRoutineDesc ? "" : " anno-code--empty"}">${utils.escapeHtml(codeRoutineDesc || "(none)")}</div>
-
-                  <div class="anno-label">Your description</div>
-                  <textarea class="textarea param-notes__input" rows="2" data-anno-type="routine" data-anno-key="${utils.escapeHtml(
-                    routineKey,
-                  )}" data-anno-field="description" data-routine-key="${utils.escapeHtml(
-              routineKey,
-            )}" placeholder="Add your description (stored locally)...">${utils.escapeHtml(userRoutineDesc)}</textarea>
-
-                  <div class="anno-label">Your note</div>
-                  <textarea class="textarea param-notes__input" rows="3" data-anno-type="routine" data-anno-key="${utils.escapeHtml(
-                    routineKey,
-                  )}" data-anno-field="note" data-routine-key="${utils.escapeHtml(
-              routineKey,
-            )}" placeholder="Add notes (stored locally)...">${utils.escapeHtml(userRoutineNote)}</textarea>
-                </div>
-              </div>
-            </details>`
+          ? renderInlineAnnoEditorHtml({
+              title: "Edit object notes",
+              style: `padding-left:${pad}px`,
+              codeDesc: codeRoutineDesc,
+              userDesc: userRoutineDesc,
+              userNote: userRoutineNote,
+              annoType: "routine",
+              annoKey: routineKey,
+              attrs: { "data-routine-key": routineKey },
+            })
           : "";
 
       let varSummary = "";
@@ -270,33 +258,19 @@
           varSummary = renderAnnoSummaryHtml({ codeDesc, userDesc, userNote });
 
           if (paramKey) {
-            varEdit = `<details class="param-notes" style="padding-left:${pad}px">
-              <summary class="param-notes__summary">Edit variable notes (${utils.escapeHtml(originDecl.name)})</summary>
-              <div class="param-notes__body">
-                <div class="anno-grid">
-                  <div class="anno-label">Description (from code)</div>
-                  <div class="anno-code${codeDesc ? "" : " anno-code--empty"}">${utils.escapeHtml(codeDesc || "(none)")}</div>
-
-                  <div class="anno-label">Your description</div>
-                  <textarea class="textarea param-notes__input" rows="2" data-anno-type="param" data-anno-key="${utils.escapeHtml(
-                    paramKey,
-                  )}" data-anno-field="description" data-routine-key="${utils.escapeHtml(
-              originRoutineKey,
-            )}" data-param-name="${utils.escapeHtml(originDecl.name)}" placeholder="Add your description (stored locally)...">${utils.escapeHtml(
+            varEdit = renderInlineAnnoEditorHtml({
+              title: `Edit variable notes (${String(originDecl.name || "")})`,
+              style: `padding-left:${pad}px`,
+              codeDesc,
               userDesc,
-            )}</textarea>
-
-                  <div class="anno-label">Your note</div>
-                  <textarea class="textarea param-notes__input" rows="3" data-anno-type="param" data-anno-key="${utils.escapeHtml(
-                    paramKey,
-                  )}" data-anno-field="note" data-routine-key="${utils.escapeHtml(
-              originRoutineKey,
-            )}" data-param-name="${utils.escapeHtml(originDecl.name)}" placeholder="Add notes (stored locally)...">${utils.escapeHtml(
               userNote,
-            )}</textarea>
-                </div>
-              </div>
-            </details>`;
+              annoType: "param",
+              annoKey: paramKey,
+              attrs: {
+                "data-routine-key": originRoutineKey,
+                "data-param-name": String(originDecl.name || ""),
+              },
+            });
           }
         } else if (
           originDecl &&
@@ -313,33 +287,20 @@
           varSummary = renderAnnoSummaryHtml({ codeDesc, userDesc, userNote });
 
           if (declKey) {
-            varEdit = `<details class="param-notes" style="padding-left:${pad}px">
-              <summary class="param-notes__summary">Edit variable notes (${utils.escapeHtml(originDecl.variableName)})</summary>
-              <div class="param-notes__body">
-                <div class="anno-grid">
-                  <div class="anno-label">Description (from code)</div>
-                  <div class="anno-code${codeDesc ? "" : " anno-code--empty"}">${utils.escapeHtml(codeDesc || "(none)")}</div>
-
-                  <div class="anno-label">Your description</div>
-                  <textarea class="textarea param-notes__input" rows="2" data-anno-type="decl" data-anno-key="${utils.escapeHtml(
-                    declKey,
-                  )}" data-anno-field="description" data-scope-key="${utils.escapeHtml(
-              scopeKey,
-            )}" data-decl-kind="${utils.escapeHtml(originDecl.declKind)}" data-var-name="${utils.escapeHtml(
-              originDecl.variableName,
-            )}" placeholder="Add your description (stored locally)...">${utils.escapeHtml(userDesc)}</textarea>
-
-                  <div class="anno-label">Your note</div>
-                  <textarea class="textarea param-notes__input" rows="3" data-anno-type="decl" data-anno-key="${utils.escapeHtml(
-                    declKey,
-                  )}" data-anno-field="note" data-scope-key="${utils.escapeHtml(
-              scopeKey,
-            )}" data-decl-kind="${utils.escapeHtml(originDecl.declKind)}" data-var-name="${utils.escapeHtml(
-              originDecl.variableName,
-            )}" placeholder="Add notes (stored locally)...">${utils.escapeHtml(userNote)}</textarea>
-                </div>
-              </div>
-            </details>`;
+            varEdit = renderInlineAnnoEditorHtml({
+              title: `Edit variable notes (${String(originDecl.variableName || "")})`,
+              style: `padding-left:${pad}px`,
+              codeDesc,
+              userDesc,
+              userNote,
+              annoType: "decl",
+              annoKey: declKey,
+              attrs: {
+                "data-scope-key": scopeKey,
+                "data-decl-kind": originDecl.declKind,
+                "data-var-name": originDecl.variableName,
+              },
+            });
           }
         }
       }

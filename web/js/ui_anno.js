@@ -30,6 +30,59 @@
     return `<div class="anno-summary">${lines.join("")}</div>`;
   }
 
+  function renderInlineAnnoEditorHtml(options) {
+    const annoKey = String(options?.annoKey || "").trim();
+    if (!annoKey) return "";
+
+    const titleText = String(options?.title || "Edit notes");
+    const codeDesc = String(options?.codeDesc || "").trim();
+    const userDesc = String(options?.userDesc || "").trim();
+    const userNote = String(options?.userNote || "").trim();
+    const annoType = String(options?.annoType || "").trim();
+    const style = String(options?.style || "").trim();
+
+    const attrs = options?.attrs && typeof options.attrs === "object" ? options.attrs : {};
+
+    function toDataAttrs(field) {
+      const parts = [];
+      parts.push(`data-anno-type="${utils.escapeHtml(annoType)}"`);
+      parts.push(`data-anno-key="${utils.escapeHtml(annoKey)}"`);
+      parts.push(`data-anno-field="${utils.escapeHtml(field)}"`);
+
+      for (const [nameRaw, valueRaw] of Object.entries(attrs)) {
+        const name = String(nameRaw || "").trim();
+        if (!name) continue;
+        if (!name.startsWith("data-")) continue;
+        if (!/^data-[a-z0-9-]+$/.test(name)) continue;
+        parts.push(`${name}="${utils.escapeHtml(String(valueRaw ?? ""))}"`);
+      }
+
+      return parts.join(" ");
+    }
+
+    const styleAttr = style ? ` style="${utils.escapeHtml(style)}"` : "";
+
+    return `<details class="param-notes"${styleAttr}>
+        <summary class="param-notes__summary">${utils.escapeHtml(titleText)}</summary>
+        <div class="param-notes__body">
+          <div class="anno-grid">
+            <div class="anno-label">Description (from code)</div>
+            <div class="anno-code${codeDesc ? "" : " anno-code--empty"}">${utils.escapeHtml(codeDesc || "(none)")}</div>
+
+            <div class="anno-label">Your description</div>
+            <textarea class="textarea param-notes__input" rows="2" ${toDataAttrs("description")} placeholder="Add your description (stored locally)...">${utils.escapeHtml(
+              userDesc,
+            )}</textarea>
+
+            <div class="anno-label">Your note</div>
+            <textarea class="textarea param-notes__input" rows="3" ${toDataAttrs("note")} placeholder="Add notes (stored locally)...">${utils.escapeHtml(
+              userNote,
+            )}</textarea>
+          </div>
+        </div>
+      </details>`;
+  }
+
   function wireInlineAnnoEditors(rootEl) {
     const model = ui.state.model;
     if (!model || !ns.notes) return;
@@ -169,7 +222,7 @@
 
   ui.sourceLink = sourceLink;
   ui.renderAnnoSummaryHtml = renderAnnoSummaryHtml;
+  ui.renderInlineAnnoEditorHtml = renderInlineAnnoEditorHtml;
   ui.wireInlineAnnoEditors = wireInlineAnnoEditors;
   ui.wireNotesEditorForKey = wireNotesEditorForKey;
 })(window.AbapFlow);
-

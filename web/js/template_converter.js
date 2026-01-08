@@ -1,19 +1,50 @@
 (function (ns) {
   "use strict";
 
-  const IDENT_PATH_RE = /[A-Za-z_][A-Za-z0-9_\/]*(?:(?:->|=>|[-~])[A-Za-z0-9_\/]+)*/g;
+  const utils = ns.utils;
+
   const desc = ns.desc || null;
+  const IDENT_PATH_RE = desc?.IDENT_PATH_RE ? new RegExp(desc.IDENT_PATH_RE.source, "g") : /[A-Za-z_][A-Za-z0-9_\/]*(?:(?:->|=>|[-~])[A-Za-z0-9_\/]+)*/g;
+  const pickDescription =
+    typeof desc?.pickDescription === "function"
+      ? desc.pickDescription
+      : (entity, fallbackName) => {
+          if (!entity) return String(fallbackName || "").trim();
+          const user = String(entity.userDescription || "").trim();
+          if (user) return user;
+          const code = String(entity.description || "").trim();
+          if (code) return code;
+          return String(fallbackName || entity.variableName || entity.name || "").trim();
+        };
+  const maskStringsAndTemplates =
+    typeof desc?.maskStringsAndTemplates === "function"
+      ? desc.maskStringsAndTemplates
+      : (s) => {
+          // ABAP strings: '...'; escaped by doubling: ''
+          const noStrings = String(s || "").replace(/'(?:[^']|'')*'/g, " ");
+          // ABAP string templates: |...|  (best-effort)
+          return noStrings.replace(/\|[^|]*\|/g, " ");
+        };
+  const rootFromPath =
+    typeof desc?.rootFromPath === "function"
+      ? desc.rootFromPath
+      : (path) => {
+          const s = String(path || "").trim();
+          if (!s) return "";
+          const root = s.split(/(?:->|=>|[-~])/)[0] || "";
+          const m = /^[A-Za-z_][A-Za-z0-9_\/]*/.exec(root.trim());
+          return m ? m[0] : "";
+        };
 
-  function pickDescription(entity, fallbackName) {
-    if (desc?.pickDescription) return desc.pickDescription(entity, fallbackName);
-
-    if (!entity) return String(fallbackName || "").trim();
-    const user = String(entity.userDescription || "").trim();
-    if (user) return user;
-    const code = String(entity.description || "").trim();
-    if (code) return code;
-    return String(fallbackName || entity.variableName || entity.name || "").trim();
-  }
+  const extractSource =
+    typeof utils?.extractSource === "function"
+      ? utils.extractSource
+      : (model, sourceRef) => {
+          if (!model || !Array.isArray(model.lines) || !sourceRef) return "";
+          const start = Math.max(1, Math.floor(Number(sourceRef.startLine || 1)));
+          const end = Math.min(model.lines.length, Math.floor(Number(sourceRef.endLine || start)));
+          return model.lines.slice(start - 1, end).join("\n").trim();
+        };
 
   function pickNote(entity) {
     if (!entity) return "";
@@ -22,27 +53,12 @@
     return String(entity.note || "").trim();
   }
 
-  function stripStringsAndTemplates(s) {
-    // ABAP strings: '...'; escaped by doubling: ''
-    const noStrings = String(s || "").replace(/'(?:[^']|'')*'/g, " ");
-    // ABAP string templates: |...|  (best-effort)
-    return noStrings.replace(/\|[^|]*\|/g, " ");
-  }
-
-  function rootFromPath(path) {
-    const s = String(path || "").trim();
-    if (!s) return "";
-    const root = s.split(/(?:->|=>|[-~])/)[0] || "";
-    const m = /^[A-Za-z_][A-Za-z0-9_\/]*/.exec(root.trim());
-    return m ? m[0] : "";
-  }
-
   function resolveBestSymbol(model, routineKey, expr) {
     const resolver = ns.lineage?.resolveSymbol;
     const rk = String(routineKey || "").trim();
     if (!resolver || !model || !rk) return { root: "", scope: "unknown", decl: null };
 
-    const sanitized = stripStringsAndTemplates(expr);
+    const sanitized = maskStringsAndTemplates(expr);
     IDENT_PATH_RE.lastIndex = 0;
     const tokens = [];
     let m = null;
@@ -62,13 +78,6 @@
     if (!fallbackRoot) return { root: "", scope: "unknown", decl: null };
     const fallback = resolver(model, rk, fallbackRoot);
     return { root: fallbackRoot, scope: fallback?.scope || "unknown", decl: fallback?.decl || null };
-  }
-
-  function extractSource(model, sourceRef) {
-    if (!model || !Array.isArray(model.lines) || !sourceRef) return "";
-    const start = Math.max(1, Math.floor(Number(sourceRef.startLine || 1)));
-    const end = Math.min(model.lines.length, Math.floor(Number(sourceRef.endLine || start)));
-    return model.lines.slice(start - 1, end).join("\n").trim();
   }
 
   function extractPerformEdges(model) {

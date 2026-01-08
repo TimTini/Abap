@@ -7,17 +7,17 @@
   const SCHEMA = "abapflow-notes";
   const VERSION = 1;
 
-  function nowIso() {
-    return new Date().toISOString();
-  }
-
-  function safeJsonParse(text) {
-    try {
-      return { ok: true, value: JSON.parse(text) };
-    } catch (err) {
-      return { ok: false, error: String(err?.message || err) };
-    }
-  }
+  const nowIso = typeof utils?.nowIso === "function" ? utils.nowIso : () => new Date().toISOString();
+  const safeJsonParse =
+    typeof utils?.safeJsonParse === "function"
+      ? utils.safeJsonParse
+      : (text) => {
+          try {
+            return { ok: true, value: JSON.parse(text) };
+          } catch (err) {
+            return { ok: false, error: String(err?.message || err) };
+          }
+        };
 
   function normalizeProgramId(id) {
     const s = String(id || "")

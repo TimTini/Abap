@@ -4,6 +4,7 @@
   const ui = ns.ui;
   ui.templates = ui.templates || {};
   const tpl = ui.templates;
+  const utils = ns.utils;
 
   const TEMPLATE_OVERRIDES_STORAGE_KEY = "abapFlow.templateLocalOverrides.v1";
   const TEMPLATE_OVERRIDES_SCHEMA = "abapflow-template-local-overrides";
@@ -11,17 +12,17 @@
 
   let templateLocalOverrides = loadTemplateLocalOverrides();
 
-  function nowIso() {
-    return new Date().toISOString();
-  }
-
-  function safeJsonParse(text) {
-    try {
-      return { ok: true, value: JSON.parse(text) };
-    } catch (err) {
-      return { ok: false, error: String(err?.message || err) };
-    }
-  }
+  const nowIso = typeof utils?.nowIso === "function" ? utils.nowIso : () => new Date().toISOString();
+  const safeJsonParse =
+    typeof utils?.safeJsonParse === "function"
+      ? utils.safeJsonParse
+      : (text) => {
+          try {
+            return { ok: true, value: JSON.parse(text) };
+          } catch (err) {
+            return { ok: false, error: String(err?.message || err) };
+          }
+        };
 
   function getActiveProgramId() {
     if (ns.notes?.getActiveProgramId) return ns.notes.getActiveProgramId();
@@ -197,4 +198,3 @@
   tpl.setLocalTemplateOverride = setLocalTemplateOverride;
   tpl.applyOverridesToConfig = applyOverridesToConfig;
 })(window.AbapFlow);
-

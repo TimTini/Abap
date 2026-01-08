@@ -4,6 +4,15 @@
   const ui = ns.ui;
   const tpl = ui.templates;
   const utils = ns.utils;
+  const extractSource =
+    typeof utils?.extractSource === "function"
+      ? utils.extractSource
+      : (model, sourceRef) => {
+          if (!model || !Array.isArray(model.lines) || !sourceRef) return "";
+          const start = Math.max(1, Math.floor(Number(sourceRef.startLine || 1)));
+          const end = Math.min(model.lines.length, Math.floor(Number(sourceRef.endLine || start)));
+          return model.lines.slice(start - 1, end).join("\n").trim();
+        };
 
   function computeIfIndentByLine(model, routine) {
     const out = new Map();
@@ -107,13 +116,6 @@
       .slice()
       .sort(byLine)
       .map((n) => n.key);
-  }
-
-  function extractSource(model, sourceRef) {
-    if (!model || !Array.isArray(model.lines) || !sourceRef) return "";
-    const start = Math.max(1, Math.floor(Number(sourceRef.startLine || 1)));
-    const end = Math.min(model.lines.length, Math.floor(Number(sourceRef.endLine || start)));
-    return model.lines.slice(start - 1, end).join("\n").trim();
   }
 
   function edgeIdFrom(edge) {

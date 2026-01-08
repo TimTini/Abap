@@ -185,6 +185,24 @@
       .replace(/'/g, "&#39;");
   };
 
+  utils.nowIso = function nowIso() {
+    return new Date().toISOString();
+  };
+
+  utils.safeJsonParse = function safeJsonParse(text) {
+    try {
+      return { ok: true, value: JSON.parse(text) };
+    } catch (err) {
+      return { ok: false, error: String(err?.message || err) };
+    }
+  };
+
+  utils.extractSource = function extractSource(model, sourceRef) {
+    if (!model || !Array.isArray(model.lines) || !sourceRef) return "";
+    const start = Math.max(1, Math.floor(Number(sourceRef.startLine || 1)));
+    const end = Math.min(model.lines.length, Math.floor(Number(sourceRef.endLine || start)));
+    return model.lines.slice(start - 1, end).join("\n").trim();
+  };
+
   ns.utils = utils;
 })(window.AbapFlow);
-
