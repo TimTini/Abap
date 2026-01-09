@@ -3,6 +3,7 @@
 
   const store = ns.templateDefs || null;
   let selectedAddr = "";
+  const EDITOR_SPLIT_KEY = "abapflow-template-editor-left-px";
 
   function $(id) {
     return document.getElementById(id);
@@ -241,6 +242,241 @@
     cfg.cells.push({ addr, text });
   }
 
+  function parseStyleDeclarations(styleText) {
+    const map = new Map();
+    const raw = String(styleText || "").trim();
+    if (!raw) return map;
+
+    const parts = raw.split(";");
+    for (const part of parts) {
+      const t = String(part || "").trim();
+      if (!t) continue;
+      const idx = t.indexOf(":");
+      if (idx <= 0) continue;
+      const prop = t.slice(0, idx).trim().toLowerCase();
+      const value = t.slice(idx + 1).trim();
+      if (!prop) continue;
+      map.set(prop, value);
+    }
+    return map;
+  }
+
+  function serializeStyleDeclarations(map) {
+    if (!map || map.size === 0) return "";
+    return Array.from(map.entries())
+      .map(([k, v]) => `${k}:${v}`)
+      .join(";")
+      .concat(";");
+  }
+
+  function upsertCellStyleProp(cfg, addrRaw, propRaw, valueRaw) {
+    if (!cfg || typeof cfg !== "object") return;
+    cfg.cells = Array.isArray(cfg.cells) ? cfg.cells : [];
+
+    const addr = normalizeAddress(addrRaw);
+    if (!addr) return;
+
+    const prop = String(propRaw || "").trim().toLowerCase();
+    if (!prop) return;
+    const value = String(valueRaw ?? "").trim();
+
+    const idx = cfg.cells.findIndex((c) => normalizeAddress(c?.addr) === addr);
+    const existing = idx >= 0 ? cfg.cells[idx] : null;
+    const next = { ...(existing || {}), addr };
+
+    const decls = parseStyleDeclarations(next.style);
+    if (!value) decls.delete(prop);
+    else decls.set(prop, value);
+
+    const style = serializeStyleDeclarations(decls);
+    if (style) next.style = style;
+    else delete next.style;
+
+    if (idx >= 0) cfg.cells[idx] = next;
+    else cfg.cells.push(next);
+  }
+
+  function clearCellStyle(cfg, addrRaw) {
+    if (!cfg || typeof cfg !== "object") return;
+    cfg.cells = Array.isArray(cfg.cells) ? cfg.cells : [];
+    const addr = normalizeAddress(addrRaw);
+    if (!addr) return;
+    const idx = cfg.cells.findIndex((c) => normalizeAddress(c?.addr) === addr);
+    if (idx < 0) return;
+    const existing = cfg.cells[idx] || {};
+    if (existing.style == null) return;
+    const next = { ...existing };
+    delete next.style;
+    cfg.cells[idx] = next;
+  }
+
+  function hex2(x) {
+    return String(x || "").padStart(2, "0");
+  }
+
+  function rgbToHex(r, g, b) {
+    const rr = Math.max(0, Math.min(255, Math.floor(Number(r))));
+    const gg = Math.max(0, Math.min(255, Math.floor(Number(g))));
+    const bb = Math.max(0, Math.min(255, Math.floor(Number(b))));
+    return `#${hex2(rr.toString(16))}${hex2(gg.toString(16))}${hex2(bb.toString(16))}`.toLowerCase();
+  }
+
+  function parseCssColorToHex(colorText, fallback) {
+    const raw = String(colorText || "").trim();
+    if (!raw) return fallback || "";
+    const s = raw.toLowerCase();
+    if (s === "transparent") return fallback || "";
+
+    const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(raw);
+    if (hex) {
+      const h = hex[1];
+      if (h.length === 3) return `#${h[0]}${h[0]}${h[1]}${h[1]}${h[2]}${h[2]}`.toLowerCase();
+      return `#${h}`.toLowerCase();
+    }
+
+    const m = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i.exec(s);
+    if (m) return rgbToHex(m[1], m[2], m[3]);
+
+    return fallback || "";
+  }
+
+  function setPreviewToolbarEnabled(enabled) {
+    const on = Boolean(enabled);
+    const ids = ["btnPreviewDeleteRow", "btnPreviewDeleteCol", "btnClearFormat", "selBgColor", "selTextColor", "selBorder", "btnApplyBorder"];
+    for (const id of ids) {
+      const el = $(id);
+      if (el) el.disabled = !on;
+    }
+  }
+
+  function syncPreviewToolbarFromSelection() {
+    const label = $("selAddr");
+    if (label) label.textContent = selectedAddr || "-";
+
+    if (!selectedAddr) {
+      setPreviewToolbarEnabled(false);
+      return;
+    }
+
+    const host = $("previewHost");
+    const td = host ? host.querySelector(`td[data-addr="${selectedAddr}"]`) : null;
+    if (!td || !window.getComputedStyle) {
+      setPreviewToolbarEnabled(false);
+      return;
+    }
+
+    const css = window.getComputedStyle(td);
+    const bg = parseCssColorToHex(css.backgroundColor, "#ffffff");
+    const fg = parseCssColorToHex(css.color, "#111111");
+
+    const bgEl = $("selBgColor");
+    const fgEl = $("selTextColor");
+    const borderEl = $("selBorder");
+
+    if (bgEl && bg) bgEl.value = bg;
+    if (fgEl && fg) fgEl.value = fg;
+    if (borderEl) borderEl.value = String(css.border || "").trim();
+
+    setPreviewToolbarEnabled(true);
+  }
+
+  function initEditorSplitter() {
+    const main = document.querySelector(".app-main.editor-main");
+    const splitter = $("editorSplitter");
+    const leftPanel = document.querySelector(".panel.panel-left");
+
+    if (!main || !splitter || !leftPanel) return;
+
+    function readStored() {
+      try {
+        const n = Number(localStorage.getItem(EDITOR_SPLIT_KEY));
+        return Number.isFinite(n) && n > 0 ? n : 0;
+      } catch (_) {
+        return 0;
+      }
+    }
+
+    function writeStored(px) {
+      try {
+        localStorage.setItem(EDITOR_SPLIT_KEY, String(Math.round(px)));
+      } catch (_) {}
+    }
+
+    function clampLeft(px) {
+      const mainW = main.getBoundingClientRect().width;
+      const splitterW = splitter.getBoundingClientRect().width;
+      const minLeft = 320;
+      const minRight = 320;
+      const maxLeft = Math.max(minLeft, mainW - minRight - splitterW);
+      return Math.max(minLeft, Math.min(maxLeft, px));
+    }
+
+    function applyLeft(px) {
+      main.style.setProperty("--editor-left", `${Math.round(px)}px`);
+    }
+
+    const stored = readStored();
+    if (stored) applyLeft(clampLeft(stored));
+
+    let dragging = false;
+    let startX = 0;
+    let startLeft = 0;
+    let lastApplied = 0;
+
+    function onMove(e) {
+      if (!dragging) return;
+      const dx = Number(e.clientX) - startX;
+      const next = clampLeft(startLeft + dx);
+      if (Math.abs(next - lastApplied) < 1) return;
+      lastApplied = next;
+      applyLeft(next);
+    }
+
+    function stopDrag() {
+      if (!dragging) return;
+      dragging = false;
+      splitter.classList.remove("is-dragging");
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      if (lastApplied) writeStored(lastApplied);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", stopDrag);
+      window.removeEventListener("pointercancel", stopDrag);
+    }
+
+    splitter.addEventListener("pointerdown", (e) => {
+      if (!e || typeof e.clientX !== "number") return;
+      dragging = true;
+      splitter.classList.add("is-dragging");
+      splitter.setPointerCapture?.(e.pointerId);
+      startX = e.clientX;
+      startLeft = leftPanel.getBoundingClientRect().width;
+      lastApplied = startLeft;
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", stopDrag);
+      window.addEventListener("pointercancel", stopDrag);
+    });
+
+    splitter.addEventListener("keydown", (e) => {
+      if (!e) return;
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      e.preventDefault();
+      const delta = e.key === "ArrowLeft" ? -24 : 24;
+      const cur = leftPanel.getBoundingClientRect().width;
+      const next = clampLeft(cur + delta);
+      applyLeft(next);
+      writeStored(next);
+    });
+
+    window.addEventListener("resize", () => {
+      const cur = leftPanel.getBoundingClientRect().width;
+      const next = clampLeft(cur);
+      if (Math.abs(next - cur) >= 1) applyLeft(next);
+    });
+  }
+
   function shiftRowHeightsOnDelete(rowHeights, delRow) {
     const src = rowHeights && typeof rowHeights === "object" ? rowHeights : {};
     const out = {};
@@ -400,6 +636,7 @@
   function selectCell(addr) {
     selectedAddr = normalizeAddress(addr);
     highlightSelectedCell();
+    syncPreviewToolbarFromSelection();
     if (selectedAddr) setStatus(`Selected: ${selectedAddr}`, false);
   }
 
@@ -590,6 +827,7 @@
       host.textContent = "";
       host.appendChild(ns.tableRenderer.renderExcelLikeTable(cfg));
       highlightSelectedCell();
+      syncPreviewToolbarFromSelection();
     } catch (e) {
       host.textContent = String(e?.message || e);
       host.classList.add("empty");
@@ -712,6 +950,53 @@
     $("btnDeleteRow")?.addEventListener("click", deleteSelectedRow);
     $("btnDeleteCol")?.addEventListener("click", deleteSelectedCol);
 
+    $("btnPreviewDeleteRow")?.addEventListener("click", deleteSelectedRow);
+    $("btnPreviewDeleteCol")?.addEventListener("click", deleteSelectedCol);
+
+    $("selBgColor")?.addEventListener("input", () => {
+      if (!selectedAddr) return;
+      const parsed = readTemplateJsonFromEditor();
+      if (!parsed.ok) return;
+      upsertCellStyleProp(parsed.value, selectedAddr, "background", $("selBgColor").value);
+      writeTemplateJson(parsed.value);
+      renderPreview();
+    });
+
+    $("selTextColor")?.addEventListener("input", () => {
+      if (!selectedAddr) return;
+      const parsed = readTemplateJsonFromEditor();
+      if (!parsed.ok) return;
+      upsertCellStyleProp(parsed.value, selectedAddr, "color", $("selTextColor").value);
+      writeTemplateJson(parsed.value);
+      renderPreview();
+    });
+
+    $("btnApplyBorder")?.addEventListener("click", () => {
+      if (!selectedAddr) return;
+      const parsed = readTemplateJsonFromEditor();
+      if (!parsed.ok) return;
+      const border = asNonEmptyString($("selBorder")?.value);
+      upsertCellStyleProp(parsed.value, selectedAddr, "border", border);
+      writeTemplateJson(parsed.value);
+      renderPreview();
+    });
+
+    $("selBorder")?.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      $("btnApplyBorder")?.click();
+    });
+
+    $("btnClearFormat")?.addEventListener("click", () => {
+      if (!selectedAddr) return;
+      const parsed = readTemplateJsonFromEditor();
+      if (!parsed.ok) return;
+      clearCellStyle(parsed.value, selectedAddr);
+      writeTemplateJson(parsed.value);
+      renderPreview();
+      setStatus(`Cleared format: ${selectedAddr}`, false);
+    });
+
     const previewHost = $("previewHost");
     previewHost?.addEventListener("click", (e) => {
       if (e?.target?.closest && e.target.closest("textarea.cell-editor")) return;
@@ -744,6 +1029,7 @@
 
     populateSourceSelect("");
     populateTemplateSelect("");
+    initEditorSplitter();
     wireUi();
 
     const sel = $("tplSelect");

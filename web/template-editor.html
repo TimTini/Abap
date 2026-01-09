@@ -98,9 +98,36 @@
         </div>
       </section>
 
+      <div id="editorSplitter" class="editor-splitter" role="separator" aria-orientation="vertical" tabindex="0"></div>
+
       <section class="panel panel-right">
         <div class="panel__title">Preview</div>
         <div class="hint">Tip: click a cell to select, double-click to edit. Shift+Enter for newline.</div>
+        <div class="template-editor-preview-toolbar">
+          <div class="template-editor-preview-toolbar__row">
+            <div class="template-editor-preview-toolbar__selected">
+              Selected: <span id="selAddr">-</span>
+            </div>
+            <button id="btnPreviewDeleteRow" class="btn" type="button" disabled>Delete row</button>
+            <button id="btnPreviewDeleteCol" class="btn" type="button" disabled>Delete col</button>
+            <button id="btnClearFormat" class="btn" type="button" disabled>Clear format</button>
+          </div>
+          <div class="template-editor-preview-toolbar__row">
+            <label class="template-editor-preview-toolbar__field">
+              Bg
+              <input id="selBgColor" class="input input-color" type="color" value="#ffffff" disabled />
+            </label>
+            <label class="template-editor-preview-toolbar__field">
+              Text
+              <input id="selTextColor" class="input input-color" type="color" value="#111111" disabled />
+            </label>
+            <label class="template-editor-preview-toolbar__field template-editor-preview-toolbar__border">
+              Border
+              <input id="selBorder" class="input" type="text" placeholder="1px solid #222" disabled />
+            </label>
+            <button id="btnApplyBorder" class="btn" type="button" disabled>Apply</button>
+          </div>
+        </div>
         <div id="previewHost" class="template-editor-preview empty">Load a template to preview.</div>
       </section>
     </main>

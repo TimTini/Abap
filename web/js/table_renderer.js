@@ -243,7 +243,12 @@
         if (classes.length) {
           td.className = classes.join(" ");
           const styleText = cssTextForClasses(config.css, classes);
-          if (styleText) td.style.cssText = styleText;
+          const cellStyle = cellCfg && typeof cellCfg === "object" ? String(cellCfg.style || "").trim() : "";
+          const mergedStyle = `${styleText || ""}${cellStyle ? (cellStyle.endsWith(";") ? cellStyle : `${cellStyle};`) : ""}`;
+          if (mergedStyle) td.style.cssText = mergedStyle;
+        } else if (cellCfg && typeof cellCfg === "object") {
+          const cellStyle = String(cellCfg.style || "").trim();
+          if (cellStyle) td.style.cssText = cellStyle.endsWith(";") ? cellStyle : `${cellStyle};`;
         }
 
         const merge = startMap.get(addr);
