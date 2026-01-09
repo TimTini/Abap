@@ -3,6 +3,7 @@
 
   const ui = ns.ui;
   const state = ui.state;
+  const MAIN_SPLIT_KEY = "abapflow-main-left-px";
 
   function exportNotes() {
     if (!ns.notes) {
@@ -123,7 +124,106 @@
     ui.setStatus("Cleared.", false);
   }
 
+  function initMainSplitter() {
+    const main = document.querySelector(".app-main.app-main--resizable");
+    const splitter = document.getElementById("mainSplitter");
+    const leftPanel = document.querySelector(".panel.panel-left");
+
+    if (!main || !splitter || !leftPanel) return;
+
+    function readStored() {
+      try {
+        const n = Number(localStorage.getItem(MAIN_SPLIT_KEY));
+        return Number.isFinite(n) && n > 0 ? n : 0;
+      } catch (_) {
+        return 0;
+      }
+    }
+
+    function writeStored(px) {
+      try {
+        localStorage.setItem(MAIN_SPLIT_KEY, String(Math.round(px)));
+      } catch (_) {}
+    }
+
+    function clampLeft(px) {
+      const mainW = main.getBoundingClientRect().width;
+      const splitterW = splitter.getBoundingClientRect().width;
+      const minLeft = 320;
+      const minRight = 420;
+      const maxLeft = Math.max(minLeft, mainW - minRight - splitterW);
+      return Math.max(minLeft, Math.min(maxLeft, px));
+    }
+
+    function applyLeft(px) {
+      main.style.setProperty("--main-left", `${Math.round(px)}px`);
+    }
+
+    const stored = readStored();
+    if (stored) applyLeft(clampLeft(stored));
+
+    let dragging = false;
+    let startX = 0;
+    let startLeft = 0;
+    let lastApplied = 0;
+
+    function onMove(e) {
+      if (!dragging) return;
+      const dx = Number(e.clientX) - startX;
+      const next = clampLeft(startLeft + dx);
+      if (Math.abs(next - lastApplied) < 1) return;
+      lastApplied = next;
+      applyLeft(next);
+    }
+
+    function stopDrag() {
+      if (!dragging) return;
+      dragging = false;
+      splitter.classList.remove("is-dragging");
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      if (lastApplied) writeStored(lastApplied);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", stopDrag);
+      window.removeEventListener("pointercancel", stopDrag);
+    }
+
+    splitter.addEventListener("pointerdown", (e) => {
+      if (!e || typeof e.clientX !== "number") return;
+      dragging = true;
+      splitter.classList.add("is-dragging");
+      splitter.setPointerCapture?.(e.pointerId);
+      startX = e.clientX;
+      startLeft = leftPanel.getBoundingClientRect().width;
+      lastApplied = startLeft;
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", stopDrag);
+      window.addEventListener("pointercancel", stopDrag);
+    });
+
+    splitter.addEventListener("keydown", (e) => {
+      if (!e) return;
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      e.preventDefault();
+      const delta = e.key === "ArrowLeft" ? -24 : 24;
+      const cur = leftPanel.getBoundingClientRect().width;
+      const next = clampLeft(cur + delta);
+      applyLeft(next);
+      writeStored(next);
+    });
+
+    window.addEventListener("resize", () => {
+      const cur = leftPanel.getBoundingClientRect().width;
+      const next = clampLeft(cur);
+      if (Math.abs(next - cur) >= 1) applyLeft(next);
+    });
+  }
+
   function init() {
+    initMainSplitter();
+
     document.addEventListener("click", (ev) => {
       const t = ev.target;
       if (!(t instanceof HTMLElement)) return;

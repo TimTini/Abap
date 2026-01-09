@@ -94,6 +94,39 @@ body {
   gap: 14px;
 }
 
+.app-main.app-main--resizable {
+  grid-template-columns: minmax(320px, var(--main-left, 44vw)) 12px minmax(420px, 1fr);
+  gap: 0;
+}
+
+.app-splitter {
+  cursor: col-resize;
+  touch-action: none;
+  position: relative;
+  border-left: 1px solid rgba(255, 255, 255, 0.04);
+  border-right: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.app-splitter::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: 50%;
+  width: 4px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.app-splitter:hover::before {
+  background: rgba(96, 165, 250, 0.45);
+}
+
+.app-splitter.is-dragging::before {
+  background: rgba(96, 165, 250, 0.70);
+}
+
 .panel {
   background: rgba(17, 24, 39, 0.76);
   border: 1px solid rgba(255, 255, 255, 0.06);
