@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ABAP Flow - Template editor</title>
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="css/templates.css" />
+    <link rel="stylesheet" href="css/template_editor.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="app-header__title">
+        <h1>Template editor</h1>
+        <div class="app-header__subtitle">Edit + save templates (localStorage)</div>
+      </div>
+      <div class="app-header__actions">
+        <a class="btn" href="index.html">Back</a>
+      </div>
+    </header>
+
+    <main class="app-main editor-main">
+      <section class="panel panel-left">
+        <div class="panel__title">Template</div>
+        <div class="template-editor">
+          <div class="template-editor__row">
+            <label>
+              Template
+              <select id="tplSelect" class="input"></select>
+            </label>
+            <label>
+              Load
+              <button id="btnLoadTemplate" class="btn btn-primary" type="button">Load</button>
+            </label>
+          </div>
+
+          <div class="template-editor__row template-editor__row--3">
+            <label>
+              Template id
+              <input id="tplId" class="input" type="text" placeholder="my.template.id" />
+            </label>
+            <label>
+              Label
+              <input id="tplLabel" class="input" type="text" placeholder="Template label" />
+            </label>
+            <label>
+              Source (objectId)
+              <select id="tplSource" class="input"></select>
+            </label>
+          </div>
+
+          <div class="template-editor__row template-editor__row--3">
+            <label>
+              <input id="tplAuto" type="checkbox" />
+              Auto
+            </label>
+            <label>
+              <input id="tplPreferred" type="checkbox" />
+              Active for this object
+            </label>
+            <label>
+              When (optional)
+              <div class="template-editor__row">
+                <input id="tplWhenPath" class="input" type="text" placeholder="itabOp.kind" />
+                <input id="tplWhenEquals" class="input" type="text" placeholder="READ" />
+              </div>
+            </label>
+          </div>
+
+          <div class="template-editor__actions">
+            <button id="btnNewTemplate" class="btn" type="button">New</button>
+            <button id="btnSaveTemplate" class="btn btn-primary" type="button">Save</button>
+            <button id="btnSaveNewTemplate" class="btn" type="button">Save new</button>
+            <button id="btnDeleteTemplate" class="btn" type="button">Delete saved</button>
+            <button id="btnDeleteRow" class="btn" type="button">Delete row</button>
+            <button id="btnDeleteCol" class="btn" type="button">Delete col</button>
+          </div>
+
+          <div class="template-editor__json">
+            <div class="panel__title">Template JSON</div>
+            <textarea id="tplJson" class="code-input" spellcheck="false" placeholder="{ ... }"></textarea>
+          </div>
+
+          <div class="template-editor__context">
+            <div class="section__title">Preview context (optional JSON)</div>
+            <textarea
+              id="ctxJson"
+              class="textarea"
+              rows="4"
+              spellcheck="false"
+              placeholder="Paste context JSON to preview filled template..."
+              style="font-family:var(--mono);font-size:12px"
+            ></textarea>
+          </div>
+        </div>
+        <div class="panel__footer">
+          <div id="statusBar" class="status-bar">Ready.</div>
+        </div>
+      </section>
+
+      <section class="panel panel-right">
+        <div class="panel__title">Preview</div>
+        <div class="hint">Tip: click a cell to select, double-click to edit. Shift+Enter for newline.</div>
+        <div id="previewHost" class="template-editor-preview empty">Load a template to preview.</div>
+      </section>
+    </main>
+
+    <script src="js/namespace.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/template_defs_store.js"></script>
+    <script src="abap_objects.config.js"></script>
+    <script src="js/abap_objects/schema.js"></script>
+    <script src="js/abap_objects/parsers.js"></script>
+    <script src="js/abap_objects/loader.js"></script>
+    <script src="js/table_renderer.js"></script>
+    <script src="js/template_converter.js"></script>
+    <script src="js/template_editor_ui.js"></script>
+  </body>
+</html>

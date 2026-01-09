@@ -144,9 +144,17 @@
       .toUpperCase();
   }
 
-  function pickTemplateEntry(entries, context) {
+  function pickTemplateEntry(entries, context, sourceId) {
     const list = Array.isArray(entries) ? entries : [];
     if (!list.length) return null;
+
+    const preferredId =
+      ns.templateDefs && typeof ns.templateDefs.getPreferredTemplateId === "function" ? ns.templateDefs.getPreferredTemplateId(sourceId) : "";
+    if (preferredId) {
+      const preferred = list.find((e) => String(e?.id || "").trim() === preferredId) || null;
+      if (preferred && templateWhenMatches(preferred, context)) return preferred;
+    }
+
     for (const e of list) {
       if (templateWhenMatches(e, context)) return e;
     }
@@ -250,7 +258,7 @@
       const ctx = registry.buildContext(step.objDef, model, step.routine, step.edge, { callPath });
       if (!ctx) return null;
 
-      const entry = pickTemplateEntry(objEntries, ctx);
+      const entry = pickTemplateEntry(objEntries, ctx, step.objectId);
       if (!entry?.config) return null;
 
       const expanded = converter.expandExcelLikeTableTemplate(entry.config, ctx);
@@ -282,7 +290,7 @@
       const ctx = registry.buildContext(objDef, model, step.routine, step.item?.payload || null, { callPath });
       if (!ctx) return null;
 
-      const entry = pickTemplateEntry(objEntries, ctx);
+      const entry = pickTemplateEntry(objEntries, ctx, step.objectId);
       if (!entry?.config) return null;
 
       const expanded = converter.expandExcelLikeTableTemplate(entry.config, ctx);

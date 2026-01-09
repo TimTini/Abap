@@ -285,11 +285,44 @@
       const uniqueFiles = Array.from(new Set(filesToLoad));
       for (const file of uniqueFiles) await loadScript(file);
 
+      const templateDefs = ns.templateDefs || null;
+      if (templateDefs && typeof templateDefs.getTemplateConfig === "function") {
+        for (const t of compiled.templates) {
+          const override = templateDefs.getTemplateConfig(t.id);
+          if (override) defineTemplate(t.id, override);
+        }
+      }
+
       for (const t of compiled.templates) {
         if (!getTemplateConfig(t.id)) throw new Error(`Template not registered: ${t.id} (${t.file})`);
       }
 
-      installTemplateRegistry(compiled.templates);
+      let templatesForRegistry = compiled.templates;
+
+      if (templateDefs && typeof templateDefs.listCustomTemplateEntries === "function") {
+        const custom = templateDefs.listCustomTemplateEntries();
+        const seen = new Set(compiled.templates.map((t) => String(t?.id || "").trim().toLowerCase()).filter(Boolean));
+
+        const merged = [];
+        for (const t of custom) {
+          const id = asNonEmptyString(t?.id).toLowerCase();
+          if (!id || seen.has(id)) continue;
+          if (t?.config) defineTemplate(t.id, t.config);
+          merged.push({
+            id: asNonEmptyString(t.id),
+            label: asNonEmptyString(t.label) || asNonEmptyString(t.id),
+            objectId: asNonEmptyString(t.objectId) || asNonEmptyString(t.source),
+            source: asNonEmptyString(t.source),
+            auto: t.auto !== false,
+            when: t.when || null,
+            file: "",
+          });
+        }
+
+        templatesForRegistry = merged.concat(compiled.templates);
+      }
+
+      installTemplateRegistry(templatesForRegistry);
       return state.registry;
     })();
 
