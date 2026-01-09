@@ -196,5 +196,6 @@
 
   tpl.getLocalTemplateOverrides = getLocalTemplateOverrides;
   tpl.setLocalTemplateOverride = setLocalTemplateOverride;
+  tpl.resolveBindPath = resolveBindPath;
   tpl.applyOverridesToConfig = applyOverridesToConfig;
 })(window.AbapFlow);

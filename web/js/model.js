@@ -54,6 +54,35 @@
     }
   }
 
+  class AbapMessageStatement {
+    constructor(options) {
+      this.kind = "MESSAGE";
+      this.msgType = String(options?.msgType || "").trim();
+      this.msgClass = String(options?.msgClass || "").trim();
+      this.msgNo = String(options?.msgNo || "").trim();
+      this.text = String(options?.text || "").trim();
+      this.displayLike = String(options?.displayLike || "").trim();
+      this.with = Array.isArray(options?.with) ? options.with.map((x) => String(x ?? "").trim()).filter(Boolean) : [];
+      this.into = String(options?.into || "").trim();
+      this.raising = String(options?.raising || "").trim();
+      this.statement = String(options?.statement || "").trim();
+      this.sourceRef = options?.sourceRef || null;
+    }
+  }
+
+  class AbapItabOperation {
+    constructor(kind, options, sourceRef) {
+      this.kind = String(kind || "").trim().toUpperCase();
+      this.table = String(options?.table || "").trim();
+      this.target = String(options?.target || "").trim();
+      this.conditionText = String(options?.conditionText || "").trim();
+      this.conditionKind = String(options?.conditionKind || "").trim().toLowerCase(); // key|where|index|from|free
+      this.binarySearch = Boolean(options?.binarySearch);
+      this.statement = String(options?.statement || "").trim();
+      this.sourceRef = sourceRef || null;
+    }
+  }
+
   class AbapCallEdge {
     constructor(fromKey, toKey, targetName, args, sourceRef) {
       this.fromKey = fromKey;
@@ -80,6 +109,9 @@
       this.assignments = [];
       this.writes = [];
       this.ifStatements = [];
+      this.messages = [];
+      this.itabOps = [];
+      this.statementItems = [];
 
       this.calls = [];
       this.calledBy = [];
@@ -214,6 +246,9 @@
         assignments: n.assignments,
         writes: n.writes,
         ifStatements: n.ifStatements,
+        messages: n.messages,
+        itabOps: n.itabOps,
+        statementItems: n.statementItems,
         calls: n.calls.map((e) => ({ toKey: e.toKey, sourceRef: e.sourceRef, args: e.args, isInCycle: e.isInCycle })),
         calledBy: n.calledBy.map((e) => ({ fromKey: e.fromKey, sourceRef: e.sourceRef, args: e.args, isInCycle: e.isInCycle })),
       }));
@@ -236,6 +271,8 @@
     AbapWrite,
     AbapAssignment,
     AbapIfStatement,
+    AbapMessageStatement,
+    AbapItabOperation,
     AbapCallEdge,
     ProgramModel,
   };

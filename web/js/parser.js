@@ -3,7 +3,18 @@
 
   const utils = ns.utils;
   const doc = ns.doc;
-  const { ProgramModel, SourceRef, AbapParameter, AbapDataDeclaration, AbapWrite, AbapAssignment, AbapIfStatement, AbapCallEdge } = ns.model;
+  const {
+    ProgramModel,
+    SourceRef,
+    AbapParameter,
+    AbapDataDeclaration,
+    AbapWrite,
+    AbapAssignment,
+    AbapIfStatement,
+    AbapMessageStatement,
+    AbapItabOperation,
+    AbapCallEdge,
+  } = ns.model;
 
   function defaultParserConfig() {
     const IDENT = String.raw`[A-Za-z_][A-Za-z0-9_\/]*`;
@@ -62,6 +73,8 @@
             { kind: "ELSEIF", regex: /^ELSEIF\s+(.+)$/i },
           ],
         },
+        messages: { enabled: true },
+        itabOps: { enabled: true },
       },
     };
   }
@@ -427,18 +440,6 @@
     return out;
   }
 
-  function parseAssignmentByRule(stmtText, rule) {
-    const statement = utils.normalizeSpaces(utils.stripTrailingPeriod(stmtText));
-    const re = asRegex(rule?.regex);
-    const m = regexExec(re, statement);
-    if (!m || !m[1]) return null;
-
-    const lhs = String(m[1] || "").trim();
-    const rhs = String(m[2] || "").trim();
-    if (!lhs || !rhs) return null;
-    return { lhs, rhs };
-  }
-
   function eventNameFromStatement(stmtText, cfg) {
     const t = utils.normalizeSpaces(utils.stripTrailingPeriod(stmtText));
     const u = t.toUpperCase();
@@ -497,24 +498,23 @@
       return;
     }
 
-    const conditionalRules = Array.isArray(cfg?.statements?.conditionals?.rules) ? cfg.statements.conditionals.rules : [];
-    for (const rule of conditionalRules) {
-      const re = asRegex(rule?.regex);
-      const m = regexExec(re, normalized);
-      if (!m) continue;
+    const registry = ns.abapObjects?.getRegistry?.() || null;
+    if (registry && typeof registry.parseStatementItems === "function") {
+      const items = registry.parseStatementItems(model, routine, normalized, src, cfg);
+      if (items.length) {
+        if (!Array.isArray(routine.statementItems)) routine.statementItems = [];
+        for (const it of items) routine.statementItems.push(it);
 
-      const kind = String(rule?.kind || "IF").trim().toUpperCase() || "IF";
-      const condition = String(m[1] || "").trim();
-      routine.ifStatements.push(new AbapIfStatement(kind, condition, src));
-      return;
-    }
+        for (const it of items) {
+          if (it.objectId === "assignment" && it.payload) routine.assignments.push(it.payload);
+          if (it.objectId === "if" && it.payload) routine.ifStatements.push(it.payload);
+          if (it.objectId === "message" && it.payload) routine.messages.push(it.payload);
+          if (it.objectId === "itabOp" && it.payload) routine.itabOps.push(it.payload);
+        }
 
-    const assignmentRules = Array.isArray(cfg?.statements?.assignments?.rules) ? cfg.statements.assignments.rules : [];
-    for (const rule of assignmentRules) {
-      const parsed = parseAssignmentByRule(normalized, rule);
-      if (!parsed) continue;
-      routine.assignments.push(new AbapAssignment(parsed.lhs, parsed.rhs, normalized, src));
-      break;
+        const shouldContinue = items.some((x) => x && x.continueAfterMatch);
+        if (!shouldContinue) return;
+      }
     }
 
     const writes = parseWriteTargets(normalized, cfg);

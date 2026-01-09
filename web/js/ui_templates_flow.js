@@ -88,9 +88,69 @@
       if (e.auto === false) continue;
       const source = String(e.source || "").trim();
       if (!source) continue;
-      if (!out.has(source)) out.set(source, e);
+      if (!out.has(source)) out.set(source, []);
+      out.get(source).push(e);
     }
     return out;
+  }
+
+  function resolvePath(obj, path) {
+    const raw = String(path || "").trim();
+    if (!raw) return undefined;
+
+    let cur = obj;
+    const parts = raw
+      .split(".")
+      .map((p) => p.trim())
+      .filter(Boolean);
+
+    for (const part of parts) {
+      if (cur == null) return undefined;
+      const m = /^([A-Za-z0-9_$]+)(.*)$/.exec(part);
+      if (!m) return undefined;
+      const prop = m[1];
+      let rest = m[2] || "";
+      cur = cur[prop];
+
+      while (rest) {
+        const m2 = /^\[(\d+)\](.*)$/.exec(rest);
+        if (!m2) return undefined;
+        const idx = Number(m2[1]);
+        if (!Number.isFinite(idx)) return undefined;
+        cur = cur == null ? undefined : cur[idx];
+        rest = m2[2] || "";
+      }
+    }
+
+    return cur;
+  }
+
+  function templateWhenMatches(entry, context) {
+    const when = entry?.when;
+    if (!when) return true;
+    if (typeof when !== "object") return true;
+
+    const path = String(when.path || "").trim();
+    if (!path) return true;
+
+    const actual = resolvePath(context, path);
+    const expected = when.equals;
+    if (expected == null) return Boolean(actual);
+
+    return String(actual ?? "")
+      .trim()
+      .toUpperCase() === String(expected ?? "")
+      .trim()
+      .toUpperCase();
+  }
+
+  function pickTemplateEntry(entries, context) {
+    const list = Array.isArray(entries) ? entries : [];
+    if (!list.length) return null;
+    for (const e of list) {
+      if (templateWhenMatches(e, context)) return e;
+    }
+    return list[0] || null;
   }
 
   function getProgramEntrypoints(model) {
@@ -126,18 +186,18 @@
     return `${fromKey}->${toKey}@${start}-${end}`;
   }
 
-  function assignmentIdFrom(routineKey, sourceRef) {
-    const rk = String(routineKey || "").trim() || "ASSIGNMENT";
+  function statementIdFrom(objectId, routineKey, sourceRef) {
+    const ok = String(objectId || "").trim() || "ST";
+    const rk = String(routineKey || "").trim() || "ROUTINE";
     const start = Math.max(0, Math.floor(Number(sourceRef?.startLine || 0)));
     const end = Math.max(start, Math.floor(Number(sourceRef?.endLine || start)));
-    return `${rk}@${start}-${end}`;
-  }
 
-  function ifIdFrom(routineKey, sourceRef) {
-    const rk = String(routineKey || "").trim() || "IF";
-    const start = Math.max(0, Math.floor(Number(sourceRef?.startLine || 0)));
-    const end = Math.max(start, Math.floor(Number(sourceRef?.endLine || start)));
-    return `IF:${rk}@${start}-${end}`;
+    if (ok === "assignment") return `${rk}@${start}-${end}`;
+    if (ok === "if") return `IF:${rk}@${start}-${end}`;
+    if (ok === "message") return `MSG:${rk}@${start}-${end}`;
+    if (ok === "itabOp") return `ITAB:${rk}@${start}-${end}`;
+
+    return `ST:${ok}:${rk}@${start}-${end}`;
   }
 
   function routineTemplateSteps(model, routineKey, templatesBySource) {
@@ -146,26 +206,26 @@
 
     const steps = [];
 
-    if (templatesBySource.has("assignments") && Array.isArray(routine.assignments)) {
-      for (const a of routine.assignments) {
-        if (!a?.sourceRef) continue;
-        steps.push({ kind: "assignment", sourceRef: a.sourceRef, routineKey, routine, assignment: a });
+    if (Array.isArray(routine.statementItems)) {
+      for (const item of routine.statementItems) {
+        const objectId = String(item?.objectId || "").trim();
+        if (!objectId) continue;
+        if (!templatesBySource.has(objectId)) continue;
+        const src = item?.sourceRef || null;
+        if (!src) continue;
+        steps.push({ kind: "statement", objectId, sourceRef: src, routineKey, routine, item });
       }
     }
 
-    if (templatesBySource.has("ifs") && Array.isArray(routine.ifStatements)) {
-      for (const st of routine.ifStatements) {
-        if (!st?.sourceRef) continue;
-        steps.push({ kind: "if", sourceRef: st.sourceRef, routineKey, routine, ifStatement: st });
-      }
-    }
-
-    if (templatesBySource.has("performCalls") && Array.isArray(routine.calls)) {
+    const registry = ns.abapObjects?.getRegistry?.() || null;
+    if (registry && Array.isArray(routine.calls)) {
       for (const edge of routine.calls) {
-        const toKey = String(edge?.toKey || "");
-        if (!toKey.toUpperCase().startsWith("FORM:")) continue;
         if (!edge?.sourceRef) continue;
-        steps.push({ kind: "perform", sourceRef: edge.sourceRef, routineKey, routine, edge });
+        const objDef = registry.matchCallEdge?.(edge) || null;
+        const objectId = String(objDef?.id || "").trim();
+        if (!objectId) continue;
+        if (!templatesBySource.has(objectId)) continue;
+        steps.push({ kind: "callEdge", objectId, sourceRef: edge.sourceRef, routineKey, routine, edge, objDef });
       }
     }
 
@@ -180,71 +240,68 @@
 
     const converter = ns.templateConverter;
     if (!converter) return { items: [], truncated: false };
+    const registry = ns.abapObjects?.getRegistry?.() || null;
+    if (!registry) return { items: [], truncated: false };
 
-    function convertPerform(edge, callPath) {
-      const entry = templatesBySource.get("performCalls");
+    function convertCallEdge(step, callPath) {
+      const objEntries = templatesBySource.get(step.objectId);
+      if (!Array.isArray(objEntries) || objEntries.length === 0) return null;
+
+      const ctx = registry.buildContext(step.objDef, model, step.routine, step.edge, { callPath });
+      if (!ctx) return null;
+
+      const entry = pickTemplateEntry(objEntries, ctx);
       if (!entry?.config) return null;
-      const context = converter.buildPerformContext(model, edge, { callPath });
-      const expanded = converter.expandExcelLikeTableTemplate(entry.config, context);
-      const filled = converter.compactExcelLikeTableConfig(converter.fillTemplateConfig(expanded, context));
-      const resultId = edgeIdFrom(edge);
-      tpl.applyOverridesToConfig(filled, tpl.getLocalTemplateOverrides(entry.id, resultId), { model, context, callPath });
+
+      const expanded = converter.expandExcelLikeTableTemplate(entry.config, ctx);
+      const filled = converter.compactExcelLikeTableConfig(converter.fillTemplateConfig(expanded, ctx));
+      const resultId = edgeIdFrom(step.edge);
+      tpl.applyOverridesToConfig(filled, tpl.getLocalTemplateOverrides(entry.id, resultId), { model, context: ctx, callPath });
+
       return {
-        kind: "perform",
+        kind: String(step.objectId || "callEdge"),
+        objectId: String(step.objectId || ""),
         templateId: String(entry.id || ""),
         resultId,
-        edge,
-        context,
-        sourceRef: edge?.sourceRef || null,
-        original: extractSource(model, edge?.sourceRef) || `PERFORM ${context.perform?.name || ""}`,
+        routineKey: String(step.routineKey || ""),
+        edge: step.edge,
+        context: ctx,
+        sourceRef: step.edge?.sourceRef || null,
+        original: extractSource(model, step.edge?.sourceRef) || `CALL ${String(step.edge?.targetName || "").trim()}`,
         filledConfig: filled,
       };
     }
 
-    function convertAssignment(routine, assignment, callPath) {
-      const entry = templatesBySource.get("assignments");
+    function convertStatement(step, callPath) {
+      const objEntries = templatesBySource.get(step.objectId);
+      if (!Array.isArray(objEntries) || objEntries.length === 0) return null;
+
+      const objDef = registry.objectsById?.get ? registry.objectsById.get(step.objectId) : null;
+      if (!objDef) return null;
+
+      const ctx = registry.buildContext(objDef, model, step.routine, step.item?.payload || null, { callPath });
+      if (!ctx) return null;
+
+      const entry = pickTemplateEntry(objEntries, ctx);
       if (!entry?.config) return null;
-      const context = converter.buildAssignmentContext(model, routine, assignment, { callPath });
-      const filled = converter.compactExcelLikeTableConfig(converter.fillTemplateConfig(entry.config, context));
-      const resultId = assignmentIdFrom(routine?.key, assignment?.sourceRef);
-      tpl.applyOverridesToConfig(filled, tpl.getLocalTemplateOverrides(entry.id, resultId), { model, context, callPath });
-      return {
-        kind: "assignment",
-        templateId: String(entry.id || ""),
-        resultId,
-        assignment,
-        routineKey: String(routine?.key || ""),
-        context,
-        sourceRef: assignment?.sourceRef || null,
-        original: extractSource(model, assignment?.sourceRef) || `${context.assignment?.lhs || ""} = ${context.assignment?.rhs || ""}`,
-        filledConfig: filled,
-      };
-    }
 
-    function convertIf(routine, ifStatement, callPath) {
-      const entry = templatesBySource.get("ifs");
-      if (!entry?.config) return null;
-      if (!converter.buildIfContext) return null;
+      const expanded = converter.expandExcelLikeTableTemplate(entry.config, ctx);
+      const filled = converter.compactExcelLikeTableConfig(converter.fillTemplateConfig(expanded, ctx));
+      const resultId = statementIdFrom(step.objectId, step.routineKey, step.item?.sourceRef);
+      tpl.applyOverridesToConfig(filled, tpl.getLocalTemplateOverrides(entry.id, resultId), { model, context: ctx, callPath });
 
-      const context = converter.buildIfContext(model, routine, ifStatement, { callPath });
-      const expanded = converter.expandExcelLikeTableTemplate(entry.config, context);
-      const filled = converter.compactExcelLikeTableConfig(converter.fillTemplateConfig(expanded, context));
-      const resultId = ifIdFrom(routine?.key, ifStatement?.sourceRef);
-      tpl.applyOverridesToConfig(filled, tpl.getLocalTemplateOverrides(entry.id, resultId), { model, context, callPath });
-
-      const k = String(context?.if?.kind || "IF").trim().toUpperCase() || "IF";
-      const cond = String(context?.if?.condition || "").trim();
-      const fallback = cond ? `${k} ${cond}.` : `${k}.`;
+      const fallback = String(step.item?.payload?.statement || "").trim() || String(objDef.label || step.objectId);
 
       return {
-        kind: "if",
+        kind: String(step.objectId || "statement"),
+        objectId: String(step.objectId || ""),
         templateId: String(entry.id || ""),
         resultId,
-        ifStatement,
-        routineKey: String(routine?.key || ""),
-        context,
-        sourceRef: ifStatement?.sourceRef || null,
-        original: extractSource(model, ifStatement?.sourceRef) || fallback,
+        routineKey: String(step.routineKey || ""),
+        item: step.item,
+        context: ctx,
+        sourceRef: step.item?.sourceRef || null,
+        original: extractSource(model, step.item?.sourceRef) || fallback,
         filledConfig: filled,
       };
     }
@@ -272,23 +329,19 @@
         const indentWithinIf = Number(ifIndentByLine.get(step?.sourceRef?.startLine) || 0);
         const stepDepth = depth + Math.max(0, indentWithinIf);
 
-        if (step.kind === "if") {
-          const r = convertIf(step.routine, step.ifStatement, callPath);
+        if (step.kind === "statement") {
+          const r = convertStatement(step, callPath);
           if (r) items.push({ kind: "template", depth: stepDepth, isRecursion: false, result: r });
           continue;
         }
 
-        if (step.kind === "assignment") {
-          const r = convertAssignment(step.routine, step.assignment, callPath);
-          if (r) items.push({ kind: "template", depth: stepDepth, isRecursion: false, result: r });
-          continue;
-        }
-
-        if (step.kind === "perform") {
+        if (step.kind === "callEdge") {
           const isRecursion = stack.has(step.edge?.toKey);
-          const r = convertPerform(step.edge, callPath);
+          const r = convertCallEdge(step, callPath);
           if (r) items.push({ kind: "template", depth: stepDepth, isRecursion, result: r });
-          if (!isRecursion) walk(step.edge.toKey, stepDepth + 1, stack, (callPath || []).concat([step.edge]));
+          if (!isRecursion && step.edge?.toKey) {
+            walk(step.edge.toKey, stepDepth + 1, stack, (callPath || []).concat([step.edge]));
+          }
         }
       }
 

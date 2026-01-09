@@ -239,16 +239,67 @@
       })
       .join("");
 
-    const assignments = (r.assignments || []).map((a) => `<li>${sourceLink(`${a.lhs} = ${a.rhs}`, a.sourceRef)}</li>`).join("");
-    const ifStatements = (r.ifStatements || [])
-      .map((st) => {
-        const kind = String(st?.kind || "IF").trim().toUpperCase() || "IF";
-        const cond = String(st?.condition || "").trim();
-        const label = cond ? `${kind} ${cond}` : kind;
-        return `<li>${sourceLink(label, st.sourceRef)}</li>`;
-      })
-      .join("");
     const writes = r.writes.map((w) => `<li>${sourceLink(`${w.variableName}  ƒØ?  ${w.statement}`, w.sourceRef)}</li>`).join("");
+
+    const statementSections = (() => {
+      const registry = ns.abapObjects?.getRegistry?.() || null;
+      const defs = Array.isArray(registry?.statementObjects) ? registry.statementObjects : [];
+      const items = Array.isArray(r.statementItems) ? r.statementItems : [];
+      if (!defs.length || !items.length) return "";
+
+      const byObjectId = new Map();
+      for (const it of items) {
+        const objectId = String(it?.objectId || "").trim();
+        if (!objectId) continue;
+        if (!byObjectId.has(objectId)) byObjectId.set(objectId, []);
+        byObjectId.get(objectId).push(it);
+      }
+
+      function labelForItem(objectId, payload) {
+        if (objectId === "assignment") {
+          const lhs = String(payload?.lhs || "").trim();
+          const rhs = String(payload?.rhs || "").trim();
+          if (lhs && rhs) return `${lhs} = ${rhs}`;
+        }
+
+        if (objectId === "if") {
+          const kind = String(payload?.kind || "IF").trim().toUpperCase() || "IF";
+          const cond = String(payload?.condition || "").trim();
+          return cond ? `${kind} ${cond}` : kind;
+        }
+
+        const stmt = String(payload?.statement || payload?.raw || "").trim();
+        if (stmt) return stmt;
+
+        const kind = String(payload?.kind || "").trim();
+        return kind || String(objectId || "Statement");
+      }
+
+      const sections = [];
+      for (const def of defs) {
+        const objectId = String(def?.id || "").trim();
+        if (!objectId) continue;
+        const list = byObjectId.get(objectId) || [];
+        if (!list.length) continue;
+
+        const rows = list
+          .map((it) => {
+            const payload = it?.payload || null;
+            const src = it?.sourceRef || payload?.sourceRef || null;
+            return `<li>${sourceLink(labelForItem(objectId, payload), src)}</li>`;
+          })
+          .join("");
+
+        sections.push(`
+          <div class="section">
+            <div class="section__title">${utils.escapeHtml(String(def?.label || objectId))}</div>
+            <ul class="list">${rows || "<li>(none)</li>"}</ul>
+          </div>
+        `);
+      }
+
+      return sections.join("");
+    })();
 
     const codeDesc = String(r.description || "").trim();
     const userDesc = String(r.userDescription || "").trim();
@@ -299,14 +350,7 @@
         <div class="section__title">Writes</div>
         <ul class="list">${writes || "<li>(none)</li>"}</ul>
       </div>
-      <div class="section">
-        <div class="section__title">Assignments</div>
-        <ul class="list">${assignments || "<li>(none)</li>"}</ul>
-      </div>
-      <div class="section">
-        <div class="section__title">IF / ELSEIF</div>
-        <ul class="list">${ifStatements || "<li>(none)</li>"}</ul>
-      </div>
+      ${statementSections}
       <div class="section">
         <div class="section__title">Calls (PERFORM)</div>
         <ul class="list">${calls || "<li>(none)</li>"}</ul>

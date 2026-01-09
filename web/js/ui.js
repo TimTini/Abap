@@ -41,7 +41,7 @@
     ui.setStatus("Notes imported.", false);
   }
 
-  function analyze() {
+  async function analyze() {
     const input = ui.$("abapInput")?.value;
     if (!String(input || "").trim()) {
       ui.setStatus("Paste ABAP code first.", true);
@@ -49,6 +49,7 @@
     }
 
     try {
+      if (ns.abapObjects?.whenReady) await ns.abapObjects.whenReady();
       if (ns.notes) ns.notes.setActiveProgramFromText(input);
       const model = ns.parser.parseProgram(input);
       if (ns.notes) ns.notes.applyToModel(model);
@@ -181,4 +182,3 @@
     init();
   }
 })(window.AbapFlow);
-

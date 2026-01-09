@@ -115,6 +115,36 @@
     return out;
   }
 
+  function extractMessages(model) {
+    const out = [];
+    const nodes = Array.from(model?.nodes?.values ? model.nodes.values() : []);
+    for (const routine of nodes) {
+      const list = Array.isArray(routine?.messages) ? routine.messages : [];
+      for (const msg of list) {
+        if (!msg || !msg.sourceRef) continue;
+        out.push({ routine, message: msg });
+      }
+    }
+
+    out.sort((a, b) => Number(a?.message?.sourceRef?.startLine || 0) - Number(b?.message?.sourceRef?.startLine || 0));
+    return out;
+  }
+
+  function extractItabOperations(model) {
+    const out = [];
+    const nodes = Array.from(model?.nodes?.values ? model.nodes.values() : []);
+    for (const routine of nodes) {
+      const list = Array.isArray(routine?.itabOps) ? routine.itabOps : [];
+      for (const op of list) {
+        if (!op || !op.sourceRef) continue;
+        out.push({ routine, itabOp: op });
+      }
+    }
+
+    out.sort((a, b) => Number(a?.itabOp?.sourceRef?.startLine || 0) - Number(b?.itabOp?.sourceRef?.startLine || 0));
+    return out;
+  }
+
   function buildArgMappings(model, callerKey, actuals, formals, options) {
     const a = Array.isArray(actuals) ? actuals : [];
     const f = Array.isArray(formals) ? formals : [];
@@ -304,6 +334,225 @@
       },
       if: { kind, condition },
       conditions,
+    };
+  }
+
+  function describeExprWithOrigin(model, routineKey, exprText, options) {
+    const text = String(exprText ?? "").trim();
+    if (!text) return { text: "", originKey: "" };
+    if (desc?.describeExpressionWithOrigin) return desc.describeExpressionWithOrigin(model, routineKey, text, options);
+    return { text, originKey: "" };
+  }
+
+  function buildExprNode(model, routineKey, exprText, options) {
+    const text = String(exprText ?? "").trim();
+    if (!text) return { text: "", description: "", originKey: "" };
+    const described = describeExprWithOrigin(model, routineKey, text, options);
+    return {
+      text,
+      description: String(described.text || "").trim() || text,
+      originKey: String(described.originKey || ""),
+    };
+  }
+
+  const KEY_COND_START_RE =
+    /[A-Za-z_][A-Za-z0-9_\/]*(?:(?:->|=>|[-~])[A-Za-z0-9_\/]+)*\s*(?:<=|>=|<>|=|<|>|EQ|NE|GT|LT|GE|LE)\b/gi;
+
+  function splitKeyConditionTerms(text) {
+    const raw = String(text || "").trim();
+    if (!raw) return [];
+
+    const masked = desc?.maskStringsAndTemplates ? desc.maskStringsAndTemplates(raw) : raw;
+
+    KEY_COND_START_RE.lastIndex = 0;
+    const starts = [];
+    let m = null;
+    while ((m = KEY_COND_START_RE.exec(masked))) starts.push(Number(m.index || 0));
+    if (starts.length <= 1) return [raw];
+
+    const out = [];
+    for (let i = 0; i < starts.length; i++) {
+      const start = starts[i];
+      const end = i + 1 < starts.length ? starts[i + 1] : raw.length;
+      const term = raw.slice(start, end).trim();
+      if (term) out.push(term);
+    }
+    return out;
+  }
+
+  function buildConditionOperand(model, routineKey, exprText, options) {
+    const text = String(exprText ?? "").trim();
+    if (!text) return { text: "", root: "", scope: "unknown", description: "", note: "", originKey: "" };
+
+    const resolved = resolveBestSymbol(model, routineKey, text);
+    const described = describeExprWithOrigin(model, routineKey, text, options);
+
+    return {
+      text,
+      root: resolved.root,
+      scope: String(resolved.scope || "unknown"),
+      description: String(described.text || "").trim() || text,
+      note: pickNote(resolved.decl),
+      originKey: String(described.originKey || ""),
+    };
+  }
+
+  function buildMessageContext(model, routine, message, options) {
+    const r = routine || null;
+    const msg = message || null;
+    const routineKey = String(r?.key || "");
+    const callPath = Array.isArray(options?.callPath) ? options.callPath : null;
+
+    const msgClass = buildExprNode(model, routineKey, msg?.msgClass || "", { callPath });
+    const msgNo = buildExprNode(model, routineKey, msg?.msgNo || "", { callPath });
+    const displayLike = buildExprNode(model, routineKey, msg?.displayLike || "", { callPath });
+    const into = buildExprNode(model, routineKey, msg?.into || "", { callPath });
+    const raising = buildExprNode(model, routineKey, msg?.raising || "", { callPath });
+    const messageText = buildExprNode(model, routineKey, msg?.text || "", { callPath });
+
+    const withArgs = Array.isArray(msg?.with) ? msg.with : [];
+    const withNodes = withArgs.map((x) => buildExprNode(model, routineKey, x, { callPath }));
+
+    return {
+      routine: {
+        key: routineKey,
+        kind: String(r?.kind || ""),
+        name: String(r?.name || ""),
+      },
+      message: {
+        msgType: String(msg?.msgType || "").trim(),
+        statement: String(msg?.statement || "").trim(),
+      },
+      msgClass,
+      msgNo,
+      displayLike,
+      with: withNodes,
+      into,
+      raising,
+      messageText,
+      labels: {
+        msgClass: msgClass.text ? "Message class" : "",
+        msgNo: msgNo.text ? "Message No." : "",
+        with1: withNodes.length >= 1 ? "Message variable &1" : "",
+        with2: withNodes.length >= 2 ? "Message variable &2" : "",
+        with3: withNodes.length >= 3 ? "Message variable &3" : "",
+        with4: withNodes.length >= 4 ? "Message variable &4" : "",
+        into: into.text ? "Đích lưu" : "",
+        raising: raising.text ? "Raising" : "",
+        displayLike: displayLike.text ? "Display like" : "",
+        messageText: messageText.text ? "Message text" : "",
+      },
+    };
+  }
+
+  function buildItabOpContext(model, routine, itabOp, options) {
+    const r = routine || null;
+    const op = itabOp || null;
+    const routineKey = String(r?.key || "");
+    const callPath = Array.isArray(options?.callPath) ? options.callPath : null;
+
+    const kind = String(op?.kind || "").trim().toUpperCase();
+    const table = buildExprNode(model, routineKey, op?.table || "", { callPath });
+    const target = buildExprNode(model, routineKey, op?.target || "", { callPath });
+
+    const condText = String(op?.conditionText || "").trim();
+    const condKind = String(op?.conditionKind || "").trim().toLowerCase();
+
+    let parsed = [];
+    if (condText) {
+      if (condKind === "where" && typeof ns.logic?.parseIfExpression === "function") {
+        parsed = ns.logic.parseIfExpression(condText);
+      } else if (condKind === "key" && typeof ns.logic?.parseSimpleCondition === "function") {
+        const terms = splitKeyConditionTerms(condText);
+        for (let i = 0; i < terms.length; i++) {
+          const p = ns.logic.parseSimpleCondition(terms[i]);
+          parsed.push({ ...p, association: i < terms.length - 1 ? "AND" : "" });
+        }
+      } else if (condKind === "index") {
+        parsed = [{ item1: "INDEX", operator: "=", item2: condText, association: "", raw: `INDEX = ${condText}` }];
+      } else if (condKind === "from") {
+        parsed = [{ item1: condText, operator: "FROM", item2: "", association: "", raw: `FROM ${condText}` }];
+      } else if (typeof ns.logic?.parseIfExpression === "function") {
+        parsed = ns.logic.parseIfExpression(condText);
+      } else {
+        parsed = [{ item1: condText, operator: "", item2: "", association: "", raw: condText }];
+      }
+    }
+
+    const conditions = (parsed || []).map((c) => {
+      const item1Text = String(c?.item1 || "").trim();
+      const item2Text = String(c?.item2 || "").trim();
+
+      return {
+        item1: buildConditionOperand(model, routineKey, item1Text, { callPath }),
+        operator: String(c?.operator || "").trim(),
+        item2: buildConditionOperand(model, routineKey, item2Text, { callPath }),
+        association: String(c?.association || "").trim().toUpperCase(),
+        raw: String(c?.raw || "").trim(),
+      };
+    });
+
+    const binarySearch = Boolean(op?.binarySearch);
+
+    const targetLabelByKind =
+      kind === "READ" ? "Đích lưu" : kind === "COLLECT" ? "Nguồn" : kind === "MODIFY" ? "Nguồn" : kind === "DELETE" ? "Nguồn" : "Target";
+
+    return {
+      routine: {
+        key: routineKey,
+        kind: String(r?.kind || ""),
+        name: String(r?.name || ""),
+      },
+      itabOp: {
+        kind,
+        statement: String(op?.statement || "").trim(),
+        binarySearch,
+        conditionKind: condKind,
+        conditionText: condText,
+      },
+      table,
+      target,
+      conditions,
+      labels: {
+        target: target.text ? targetLabelByKind : "",
+        conditions: conditions.length ? "Điều kiện" : "",
+        condItem1: conditions.length ? "Item 1" : "",
+        condOperator: conditions.length ? "Operator" : "",
+        condItem2: conditions.length ? "Item 2" : "",
+        condAssoc: conditions.length ? "Associations" : "",
+        binarySearch: binarySearch ? "* Binarysearch" : "",
+      },
+    };
+  }
+
+  function buildAppendContext(model, routine, append, options) {
+    const r = routine || null;
+    const a = append || null;
+
+    const routineKey = String(r?.key || "");
+    const callPath = Array.isArray(options?.callPath) ? options.callPath : null;
+
+    const line = buildExprNode(model, routineKey, a?.line || "", { callPath });
+    const itab = buildExprNode(model, routineKey, a?.itab || "", { callPath });
+    const sortedBy = buildExprNode(model, routineKey, a?.sortedBy || "", { callPath });
+    const result = buildExprNode(model, routineKey, a?.result || "", { callPath });
+
+    return {
+      routine: {
+        key: routineKey,
+        kind: String(r?.kind || ""),
+        name: String(r?.name || ""),
+      },
+      append: {
+        statement: String(a?.statement || "").trim(),
+      },
+      line,
+      itab,
+      sortedBy,
+      result,
+      labels: {
+        sortedBy: sortedBy.text ? "Sorted By" : "",
+      },
     };
   }
 
@@ -653,9 +902,14 @@
     extractPerformEdges,
     extractAssignments,
     extractIfStatements,
+    extractMessages,
+    extractItabOperations,
     buildPerformContext,
     buildAssignmentContext,
     buildIfContext,
+    buildMessageContext,
+    buildItabOpContext,
+    buildAppendContext,
     fillTemplateConfig,
     expandExcelLikeTableTemplate,
     compactExcelLikeTableConfig,

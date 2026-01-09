@@ -61,6 +61,14 @@ FORM main
   PERFORM step_b USING lv_a CHANGING lv_b.
   PERFORM pass_changing CHANGING lv_b.
 
+  MESSAGE s001(zmsg) WITH iv_user lv_a INTO lv_msg DISPLAY LIKE 'I'.
+  MESSAGE |Hello { iv_user }|.
+
+  READ TABLE gt_log WITH KEY table_line = lv_b INTO lv_msg BINARY SEARCH.
+  COLLECT lv_b INTO gt_log.
+  MODIFY gt_log FROM lv_b INDEX 1.
+  DELETE gt_log WHERE table_line = lv_b.
+
   cv_text = lv_b.
 
   IF iv_demo = abap_true.
@@ -274,6 +282,8 @@ FORM demo_all
 
   DATA lv_num TYPE i.
   lv_num = iv_in.
+
+  MESSAGE e001(zmsg) WITH iv_in RAISING cx_sy_conversion_no_number.
 
   cv_text = |Converted: { lv_num }|.
   APPEND cv_text TO pt_log.

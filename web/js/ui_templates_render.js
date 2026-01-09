@@ -18,6 +18,9 @@
     if (!b) return false;
     if (b === "perform.description") return true;
     if (b === "item.description" || b === "value.description") return true;
+    if (b === "table.description" || b === "target.description") return true;
+    if (/^(?:msgClass|msgNo|displayLike|messageText|into|raising)\.description$/.test(b)) return true;
+    if (/^with\[\d+\]\.description$/.test(b)) return true;
     if (/^conditions\[\d+\]\.(?:item1|item2)\.description$/.test(b)) return true;
     return /^(tables|using|changing|raising)\[\d+\]\.description$/.test(b);
   }
@@ -35,6 +38,47 @@
     if (b === "value.description") {
       const value = String(ctx?.assignment?.rhs || "").trim();
       return value ? `Desc Value: ${value}` : "Desc Value";
+    }
+
+    if (b === "table.description") {
+      const text = String(ctx?.table?.text || "").trim();
+      return text ? `Desc Internal table: ${text}` : "Desc Internal table";
+    }
+
+    if (b === "target.description") {
+      const text = String(ctx?.target?.text || "").trim();
+      return text ? `Desc Target: ${text}` : "Desc Target";
+    }
+
+    const msgMatch = /^(msgClass|msgNo|displayLike|messageText|into|raising)\.description$/.exec(b);
+    if (msgMatch) {
+      const prop = String(msgMatch[1] || "");
+      const node = ctx?.[prop] || null;
+      const text = String(node?.text || "").trim();
+      const label =
+        prop === "msgClass"
+          ? "Message class"
+          : prop === "msgNo"
+            ? "Message No."
+            : prop === "displayLike"
+              ? "Display like"
+              : prop === "messageText"
+                ? "Message text"
+                : prop === "into"
+                  ? "Destination"
+                  : prop === "raising"
+                    ? "Raising"
+                    : prop;
+      return text ? `Desc ${label}: ${text}` : `Desc ${label}`;
+    }
+
+    const withMatch = /^with\[(\d+)\]\.description$/.exec(b);
+    if (withMatch) {
+      const idx = Number(withMatch[1]);
+      const node = ctx?.with?.[idx] || null;
+      const text = String(node?.text || "").trim();
+      const label = `Message &${idx + 1}`;
+      return text ? `Desc ${label}: ${text}` : `Desc ${label}`;
     }
 
     const condMatch = /^conditions\[(\d+)\]\.(item1|item2)\.description$/.exec(b);
@@ -72,6 +116,51 @@
     const b = String(bind || "").trim();
     const ctx = result?.context;
     if (!ctx) return null;
+
+    function keyFromExprNode(node) {
+      const originKey = String(node?.originKey || "").trim();
+      if (originKey) return { key: originKey };
+
+      if (!ns.notes?.makeDeclKey || !ns.lineage?.resolveSymbol) return null;
+
+      const model = state.model;
+      const routineKey = String(result?.routineKey || ctx.routine?.key || "").trim();
+      const exprText = String(node?.text || "").trim();
+      if (!model || !routineKey || !exprText) return null;
+
+      const root =
+        typeof ns.desc?.rootFromPath === "function"
+          ? ns.desc.rootFromPath(exprText)
+          : (/^[A-Za-z_][A-Za-z0-9_\/]*/.exec(exprText) || [])[0] || "";
+      if (!root) return null;
+
+      const resolution = ns.lineage.resolveSymbol(model, routineKey, root);
+      if (!resolution || resolution.scope === "unknown") return null;
+
+      if (resolution.scope === "parameter") {
+        const key = ns.notes.makeParamKey?.(routineKey, root);
+        return key ? { key } : null;
+      }
+
+      if (resolution.scope === "local" || resolution.scope === "global") {
+        const declKind = String(resolution.decl?.declKind || "").trim();
+        if (!declKind) return null;
+        const scopeKey = resolution.scope === "global" ? "PROGRAM" : routineKey;
+        const key = ns.notes.makeDeclKey(scopeKey, declKind, root);
+        return key ? { key } : null;
+      }
+
+      return null;
+    }
+
+    if (b === "table.description") return keyFromExprNode(ctx?.table);
+    if (b === "target.description") return keyFromExprNode(ctx?.target);
+
+    const msgMatch = /^(msgClass|msgNo|displayLike|messageText|into|raising)\.description$/.exec(b);
+    if (msgMatch) return keyFromExprNode(ctx?.[msgMatch[1]]);
+
+    const withMatch = /^with\[(\d+)\]\.description$/.exec(b);
+    if (withMatch) return keyFromExprNode(ctx?.with?.[Number(withMatch[1])]);
 
     if (b === "perform.description") {
       const key = String(ctx.perform?.originKey || ctx.perform?.key || "").trim();
@@ -160,6 +249,93 @@
 
     const key = ns.notes.makeParamKey(routineKey, formalName);
     return key ? { key } : null;
+  }
+
+  // Config-driven templates support:
+  // - Allow editing any `*.description` cell (local override or global notes).
+  // - Resolve the "global" target using `originKey` when available, otherwise fall back to symbol resolution.
+  function isEditableDescriptionBind(bind) {
+    const b = String(bind || "").trim();
+    return b.endsWith(".description") && b.length > ".description".length;
+  }
+
+  function labelForDescriptionBind(result, bind) {
+    const b = String(bind || "").trim();
+    if (!b || !isEditableDescriptionBind(b)) return "Edit description";
+
+    const ctx = result?.context || null;
+    const basePath = b.slice(0, -".description".length);
+    const node = typeof tpl.resolveBindPath === "function" ? tpl.resolveBindPath(ctx, basePath) : null;
+
+    if (basePath === "perform") {
+      const performName = String(ctx?.perform?.name || "").trim();
+      return performName ? `Description FORM ${performName}` : "Description FORM";
+    }
+
+    const text = String(node?.text ?? node?.actual ?? node?.name ?? "").trim();
+    if (text) return `Description: ${text}`;
+    return `Description: ${basePath}`;
+  }
+
+  function resolveGlobalDescriptionKey(result, bind) {
+    const b = String(bind || "").trim();
+    if (!b || !isEditableDescriptionBind(b)) return null;
+
+    const ctx = result?.context || null;
+    if (!ctx) return null;
+
+    const basePath = b.slice(0, -".description".length);
+    const node = typeof tpl.resolveBindPath === "function" ? tpl.resolveBindPath(ctx, basePath) : null;
+    if (!node || typeof node !== "object") return null;
+
+    const originKey = String(node?.originKey || "").trim();
+    if (originKey) return { key: originKey };
+
+    const calleeKey = String(ctx?.perform?.key || "").trim();
+    const formalName = String(node?.name || "").trim();
+    if (calleeKey && formalName && typeof ns.notes?.makeParamKey === "function") {
+      const key = ns.notes.makeParamKey(calleeKey, formalName);
+      if (key) return { key };
+    }
+
+    if (!ns.notes?.makeDeclKey || !ns.lineage?.resolveSymbol) return null;
+
+    const model = state.model;
+    if (!model) return null;
+
+    const exprText = String(
+      (typeof node?.text === "string" && node.text.trim()) || (typeof node?.actual === "string" && node.actual.trim()) || "",
+    ).trim();
+    if (!exprText) return null;
+
+    const callerKey = String(ctx?.caller?.key || "").trim();
+    const routineKey = String(result?.routineKey || ctx?.routine?.key || "").trim();
+    const evalRoutineKey = callerKey && typeof node?.actual === "string" ? callerKey : routineKey || callerKey;
+    if (!evalRoutineKey) return null;
+
+    const root =
+      typeof ns.desc?.rootFromPath === "function"
+        ? ns.desc.rootFromPath(exprText)
+        : (/^[A-Za-z_][A-Za-z0-9_\/]*/.exec(exprText) || [])[0] || "";
+    if (!root) return null;
+
+    const resolution = ns.lineage.resolveSymbol(model, evalRoutineKey, root);
+    if (!resolution || resolution.scope === "unknown") return null;
+
+    if (resolution.scope === "parameter") {
+      const key = ns.notes.makeParamKey?.(evalRoutineKey, root);
+      return key ? { key } : null;
+    }
+
+    if (resolution.scope === "local" || resolution.scope === "global") {
+      const declKind = String(resolution.decl?.declKind || "").trim();
+      if (!declKind) return null;
+      const scopeKey = resolution.scope === "global" ? "PROGRAM" : evalRoutineKey;
+      const key = ns.notes.makeDeclKey(scopeKey, declKind, root);
+      return key ? { key } : null;
+    }
+
+    return null;
   }
 
   function openDescriptionEditorDialog(options) {
@@ -579,21 +755,40 @@
         : "";
       const loopText = item.isRecursion ? " (loop)" : "";
 
-      if (result.kind === "perform") {
-        title.textContent = `PERFORM ${result.context?.perform?.name || ""}${lineText}${loopText}`;
-      } else if (result.kind === "if") {
-        const k = String(result.context?.if?.kind || "IF").trim().toUpperCase() || "IF";
-        const cond = String(result.context?.if?.condition || "").trim();
-        const text = cond ? `${k} ${cond}` : k;
-        title.textContent = `${text}${lineText}`;
-      } else if (result.kind === "assignment") {
-        const lhs = String(result.context?.assignment?.lhs || "").trim();
-        const rhs = String(result.context?.assignment?.rhs || "").trim();
-        const text = lhs && rhs ? `${lhs} = ${rhs}` : lhs ? `${lhs} = ...` : "Assignment";
-        title.textContent = `${text}${lineText}`;
+      const ctx = result?.context || null;
+      const originalFirstLine = String(result?.original || "")
+        .replace(/\r\n/g, "\n")
+        .split("\n")[0]
+        .trim();
+
+      let mainText = "";
+
+      const performName = String(ctx?.perform?.name || "").trim();
+      if (performName) {
+        mainText = `PERFORM ${performName}`;
+      } else if (ctx?.if) {
+        const k = String(ctx?.if?.kind || "IF").trim().toUpperCase() || "IF";
+        const cond = String(ctx?.if?.condition || "").trim();
+        mainText = cond ? `${k} ${cond}` : k;
+      } else if (ctx?.assignment) {
+        const lhs = String(ctx?.assignment?.lhs || "").trim();
+        const rhs = String(ctx?.assignment?.rhs || "").trim();
+        mainText = lhs && rhs ? `${lhs} = ${rhs}` : lhs ? `${lhs} = ...` : "Assignment";
+      } else if (ctx?.message) {
+        mainText = String(ctx?.message?.statement || "").trim() || "MESSAGE";
+      } else if (ctx?.itabOp) {
+        const st = String(ctx?.itabOp?.statement || "").trim();
+        const kind = String(ctx?.itabOp?.kind || "ITAB").trim();
+        const table = String(ctx?.table?.text || "").trim();
+        const fallback = `${kind}${table ? ` ${table}` : ""}`.trim();
+        mainText = st || fallback || "ITAB";
+      } else if (originalFirstLine) {
+        mainText = originalFirstLine;
       } else {
-        title.textContent = `Template${lineText}`;
+        mainText = String(result?.objectId || result?.kind || "Template");
       }
+
+      title.textContent = `${mainText}${lineText}${loopText}`;
 
       headerLeft.appendChild(btnToggle);
       headerLeft.appendChild(checkbox);

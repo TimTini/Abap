@@ -121,6 +121,22 @@
           { kind: "ELSEIF", regex: /^ELSEIF\s+(.+)$/i },
         ],
       },
+
+      messages: {
+        // MESSAGE statements (best-effort parsing into an object for Templates tab).
+        // Ref: https://help.sap.com/doc/abapdocu_752_index_htm/7.52/en-US/abapmessage.htm
+        enabled: true,
+      },
+
+      itabOps: {
+        // READ/COLLECT/MODIFY/DELETE internal table operations (best-effort).
+        // Refs:
+        // - READ TABLE: https://help.sap.com/doc/abapdocu_752_index_htm/7.52/en-us/abapread_table.htm
+        // - COLLECT: https://help.sap.com/doc/abapdocu_752_index_htm/7.52/en-us/abapcollect.htm
+        // - MODIFY itab: https://help.sap.com/doc/abapdocu_752_index_htm/7.52/en-us/abapmodify_itab.htm
+        // - DELETE itab: https://help.sap.com/doc/abapdocu_752_index_htm/7.52/en-us/abapdelete_itab.htm
+        enabled: true,
+      },
     },
   };
 })(window.AbapFlow);
