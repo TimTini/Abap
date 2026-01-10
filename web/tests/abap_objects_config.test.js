@@ -127,6 +127,94 @@ test("template_converter fills excel-like-table binds", async () => {
   assert.equal(byAddr.get("H2").bind, "value.description");
 });
 
+test("mapping builder supports exprlist from string (merges 'LINES OF')", async () => {
+  const ns = setupAbapFlowWithAbapObjects();
+  await ns.abapObjects.init({
+    config: ns.abapObjectsMasterConfig,
+    loadScript: async (url) => {
+      loadScript(url);
+      return true;
+    },
+  });
+  const registry = ns.abapObjects.getRegistry();
+  assert.ok(registry);
+
+  const def = {
+    id: "x",
+    label: "X",
+    builder: { kind: "mapping", fields: { items: { type: "exprlist", from: "sources" } } },
+  };
+
+  const ctx = registry.buildContext(def, null, { key: "FORM:MAIN", kind: "FORM", name: "main" }, { sources: "a LINES OF itab b" }, { callPath: [] });
+  assert.deepEqual(
+    (ctx.items || []).map((x) => x.text),
+    ["a", "LINES OF itab", "b"],
+  );
+});
+
+test("default key/value template expands for ctx.pairs (keyword blue, value white)", async () => {
+  const ns = setupAbapFlowWithAbapObjects();
+  loadScript("js/abap_objects/syntax_generator.js");
+
+  await ns.abapObjects.init({
+    config: ns.abapObjectsMasterConfig,
+    loadScript: async (url) => {
+      loadScript(url);
+      return true;
+    },
+  });
+  const registry = ns.abapObjects.getRegistry();
+  assert.ok(registry);
+
+  const def = {
+    id: "x",
+    label: "X",
+    builder: {
+      kind: "mapping",
+      fields: {
+        items: { type: "exprlist", from: "sources", label: "Keyword 1" },
+        result: { type: "expr", from: "result", label: "Keyword 2" },
+        mode: { type: "text", from: "mode", label: "Keyword 3" },
+      },
+    },
+  };
+
+  const ctx = registry.buildContext(
+    def,
+    null,
+    { key: "FORM:MAIN", kind: "FORM", name: "main" },
+    { sources: "a b", result: "lv_out", mode: "CHARACTER" },
+    { callPath: [] },
+  );
+
+  assert.deepEqual(
+    (ctx.pairs || []).map((p) => [p.keyword, String(p?.value?.text || "")]),
+    [
+      ["Keyword 1", "a"],
+      ["", "b"],
+      ["Keyword 2", "lv_out"],
+      ["Keyword 3", "CHARACTER"],
+    ],
+  );
+
+  const tplCfg = ns.abapObjects.syntaxGenerator.createDefaultKeyValueExcelLikeTableTemplate("pairs");
+  const expanded = ns.templateConverter.expandExcelLikeTableTemplate(tplCfg, ctx);
+  const filled = ns.templateConverter.compactExcelLikeTableConfig(ns.templateConverter.fillTemplateConfig(expanded, ctx));
+
+  const byAddr = new Map(filled.cells.map((c) => [String(c.addr || "").toUpperCase(), c]));
+  assert.equal(byAddr.get("A1").text, "Keyword 1");
+  assert.equal(byAddr.get("H1").text, "a");
+  assert.equal(byAddr.get("A2").text, "");
+  assert.equal(byAddr.get("H2").text, "b");
+  assert.equal(byAddr.get("A3").text, "Keyword 2");
+  assert.equal(byAddr.get("H3").text, "lv_out");
+  assert.equal(byAddr.get("A4").text, "Keyword 3");
+  assert.equal(byAddr.get("H4").text, "CHARACTER");
+
+  assert.equal(byAddr.get("H1").bind, "pairs[0].value.description");
+  assert.equal(byAddr.get("H2").bind, "pairs[1].value.description");
+});
+
 test("new ABAP Object can be added by config + template only", async () => {
   global.window = { AbapFlow: {} };
   global.localStorage = createMemoryStorage();

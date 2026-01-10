@@ -435,6 +435,57 @@
       margin-bottom: 10px;
     }
 
+    .objcfg-right {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 0;
+    }
+
+    .objcfg-right > .details {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+    }
+
+    .objcfg-gen {
+      margin: 12px 12px 0;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(15, 23, 42, 0.18);
+      border-radius: 14px;
+      padding: 10px 12px 12px;
+    }
+
+    .objcfg-gen[open] > .objcfg-advanced__summary {
+      margin-bottom: 10px;
+    }
+
+    .objcfg-gen__row {
+      margin-top: 10px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .objcfg-gen__row .input {
+      flex: 1;
+    }
+
+    .objcfg-gen__output {
+      margin: 10px 0 0;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(11, 15, 23, 0.35);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.4;
+      white-space: pre;
+      max-height: 240px;
+      overflow: auto;
+    }
+
     .objcfg-quick {
       margin-top: 12px;
       border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1660,7 +1711,24 @@
               </div>
               <div class="split__right">
                 <div class="panel__title">ABAP Objects config (localStorage)</div>
-                <div id="abapObjCfgEditor" class="details empty">Select an object on the left.</div>
+                <div class="objcfg-right">
+                  <details id="abapObjCfgGen" class="objcfg-gen">
+                    <summary class="objcfg-advanced__summary">Generate from ABAP syntax (beta)</summary>
+                    <textarea
+                      id="abapObjCfgGenInput"
+                      class="objcfg-json objcfg-json--small"
+                      spellcheck="false"
+                      placeholder="Paste ABAP Doc syntax block here (example: CONCATENATE ... INTO result ...)."
+                    ></textarea>
+                    <div class="objcfg-gen__row">
+                      <input id="abapObjCfgGenId" class="input" type="text" placeholder="Object id (optional)" />
+                      <button id="abapObjCfgGenBtn" class="btn btn-primary" type="button">Generate</button>
+                    </div>
+                    <pre id="abapObjCfgGenOutput" class="objcfg-gen__output"></pre>
+                  </details>
+
+                  <div id="abapObjCfgEditor" class="details empty">Select an object on the left.</div>
+                </div>
               </div>
             </div>
           </section>
@@ -4240,6 +4308,33 @@
         const callPath = Array.isArray(options?.callPath) ? options.callPath : null;
         const mapping = def?.builder?.fields && typeof def.builder.fields === "object" ? def.builder.fields : {};
 
+        function splitExprList(text) {
+          const s = String(text ?? "").trim();
+          if (!s) return [];
+          const tokenize =
+            parsers && typeof parsers.splitTokensOutsideStrings === "function"
+              ? parsers.splitTokensOutsideStrings
+              : (x) => String(x || "").split(/\s+/).filter(Boolean);
+
+          const tokens = tokenize(s);
+          const out = [];
+          for (let i = 0; i < tokens.length; i++) {
+            const t = String(tokens[i] || "");
+            const tUpper = t.toUpperCase();
+            const n1 = tokens[i + 1];
+            const n2 = tokens[i + 2];
+
+            if (tUpper === "LINES" && String(n1 || "").toUpperCase() === "OF" && n2 != null) {
+              out.push(`LINES OF ${String(n2)}`.trim());
+              i += 2;
+              continue;
+            }
+
+            out.push(t);
+          }
+          return out.filter(Boolean);
+        }
+
         const ctx = {
           routine: { key: routineKey, kind: String(routine?.kind || ""), name: String(routine?.name || "") },
           object: { id: String(def?.id || ""), label: String(def?.label || ""), statement: String(payload?.statement || payload?.raw || "") },
@@ -4256,7 +4351,7 @@
           }
 
           if (t === "exprlist") {
-            const list = Array.isArray(raw) ? raw : [];
+            const list = Array.isArray(raw) ? raw : splitExprList(raw);
             ctx[outKey] = list.map((x) => buildExprNode(model, routineKey, x, { callPath }));
             continue;
           }
@@ -4264,6 +4359,41 @@
           ctx[outKey] = buildExprNode(model, routineKey, raw, { callPath });
         }
 
+        const pairs = [];
+        for (const [outKey, spec] of Object.entries(mapping)) {
+          const t = String(spec?.type || "expr").trim().toLowerCase();
+          const keyword = asNonEmptyString(spec?.label) || asNonEmptyString(outKey);
+          if (!keyword) continue;
+
+          if (t === "exprlist") {
+            const list = Array.isArray(ctx[outKey]) ? ctx[outKey] : [];
+            for (let i = 0; i < list.length; i++) {
+              const node = list[i];
+              const text = asNonEmptyString(node?.text) || asNonEmptyString(node?.description);
+              if (!text) continue;
+              pairs.push({ keyword: i === 0 ? keyword : "", value: node });
+            }
+            continue;
+          }
+
+          if (t === "text") {
+            const raw = asNonEmptyString(ctx[outKey]);
+            if (!raw) continue;
+            if (spec?.presentOnly) {
+              pairs.push({ keyword, value: { text: "", description: "", originKey: "" } });
+            } else {
+              pairs.push({ keyword, value: { text: raw, description: raw, originKey: "" } });
+            }
+            continue;
+          }
+
+          const node = ctx[outKey];
+          const text = asNonEmptyString(node?.text) || asNonEmptyString(node?.description);
+          if (!text) continue;
+          pairs.push({ keyword, value: node });
+        }
+
+        ctx.pairs = pairs;
         return ctx;
       }
 
@@ -4414,6 +4544,157 @@
       ns.abapObjects.getRegistry = () => state.registry;
       ns.abapObjects.getConfig = () => state.config;
       ns.abapObjects.reset = reset;
+    })(window.AbapFlow);
+
+    </script>
+        <script>
+    // js/abap_objects/syntax_generator.js
+    (function (ns) {
+      "use strict";
+
+      const utils = ns.utils;
+
+      function asNonEmptyString(x) {
+        const s = String(x ?? "").trim();
+        return s ? s : "";
+      }
+
+      function normalizeSpaces(s) {
+        if (utils && typeof utils.normalizeSpaces === "function") return utils.normalizeSpaces(s);
+        return String(s ?? "")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+
+      function splitLines(text) {
+        if (utils && typeof utils.splitLines === "function") return utils.splitLines(text);
+        return String(text ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+      }
+
+      function isSectionHeader(line) {
+        const t = asNonEmptyString(line).toLowerCase();
+        if (!t) return false;
+        return t === "syntax" || t.startsWith("additions") || t.startsWith("addition") || t.startsWith("effect") || t.startsWith("example");
+      }
+
+      function extractFirstSyntaxStatement(text) {
+        const lines = splitLines(text);
+
+        let start = -1;
+        for (let i = 0; i < lines.length; i++) {
+          const raw = String(lines[i] ?? "");
+          const t = raw.trim();
+          if (!t) continue;
+          if (isSectionHeader(t)) continue;
+          if (/^[A-Z][A-Z0-9_-]*\b/.test(t)) {
+            start = i;
+            break;
+          }
+        }
+
+        if (start < 0) return "";
+
+        const parts = [];
+        for (let i = start; i < lines.length; i++) {
+          const raw = String(lines[i] ?? "");
+          const t = raw.trim();
+          if (!t) break;
+          if (isSectionHeader(t)) break;
+          parts.push(t);
+        }
+
+        return normalizeSpaces(parts.join(" ")).replace(/\.\s*$/, "");
+      }
+
+      function createDefaultKeyValueExcelLikeTableTemplate(listName) {
+        const list = /^[A-Za-z_][A-Za-z0-9_]*$/.test(String(listName || "")) ? String(listName) : "pairs";
+
+        return {
+          type: "excel-like-table",
+          compact: { removeEmptyRows: true },
+          grid: {
+            rows: 1,
+            cols: 14, // A..N
+            colWidths: {
+              A: 420, // merged A..G (keyword)
+              H: 700, // merged H..N (value)
+            },
+            defaultRowHeight: 30,
+          },
+          css: {
+            kw: "background:#9dc3e6;font-weight:700;color:#111;",
+            cell: "border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;",
+            wrap: "white-space:normal;line-height:1.25;",
+          },
+          merges: [
+            { start: "A1", rowspan: 1, colspan: 7 },
+            { start: "H1", rowspan: 1, colspan: 7 },
+          ],
+          cells: [
+            { addr: "A1", text: `{${list}[0].keyword}`, class: ["cell", "kw", "wrap"] },
+            { addr: "H1", text: `{${list}[0].value.description}`, class: ["cell", "wrap"] },
+          ],
+        };
+      }
+
+      function generateConcatenateObject() {
+        const regex =
+          "^CONCATENATE\\s+(.+?)\\s+INTO\\s+(.+?)(?=\\s+IN\\s+(?:CHARACTER|BYTE)\\s+MODE\\b|\\s+SEPARATED\\s+BY\\b|\\s+RESPECTING\\s+BLANKS\\b|$)" +
+          "(?:\\s+IN\\s+(CHARACTER|BYTE)\\s+MODE)?" +
+          "(?:\\s+SEPARATED\\s+BY\\s+(.+?)(?=\\s+RESPECTING\\s+BLANKS\\b|$))?" +
+          "(?:\\s+(RESPECTING\\s+BLANKS))?$";
+
+        return {
+          id: "concatenate",
+          kind: "statement",
+          label: "CONCATENATE",
+          parse: {
+            kind: "regex",
+            regex,
+            flags: "i",
+            fields: {
+              sources: 1,
+              result: 2,
+              mode: 3,
+              sep: 4,
+              respectingBlanks: 5,
+            },
+          },
+          builder: {
+            kind: "mapping",
+            fields: {
+              items: { type: "exprlist", from: "sources", label: "CONCATENATE" },
+              result: { type: "expr", from: "result", label: "INTO" },
+              mode: { type: "text", from: "mode", label: "IN ... MODE" },
+              sep: { type: "expr", from: "sep", label: "SEPARATED BY" },
+              respectingBlanks: { type: "text", from: "respectingBlanks", label: "RESPECTING BLANKS", presentOnly: true },
+            },
+          },
+          templates: [],
+        };
+      }
+
+      function generateObjectDefFromSyntaxText(text) {
+        const syntax = extractFirstSyntaxStatement(text);
+        if (!syntax) return { ok: false, error: "No ABAP syntax statement found." };
+
+        const m = /^([A-Z][A-Z0-9_-]*)\b/.exec(syntax);
+        const keyword = String(m?.[1] || "").toUpperCase();
+        if (!keyword) return { ok: false, error: "Could not detect ABAP keyword from syntax." };
+
+        if (keyword === "CONCATENATE") {
+          return { ok: true, keyword, syntax, objectDef: generateConcatenateObject(), warnings: [] };
+        }
+
+        return { ok: false, error: `Unsupported keyword: ${keyword}. (Currently supports: CONCATENATE)` };
+      }
+
+      ns.abapObjects = ns.abapObjects || {};
+      ns.abapObjects.syntaxGenerator = {
+        extractFirstSyntaxStatement,
+        createDefaultKeyValueExcelLikeTableTemplate,
+        generateObjectDefFromSyntaxText,
+      };
     })(window.AbapFlow);
 
     </script>
@@ -8552,7 +8833,7 @@
 
       function scanRepeatSections(cells) {
         const info = new Map();
-        const re = /\{(tables|using|changing|raising|conditions)\[(\d+)\]\.[^}]*\}/g;
+        const re = /\{([A-Za-z_][A-Za-z0-9_]*)\[(\d+)\]\.[^}]*\}/g;
 
         for (const cell of cells) {
           const a = parseCellAddr(cell?.addr);
@@ -8587,14 +8868,6 @@
 
         const merges = Array.isArray(cfg.merges) ? cfg.merges : [];
         cfg.merges = merges;
-
-        const listLens = {
-          tables: Array.isArray(context?.tables) ? context.tables.length : 0,
-          using: Array.isArray(context?.using) ? context.using.length : 0,
-          changing: Array.isArray(context?.changing) ? context.changing.length : 0,
-          raising: Array.isArray(context?.raising) ? context.raising.length : 0,
-          conditions: Array.isArray(context?.conditions) ? context.conditions.length : 0,
-        };
 
         const info = scanRepeatSections(cfg.cells);
         const sections = [];
@@ -8668,7 +8941,7 @@
         }
 
         for (const section of sections) {
-          const want = listLens[section.list] || 0;
+          const want = Array.isArray(context?.[section.list]) ? context[section.list].length : 0;
           const baseCount = section.baseCount;
           if (want <= baseCount) continue;
           insertRowsAfter(section.endRow, want - baseCount, section);
@@ -11122,6 +11395,151 @@
       };
 
       ui.selectAbapObjectConfig = selectObject;
+    })(window.AbapFlow);
+
+    </script>
+        <script>
+    // js/ui_abap_objects_syntax_generator.js
+    (function (ns) {
+      "use strict";
+
+      const ui = ns.ui;
+      const utils = ns.utils;
+
+      function asNonEmptyString(x) {
+        const s = String(x ?? "").trim();
+        return s ? s : "";
+      }
+
+      function safeJsonStringify(value) {
+        try {
+          return JSON.stringify(value, null, 2);
+        } catch (e) {
+          return String(e?.message || e);
+        }
+      }
+
+      function bindOnce() {
+        const btn = ui?.$("abapObjCfgGenBtn");
+        if (!btn || btn.dataset.bound) return;
+        btn.dataset.bound = "1";
+
+        btn.addEventListener("click", () => {
+          const gen = ns.abapObjects?.syntaxGenerator;
+          const store = ns.abapObjects?.customStore;
+          if (!gen?.generateObjectDefFromSyntaxText) {
+            ui.setStatus("Syntax generator module not loaded.", true);
+            return;
+          }
+          if (!store?.upsertObjectDef) {
+            ui.setStatus("ABAP Objects custom store module not loaded.", true);
+            return;
+          }
+
+          const input = ui.$("abapObjCfgGenInput")?.value || "";
+          const res = gen.generateObjectDefFromSyntaxText(input);
+          const out = ui.$("abapObjCfgGenOutput");
+
+          if (!res?.ok) {
+            if (out) out.textContent = String(res?.error || "Generate failed.");
+            ui.setStatus(String(res?.error || "Generate failed."), true);
+            return;
+          }
+
+          const idOverride = asNonEmptyString(ui.$("abapObjCfgGenId")?.value);
+          const objectDef = res.objectDef || {};
+          const id = asNonEmptyString(idOverride) || asNonEmptyString(objectDef.id) || asNonEmptyString(res.keyword)?.toLowerCase();
+          if (!id) {
+            ui.setStatus("Object id is required.", true);
+            return;
+          }
+
+          objectDef.id = id;
+          if (!asNonEmptyString(objectDef.label)) objectDef.label = asNonEmptyString(res.keyword) || id;
+          if (!asNonEmptyString(objectDef.kind)) objectDef.kind = "statement";
+
+          const effective = store.getEffectiveConfig ? store.getEffectiveConfig(ns.abapObjectsMasterConfig)?.config : null;
+          const existingObj = Array.isArray(effective?.objects)
+            ? effective.objects.find((o) => String(o?.id || "").trim().toLowerCase() === id.toLowerCase()) || null
+            : null;
+          const existing = Boolean(existingObj);
+          if (existing) {
+            const ok = window.confirm(`"${id}" already exists. Override it with generated config?`);
+            if (!ok) return;
+          }
+
+          if (existingObj && Array.isArray(existingObj.templates) && existingObj.templates.length && (!Array.isArray(objectDef.templates) || objectDef.templates.length === 0)) {
+            objectDef.templates = JSON.parse(JSON.stringify(existingObj.templates));
+          }
+
+          if (!Array.isArray(objectDef.templates)) objectDef.templates = [];
+          if (objectDef.templates.length === 0) {
+            const genTpl = ns.abapObjects?.syntaxGenerator;
+            const defs = ns.templateDefs;
+            if (genTpl?.createDefaultKeyValueExcelLikeTableTemplate && defs?.upsertTemplate) {
+              const templateId = `${id}.default.excel-like-table`;
+
+              objectDef.templates.push({ id: templateId, label: "Default (key/value)", auto: true });
+
+              if (!defs.getTemplateConfig || !defs.getTemplateConfig(templateId)) {
+                const cfg = genTpl.createDefaultKeyValueExcelLikeTableTemplate("pairs");
+                defs.upsertTemplate(templateId, cfg, { label: "Default (key/value)", source: id, auto: true });
+              }
+            }
+          }
+
+          const saved = store.upsertObjectDef(objectDef);
+          if (!saved.ok) {
+            const msg = saved.error || "Save failed.";
+            if (out) out.textContent = msg;
+            ui.setStatus(msg, true);
+            return;
+          }
+
+          if (out) out.textContent = safeJsonStringify(objectDef);
+          ui.setStatus(`Generated object: ${id}.`, false);
+
+          if (ns.abapObjects?.reset) ns.abapObjects.reset();
+
+          if (ui.selectAbapObjectConfig) {
+            ui.selectAbapObjectConfig(id);
+          } else {
+            ui.setActiveTab?.("config");
+          }
+
+          const code = ui.$("abapInput")?.value || "";
+          if (String(code).trim()) ui.$("btnAnalyze")?.click();
+        });
+
+        const input = ui.$("abapObjCfgGenInput");
+        if (input) {
+          input.addEventListener("input", () => {
+            const gen = ns.abapObjects?.syntaxGenerator;
+            const out = ui.$("abapObjCfgGenOutput");
+            if (!gen?.extractFirstSyntaxStatement || !out) return;
+            const stmt = gen.extractFirstSyntaxStatement(input.value);
+            if (!stmt) {
+              out.textContent = "";
+              return;
+            }
+            const m = /^([A-Z][A-Z0-9_-]*)\\b/.exec(stmt);
+            const keyword = asNonEmptyString(m?.[1]);
+            if (keyword) {
+              const idEl = ui.$("abapObjCfgGenId");
+              if (idEl && !asNonEmptyString(idEl.value)) idEl.value = keyword.toLowerCase();
+            }
+          });
+        }
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", bindOnce);
+      } else {
+        bindOnce();
+      }
+
+      ns.ui = ns.ui || {};
+      ns.ui.initAbapObjectsSyntaxGenerator = bindOnce;
     })(window.AbapFlow);
 
     </script>

@@ -155,7 +155,24 @@
               </div>
               <div class="split__right">
                 <div class="panel__title">ABAP Objects config (localStorage)</div>
-                <div id="abapObjCfgEditor" class="details empty">Select an object on the left.</div>
+                <div class="objcfg-right">
+                  <details id="abapObjCfgGen" class="objcfg-gen">
+                    <summary class="objcfg-advanced__summary">Generate from ABAP syntax (beta)</summary>
+                    <textarea
+                      id="abapObjCfgGenInput"
+                      class="objcfg-json objcfg-json--small"
+                      spellcheck="false"
+                      placeholder="Paste ABAP Doc syntax block here (example: CONCATENATE ... INTO result ...)."
+                    ></textarea>
+                    <div class="objcfg-gen__row">
+                      <input id="abapObjCfgGenId" class="input" type="text" placeholder="Object id (optional)" />
+                      <button id="abapObjCfgGenBtn" class="btn btn-primary" type="button">Generate</button>
+                    </div>
+                    <pre id="abapObjCfgGenOutput" class="objcfg-gen__output"></pre>
+                  </details>
+
+                  <div id="abapObjCfgEditor" class="details empty">Select an object on the left.</div>
+                </div>
               </div>
             </div>
           </section>
@@ -179,6 +196,7 @@
     <script src="js/abap_objects/schema.js"></script>
     <script src="js/abap_objects/parsers.js"></script>
     <script src="js/abap_objects/loader.js"></script>
+    <script src="js/abap_objects/syntax_generator.js"></script>
     <script src="js/doc.js"></script>
     <script src="js/graph.js"></script>
     <script src="js/lineage.js"></script>
@@ -195,6 +213,7 @@
     <script src="js/ui_objects_list.js"></script>
     <script src="js/ui_objects_details.js"></script>
     <script src="js/ui_abap_objects_config.js"></script>
+    <script src="js/ui_abap_objects_syntax_generator.js"></script>
     <script src="js/ui_templates_store.js"></script>
     <script src="js/ui_templates_flow.js"></script>
     <script src="js/ui_clipboard.js"></script>

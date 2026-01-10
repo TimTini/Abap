@@ -179,6 +179,33 @@
     const callPath = Array.isArray(options?.callPath) ? options.callPath : null;
     const mapping = def?.builder?.fields && typeof def.builder.fields === "object" ? def.builder.fields : {};
 
+    function splitExprList(text) {
+      const s = String(text ?? "").trim();
+      if (!s) return [];
+      const tokenize =
+        parsers && typeof parsers.splitTokensOutsideStrings === "function"
+          ? parsers.splitTokensOutsideStrings
+          : (x) => String(x || "").split(/\s+/).filter(Boolean);
+
+      const tokens = tokenize(s);
+      const out = [];
+      for (let i = 0; i < tokens.length; i++) {
+        const t = String(tokens[i] || "");
+        const tUpper = t.toUpperCase();
+        const n1 = tokens[i + 1];
+        const n2 = tokens[i + 2];
+
+        if (tUpper === "LINES" && String(n1 || "").toUpperCase() === "OF" && n2 != null) {
+          out.push(`LINES OF ${String(n2)}`.trim());
+          i += 2;
+          continue;
+        }
+
+        out.push(t);
+      }
+      return out.filter(Boolean);
+    }
+
     const ctx = {
       routine: { key: routineKey, kind: String(routine?.kind || ""), name: String(routine?.name || "") },
       object: { id: String(def?.id || ""), label: String(def?.label || ""), statement: String(payload?.statement || payload?.raw || "") },
@@ -195,7 +222,7 @@
       }
 
       if (t === "exprlist") {
-        const list = Array.isArray(raw) ? raw : [];
+        const list = Array.isArray(raw) ? raw : splitExprList(raw);
         ctx[outKey] = list.map((x) => buildExprNode(model, routineKey, x, { callPath }));
         continue;
       }
@@ -203,6 +230,41 @@
       ctx[outKey] = buildExprNode(model, routineKey, raw, { callPath });
     }
 
+    const pairs = [];
+    for (const [outKey, spec] of Object.entries(mapping)) {
+      const t = String(spec?.type || "expr").trim().toLowerCase();
+      const keyword = asNonEmptyString(spec?.label) || asNonEmptyString(outKey);
+      if (!keyword) continue;
+
+      if (t === "exprlist") {
+        const list = Array.isArray(ctx[outKey]) ? ctx[outKey] : [];
+        for (let i = 0; i < list.length; i++) {
+          const node = list[i];
+          const text = asNonEmptyString(node?.text) || asNonEmptyString(node?.description);
+          if (!text) continue;
+          pairs.push({ keyword: i === 0 ? keyword : "", value: node });
+        }
+        continue;
+      }
+
+      if (t === "text") {
+        const raw = asNonEmptyString(ctx[outKey]);
+        if (!raw) continue;
+        if (spec?.presentOnly) {
+          pairs.push({ keyword, value: { text: "", description: "", originKey: "" } });
+        } else {
+          pairs.push({ keyword, value: { text: raw, description: raw, originKey: "" } });
+        }
+        continue;
+      }
+
+      const node = ctx[outKey];
+      const text = asNonEmptyString(node?.text) || asNonEmptyString(node?.description);
+      if (!text) continue;
+      pairs.push({ keyword, value: node });
+    }
+
+    ctx.pairs = pairs;
     return ctx;
   }
 

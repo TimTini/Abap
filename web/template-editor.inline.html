@@ -435,6 +435,57 @@
       margin-bottom: 10px;
     }
 
+    .objcfg-right {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 0;
+    }
+
+    .objcfg-right > .details {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+    }
+
+    .objcfg-gen {
+      margin: 12px 12px 0;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(15, 23, 42, 0.18);
+      border-radius: 14px;
+      padding: 10px 12px 12px;
+    }
+
+    .objcfg-gen[open] > .objcfg-advanced__summary {
+      margin-bottom: 10px;
+    }
+
+    .objcfg-gen__row {
+      margin-top: 10px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .objcfg-gen__row .input {
+      flex: 1;
+    }
+
+    .objcfg-gen__output {
+      margin: 10px 0 0;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(11, 15, 23, 0.35);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.4;
+      white-space: pre;
+      max-height: 240px;
+      overflow: auto;
+    }
+
     .objcfg-quick {
       margin-top: 12px;
       border: 1px solid rgba(255, 255, 255, 0.08);
@@ -3473,6 +3524,33 @@
         const callPath = Array.isArray(options?.callPath) ? options.callPath : null;
         const mapping = def?.builder?.fields && typeof def.builder.fields === "object" ? def.builder.fields : {};
 
+        function splitExprList(text) {
+          const s = String(text ?? "").trim();
+          if (!s) return [];
+          const tokenize =
+            parsers && typeof parsers.splitTokensOutsideStrings === "function"
+              ? parsers.splitTokensOutsideStrings
+              : (x) => String(x || "").split(/\s+/).filter(Boolean);
+
+          const tokens = tokenize(s);
+          const out = [];
+          for (let i = 0; i < tokens.length; i++) {
+            const t = String(tokens[i] || "");
+            const tUpper = t.toUpperCase();
+            const n1 = tokens[i + 1];
+            const n2 = tokens[i + 2];
+
+            if (tUpper === "LINES" && String(n1 || "").toUpperCase() === "OF" && n2 != null) {
+              out.push(`LINES OF ${String(n2)}`.trim());
+              i += 2;
+              continue;
+            }
+
+            out.push(t);
+          }
+          return out.filter(Boolean);
+        }
+
         const ctx = {
           routine: { key: routineKey, kind: String(routine?.kind || ""), name: String(routine?.name || "") },
           object: { id: String(def?.id || ""), label: String(def?.label || ""), statement: String(payload?.statement || payload?.raw || "") },
@@ -3489,7 +3567,7 @@
           }
 
           if (t === "exprlist") {
-            const list = Array.isArray(raw) ? raw : [];
+            const list = Array.isArray(raw) ? raw : splitExprList(raw);
             ctx[outKey] = list.map((x) => buildExprNode(model, routineKey, x, { callPath }));
             continue;
           }
@@ -3497,6 +3575,41 @@
           ctx[outKey] = buildExprNode(model, routineKey, raw, { callPath });
         }
 
+        const pairs = [];
+        for (const [outKey, spec] of Object.entries(mapping)) {
+          const t = String(spec?.type || "expr").trim().toLowerCase();
+          const keyword = asNonEmptyString(spec?.label) || asNonEmptyString(outKey);
+          if (!keyword) continue;
+
+          if (t === "exprlist") {
+            const list = Array.isArray(ctx[outKey]) ? ctx[outKey] : [];
+            for (let i = 0; i < list.length; i++) {
+              const node = list[i];
+              const text = asNonEmptyString(node?.text) || asNonEmptyString(node?.description);
+              if (!text) continue;
+              pairs.push({ keyword: i === 0 ? keyword : "", value: node });
+            }
+            continue;
+          }
+
+          if (t === "text") {
+            const raw = asNonEmptyString(ctx[outKey]);
+            if (!raw) continue;
+            if (spec?.presentOnly) {
+              pairs.push({ keyword, value: { text: "", description: "", originKey: "" } });
+            } else {
+              pairs.push({ keyword, value: { text: raw, description: raw, originKey: "" } });
+            }
+            continue;
+          }
+
+          const node = ctx[outKey];
+          const text = asNonEmptyString(node?.text) || asNonEmptyString(node?.description);
+          if (!text) continue;
+          pairs.push({ keyword, value: node });
+        }
+
+        ctx.pairs = pairs;
         return ctx;
       }
 
@@ -4594,7 +4707,7 @@
 
       function scanRepeatSections(cells) {
         const info = new Map();
-        const re = /\{(tables|using|changing|raising|conditions)\[(\d+)\]\.[^}]*\}/g;
+        const re = /\{([A-Za-z_][A-Za-z0-9_]*)\[(\d+)\]\.[^}]*\}/g;
 
         for (const cell of cells) {
           const a = parseCellAddr(cell?.addr);
@@ -4629,14 +4742,6 @@
 
         const merges = Array.isArray(cfg.merges) ? cfg.merges : [];
         cfg.merges = merges;
-
-        const listLens = {
-          tables: Array.isArray(context?.tables) ? context.tables.length : 0,
-          using: Array.isArray(context?.using) ? context.using.length : 0,
-          changing: Array.isArray(context?.changing) ? context.changing.length : 0,
-          raising: Array.isArray(context?.raising) ? context.raising.length : 0,
-          conditions: Array.isArray(context?.conditions) ? context.conditions.length : 0,
-        };
 
         const info = scanRepeatSections(cfg.cells);
         const sections = [];
@@ -4710,7 +4815,7 @@
         }
 
         for (const section of sections) {
-          const want = listLens[section.list] || 0;
+          const want = Array.isArray(context?.[section.list]) ? context[section.list].length : 0;
           const baseCount = section.baseCount;
           if (want <= baseCount) continue;
           insertRowsAfter(section.endRow, want - baseCount, section);

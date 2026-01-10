@@ -664,7 +664,7 @@
 
   function scanRepeatSections(cells) {
     const info = new Map();
-    const re = /\{(tables|using|changing|raising|conditions)\[(\d+)\]\.[^}]*\}/g;
+    const re = /\{([A-Za-z_][A-Za-z0-9_]*)\[(\d+)\]\.[^}]*\}/g;
 
     for (const cell of cells) {
       const a = parseCellAddr(cell?.addr);
@@ -699,14 +699,6 @@
 
     const merges = Array.isArray(cfg.merges) ? cfg.merges : [];
     cfg.merges = merges;
-
-    const listLens = {
-      tables: Array.isArray(context?.tables) ? context.tables.length : 0,
-      using: Array.isArray(context?.using) ? context.using.length : 0,
-      changing: Array.isArray(context?.changing) ? context.changing.length : 0,
-      raising: Array.isArray(context?.raising) ? context.raising.length : 0,
-      conditions: Array.isArray(context?.conditions) ? context.conditions.length : 0,
-    };
 
     const info = scanRepeatSections(cfg.cells);
     const sections = [];
@@ -780,7 +772,7 @@
     }
 
     for (const section of sections) {
-      const want = listLens[section.list] || 0;
+      const want = Array.isArray(context?.[section.list]) ? context[section.list].length : 0;
       const baseCount = section.baseCount;
       if (want <= baseCount) continue;
       insertRowsAfter(section.endRow, want - baseCount, section);
