@@ -9,23 +9,71 @@
   const renderAnnoSummaryHtml = ui.renderAnnoSummaryHtml;
   const renderInlineAnnoEditorHtml = ui.renderInlineAnnoEditorHtml;
 
-  function renderProgramDetails(model) {
-    function renderGlobalDecl(decl) {
-      const name = String(decl?.variableName || "").trim();
-      const declKind = String(decl?.declKind || "").trim();
-      const key = ns.notes?.makeDeclKey ? ns.notes.makeDeclKey("PROGRAM", declKind, name) : "";
-      const codeDesc = String(decl?.description || "").trim();
-      const userDesc = String(decl?.userDescription || "").trim();
-      const userNote = String(decl?.userNote || "").trim();
-      const shownDesc = userDesc || codeDesc;
+  function isSimpleStructFieldName(name) {
+    const s = String(name || "");
+    if (!s.includes("-")) return false;
+    if (s.includes("->") || s.includes("=>") || s.includes("~")) return false;
+    return true;
+  }
 
-      const dt = decl?.dataType ? ` TYPE ${decl.dataType}` : " TYPE ?";
-      const valuePart = decl?.value ? ` VALUE ${decl.value}` : "";
-      const desc = shownDesc ? ` - ${shownDesc}` : "";
+  function resolveTypeFieldForVirtualDecl(model, decl) {
+    const origin = decl?.virtualOrigin && typeof decl.virtualOrigin === "object" ? decl.virtualOrigin : null;
+    if (!origin || origin.kind !== "typeField") return null;
 
-      const summary = renderAnnoSummaryHtml({ codeDesc, userDesc, userNote });
+    const typeScopeKey = String(origin.typeScopeKey || "").trim() || "PROGRAM";
+    const typeName = String(origin.typeName || "").trim();
+    const fieldPath = String(origin.fieldPath || "").trim();
+    if (!typeName || !fieldPath) return null;
 
-      const edit = key
+    const typeKey = `${typeScopeKey}|${typeName.toLowerCase()}`;
+    const typeDef = model?.typeDefs?.get ? model.typeDefs.get(typeKey) : null;
+    const field = typeDef?.fields?.get ? typeDef.fields.get(fieldPath.toLowerCase()) : null;
+    if (!field) return null;
+
+    return { typeScopeKey, typeName, fieldPath, field };
+  }
+
+  function renderDeclInner(model, decl, scopeKey, options) {
+    const name = String(decl?.variableName || "").trim();
+    const declKind = String(decl?.declKind || "").trim();
+    const upperKind = declKind.toUpperCase();
+
+    const isVirtualTypeField = Boolean(decl?.isVirtual && decl?.virtualOrigin?.kind === "typeField");
+    const typeField = isVirtualTypeField ? resolveTypeFieldForVirtualDecl(model, decl) : null;
+
+    const codeDesc = String((typeField?.field?.description ?? decl?.description) || "").trim();
+    const userDesc = String((typeField?.field?.userDescription ?? decl?.userDescription) || "").trim();
+    const userNote = String((typeField?.field?.userNote ?? decl?.userNote) || "").trim();
+    const shownDesc = userDesc || codeDesc;
+
+    const dt = decl?.dataType ? ` TYPE ${decl.dataType}` : options?.showUnknownType ? " TYPE ?" : "";
+    const valueKeyword = upperKind === "PARAMETERS" ? "DEFAULT" : "VALUE";
+    const valuePart = decl?.value ? ` ${valueKeyword} ${decl.value}` : "";
+    const desc = shownDesc ? ` - ${shownDesc}` : "";
+
+    const summary = renderAnnoSummaryHtml({ codeDesc, userDesc, userNote });
+
+    let edit = "";
+    if (typeField && ns.notes?.makeTypeFieldKey) {
+      const key = ns.notes.makeTypeFieldKey(typeField.typeScopeKey, typeField.typeName, typeField.fieldPath);
+      edit = key
+        ? renderInlineAnnoEditorHtml({
+            title: `Edit type field notes — ${typeField.typeName}-${typeField.fieldPath}`,
+            codeDesc,
+            userDesc,
+            userNote,
+            annoType: "typefield",
+            annoKey: key,
+            attrs: {
+              "data-type-scope-key": typeField.typeScopeKey,
+              "data-type-name": typeField.typeName,
+              "data-field-path": typeField.fieldPath,
+            },
+          })
+        : "";
+    } else if (ns.notes?.makeDeclKey) {
+      const key = ns.notes.makeDeclKey(scopeKey, declKind, name);
+      edit = key
         ? renderInlineAnnoEditorHtml({
             title: "Edit notes",
             codeDesc,
@@ -34,18 +82,103 @@
             annoType: "decl",
             annoKey: key,
             attrs: {
-              "data-scope-key": "PROGRAM",
+              "data-scope-key": scopeKey,
               "data-decl-kind": declKind,
               "data-var-name": name,
             },
           })
         : "";
-
-      return `<li class="param-item">${sourceLink(`${name}${dt}${valuePart}${desc}`, decl?.sourceRef)}${summary}${edit}</li>`;
     }
 
-    const globalsData = (model.globalData || []).map(renderGlobalDecl).join("");
-    const globalsConst = (model.globalConstants || []).map(renderGlobalDecl).join("");
+    const labelName = String(options?.labelName || name);
+    return `${sourceLink(`${labelName}${dt}${valuePart}${desc}`, decl?.sourceRef)}${summary}${edit}`;
+  }
+
+  function renderDeclListGrouped(model, decls, scopeKey, options) {
+    const list = Array.isArray(decls) ? decls : [];
+    if (!list.length) return "";
+
+    const fieldsByRoot = new Map();
+    for (const d of list) {
+      const name = String(d?.variableName || "").trim();
+      if (!isSimpleStructFieldName(name)) continue;
+      const root = name.split("-")[0] || "";
+      const rootLower = root.toLowerCase();
+      if (!rootLower) continue;
+      if (!fieldsByRoot.has(rootLower)) fieldsByRoot.set(rootLower, []);
+      fieldsByRoot.get(rootLower).push(d);
+    }
+
+    const rendered = new Set();
+    const out = [];
+
+    function renderSingle(decl, extra) {
+      return `<li class="param-item">${renderDeclInner(model, decl, scopeKey, { ...options, ...(extra || {}) })}</li>`;
+    }
+
+    function renderGroup(rootDecl, rootName, fields) {
+      const rootLower = String(rootName || "").toLowerCase();
+      if (rendered.has(rootLower)) return;
+      rendered.add(rootLower);
+
+      const sorted = (fields || [])
+        .slice()
+        .sort((a, b) => String(a?.variableName || "").localeCompare(String(b?.variableName || "")));
+
+      const headerInner = rootDecl
+        ? renderDeclInner(model, rootDecl, scopeKey, options)
+        : `<span>${utils.escapeHtml(rootName || "")}</span>`;
+
+      const fieldItems = sorted
+        .map((d) => {
+          const full = String(d?.variableName || "").trim();
+          const rel = full.toLowerCase().startsWith(`${rootLower}-`) ? full.slice(rootLower.length + 1) : full;
+          const depth = rel.split("-").filter(Boolean).length;
+          const pad = Math.max(0, depth - 1) * 14;
+          return `<li class="param-item decl-group__field" style="padding-left:${pad}px">${renderDeclInner(model, d, scopeKey, {
+            ...options,
+            showUnknownType: false,
+            labelName: rel,
+          })}</li>`;
+        })
+        .join("");
+
+      out.push(`<li class="decl-group">
+        <div class="decl-group__header param-item">
+          <button type="button" class="decl-group__toggle" aria-expanded="true" title="Collapse/expand">▾</button>
+          <div class="decl-group__header-content">${headerInner}</div>
+        </div>
+        <ul class="list decl-group__fields">${fieldItems || "<li>(none)</li>"}</ul>
+      </li>`);
+    }
+
+    for (const d of list) {
+      const name = String(d?.variableName || "").trim();
+      if (isSimpleStructFieldName(name)) {
+        const rootLower = String(name.split("-")[0] || "").toLowerCase();
+        if (fieldsByRoot.has(rootLower)) continue;
+      }
+
+      const rootLower = name.toLowerCase();
+      const fields = fieldsByRoot.get(rootLower) || null;
+      if (fields) {
+        renderGroup(d, name, fields);
+      } else {
+        out.push(renderSingle(d));
+      }
+    }
+
+    for (const [rootLower, fields] of fieldsByRoot.entries()) {
+      if (rendered.has(rootLower)) continue;
+      renderGroup(null, rootLower, fields);
+    }
+
+    return out.join("");
+  }
+
+  function renderProgramDetails(model) {
+    const globalsData = renderDeclListGrouped(model, model.globalData || [], "PROGRAM", { showUnknownType: true });
+    const globalsConst = renderDeclListGrouped(model, model.globalConstants || [], "PROGRAM", { showUnknownType: true });
 
     const userDesc = String(model.userDescription || "").trim();
     const userNote = String(model.userNote || "").trim();
@@ -120,72 +253,9 @@
       })
       .join("");
 
-    const localsData = r.localData
-      .map((d) => {
-        const name = String(d?.variableName || "").trim();
-        const declKind = String(d?.declKind || "").trim();
-        const key = ns.notes?.makeDeclKey ? ns.notes.makeDeclKey(r.key, declKind, name) : "";
-        const codeDesc = String(d?.description || "").trim();
-        const userDesc = String(d?.userDescription || "").trim();
-        const userNote = String(d?.userNote || "").trim();
-        const shownDesc = userDesc || codeDesc;
-        const desc = shownDesc ? ` - ${shownDesc}` : "";
-        const dt = d?.dataType ? ` TYPE ${d.dataType}` : "";
-        const summary = renderAnnoSummaryHtml({ codeDesc, userDesc, userNote });
+    const localsData = renderDeclListGrouped(model, r.localData || [], r.key, { showUnknownType: false });
 
-        const edit = key
-          ? renderInlineAnnoEditorHtml({
-              title: "Edit notes",
-              codeDesc,
-              userDesc,
-              userNote,
-              annoType: "decl",
-              annoKey: key,
-              attrs: {
-                "data-scope-key": r.key,
-                "data-decl-kind": declKind,
-                "data-var-name": name,
-              },
-            })
-          : "";
-
-        return `<li class="param-item">${sourceLink(`${name}${dt}${desc}`, d?.sourceRef)}${summary}${edit}</li>`;
-      })
-      .join("");
-
-    const localsConst = r.localConstants
-      .map((c) => {
-        const name = String(c?.variableName || "").trim();
-        const declKind = String(c?.declKind || "").trim();
-        const key = ns.notes?.makeDeclKey ? ns.notes.makeDeclKey(r.key, declKind, name) : "";
-        const codeDesc = String(c?.description || "").trim();
-        const userDesc = String(c?.userDescription || "").trim();
-        const userNote = String(c?.userNote || "").trim();
-        const shownDesc = userDesc || codeDesc;
-        const desc = shownDesc ? ` - ${shownDesc}` : "";
-        const dt = c?.dataType ? ` TYPE ${c.dataType}` : "";
-        const valuePart = c?.value ? ` VALUE ${c.value}` : "";
-        const summary = renderAnnoSummaryHtml({ codeDesc, userDesc, userNote });
-
-        const edit = key
-          ? renderInlineAnnoEditorHtml({
-              title: "Edit notes",
-              codeDesc,
-              userDesc,
-              userNote,
-              annoType: "decl",
-              annoKey: key,
-              attrs: {
-                "data-scope-key": r.key,
-                "data-decl-kind": declKind,
-                "data-var-name": name,
-              },
-            })
-          : "";
-
-        return `<li class="param-item">${sourceLink(`${name}${dt}${valuePart}${desc}`, c?.sourceRef)}${summary}${edit}</li>`;
-      })
-      .join("");
+    const localsConst = renderDeclListGrouped(model, r.localConstants || [], r.key, { showUnknownType: false });
 
     const calls = r.calls
       .map((e) => {
@@ -380,6 +450,23 @@
     }
 
     el.classList.remove("empty");
+
+    if (!el.dataset.declGroupsBound) {
+      el.dataset.declGroupsBound = "1";
+      el.addEventListener("click", (ev) => {
+        const t = ev.target;
+        if (!(t instanceof HTMLElement)) return;
+        const btn = t.closest("button.decl-group__toggle");
+        if (!btn) return;
+        const group = btn.closest(".decl-group");
+        if (!group) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        const collapsed = group.classList.toggle("is-collapsed");
+        btn.setAttribute("aria-expanded", String(!collapsed));
+      });
+    }
+
     if (state.selectedKey === "PROGRAM") {
       el.innerHTML = renderProgramDetails(model);
       ui.wireNotesEditorForKey(

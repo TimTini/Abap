@@ -57,6 +57,27 @@ test("abap_objects master config validates", () => {
   assert.deepEqual(res.errors, []);
 });
 
+test("abap_objects schema allows templates without file (localStorage templates)", () => {
+  const ns = setupAbapFlowWithAbapObjects();
+  const master = {
+    schema: "abapflow-abap-objects-master-config",
+    version: 1,
+    parserConfig: { version: 1 },
+    objects: [
+      {
+        id: "echo",
+        kind: "statement",
+        label: "ECHO",
+        parse: { kind: "regex", regex: /^ECHO\\s+(.+)$/i, fields: { value: 1 } },
+        builder: { kind: "mapping", fields: { value: { type: "expr", from: "value" } } },
+        templates: [{ id: "echo.excel", label: "ECHO template", auto: true }],
+      },
+    ],
+  };
+  const res = ns.abapObjects.schema.validateMasterConfig(master);
+  assert.equal(res.ok, true);
+});
+
 test("abap_objects loader registers templates from master config", async () => {
   const ns = setupAbapFlowWithAbapObjects();
 

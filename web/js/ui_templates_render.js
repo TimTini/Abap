@@ -13,6 +13,18 @@
   let lastRenderOrder = [];
   let lastToolbarUpdate = null;
 
+  function scrollToTemplateResultId(resultId) {
+    const id = String(resultId || "").trim();
+    if (!id) return;
+    if (!state.model) return;
+
+    if (typeof ui.setActiveTab === "function") ui.setActiveTab("templates");
+
+    requestAnimationFrame(() => {
+      renderTemplates({ autoSelectResultId: id });
+    });
+  }
+
   function isEditableDescriptionBind(bind) {
     const b = String(bind || "").trim();
     if (!b) return false;
@@ -428,6 +440,178 @@
     });
   }
 
+  function originLabel(origin) {
+    const kind = String(origin?.kind || "").trim().toUpperCase();
+    const key = String(origin?.key || "").trim();
+
+    if (kind === "DECL") {
+      const vn = String(origin?.entity?.variableName || "").trim();
+      if (vn) return vn;
+      return String(origin?.name || "").trim();
+    }
+
+    if (kind === "PARAM") {
+      const pn = String(origin?.entity?.name || "").trim();
+      if (pn) return pn;
+      return String(origin?.name || "").trim();
+    }
+
+    if (kind === "TYPEFIELD") {
+      const m = /^TYPEFIELD:[^:]*:([^:]+):(.+)$/.exec(key);
+      if (m) return `${m[1]}-${m[2]}`;
+      return String(origin?.name || "").trim();
+    }
+
+    return String(origin?.name || "").trim() || key;
+  }
+
+  function openDescriptionEditorDialogForTargets(options) {
+    const titleText = String(options?.title || "Edit description");
+    const targets = Array.isArray(options?.targets) ? options.targets : [];
+    const initialByKey = options?.initialByKey && typeof options.initialByKey === "object" ? options.initialByKey : {};
+    const initialKey = String(options?.initialKey || (targets[0] ? targets[0].key : "") || "").trim();
+
+    return new Promise((resolve) => {
+      const overlay = document.createElement("div");
+      overlay.className = "demo-modal";
+
+      const dialog = document.createElement("div");
+      dialog.className = "demo-modal__dialog";
+      overlay.appendChild(dialog);
+
+      const title = document.createElement("div");
+      title.className = "demo-modal__title";
+      title.textContent = titleText;
+      dialog.appendChild(title);
+
+      let selectedKey = initialKey;
+      const draftByKey = new Map();
+
+      function getInitialForKey(key) {
+        return String(initialByKey[String(key || "")] ?? "");
+      }
+
+      for (const t of targets) {
+        const k = String(t?.key || "").trim();
+        if (!k) continue;
+        draftByKey.set(k, getInitialForKey(k));
+      }
+
+      let select = null;
+      if (targets.length > 1) {
+        const row = document.createElement("div");
+        row.style.display = "flex";
+        row.style.gap = "8px";
+        row.style.alignItems = "center";
+        row.style.marginBottom = "8px";
+
+        const label = document.createElement("div");
+        label.textContent = "Object:";
+        label.style.minWidth = "64px";
+        row.appendChild(label);
+
+        select = document.createElement("select");
+        select.className = "input";
+        select.style.flex = "1";
+        for (const t of targets) {
+          const key = String(t?.key || "").trim();
+          const labelText = String(t?.label || "").trim() || key;
+          if (!key) continue;
+          const opt = document.createElement("option");
+          opt.value = key;
+          opt.textContent = labelText;
+          select.appendChild(opt);
+        }
+        if (selectedKey) select.value = selectedKey;
+        row.appendChild(select);
+
+        dialog.appendChild(row);
+      }
+
+      const textarea = document.createElement("textarea");
+      textarea.className = "input demo-modal__textarea";
+      textarea.value = selectedKey ? draftByKey.get(selectedKey) || "" : "";
+      textarea.placeholder = "Nhập mô tả...";
+      dialog.appendChild(textarea);
+
+      const hint = document.createElement("div");
+      hint.className = "demo-modal__hint";
+      hint.textContent = "Chọn phạm vi cập nhật:";
+      dialog.appendChild(hint);
+
+      const actions = document.createElement("div");
+      actions.className = "demo-modal__actions";
+      dialog.appendChild(actions);
+
+      const btnCancel = document.createElement("button");
+      btnCancel.type = "button";
+      btnCancel.className = "btn";
+      btnCancel.textContent = "Hủy";
+
+      const btnClear = document.createElement("button");
+      btnClear.type = "button";
+      btnClear.className = "btn";
+      btnClear.textContent = "Xóa mô tả";
+
+      const btnLocal = document.createElement("button");
+      btnLocal.type = "button";
+      btnLocal.className = "btn";
+      btnLocal.textContent = "Chỉ template hiện tại";
+
+      const btnGlobal = document.createElement("button");
+      btnGlobal.type = "button";
+      btnGlobal.className = "btn btn-primary";
+      btnGlobal.textContent = "Toàn bộ template";
+
+      actions.appendChild(btnCancel);
+      actions.appendChild(btnClear);
+      actions.appendChild(btnLocal);
+      actions.appendChild(btnGlobal);
+
+      function cleanup() {
+        window.removeEventListener("keydown", onKeyDown);
+        overlay.remove();
+      }
+
+      function close(action) {
+        if (selectedKey) draftByKey.set(selectedKey, textarea.value);
+        const value = selectedKey ? draftByKey.get(selectedKey) || "" : textarea.value;
+        cleanup();
+        resolve({ action, value, targetKey: selectedKey });
+      }
+
+      function onKeyDown(e) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          close("cancel");
+        }
+      }
+
+      if (select) {
+        select.addEventListener("change", () => {
+          if (selectedKey) draftByKey.set(selectedKey, textarea.value);
+          selectedKey = String(select.value || "").trim();
+          textarea.value = selectedKey ? draftByKey.get(selectedKey) || "" : "";
+          textarea.focus();
+          textarea.select();
+        });
+      }
+
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) close("cancel");
+      });
+      btnCancel.addEventListener("click", () => close("cancel"));
+      btnClear.addEventListener("click", () => close("clear"));
+      btnLocal.addEventListener("click", () => close("local"));
+      btnGlobal.addEventListener("click", () => close("global"));
+      window.addEventListener("keydown", onKeyDown);
+
+      document.body.appendChild(overlay);
+      textarea.focus();
+      textarea.select();
+    });
+  }
+
   function handleTemplatesDblClick(event) {
     const t = event?.target && event.target.nodeType === 1 ? event.target : event?.target?.parentElement;
     const td = t?.closest ? t.closest("td[data-bind]") : null;
@@ -448,6 +632,135 @@
     if (card && typeof card.click === "function") card.click();
 
     const title = labelForDescriptionBind(result, bind);
+
+    // Multi-origin edit support (expressions / struct segments)
+    try {
+      const ctx = result?.context || null;
+      const basePath = bind.slice(0, -".description".length);
+      const node = ctx && typeof tpl.resolveBindPath === "function" ? tpl.resolveBindPath(ctx, basePath) : null;
+      const baseOriginKey = String(node?.originKey || "").trim();
+
+      const exprText = String(
+        (typeof node?.text === "string" && node.text.trim()) ||
+          (typeof node?.actual === "string" && node.actual.trim()) ||
+          (typeof node?.name === "string" && node.name.trim()) ||
+          "",
+      ).trim();
+      const callerKey = String(ctx?.caller?.key || "").trim();
+      const routineKey = String(result?.routineKey || ctx?.routine?.key || "").trim();
+      const evalRoutineKey = callerKey && typeof node?.actual === "string" ? callerKey : routineKey || callerKey;
+      const callPath = Array.isArray(result?.callPath) ? result.callPath : null;
+
+      if (state.model && evalRoutineKey && exprText && typeof ns.desc?.describeExpressionWithOrigin === "function") {
+        const described = ns.desc.describeExpressionWithOrigin(state.model, evalRoutineKey, exprText, { callPath });
+        const origins = Array.isArray(described?.origins) ? described.origins : [];
+
+        if (origins.length > 1) {
+          const targets = [];
+          const seen = new Set();
+          for (const o of origins) {
+            const k = String(o?.key || "").trim();
+            if (!k || seen.has(k)) continue;
+            seen.add(k);
+            targets.push({ key: k, label: originLabel(o), origin: o });
+          }
+
+          const overrides = typeof tpl.getLocalTemplateOverrides === "function" ? tpl.getLocalTemplateOverrides(templateId, resultId) : null;
+          const overridesEntry = overrides && typeof overrides.get === "function" ? overrides.get(bind) : null;
+
+          function hasLocalOverrideForTarget(targetKey) {
+            const tk = String(targetKey || "").trim();
+            if (!tk) return false;
+            if (overridesEntry instanceof Map) return overridesEntry.has(tk);
+            if (typeof overridesEntry === "string") return Boolean(baseOriginKey && tk === baseOriginKey && String(overridesEntry || "").trim());
+            return false;
+          }
+
+          function localOverrideValueForTarget(targetKey) {
+            const tk = String(targetKey || "").trim();
+            if (!tk) return "";
+            if (overridesEntry instanceof Map) return String(overridesEntry.get(tk) ?? "");
+            if (typeof overridesEntry === "string" && baseOriginKey && tk === baseOriginKey) return String(overridesEntry ?? "");
+            return "";
+          }
+
+          const initialByKey = {};
+          for (const t2 of targets) {
+            const k = String(t2?.key || "").trim();
+            if (!k) continue;
+            const localValue = localOverrideValueForTarget(k);
+            if (localValue.trim()) {
+              initialByKey[k] = localValue;
+              continue;
+            }
+            const origin = t2.origin;
+            const fallback = String(origin?.name || "").trim();
+            initialByKey[k] = typeof ns.desc?.pickDescription === "function" ? ns.desc.pickDescription(origin?.entity || null, fallback) : fallback;
+          }
+
+          openDescriptionEditorDialogForTargets({ title, targets, initialByKey, initialKey: targets[0]?.key || "" }).then(
+            ({ action, value, targetKey }) => {
+              const tk = String(targetKey || "").trim();
+              const nextValue = String(value ?? "").trim();
+              if (action === "cancel") return;
+              if (!tk) {
+                ui.setStatus("Cannot resolve object for this cell.", true);
+                return;
+              }
+
+              if (action === "clear") {
+                if (hasLocalOverrideForTarget(tk)) {
+                  tpl.setLocalTemplateOverrideByOriginKey?.(templateId, resultId, bind, tk, "", baseOriginKey);
+                  renderTemplates({ autoSelectResultId: resultId });
+                  ui.setStatus("Cleared description (local).", false);
+                  return;
+                }
+
+                if (!ns.notes?.setEntry) {
+                  ui.setStatus("Cannot clear description for this cell.", true);
+                  return;
+                }
+
+                tpl.setLocalTemplateOverrideByOriginKey?.(templateId, resultId, bind, tk, "", baseOriginKey);
+                ns.notes.setEntry(tk, { description: "" });
+                if (state.model && ns.notes?.applyToModel) ns.notes.applyToModel(state.model);
+                renderTemplates({ autoSelectResultId: resultId });
+                ui.setStatus("Cleared description.", false);
+                return;
+              }
+
+              if (action === "local") {
+                if (typeof tpl.setLocalTemplateOverrideByOriginKey === "function") {
+                  tpl.setLocalTemplateOverrideByOriginKey(templateId, resultId, bind, tk, nextValue, baseOriginKey);
+                } else {
+                  tpl.setLocalTemplateOverride?.(templateId, resultId, bind, nextValue);
+                }
+                renderTemplates({ autoSelectResultId: resultId });
+                ui.setStatus("Saved description (local).", false);
+                return;
+              }
+
+              if (action === "global") {
+                if (!ns.notes?.setEntry) {
+                  ui.setStatus("Cannot update global description for this cell.", true);
+                  return;
+                }
+                tpl.setLocalTemplateOverrideByOriginKey?.(templateId, resultId, bind, tk, "", baseOriginKey);
+                ns.notes.setEntry(tk, { description: nextValue });
+                if (state.model && ns.notes?.applyToModel) ns.notes.applyToModel(state.model);
+                renderTemplates({ autoSelectResultId: resultId });
+                ui.setStatus("Saved description (global).", false);
+              }
+            },
+          );
+
+          return;
+        }
+      }
+    } catch (_) {
+      // ignore and fall back to single-key editor
+    }
+
     const initial = String(td.textContent ?? "");
 
     openDescriptionEditorDialog({ title, value: initial }).then(({ action, value }) => {
@@ -601,6 +914,8 @@
     lastRenderOrder = [];
     lastToolbarUpdate = null;
 
+    if (typeof ui.clearAbapTemplateMarkers === "function") ui.clearAbapTemplateMarkers();
+
     const model = state.model;
     if (!model) {
       host.textContent = "Analyze to see templates.";
@@ -629,6 +944,7 @@
       return;
     }
 
+    const markerItems = [];
     const autoSelectResultId = String(options?.autoSelectResultId || "");
     let autoSelectCard = null;
 
@@ -703,6 +1019,16 @@
       const result = item.result;
       templateResultById.set(result.resultId, result);
       lastRenderOrder.push(String(result.resultId || ""));
+
+      if (result?.sourceRef?.startLine) {
+        markerItems.push({
+          resultId: result.resultId,
+          objectId: result.objectId,
+          templateId: result.templateId,
+          startLine: result.sourceRef.startLine,
+          endLine: result.sourceRef.endLine || result.sourceRef.startLine,
+        });
+      }
 
       const card = document.createElement("div");
       card.className = "template-block is-clickable";
@@ -855,9 +1181,19 @@
     applyTemplateTreeState(host);
     updateTemplatesToolbar();
 
-    if (autoSelectCard) autoSelectCard.click();
+    if (typeof ui.renderAbapTemplateMarkers === "function") ui.renderAbapTemplateMarkers(markerItems);
+
+    if (autoSelectCard) {
+      autoSelectCard.click();
+      try {
+        autoSelectCard.scrollIntoView({ block: "center", behavior: "smooth" });
+      } catch (_) {
+        autoSelectCard.scrollIntoView();
+      }
+    }
   }
 
   ui.handleTemplatesDblClick = handleTemplatesDblClick;
   ui.renderTemplates = renderTemplates;
+  ui.scrollToTemplateResultId = scrollToTemplateResultId;
 })(window.AbapFlow);

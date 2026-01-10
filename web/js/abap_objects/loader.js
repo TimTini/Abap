@@ -237,7 +237,13 @@
       if (!schema?.validateMasterConfig) throw new Error("ABAP Objects schema module not loaded.");
       if (!parsers) throw new Error("ABAP Objects parsers module not loaded.");
 
-      const config = options?.config || ns.abapObjectsMasterConfig;
+      let config = options?.config || ns.abapObjectsMasterConfig;
+      if (!options?.config) {
+        const customStore = ns.abapObjects?.customStore || null;
+        if (customStore && typeof customStore.getEffectiveConfig === "function") {
+          config = customStore.getEffectiveConfig(config)?.config || config;
+        }
+      }
       const validation = schema.validateMasterConfig(config);
       if (!validation.ok) {
         throw new Error(formatSchemaErrors(validation.errors));
@@ -333,9 +339,18 @@
     return init();
   }
 
+  function reset() {
+    state.readyPromise = null;
+    state.config = null;
+    state.registry = null;
+    state.templatesById.clear();
+  }
+
   ns.abapObjects.defineTemplate = defineTemplate;
   ns.abapObjects.getTemplateConfig = getTemplateConfig;
   ns.abapObjects.init = init;
   ns.abapObjects.whenReady = whenReady;
   ns.abapObjects.getRegistry = () => state.registry;
+  ns.abapObjects.getConfig = () => state.config;
+  ns.abapObjects.reset = reset;
 })(window.AbapFlow);

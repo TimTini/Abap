@@ -107,6 +107,9 @@
         const scopeKey = String(el.dataset.scopeKey || "");
         const declKind = String(el.dataset.declKind || "");
         const varName = String(el.dataset.varName || "");
+        const typeScopeKey = String(el.dataset.typeScopeKey || "");
+        const typeName = String(el.dataset.typeName || "");
+        const fieldPath = String(el.dataset.fieldPath || "");
         const value = String(el.value || "").trim();
         if (!key) return;
 
@@ -146,6 +149,36 @@
           const rk = routineKey || key;
           if (rk === "PROGRAM") applyUserFields(model);
           else applyUserFields(model.nodes.get(rk));
+        } else if (annoType === "typefield") {
+          const sk = typeScopeKey || "PROGRAM";
+          const tn = String(typeName || "").trim();
+          const fp = String(fieldPath || "").trim();
+          if (tn && fp && model.typeDefs && typeof model.typeDefs.get === "function") {
+            const typeKey = `${sk}|${tn.toLowerCase()}`;
+            const typeDef = model.typeDefs.get(typeKey) || null;
+            const typeField = typeDef?.fields?.get ? typeDef.fields.get(fp.toLowerCase()) : null;
+            applyUserFields(typeField);
+
+            function syncVirtualDecls(list) {
+              const arr = Array.isArray(list) ? list : [];
+              for (const d of arr) {
+                if (!d || !d.isVirtual) continue;
+                const origin = d.virtualOrigin && typeof d.virtualOrigin === "object" ? d.virtualOrigin : null;
+                if (!origin || origin.kind !== "typeField") continue;
+                if (String(origin.typeScopeKey || "PROGRAM") !== sk) continue;
+                if (String(origin.typeName || "").trim().toLowerCase() !== tn.toLowerCase()) continue;
+                if (String(origin.fieldPath || "").trim().toLowerCase() !== fp.toLowerCase()) continue;
+                applyUserFields(d);
+              }
+            }
+
+            syncVirtualDecls(model.globalData);
+            syncVirtualDecls(model.globalConstants);
+            for (const node of model.nodes.values()) {
+              syncVirtualDecls(node?.localData);
+              syncVirtualDecls(node?.localConstants);
+            }
+          }
         }
 
         if (document.getElementById("tab-sequence").classList.contains("is-active") && typeof ui.renderSequence === "function") {

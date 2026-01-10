@@ -153,6 +153,10 @@
   function traceVariable(model, startKey, varName, options) {
     const maxNodes = Math.max(50, Number(options?.maxNodes || 250));
     const globalIndex = buildGlobalIndex(model);
+    const globalDeclMap = buildGlobalDeclMap(model);
+    const usesGlobalCache = new Map();
+    const usesGlobalSubtreeCache = new Map();
+    const usesGlobalSubtreeVisiting = new Set();
 
     const startVar = String(varName || "").trim();
     if (!startVar) return { error: "Variable name is empty." };
@@ -162,6 +166,49 @@
 
     const stack = new Set();
     let visitedCount = 0;
+
+    function routineUsesGlobal(routineKey, nameLower) {
+      const key = `${String(routineKey || "")}|${String(nameLower || "").toLowerCase()}`;
+      if (usesGlobalCache.has(key)) return usesGlobalCache.get(key);
+      const routine = model.nodes.get(routineKey);
+      if (!routine?.sourceRef) {
+        usesGlobalCache.set(key, false);
+        return false;
+      }
+
+      const used = collectUsedGlobalNames(
+        model,
+        routine.sourceRef.startLine,
+        routine.sourceRef.endLine || routine.sourceRef.startLine,
+        globalDeclMap,
+        nameLower,
+      );
+      const out = used.has(String(nameLower || "").toLowerCase());
+      usesGlobalCache.set(key, out);
+      return out;
+    }
+
+    function routineUsesGlobalInSubtree(routineKey, nameLower) {
+      const key = `${String(routineKey || "")}|${String(nameLower || "").toLowerCase()}`;
+      if (usesGlobalSubtreeCache.has(key)) return usesGlobalSubtreeCache.get(key);
+      if (usesGlobalSubtreeVisiting.has(key)) return false;
+      usesGlobalSubtreeVisiting.add(key);
+
+      let out = routineUsesGlobal(routineKey, nameLower);
+      if (!out) {
+        const routine = model.nodes.get(routineKey);
+        for (const edge of routine?.calls || []) {
+          if (routineUsesGlobalInSubtree(edge.toKey, nameLower)) {
+            out = true;
+            break;
+          }
+        }
+      }
+
+      usesGlobalSubtreeVisiting.delete(key);
+      usesGlobalSubtreeCache.set(key, out);
+      return out;
+    }
 
     function walk(routineKey, currentVarName) {
       visitedCount++;
@@ -214,9 +261,11 @@
         matchesVariableName(decl.variableName, currentVarName)
       ) {
         const dt = decl.dataType ? ` TYPE ${decl.dataType}` : "";
+        const declUpper = String(decl.declKind || "").toUpperCase();
+        const valueKeyword = declUpper === "PARAMETERS" ? "DEFAULT" : "VALUE";
         writes.unshift({
           variableName: decl.variableName,
-          statement: `${decl.declKind} ${decl.variableName}${dt} VALUE ${decl.value}`,
+          statement: `${decl.declKind} ${decl.variableName}${dt} ${valueKeyword} ${decl.value}`,
           sourceRef: decl.sourceRef || null,
         });
       }
@@ -247,22 +296,32 @@
       }
 
       for (const edge of routine.calls) {
-        let mapping = null;
-        if (isGlobal) {
-          mapping = { mappedVarName: currentVarName, kind: "GLOBAL" };
-        } else {
-          mapping = mapThroughEdge(model, edge, currentVarName);
+        const paramMapping = mapThroughEdge(model, edge, currentVarName);
+        if (paramMapping) {
+          const child = walk(edge.toKey, paramMapping.mappedVarName);
+          if (!child) continue;
+          calls.push({
+            direction: "toCallee",
+            edge,
+            fromVar: currentVarName,
+            toVar: paramMapping.mappedVarName,
+            mappingKind: paramMapping.kind,
+            child,
+          });
+          continue;
         }
 
-        if (!mapping) continue;
-        const child = walk(edge.toKey, mapping.mappedVarName);
+        if (!isGlobal) continue;
+        if (!routineUsesGlobalInSubtree(edge.toKey, nameLower)) continue;
+
+        const child = walk(edge.toKey, currentVarName);
         if (!child) continue;
         calls.push({
           direction: "toCallee",
           edge,
           fromVar: currentVarName,
-          toVar: mapping.mappedVarName,
-          mappingKind: mapping.kind,
+          toVar: currentVarName,
+          mappingKind: "GLOBAL",
           child,
         });
       }
@@ -366,17 +425,21 @@
     for (const key of entrypoints) {
       const routine = model.nodes.get(key);
       if (!routine?.sourceRef) continue;
-      const used = collectUsedGlobalNames(
-        model,
-        routine.sourceRef.startLine,
-        routine.sourceRef.endLine || routine.sourceRef.startLine,
-        globalDeclMap,
-        startLower,
-      );
-      if (!used.has(startLower)) continue;
-
       const childResult = traceVariable(model, key, startVar, options);
       if (!childResult?.root) continue;
+
+      const root = childResult.root;
+      const hasChildCalls = (root.calls || []).length > 0;
+      const hasOwnWrites = (root.writes || []).some((w) => {
+        const ln = w?.sourceRef?.startLine ?? null;
+        if (!ln) return false;
+        const from = root.sourceRef?.startLine ?? null;
+        if (!from) return false;
+        const to = root.sourceRef?.endLine ?? from;
+        return ln >= from && ln <= to;
+      });
+
+      if (!hasChildCalls && !hasOwnWrites) continue;
 
       calls.push({
         direction: "toCallee",

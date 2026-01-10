@@ -88,7 +88,7 @@
         ],
 
         declarations: {
-          globalKinds: ["DATA", "CONSTANTS"],
+          globalKinds: ["DATA", "CONSTANTS", "PARAMETERS"],
           localKinds: ["DATA", "CONSTANTS"],
           ignorePatterns: {
             DATA: [/^DATA\(/i, /\bBEGIN\s+OF\b/i, /\bEND\s+OF\b/i],

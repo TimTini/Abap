@@ -27,7 +27,10 @@
     <main class="app-main app-main--resizable">
       <section class="panel panel-left">
         <div class="panel__title">ABAP code</div>
-        <textarea id="abapInput" class="code-input" spellcheck="false" placeholder="Paste ABAP code here..."></textarea>
+        <div class="code-editor">
+          <textarea id="abapInput" class="code-input" spellcheck="false" placeholder="Paste ABAP code here..."></textarea>
+          <div id="abapTemplateMarkers" class="code-markers" aria-hidden="true"></div>
+        </div>
         <div class="panel__footer">
           <div id="statusBar" class="status-bar">Ready.</div>
         </div>
@@ -42,6 +45,7 @@
           <button class="tab" data-tab="sequence" type="button">Sequence</button>
           <button class="tab" data-tab="trace" type="button">Trace</button>
           <button class="tab" data-tab="templates" type="button">Templates</button>
+          <button class="tab" data-tab="config" type="button">Config</button>
           <button class="tab" data-tab="json" type="button">JSON</button>
         </div>
 
@@ -134,6 +138,28 @@
             <div class="hint">Tip: click a block to highlight the original statement in the editor.</div>
           </section>
 
+          <section class="tab-panel" id="tab-config">
+            <div class="split objcfg">
+              <div class="split__left">
+                <div class="toolbar objcfg-toolbar">
+                  <input id="abapObjCfgSearch" class="input" type="search" placeholder="Search (id/label/kind)..." />
+                  <button id="abapObjCfgNew" class="btn" type="button">New</button>
+                </div>
+                <div id="abapObjCfgList" class="objcfg-list"></div>
+                <div class="toolbar objcfg-toolbar objcfg-toolbar--bottom">
+                  <button id="abapObjCfgExport" class="btn" type="button">Export</button>
+                  <button id="abapObjCfgImport" class="btn" type="button">Import</button>
+                  <button id="abapObjCfgResetAll" class="btn" type="button">Reset all</button>
+                  <input id="abapObjCfgImportFile" type="file" accept="application/json" style="display:none" />
+                </div>
+              </div>
+              <div class="split__right">
+                <div class="panel__title">ABAP Objects config (localStorage)</div>
+                <div id="abapObjCfgEditor" class="details empty">Select an object on the left.</div>
+              </div>
+            </div>
+          </section>
+
           <section class="tab-panel" id="tab-json">
             <div class="panel__title">Model JSON</div>
             <pre id="jsonOutput" class="json-output empty">Analyze to see JSON.</pre>
@@ -146,6 +172,7 @@
     <script src="abap_objects.config.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/template_defs_store.js"></script>
+    <script src="js/abap_objects/custom_store.js"></script>
     <script src="js/logic.js"></script>
     <script src="js/notes.js"></script>
     <script src="js/model.js"></script>
@@ -163,9 +190,11 @@
     <script src="js/table_renderer.js"></script>
     <script src="js/template_converter.js"></script>
     <script src="js/ui_core.js"></script>
+    <script src="js/ui_abap_markers.js"></script>
     <script src="js/ui_anno.js"></script>
     <script src="js/ui_objects_list.js"></script>
     <script src="js/ui_objects_details.js"></script>
+    <script src="js/ui_abap_objects_config.js"></script>
     <script src="js/ui_templates_store.js"></script>
     <script src="js/ui_templates_flow.js"></script>
     <script src="js/ui_clipboard.js"></script>

@@ -242,6 +242,9 @@
         if (name === "templates") {
           requestAnimationFrame(() => ui.renderTemplates());
         }
+        if (name === "config") {
+          requestAnimationFrame(() => ui.renderAbapObjectsConfig?.());
+        }
       });
     });
 

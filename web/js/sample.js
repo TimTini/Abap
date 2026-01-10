@@ -13,8 +13,56 @@ DATA gv_count TYPE i.
 DATA gv_text  TYPE string.
 DATA gt_log   TYPE TABLE OF string.
 
+* Global config (BEGIN OF struct)
+DATA: BEGIN OF gs_conf,
+        counter TYPE i, " Counter
+        title   TYPE string,
+        BEGIN OF meta, " Meta
+          user  TYPE syuname, " User
+          depth TYPE i,
+        END OF meta,
+      END OF gs_conf.
+
+* Typed config (TYPES BEGIN OF struct)
+TYPES: BEGIN OF ty_conf,
+         counter TYPE i, " Counter
+         title   TYPE string, " Title
+         flag    TYPE abap_bool,
+         BEGIN OF meta, " Meta
+           user  TYPE syuname, " User
+           depth TYPE i, " Depth
+         END OF meta,
+       END OF ty_conf.
+
+DATA gs_typed TYPE ty_conf. " Typed config
+
+* Constants struct (BEGIN OF)
+CONSTANTS: BEGIN OF gc_labels,
+             ok     TYPE string VALUE 'OK', " OK label
+             cancel TYPE string VALUE 'CANCEL',
+           END OF gc_labels.
+
+* Selection screen parameters (demo)
+PARAMETERS p_user TYPE syuname DEFAULT sy-uname. " Current user
+PARAMETERS p_text(10) TYPE c. " Text (len via parentheses)
+PARAMETERS p_len LENGTH 5. " Len-only (defaults to c LENGTH 5)
+
+PARAMETERS: p_a TYPE i DEFAULT 1, " A
+            p_b TYPE i. " B
+
 START-OF-SELECTION.
-  PERFORM main USING sy-uname '123' abap_true abap_true abap_true 3
+  gs_conf-meta-user = p_user.
+  gs_conf-title = p_text.
+  gs_conf-meta-depth = p_a + p_b.
+  gs_conf-counter = gs_conf-meta-depth.
+
+  gs_typed-counter = gs_conf-counter.
+  gs_typed-title = gs_conf-title.
+  gs_typed-flag = abap_true.
+  gs_typed-meta-user = gs_conf-meta-user.
+  gs_typed-meta-depth = gs_conf-meta-depth.
+
+  PERFORM main USING p_user p_text abap_true abap_true abap_true gs_conf-meta-depth
               CHANGING gv_count gv_text.
 
 *&--------------------------------------------------------------------*
@@ -44,25 +92,67 @@ FORM main
   DATA lv_a TYPE i VALUE 0.
   DATA lv_b TYPE string.
 
+  TYPES: BEGIN OF ty_local,
+           item_1 TYPE i, " Local item 1
+           BEGIN OF meta, " Local meta
+             depth TYPE i, " Local depth
+           END OF meta,
+         END OF ty_local.
+
+  DATA ls_local_typed TYPE ty_local. " Local typed struct
+
+  * Local context struct
+  DATA: BEGIN OF ls_ctx,
+          item_1 TYPE i, " Item desc 1
+          text   TYPE string,
+          BEGIN OF meta, " Meta
+            user TYPE syuname, " User
+          END OF meta,
+        END OF ls_ctx.
+
   * Độ sâu
   DATA lv_next_depth TYPE i.
   DATA lv_msg        TYPE string.     " Message
 
+  lv_a = p_a + p_b.
+  lv_b = p_text.
+  lv_msg = p_len.
+
+  ls_ctx-item_1 = lv_a.
+  ls_ctx-text = lv_b.
+  ls_ctx-meta-user = iv_user.
+
+  ls_local_typed-item_1 = ls_ctx-item_1.
+  ls_local_typed-meta-depth = iv_maxd.
+
+  gs_conf-counter = ls_ctx-item_1.
+  gs_conf-title = ls_ctx-text.
+  gs_conf-meta-user = ls_ctx-meta-user.
+  gs_conf-counter = gs_conf-counter + 1.
+
+  gs_typed-counter = gs_conf-counter.
+  gs_typed-title = gs_conf-title.
+  gs_typed-flag = iv_demo.
+  gs_typed-meta-user = gs_conf-meta-user.
+  gs_typed-meta-depth = gs_conf-meta-depth + 1.
+
   DATA: lv_next_depth2 TYPE i,         " Độ sâu
         lv_msg2        TYPE string.    " Message
 
-  IF lv_a = 0 AND lv_msg IS INITIAL OR iv_cycle = abap_true.
+  IF ls_ctx-item_1 = 0 AND lv_msg IS INITIAL OR gs_conf-meta-user IS INITIAL.
     cv_count = cv_count.
   ENDIF.
 
   cv_count = cv_count + 1.
 
-  PERFORM step_a USING lv_a iv_maxd CHANGING cv_count.
-  PERFORM step_b USING lv_a CHANGING lv_b.
+  PERFORM step_a USING ls_ctx-item_1 iv_maxd CHANGING cv_count.
+  PERFORM step_b USING ls_local_typed-meta-depth CHANGING lv_b.
   PERFORM pass_changing CHANGING lv_b.
 
-  MESSAGE s001(zmsg) WITH iv_user lv_a INTO lv_msg DISPLAY LIKE 'I'.
+  MESSAGE s001(zmsg) WITH gs_conf-meta-user gs_typed-counter INTO lv_msg DISPLAY LIKE 'I'.
   MESSAGE |Hello { iv_user }|.
+
+  CONCATENATE lv_b gc_labels-ok INTO lv_b.
 
   READ TABLE gt_log WITH KEY table_line = lv_b INTO lv_msg BINARY SEARCH.
   COLLECT lv_b INTO gt_log.

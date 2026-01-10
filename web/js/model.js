@@ -153,6 +153,7 @@
 
       this.globalData = [];
       this.globalConstants = [];
+      this.typeDefs = new Map();
     }
 
     static formKey(name) {
@@ -253,9 +254,18 @@
         calledBy: n.calledBy.map((e) => ({ fromKey: e.fromKey, sourceRef: e.sourceRef, args: e.args, isInCycle: e.isInCycle })),
       }));
 
+      const types = Array.from(this.typeDefs?.values?.() || []).map((t) => ({
+        scopeKey: t.scopeKey,
+        name: t.name,
+        description: t.description,
+        sourceRef: t.sourceRef,
+        fields: Array.from(t.fields?.values?.() || []).map((f) => f),
+      }));
+
       return {
         version: ns.version,
         globals: { data: this.globalData, constants: this.globalConstants },
+        types,
         nodes,
         edges: this.edges,
         warnings: this.warnings,

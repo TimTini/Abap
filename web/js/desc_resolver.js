@@ -37,6 +37,12 @@
     }
   }
 
+  class ObjAbapTypeField extends ObjAbap {
+    constructor(options) {
+      super({ ...options, kind: "TYPEFIELD" });
+    }
+  }
+
   class ObjAbapUnknown extends ObjAbap {
     constructor(options) {
       super({ ...options, kind: "UNKNOWN" });
@@ -77,6 +83,50 @@
 
   function isRootIdentifier(name) {
     return /^[A-Za-z_][A-Za-z0-9_\/]*$/.test(String(name || "").trim());
+  }
+
+  function isSimpleStructPath(token) {
+    const s = String(token || "");
+    if (!s.includes("-")) return false;
+    if (s.includes("->") || s.includes("=>") || s.includes("~")) return false;
+    return true;
+  }
+
+  function splitStructPath(token) {
+    const s = String(token || "").trim();
+    if (!isSimpleStructPath(s)) return null;
+    const parts = s.split("-").filter(Boolean);
+    if (parts.length < 2) return null;
+    const root = parts[0];
+    if (!isRootIdentifier(root)) return null;
+    const fields = parts.slice(1);
+    if (fields.some((x) => !/^[A-Za-z0-9_\/]+$/.test(String(x || "")))) return null;
+    return { root, fields };
+  }
+
+  function makeTypeDefKey(scopeKey, typeName) {
+    const sk = String(scopeKey || "").trim();
+    const tn = String(typeName || "")
+      .trim()
+      .toLowerCase();
+    if (!sk || !tn) return "";
+    return `${sk}|${tn}`;
+  }
+
+  function resolveTypeFieldFromVirtualDecl(model, decl) {
+    const origin = decl?.virtualOrigin && typeof decl.virtualOrigin === "object" ? decl.virtualOrigin : null;
+    if (!origin || origin.kind !== "typeField") return null;
+
+    const typeScopeKey = String(origin.typeScopeKey || "").trim() || "PROGRAM";
+    const typeName = String(origin.typeName || "").trim();
+    const fieldPath = String(origin.fieldPath || "").trim();
+    if (!typeName || !fieldPath) return null;
+
+    const key = makeTypeDefKey(typeScopeKey, typeName);
+    const typeDef = model?.typeDefs?.get ? model.typeDefs.get(key) : null;
+    const field = typeDef?.fields?.get ? typeDef.fields.get(fieldPath.toLowerCase()) : null;
+
+    return { typeScopeKey, typeName, fieldPath, field, typeDef };
   }
 
   function incomingEdgeForRoutine(callPath, routineKey) {
@@ -162,9 +212,21 @@
     const masked = maskStringsAndTemplates(expr);
 
     let primary = null;
+    let originChain = null;
+    const origins = [];
+    const originByKey = new Map();
     let out = "";
     let last = 0;
     IDENT_PATH_RE.lastIndex = 0;
+
+    function addOrigin(obj) {
+      if (!obj || !obj.key) return;
+      const k = String(obj.key || "").trim();
+      if (!k) return;
+      if (originByKey.has(k)) return;
+      originByKey.set(k, obj);
+      origins.push(obj);
+    }
 
     function lookupOverride(originKey) {
       const k = String(originKey || "").trim();
@@ -178,7 +240,8 @@
     }
 
     function describeToken(currentRoutineKey, token, currentCallPath, depth) {
-      const root = rootFromPath(token);
+      const structPath = splitStructPath(token);
+      const root = structPath ? structPath.root : rootFromPath(token);
       if (!root) return { text: token, primary: null };
 
       const suffix = token.slice(root.length);
@@ -228,6 +291,7 @@
             return {
               text: nested.text || mappedExpr || `${fallback}${suffix}`,
               primary: nested.primary || null,
+              chain: Array.isArray(nested.origins) && nested.origins.length ? nested.origins : null,
             };
           }
         }
@@ -235,19 +299,78 @@
         const key = makeOriginKeyFromResolution(resolution, currentRoutineKey, root);
         const override = lookupOverride(key);
         const desc = override || fallback;
-        return {
-          text: `${desc}${suffix}`,
-          primary: key ? new ObjAbapParam({ key, scope: "parameter", routineKey: currentRoutineKey, name: root, entity: resolution?.decl || null }) : null,
-        };
+        const p = key
+          ? new ObjAbapParam({ key, scope: "parameter", routineKey: currentRoutineKey, name: root, entity: resolution?.decl || null })
+          : null;
+        return { text: `${desc}${suffix}`, primary: p, chain: p ? [p] : null };
       }
 
       if (scope === "local" || scope === "global") {
+        if (structPath) {
+          const parts = [];
+          const chain = [];
+          let lastPrimary = null;
+
+          const rootKey = makeOriginKeyFromResolution(resolution, currentRoutineKey, root);
+          const rootOverride = lookupOverride(rootKey);
+          const rootDesc = rootOverride || pickDescription(resolution?.decl, root) || root;
+          parts.push(rootDesc);
+          if (rootKey) chain.push(new ObjAbapDecl({ key: rootKey, scope, routineKey: currentRoutineKey, name: root, entity: resolution?.decl || null }));
+
+          let currentFull = root;
+          for (const segName of structPath.fields) {
+            currentFull = `${currentFull}-${segName}`;
+            const segRes =
+              typeof ns.lineage?.resolveSymbol === "function"
+                ? ns.lineage.resolveSymbol(model, currentRoutineKey, currentFull)
+                : { scope: "unknown" };
+
+            let segText = segName;
+            let segPrimary = null;
+
+            if ((segRes.scope === "local" || segRes.scope === "global") && segRes.decl) {
+              const decl = segRes.decl;
+              const virtualType = resolveTypeFieldFromVirtualDecl(model, decl);
+              if (virtualType && virtualType.field) {
+                const segKey = ns.notes?.makeTypeFieldKey
+                  ? ns.notes.makeTypeFieldKey(virtualType.typeScopeKey, virtualType.typeName, virtualType.fieldPath)
+                  : "";
+                const segOverride = lookupOverride(segKey);
+                segText = segOverride || pickDescription(virtualType.field, segName) || segName;
+                if (segKey) {
+                  segPrimary = new ObjAbapTypeField({
+                    key: segKey,
+                    scope: "type",
+                    routineKey: virtualType.typeScopeKey,
+                    name: segName,
+                    entity: virtualType.field,
+                  });
+                }
+              } else {
+                const segKey = makeOriginKeyFromResolution(segRes, currentRoutineKey, currentFull);
+                const segOverride = lookupOverride(segKey);
+                segText = segOverride || pickDescription(decl, segName) || segName;
+                if (segKey) segPrimary = new ObjAbapDecl({ key: segKey, scope: segRes.scope, routineKey: currentRoutineKey, name: segName, entity: decl });
+              }
+            }
+
+            parts.push(segText);
+            if (segPrimary) {
+              chain.push(segPrimary);
+              lastPrimary = segPrimary;
+            }
+          }
+
+          return { text: parts.join("-"), primary: lastPrimary || null, chain };
+        }
+
         const key = makeOriginKeyFromResolution(resolution, currentRoutineKey, root);
         const override = lookupOverride(key);
         const desc = override || pickDescription(resolution?.decl, root) || root;
         return {
           text: `${desc}${suffix}`,
           primary: key ? new ObjAbapDecl({ key, scope, routineKey: currentRoutineKey, name: root, entity: resolution?.decl || null }) : null,
+          chain: key ? [new ObjAbapDecl({ key, scope, routineKey: currentRoutineKey, name: root, entity: resolution?.decl || null })] : null,
         };
       }
 
@@ -267,16 +390,28 @@
       out += r.text;
 
       if (!primary && r.primary?.key) primary = r.primary;
+      if (!originChain && Array.isArray(r.chain) && r.chain.length) originChain = r.chain;
+      if (Array.isArray(r.chain) && r.chain.length) {
+        for (const o of r.chain) addOrigin(o);
+      } else if (r.primary?.key) {
+        addOrigin(r.primary);
+      }
       last = idx + token.length;
     }
 
     out += expr.slice(last);
-    return { text: out, primary };
+    return { text: out, primary, originChain, origins };
   }
 
   function describeExpressionWithOrigin(model, routineKey, expression, options) {
     const res = describeExpression(model, routineKey, expression, options);
-    return { text: res.text, originKey: String(res.primary?.key || ""), primary: res.primary || null };
+    return {
+      text: res.text,
+      originKey: String(res.primary?.key || ""),
+      primary: res.primary || null,
+      originChain: Array.isArray(res.originChain) ? res.originChain : null,
+      origins: Array.isArray(res.origins) ? res.origins : null,
+    };
   }
 
   ns.desc = {
@@ -284,6 +419,7 @@
     ObjAbap,
     ObjAbapParam,
     ObjAbapDecl,
+    ObjAbapTypeField,
     ObjAbapUnknown,
     pickDescription,
     maskStringsAndTemplates,

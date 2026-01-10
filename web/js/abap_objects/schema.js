@@ -25,8 +25,9 @@
     const label = asNonEmptyString(tpl.label);
     if (!label) pushErr(errors, `${path}.label`, "Template label is required.");
 
-    const file = asNonEmptyString(tpl.file);
-    if (!file) pushErr(errors, `${path}.file`, "Template file path is required.");
+    if (tpl.file != null && typeof tpl.file !== "string") {
+      pushErr(errors, `${path}.file`, "Template file path must be a string.");
+    }
 
     if (tpl.auto != null && typeof tpl.auto !== "boolean") {
       pushErr(errors, `${path}.auto`, "Template auto must be boolean.");
@@ -52,8 +53,31 @@
     if (!builderKind) pushErr(errors, `${path}.builder.kind`, "Builder kind is required.");
 
     if (kind === "statement") {
-      const parseKind = asNonEmptyString(obj?.parse?.kind);
+      const parseKind = asNonEmptyString(obj?.parse?.kind).toLowerCase();
       if (!parseKind) pushErr(errors, `${path}.parse.kind`, "Parse kind is required for statement objects.");
+
+      if (parseKind === "regex") {
+        const rx = obj?.parse?.regex;
+        const isRe = rx instanceof RegExp;
+        const isStr = typeof rx === "string" && asNonEmptyString(rx);
+        if (!isRe && !isStr) {
+          pushErr(errors, `${path}.parse.regex`, "parse.regex must be a RegExp or a non-empty pattern string.");
+        }
+
+        if (obj?.parse?.flags != null && typeof obj.parse.flags !== "string") {
+          pushErr(errors, `${path}.parse.flags`, "parse.flags must be a string.");
+        }
+
+        if (obj?.parse?.fields != null && !isPlainObject(obj.parse.fields)) {
+          pushErr(errors, `${path}.parse.fields`, "parse.fields must be an object.");
+        } else if (isPlainObject(obj?.parse?.fields)) {
+          for (const [k, v] of Object.entries(obj.parse.fields)) {
+            const n = Number(v);
+            if (!asNonEmptyString(k)) continue;
+            if (!Number.isFinite(n) || n < 0) pushErr(errors, `${path}.parse.fields.${k}`, "Field index must be a number >= 0.");
+          }
+        }
+      }
     }
 
     if (kind === "calledge") {
@@ -113,4 +137,3 @@
     validateMasterConfig,
   };
 })(window.AbapFlow);
-

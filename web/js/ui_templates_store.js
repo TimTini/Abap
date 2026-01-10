@@ -44,9 +44,28 @@
         if (!binds || typeof binds !== "object") continue;
         const bindMap = new Map();
         for (const [bind, value] of Object.entries(binds)) {
-          const v = String(value ?? "");
-          if (!v.trim()) continue;
-          bindMap.set(String(bind), v);
+          const b = String(bind || "").trim();
+          if (!b) continue;
+
+          if (typeof value === "string") {
+            const v = String(value ?? "");
+            if (!v.trim()) continue;
+            bindMap.set(b, v);
+            continue;
+          }
+
+          if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+
+          const rawByKey = value.byKey && typeof value.byKey === "object" && !Array.isArray(value.byKey) ? value.byKey : value;
+          const byKey = new Map();
+          for (const [originKeyRaw, ov] of Object.entries(rawByKey)) {
+            const originKey = String(originKeyRaw || "").trim();
+            if (!originKey) continue;
+            const v = String(ov ?? "");
+            if (!v.trim()) continue;
+            byKey.set(originKey, v);
+          }
+          if (byKey.size) bindMap.set(b, byKey);
         }
         if (bindMap.size) out.set(String(key), bindMap);
       }
@@ -68,9 +87,27 @@
       for (const [key, bindMap] of templateLocalOverrides.entries()) {
         const bucket = {};
         for (const [bind, value] of bindMap.entries()) {
-          const v = String(value ?? "");
-          if (!v.trim()) continue;
-          bucket[String(bind)] = v;
+          const b = String(bind || "").trim();
+          if (!b) continue;
+
+          if (typeof value === "string") {
+            const v = String(value ?? "");
+            if (!v.trim()) continue;
+            bucket[b] = v;
+            continue;
+          }
+
+          if (value instanceof Map) {
+            const byKey = {};
+            for (const [originKey, ov] of value.entries()) {
+              const ok = String(originKey || "").trim();
+              if (!ok) continue;
+              const v = String(ov ?? "");
+              if (!v.trim()) continue;
+              byKey[ok] = v;
+            }
+            if (Object.keys(byKey).length) bucket[b] = { byKey };
+          }
         }
         if (Object.keys(bucket).length) obj.overrides[String(key)] = bucket;
       }
@@ -108,7 +145,50 @@
     }
     if (!bucket) return;
 
-    if (hasValue) bucket.set(b, v);
+    bucket.set(b, v);
+    if (!hasValue) bucket.delete(b);
+
+    if (bucket.size === 0) templateLocalOverrides.delete(key);
+    saveTemplateLocalOverrides();
+  }
+
+  function setLocalTemplateOverrideByOriginKey(templateId, resultId, bind, originKey, value, baseOriginKey) {
+    const key = templateBucketKey(templateId, resultId);
+    const b = String(bind || "").trim();
+    const ok = String(originKey || "").trim();
+    if (!b || !ok) return;
+
+    const v = String(value ?? "");
+    const hasValue = Boolean(v.trim());
+
+    let bucket = templateLocalOverrides.get(key);
+    if (!bucket && hasValue) {
+      bucket = new Map();
+      templateLocalOverrides.set(key, bucket);
+    }
+    if (!bucket) return;
+
+    const baseKey = String(baseOriginKey || "").trim();
+
+    const cur = bucket.get(b);
+    let map = null;
+
+    if (cur instanceof Map) {
+      map = cur;
+    } else if (typeof cur === "string") {
+      map = new Map();
+      const legacy = String(cur ?? "");
+      if (legacy.trim()) {
+        map.set(baseKey || ok, legacy);
+      }
+    } else {
+      map = new Map();
+    }
+
+    if (hasValue) map.set(ok, v);
+    else map.delete(ok);
+
+    if (map.size) bucket.set(b, map);
     else bucket.delete(b);
 
     if (bucket.size === 0) templateLocalOverrides.delete(key);
@@ -160,7 +240,8 @@
       if (!bind) continue;
       if (!overridesMap.has(bind)) continue;
 
-      const overrideValue = String(overridesMap.get(bind) ?? "");
+      const overrideEntry = overridesMap.get(bind);
+      const overrideValue = typeof overrideEntry === "string" ? String(overrideEntry ?? "") : "";
 
       if (
         model &&
@@ -179,23 +260,32 @@
         const routineKey = String(context?.routine?.key || "").trim();
         const evalRoutineKey = callerKey && typeof base?.actual === "string" ? callerKey : routineKey || callerKey;
 
-        if (originKey && exprText && evalRoutineKey) {
-          const overrideByKey = new Map([[originKey, overrideValue]]);
-          const resolved = desc.describeExpression(model, evalRoutineKey, exprText, { callPath, overrideByKey });
-          const nextText = String(resolved?.text ?? "").trim();
-          if (nextText) {
-            cell.text = nextText;
-            continue;
+        if (exprText && evalRoutineKey) {
+          let overrideByKey = null;
+          if (overrideEntry instanceof Map) {
+            overrideByKey = overrideEntry;
+          } else if (originKey && overrideValue.trim()) {
+            overrideByKey = new Map([[originKey, overrideValue]]);
+          }
+
+          if (overrideByKey && overrideByKey.size) {
+            const resolved = desc.describeExpression(model, evalRoutineKey, exprText, { callPath, overrideByKey });
+            const nextText = String(resolved?.text ?? "").trim();
+            if (nextText) {
+              cell.text = nextText;
+              continue;
+            }
           }
         }
       }
 
-      cell.text = overrideValue;
+      if (typeof overrideEntry === "string") cell.text = overrideValue;
     }
   }
 
   tpl.getLocalTemplateOverrides = getLocalTemplateOverrides;
   tpl.setLocalTemplateOverride = setLocalTemplateOverride;
+  tpl.setLocalTemplateOverrideByOriginKey = setLocalTemplateOverrideByOriginKey;
   tpl.resolveBindPath = resolveBindPath;
   tpl.applyOverridesToConfig = applyOverridesToConfig;
 })(window.AbapFlow);

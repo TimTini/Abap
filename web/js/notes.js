@@ -51,6 +51,14 @@
     return `DECL:${sk}:${dk}:${vn}`;
   }
 
+  function makeTypeFieldKey(typeScopeKey, typeName, fieldPath) {
+    const sk = String(typeScopeKey || "").trim();
+    const tn = normalizeParamName(typeName);
+    const fp = normalizeParamName(fieldPath);
+    if (!sk || !tn || !fp) return "";
+    return `TYPEFIELD:${sk}:${tn}:${fp}`;
+  }
+
   function getProgramIdFromText(text) {
     const lines = String(text || "").split(/\r?\n/);
     for (const rawLine of lines) {
@@ -271,6 +279,67 @@
         }
       }
     }
+
+    function makeTypeDefKey(scopeKey, typeName) {
+      const sk = String(scopeKey || "").trim();
+      const tn = String(typeName || "")
+        .trim()
+        .toLowerCase();
+      if (!sk || !tn) return "";
+      return `${sk}|${tn}`;
+    }
+
+    if (model.typeDefs && typeof model.typeDefs.values === "function") {
+      for (const t of model.typeDefs.values()) {
+        const scopeKey = String(t?.scopeKey || "").trim() || "PROGRAM";
+        const typeName = String(t?.name || "").trim();
+        if (!typeName) continue;
+        const fields = t?.fields && typeof t.fields.values === "function" ? t.fields : null;
+        if (!fields) continue;
+
+        for (const field of fields.values()) {
+          const path = String(field?.variableName || "").trim();
+          if (!path) continue;
+          const key = makeTypeFieldKey(scopeKey, typeName, path);
+          const entry = key ? p?.routines?.[key] || null : null;
+          if (entry) {
+            field.userDescription = String(entry.description || "");
+            field.userNote = String(entry.note || "");
+          } else {
+            delete field.userDescription;
+            delete field.userNote;
+          }
+        }
+      }
+    }
+
+    function syncVirtualDeclFromTypeField(decl) {
+      if (!decl || !decl.isVirtual) return;
+      const origin = decl?.virtualOrigin && typeof decl.virtualOrigin === "object" ? decl.virtualOrigin : null;
+      if (!origin || origin.kind !== "typeField") return;
+
+      const typeScopeKey = String(origin.typeScopeKey || "").trim() || "PROGRAM";
+      const typeName = String(origin.typeName || "").trim();
+      const fieldPath = String(origin.fieldPath || "").trim();
+      if (!typeName || !fieldPath) return;
+
+      const typeDef = model.typeDefs.get(makeTypeDefKey(typeScopeKey, typeName)) || null;
+      const field = typeDef?.fields?.get ? typeDef.fields.get(fieldPath.toLowerCase()) : null;
+      if (!field) return;
+
+      decl.description = String(field.description || "");
+      if (field.userDescription) decl.userDescription = String(field.userDescription || "");
+      else delete decl.userDescription;
+      if (field.userNote) decl.userNote = String(field.userNote || "");
+      else delete decl.userNote;
+    }
+
+    for (const decl of model.globalData || []) syncVirtualDeclFromTypeField(decl);
+    for (const decl of model.globalConstants || []) syncVirtualDeclFromTypeField(decl);
+    for (const node of model.nodes.values()) {
+      for (const decl of node?.localData || []) syncVirtualDeclFromTypeField(decl);
+      for (const decl of node?.localConstants || []) syncVirtualDeclFromTypeField(decl);
+    }
   }
 
   function exportJson() {
@@ -318,6 +387,7 @@
     getActiveProgramId,
     makeParamKey,
     makeDeclKey,
+    makeTypeFieldKey,
     getEntry,
     setEntry,
     applyToModel,
