@@ -342,7 +342,7 @@
 
   function setPreviewToolbarEnabled(enabled) {
     const on = Boolean(enabled);
-    const ids = ["btnPreviewDeleteRow", "btnPreviewDeleteCol", "btnClearFormat", "selBgColor", "selTextColor", "selBorder", "btnApplyBorder"];
+    const ids = ["btnPreviewDeleteRow", "btnPreviewDeleteCol", "btnClearFormat", "selBgColor", "selTextColor", "selBorder", "btnApplyBorder", "selColSpan", "selRowSpan", "btnApplyMerge", "btnClearMerge"];
     for (const id of ids) {
       const el = $(id);
       if (el) el.disabled = !on;
@@ -372,10 +372,14 @@
     const bgEl = $("selBgColor");
     const fgEl = $("selTextColor");
     const borderEl = $("selBorder");
+    const colSpanEl = $("selColSpan");
+    const rowSpanEl = $("selRowSpan");
 
     if (bgEl && bg) bgEl.value = bg;
     if (fgEl && fg) fgEl.value = fg;
     if (borderEl) borderEl.value = String(css.border || "").trim();
+    if (colSpanEl) colSpanEl.value = String(Math.max(1, Number(td.colSpan || 1)));
+    if (rowSpanEl) rowSpanEl.value = String(Math.max(1, Number(td.rowSpan || 1)));
 
     setPreviewToolbarEnabled(true);
   }
@@ -524,6 +528,81 @@
     }
 
     return out;
+  }
+
+  function mergeRegion(start, rowspan, colspan) {
+    const r1 = start.row;
+    const c1 = start.colIndex;
+    const r2 = r1 + Math.max(1, Math.floor(Number(rowspan || 1))) - 1;
+    const c2 = c1 + Math.max(1, Math.floor(Number(colspan || 1))) - 1;
+    return { r1, c1, r2, c2 };
+  }
+
+  function regionsOverlap(a, b) {
+    if (!a || !b) return false;
+    const rowOverlap = a.r1 <= b.r2 && b.r1 <= a.r2;
+    const colOverlap = a.c1 <= b.c2 && b.c1 <= a.c2;
+    return rowOverlap && colOverlap;
+  }
+
+  function applyMergeAtSelected() {
+    if (!selectedAddr) return;
+    const parsed = readTemplateJsonFromEditor();
+    if (!parsed.ok) {
+      setStatus(String(parsed.error || "Invalid template JSON."), true);
+      return;
+    }
+
+    const cfg = parsed.value;
+    if (!cfg?.grid || typeof cfg.grid !== "object") cfg.grid = { rows: 1, cols: 1 };
+
+    const start = parseAddress(selectedAddr);
+    if (!start) return;
+
+    const wantCol = Math.max(1, Math.floor(Number($("selColSpan")?.value || 1)));
+    const wantRow = Math.max(1, Math.floor(Number($("selRowSpan")?.value || 1)));
+
+    const needCols = start.colIndex + wantCol - 1;
+    const needRows = start.row + wantRow - 1;
+    cfg.grid.cols = Math.max(1, Math.floor(Number(cfg.grid.cols || 1)), needCols);
+    cfg.grid.rows = Math.max(1, Math.floor(Number(cfg.grid.rows || 1)), needRows);
+
+    const region = mergeRegion(start, wantRow, wantCol);
+    const merges = Array.isArray(cfg.merges) ? cfg.merges : [];
+    const next = [];
+
+    for (const m of merges) {
+      const ms = parseAddress(m?.start);
+      if (!ms) continue;
+      const mr = mergeRegion(ms, m?.rowspan || 1, m?.colspan || 1);
+      if (regionsOverlap(mr, region)) continue;
+      next.push(m);
+    }
+
+    if (wantRow > 1 || wantCol > 1) {
+      next.push({ start: addrFromRC(start.colIndex, start.row), rowspan: wantRow, colspan: wantCol });
+    }
+
+    cfg.merges = normalizeMerges(next, cfg.grid.rows, cfg.grid.cols);
+    writeTemplateJson(cfg);
+    renderPreview();
+    setStatus(`Merge updated at ${selectedAddr} (${wantRow}x${wantCol}).`, false);
+  }
+
+  function clearMergeAtSelected() {
+    if (!selectedAddr) return;
+    const parsed = readTemplateJsonFromEditor();
+    if (!parsed.ok) {
+      setStatus(String(parsed.error || "Invalid template JSON."), true);
+      return;
+    }
+
+    const cfg = parsed.value;
+    const addr = normalizeAddress(selectedAddr);
+    cfg.merges = (Array.isArray(cfg.merges) ? cfg.merges : []).filter((m) => normalizeAddress(m?.start) !== addr);
+    writeTemplateJson(cfg);
+    renderPreview();
+    setStatus(`Unmerged: ${selectedAddr}`, false);
   }
 
   function deleteRow(cfg, delRow) {
@@ -949,6 +1028,62 @@
     $("btnDeleteTemplate")?.addEventListener("click", deleteSaved);
     $("btnDeleteRow")?.addEventListener("click", deleteSelectedRow);
     $("btnDeleteCol")?.addEventListener("click", deleteSelectedCol);
+    $("btnCopyExcel")?.addEventListener("click", async () => {
+      const exporter = ns.templateExcelExport || null;
+      const table = $("previewHost")?.querySelector("table.excel-like-table") || null;
+      const res = exporter?.copyExcelLikeTableToClipboard ? await exporter.copyExcelLikeTableToClipboard(table) : { ok: false, error: "Excel export module not loaded." };
+      setStatus(String(res.ok ? `Copied to clipboard (${res.method || "copy"}). Paste into Excel.` : res.error || "Copy failed."), !res.ok);
+    });
+    $("btnPasteExcel")?.addEventListener("click", () => {
+      const modal = $("excelPasteModal");
+      const target = $("excelPasteTarget");
+      if (!modal || !target) return;
+      modal.hidden = false;
+      target.textContent = "";
+      window.setTimeout(() => target.focus(), 0);
+    });
+    $("btnExcelPasteCancel")?.addEventListener("click", () => {
+      const modal = $("excelPasteModal");
+      if (modal) modal.hidden = true;
+    });
+    $("excelPasteModal")?.addEventListener("click", (e) => {
+      const modal = $("excelPasteModal");
+      if (!modal) return;
+      const panel = e?.target?.closest ? e.target.closest(".excel-paste-modal__panel") : null;
+      if (panel) return;
+      modal.hidden = true;
+    });
+    $("excelPasteTarget")?.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      const modal = $("excelPasteModal");
+      if (modal) modal.hidden = true;
+    });
+    $("excelPasteTarget")?.addEventListener("paste", (e) => {
+      const ev = e || window.event;
+      const html = ev?.clipboardData?.getData ? ev.clipboardData.getData("text/html") : "";
+      const plain = ev?.clipboardData?.getData ? ev.clipboardData.getData("text/plain") : "";
+      if (ev?.preventDefault) ev.preventDefault();
+
+      const importer = ns.templateExcelImport || null;
+      if (!importer?.buildTemplateConfigFromExcelHtml) {
+        setStatus("Excel import module not loaded.", true);
+        return;
+      }
+
+      const res = importer.buildTemplateConfigFromExcelHtml(html, plain);
+      if (!res.ok) {
+        setStatus(res.error || "Paste failed.", true);
+        return;
+      }
+
+      writeTemplateJson(res.config);
+      selectedAddr = "";
+      renderPreview();
+      setStatus("Imported from Excel clipboard.", false);
+
+      const modal = $("excelPasteModal");
+      if (modal) modal.hidden = true;
+    });
 
     $("btnPreviewDeleteRow")?.addEventListener("click", deleteSelectedRow);
     $("btnPreviewDeleteCol")?.addEventListener("click", deleteSelectedCol);
@@ -985,6 +1120,19 @@
       if (e.key !== "Enter") return;
       e.preventDefault();
       $("btnApplyBorder")?.click();
+    });
+
+    $("btnApplyMerge")?.addEventListener("click", applyMergeAtSelected);
+    $("btnClearMerge")?.addEventListener("click", clearMergeAtSelected);
+    $("selColSpan")?.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      $("btnApplyMerge")?.click();
+    });
+    $("selRowSpan")?.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      $("btnApplyMerge")?.click();
     });
 
     $("btnClearFormat")?.addEventListener("click", () => {

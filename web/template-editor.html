@@ -74,6 +74,7 @@
             <button id="btnDeleteTemplate" class="btn" type="button">Delete saved</button>
             <button id="btnDeleteRow" class="btn" type="button">Delete row</button>
             <button id="btnDeleteCol" class="btn" type="button">Delete col</button>
+            <button id="btnPasteExcel" class="btn" type="button">Paste from Excel</button>
           </div>
 
           <div class="template-editor__json">
@@ -104,14 +105,15 @@
         <div class="panel__title">Preview</div>
         <div class="hint">Tip: click a cell to select, double-click to edit. Shift+Enter for newline.</div>
         <div class="template-editor-preview-toolbar">
-          <div class="template-editor-preview-toolbar__row">
-            <div class="template-editor-preview-toolbar__selected">
-              Selected: <span id="selAddr">-</span>
+            <div class="template-editor-preview-toolbar__row">
+              <div class="template-editor-preview-toolbar__selected">
+                Selected: <span id="selAddr">-</span>
+              </div>
+              <button id="btnCopyExcel" class="btn btn-primary" type="button">Copy to Excel</button>
+              <button id="btnPreviewDeleteRow" class="btn" type="button" disabled>Delete row</button>
+              <button id="btnPreviewDeleteCol" class="btn" type="button" disabled>Delete col</button>
+              <button id="btnClearFormat" class="btn" type="button" disabled>Clear format</button>
             </div>
-            <button id="btnPreviewDeleteRow" class="btn" type="button" disabled>Delete row</button>
-            <button id="btnPreviewDeleteCol" class="btn" type="button" disabled>Delete col</button>
-            <button id="btnClearFormat" class="btn" type="button" disabled>Clear format</button>
-          </div>
           <div class="template-editor-preview-toolbar__row">
             <label class="template-editor-preview-toolbar__field">
               Bg
@@ -127,10 +129,37 @@
             </label>
             <button id="btnApplyBorder" class="btn" type="button" disabled>Apply</button>
           </div>
+          <div class="template-editor-preview-toolbar__row">
+            <label class="template-editor-preview-toolbar__field">
+              Colspan
+              <input id="selColSpan" class="input input-span" type="number" min="1" value="1" disabled />
+            </label>
+            <label class="template-editor-preview-toolbar__field">
+              Rowspan
+              <input id="selRowSpan" class="input input-span" type="number" min="1" value="1" disabled />
+            </label>
+            <button id="btnApplyMerge" class="btn" type="button" disabled>Merge</button>
+            <button id="btnClearMerge" class="btn" type="button" disabled>Unmerge</button>
+          </div>
         </div>
         <div id="previewHost" class="template-editor-preview empty">Load a template to preview.</div>
       </section>
     </main>
+
+    <div id="excelPasteModal" class="excel-paste-modal" hidden>
+      <div class="excel-paste-modal__backdrop"></div>
+      <div class="excel-paste-modal__panel" role="dialog" aria-modal="true" aria-label="Paste from Excel">
+        <div class="excel-paste-modal__title">Paste from Excel</div>
+        <div class="excel-paste-modal__hint">
+          1) Copy a formatted cell range in Excel (Ctrl+C). 2) Click the box below and paste (Ctrl+V). This will import
+          table + merges + styles into the Template JSON.
+        </div>
+        <div id="excelPasteTarget" class="excel-paste-modal__target" contenteditable="true" spellcheck="false" tabindex="0"></div>
+        <div class="excel-paste-modal__actions">
+          <button id="btnExcelPasteCancel" class="btn" type="button">Cancel</button>
+        </div>
+      </div>
+    </div>
 
     <script src="js/namespace.js"></script>
     <script src="js/utils.js"></script>
@@ -142,6 +171,8 @@
     <script src="js/abap_objects/loader.js"></script>
     <script src="js/table_renderer.js"></script>
     <script src="js/template_converter.js"></script>
+    <script src="js/template_excel_import.js"></script>
+    <script src="js/template_excel_export.js"></script>
     <script src="js/template_editor_ui.js"></script>
   </body>
 </html>

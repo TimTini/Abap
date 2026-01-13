@@ -857,8 +857,8 @@
     updateTemplatesToolbar();
   }
 
-  function cloneTableHtmlWithTrailingBlankRow(tableEl) {
-    if (!tableEl || typeof tableEl.cloneNode !== "function") return "";
+  function cloneTableWithTrailingBlankRow(tableEl) {
+    if (!tableEl || typeof tableEl.cloneNode !== "function") return null;
     const clone = tableEl.cloneNode(true);
 
     const colCount = clone.querySelectorAll("colgroup col").length || 1;
@@ -876,7 +876,7 @@
     const tbody = clone.tBodies && clone.tBodies.length ? clone.tBodies[clone.tBodies.length - 1] : clone;
     tbody.appendChild(tr);
 
-    return clone.outerHTML;
+    return clone;
   }
 
   async function copySelectedTables() {
@@ -884,6 +884,8 @@
       ui.setStatus("Clipboard module not loaded.", true);
       return;
     }
+
+    const exporter = ns.templateExcelExport || null;
 
     const orderedIds = lastRenderOrder.filter((id) => selectedTemplateResultIds.has(id));
     const tables = orderedIds.map((id) => tableByResultId.get(id)).filter(Boolean);
@@ -894,11 +896,17 @@
 
     const html = tables
       .map((t, idx) => {
-        const tableHtml = idx < tables.length - 1 ? cloneTableHtmlWithTrailingBlankRow(t) : t.outerHTML;
+        if (idx < tables.length - 1) {
+          const clone = cloneTableWithTrailingBlankRow(t);
+          const tableHtml = clone ? (exporter?.toExcelHtml ? exporter.toExcelHtml(clone) : clone.outerHTML) : "";
+          return `<div>${tableHtml}</div>`;
+        }
+
+        const tableHtml = exporter?.toExcelHtml ? exporter.toExcelHtml(t) : t.outerHTML;
         return `<div>${tableHtml}</div>`;
       })
       .join("\n");
-    const plain = tables.map((t) => t.innerText || "").join("\n\n");
+    const plain = exporter?.toTsv ? tables.map((t) => exporter.toTsv(t)).join("\n\n") : tables.map((t) => t.innerText || "").join("\n\n");
 
     const ok = await ui.clipboard.copyHtml(html, plain);
     ui.setStatus(ok ? `Copied ${tables.length} table(s) to clipboard.` : "Copy failed (browser blocked clipboard).", !ok);
@@ -1140,7 +1148,10 @@
           ui.setStatus("No table to copy.", true);
           return;
         }
-        const ok = await ui.clipboard.copyHtml(`<div>${t.outerHTML}</div>`, t.innerText || title.textContent || "");
+        const exporter = ns.templateExcelExport || null;
+        const html = exporter?.toExcelHtml ? exporter.toExcelHtml(t) : t.outerHTML;
+        const plain = exporter?.toTsv ? exporter.toTsv(t) : t.innerText || title.textContent || "";
+        const ok = await ui.clipboard.copyHtml(`<div>${html}</div>`, plain);
         ui.setStatus(ok ? "Copied HTML table (paste into Excel)." : "Copy failed (browser blocked clipboard).", !ok);
       });
 

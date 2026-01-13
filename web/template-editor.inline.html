@@ -1240,12 +1240,12 @@
       min-height: 0;
       overflow: auto;
     }
-
+    
     .conversion-results.empty,
     .original-performs.empty {
       color: var(--muted);
     }
-
+    
     .template-block {
       margin-bottom: 16px;
       padding: 12px;
@@ -1434,42 +1434,42 @@
       font-family: var(--mono);
       font-size: 12px;
     }
-
+    
     .template-line__label {
       color: var(--accent);
       font-weight: 650;
       margin-right: 8px;
     }
-
+    
     .template-line__value {
       color: var(--text);
     }
-
+    
     .param-list {
       margin-left: 20px;
     }
-
+    
     .param-item {
       margin: 4px 0;
       color: var(--text);
     }
-
+    
     .param-item__name {
       color: var(--accent);
       font-weight: 650;
     }
-
+    
     .param-item__type {
       color: var(--muted);
       margin-left: 8px;
     }
-
+    
     .param-item__desc {
       color: var(--muted);
       font-style: italic;
       margin-left: 8px;
     }
-
+    
     .original-perform {
       margin-bottom: 12px;
       padding: 10px;
@@ -1480,24 +1480,24 @@
       font-size: 12px;
       white-space: pre-wrap;
     }
-
+    
     .original-perform__header {
       font-weight: 650;
       color: var(--text);
       margin-bottom: 6px;
     }
-
+    
     .original-perform__code {
       color: var(--muted);
     }
-
+    
     .copy-success {
       color: var(--ok);
       font-size: 12px;
       margin-top: 8px;
       animation: fadeInOut 2s ease-in-out;
     }
-
+    
     @keyframes fadeInOut {
       0%, 100% { opacity: 0; }
       50% { opacity: 1; }
@@ -1691,6 +1691,10 @@
       height: 34px;
     }
 
+    .input-span {
+      width: 90px;
+    }
+
     .template-editor-preview td.is-selected {
       outline: 2px solid #60a5fa;
       outline-offset: -2px;
@@ -1714,6 +1718,70 @@
       line-height: 1.25;
       background: rgba(255, 255, 255, 0.92);
       color: #111;
+    }
+
+    .excel-paste-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: grid;
+      place-items: center;
+    }
+
+    .excel-paste-modal[hidden] {
+      display: none;
+    }
+
+    .excel-paste-modal__backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.68);
+    }
+
+    .excel-paste-modal__panel {
+      position: relative;
+      width: min(820px, calc(100vw - 32px));
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(18, 18, 18, 0.95);
+      box-shadow: 0 20px 70px rgba(0, 0, 0, 0.45);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .excel-paste-modal__title {
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.92);
+    }
+
+    .excel-paste-modal__hint {
+      color: rgba(255, 255, 255, 0.74);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .excel-paste-modal__target {
+      min-height: 180px;
+      max-height: 40vh;
+      overflow: auto;
+      border-radius: 12px;
+      border: 1px dashed rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.04);
+      padding: 10px;
+      outline: none;
+    }
+
+    .excel-paste-modal__target:focus {
+      border-color: rgba(96, 165, 250, 0.70);
+      box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.18);
+    }
+
+    .excel-paste-modal__actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
     }
 
     </style>
@@ -1784,6 +1852,7 @@
             <button id="btnDeleteTemplate" class="btn" type="button">Delete saved</button>
             <button id="btnDeleteRow" class="btn" type="button">Delete row</button>
             <button id="btnDeleteCol" class="btn" type="button">Delete col</button>
+            <button id="btnPasteExcel" class="btn" type="button">Paste from Excel</button>
           </div>
 
           <div class="template-editor__json">
@@ -1814,14 +1883,15 @@
         <div class="panel__title">Preview</div>
         <div class="hint">Tip: click a cell to select, double-click to edit. Shift+Enter for newline.</div>
         <div class="template-editor-preview-toolbar">
-          <div class="template-editor-preview-toolbar__row">
-            <div class="template-editor-preview-toolbar__selected">
-              Selected: <span id="selAddr">-</span>
+            <div class="template-editor-preview-toolbar__row">
+              <div class="template-editor-preview-toolbar__selected">
+                Selected: <span id="selAddr">-</span>
+              </div>
+              <button id="btnCopyExcel" class="btn btn-primary" type="button">Copy to Excel</button>
+              <button id="btnPreviewDeleteRow" class="btn" type="button" disabled>Delete row</button>
+              <button id="btnPreviewDeleteCol" class="btn" type="button" disabled>Delete col</button>
+              <button id="btnClearFormat" class="btn" type="button" disabled>Clear format</button>
             </div>
-            <button id="btnPreviewDeleteRow" class="btn" type="button" disabled>Delete row</button>
-            <button id="btnPreviewDeleteCol" class="btn" type="button" disabled>Delete col</button>
-            <button id="btnClearFormat" class="btn" type="button" disabled>Clear format</button>
-          </div>
           <div class="template-editor-preview-toolbar__row">
             <label class="template-editor-preview-toolbar__field">
               Bg
@@ -1837,10 +1907,37 @@
             </label>
             <button id="btnApplyBorder" class="btn" type="button" disabled>Apply</button>
           </div>
+          <div class="template-editor-preview-toolbar__row">
+            <label class="template-editor-preview-toolbar__field">
+              Colspan
+              <input id="selColSpan" class="input input-span" type="number" min="1" value="1" disabled />
+            </label>
+            <label class="template-editor-preview-toolbar__field">
+              Rowspan
+              <input id="selRowSpan" class="input input-span" type="number" min="1" value="1" disabled />
+            </label>
+            <button id="btnApplyMerge" class="btn" type="button" disabled>Merge</button>
+            <button id="btnClearMerge" class="btn" type="button" disabled>Unmerge</button>
+          </div>
         </div>
         <div id="previewHost" class="template-editor-preview empty">Load a template to preview.</div>
       </section>
     </main>
+
+    <div id="excelPasteModal" class="excel-paste-modal" hidden>
+      <div class="excel-paste-modal__backdrop"></div>
+      <div class="excel-paste-modal__panel" role="dialog" aria-modal="true" aria-label="Paste from Excel">
+        <div class="excel-paste-modal__title">Paste from Excel</div>
+        <div class="excel-paste-modal__hint">
+          1) Copy a formatted cell range in Excel (Ctrl+C). 2) Click the box below and paste (Ctrl+V). This will import
+          table + merges + styles into the Template JSON.
+        </div>
+        <div id="excelPasteTarget" class="excel-paste-modal__target" contenteditable="true" spellcheck="false" tabindex="0"></div>
+        <div class="excel-paste-modal__actions">
+          <button id="btnExcelPasteCancel" class="btn" type="button">Cancel</button>
+        </div>
+      </div>
+    </div>
 
         <script>
     // js/namespace.js
@@ -4956,6 +5053,539 @@
 
     </script>
         <script>
+    // js/template_excel_import.js
+    (function (ns) {
+      "use strict";
+
+      function indexToCol(index1) {
+        let n = Number(index1);
+        if (!Number.isFinite(n) || n <= 0) return "";
+        n = Math.floor(n);
+        let s = "";
+        while (n > 0) {
+          const rem = (n - 1) % 26;
+          s = String.fromCharCode(65 + rem) + s;
+          n = Math.floor((n - 1) / 26);
+        }
+        return s;
+      }
+
+      function addrFromRC(colIndex, row) {
+        return `${indexToCol(colIndex)}${row}`;
+      }
+
+      function parseStyleDeclarations(styleText) {
+        const map = new Map();
+        const raw = String(styleText || "").trim();
+        if (!raw) return map;
+
+        const parts = raw.split(";");
+        for (const part of parts) {
+          const t = String(part || "").trim();
+          if (!t) continue;
+          const idx = t.indexOf(":");
+          if (idx <= 0) continue;
+          const prop = t.slice(0, idx).trim().toLowerCase();
+          const value = t.slice(idx + 1).trim();
+          if (!prop) continue;
+          map.set(prop, value);
+        }
+        return map;
+      }
+
+      function serializeStyleDeclarations(map) {
+        if (!map || map.size === 0) return "";
+        return Array.from(map.entries())
+          .map(([k, v]) => `${k}:${v}`)
+          .join(";")
+          .concat(";");
+      }
+
+      function cssSizeToPx(value) {
+        const raw = String(value ?? "").trim().toLowerCase();
+        if (!raw) return 0;
+
+        const m = /^(-?\d+(?:\.\d+)?)(px|pt|in|cm|mm)?$/.exec(raw);
+        if (!m) return 0;
+
+        const n = Number(m[1]);
+        if (!Number.isFinite(n)) return 0;
+        const unit = String(m[2] || "px").toLowerCase();
+
+        const factors = { px: 1, pt: 96 / 72, in: 96, cm: 96 / 2.54, mm: 96 / 25.4 };
+        const f = factors[unit] || 1;
+        const px = n * f;
+        if (!Number.isFinite(px) || px <= 0) return 0;
+        return Math.max(1, Math.round(px));
+      }
+
+      function normalizeExcelCssValue(prop, valueRaw) {
+        const propKey = String(prop || "").trim().toLowerCase();
+        let value = String(valueRaw ?? "").trim();
+        if (!value) return "";
+
+        value = value.replace(/\bwindowtext\b/gi, "#000").replace(/\bwindow\b/gi, "#fff");
+        if (propKey === "text-align" && value.toLowerCase() === "general") return "left";
+        return value;
+      }
+
+      function filterExcelStyleDecls(map) {
+        if (!(map instanceof Map)) return new Map();
+        const out = new Map();
+
+        for (const [kRaw, vRaw] of map.entries()) {
+          const k = String(kRaw || "").trim().toLowerCase();
+          if (!k) continue;
+          if (k.startsWith("mso-")) continue;
+          if (k === "mso-number-format") continue;
+
+          const v = normalizeExcelCssValue(k, vRaw);
+          if (!v) continue;
+
+          if (
+            k.startsWith("border") ||
+            k === "background" ||
+            k === "background-color" ||
+            k === "color" ||
+            k === "font" ||
+            k === "font-weight" ||
+            k === "font-style" ||
+            k === "font-size" ||
+            k === "font-family" ||
+            k.startsWith("padding") ||
+            k === "line-height" ||
+            k === "text-decoration" ||
+            k === "text-align" ||
+            k === "vertical-align" ||
+            k === "white-space"
+          ) {
+            out.set(k, v);
+          }
+        }
+
+        return out;
+      }
+
+      function mergeStyleDecls(target, source) {
+        if (!(target instanceof Map) || !(source instanceof Map)) return;
+        for (const [k, v] of source.entries()) target.set(k, v);
+      }
+
+      function parseExcelCss(doc) {
+        const baseTd = new Map();
+        const baseTh = new Map();
+        const byClass = new Map();
+
+        const styleEls = doc ? Array.from(doc.querySelectorAll("style")) : [];
+        const allCss = styleEls.map((s) => String(s.textContent || "")).join("\n").replace(/<!--|-->/g, "");
+
+        const re = /([^{}]+)\{([^}]*)\}/g;
+        let m;
+        while ((m = re.exec(allCss))) {
+          const selText = String(m[1] || "").trim();
+          if (!selText || selText.startsWith("@")) continue;
+
+          const decls = filterExcelStyleDecls(parseStyleDeclarations(m[2]));
+          if (!decls.size) continue;
+
+          const selectors = selText
+            .split(",")
+            .map((x) => String(x || "").trim())
+            .filter(Boolean);
+
+          for (const sel of selectors) {
+            const s = sel.toLowerCase();
+            if (s === "td") {
+              mergeStyleDecls(baseTd, decls);
+              continue;
+            }
+            if (s === "th") {
+              mergeStyleDecls(baseTh, decls);
+              continue;
+            }
+
+            const clsOnly = /^\.([a-z0-9_-]+)$/i.exec(sel);
+            const tdCls = /^td\.([a-z0-9_-]+)$/i.exec(sel);
+            const thCls = /^th\.([a-z0-9_-]+)$/i.exec(sel);
+            const cls = clsOnly?.[1] || tdCls?.[1] || thCls?.[1] || "";
+            if (!cls) continue;
+
+            if (!byClass.has(cls)) byClass.set(cls, new Map());
+            mergeStyleDecls(byClass.get(cls), decls);
+          }
+        }
+
+        return { baseTd, baseTh, byClass };
+      }
+
+      function buildExcelCellStyle(cellEl, cssMeta) {
+        const tag = String(cellEl?.tagName || "").toUpperCase();
+        const merged = new Map();
+
+        const base = tag === "TH" ? cssMeta?.baseTh : cssMeta?.baseTd;
+        if (base instanceof Map) mergeStyleDecls(merged, base);
+
+        const classList = cellEl?.classList ? Array.from(cellEl.classList) : [];
+        for (const c of classList) {
+          const cls = String(c || "").trim();
+          if (!cls) continue;
+          const decls = cssMeta?.byClass?.get ? cssMeta.byClass.get(cls) : null;
+          if (decls instanceof Map) mergeStyleDecls(merged, decls);
+        }
+
+        const inline = filterExcelStyleDecls(parseStyleDeclarations(cellEl?.getAttribute?.("style") || ""));
+        if (inline.size) mergeStyleDecls(merged, inline);
+
+        return serializeStyleDeclarations(merged);
+      }
+
+      function getExcelCellText(cellEl) {
+        if (!cellEl) return "";
+        let text = "";
+        try {
+          text = typeof cellEl.innerText === "string" ? cellEl.innerText : String(cellEl.textContent || "");
+        } catch (_) {
+          text = String(cellEl.textContent || "");
+        }
+        return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\u00a0/g, " ").trimEnd();
+      }
+
+      function pickBestTable(doc) {
+        const tables = doc ? Array.from(doc.querySelectorAll("table")) : [];
+        if (tables.length === 0) return null;
+        if (tables.length === 1) return tables[0];
+        let best = tables[0];
+        let bestScore = 0;
+        for (const t of tables) {
+          const score = t.querySelectorAll("td,th").length;
+          if (score > bestScore) {
+            bestScore = score;
+            best = t;
+          }
+        }
+        return best;
+      }
+
+      function buildTemplateConfigFromExcelHtml(html) {
+        const raw = String(html || "").trim();
+        if (!raw) return { ok: false, error: "Clipboard HTML is empty." };
+        if (typeof DOMParser === "undefined") return { ok: false, error: "DOMParser not available in this environment." };
+
+        const doc = new DOMParser().parseFromString(raw, "text/html");
+        const table = pickBestTable(doc);
+        if (!table) return { ok: false, error: "No <table> found in clipboard HTML. (Copy from Excel cells, not plain text.)" };
+
+        const cssMeta = parseExcelCss(doc);
+        const startCells = [];
+        const colWidths = {};
+        const rowHeights = {};
+
+        const colEls = Array.from(table.querySelectorAll("col"));
+        for (let i = 0; i < colEls.length; i++) {
+          const el = colEls[i];
+          const w = cssSizeToPx(el?.style?.width) || cssSizeToPx(el?.getAttribute?.("width"));
+          if (!w) continue;
+          colWidths[indexToCol(i + 1)] = w;
+        }
+
+        const rows = Array.from(table.querySelectorAll("tr"));
+        const occupied = [];
+        const coverAt = [];
+        let maxCol = 0;
+        let maxRow = rows.length;
+
+        function markCover(cellInfo) {
+          const startRow0 = cellInfo.startRow - 1;
+          const startCol0 = cellInfo.startCol;
+          for (let rr = 0; rr < cellInfo.rowspan; rr++) {
+            const rowIdx0 = startRow0 + rr;
+            if (!occupied[rowIdx0]) occupied[rowIdx0] = [];
+            if (!coverAt[rowIdx0]) coverAt[rowIdx0] = [];
+            for (let cc = 0; cc < cellInfo.colspan; cc++) {
+              const colIdx = startCol0 + cc;
+              occupied[rowIdx0][colIdx] = true;
+              coverAt[rowIdx0][colIdx] = cellInfo;
+            }
+          }
+          maxCol = Math.max(maxCol, cellInfo.startCol + cellInfo.colspan - 1);
+          maxRow = Math.max(maxRow, cellInfo.startRow + cellInfo.rowspan - 1);
+        }
+
+        function parseIgnoreFlags(cellEl) {
+          const rawStyle = String(cellEl?.getAttribute?.("style") || "");
+          return {
+            ignoreCol: /mso-ignore\s*:\s*colspan/i.test(rawStyle),
+            ignoreRow: /mso-ignore\s*:\s*rowspan/i.test(rawStyle),
+            displayNone: /display\s*:\s*none/i.test(rawStyle),
+            visibilityHidden: /visibility\s*:\s*hidden/i.test(rawStyle),
+          };
+        }
+
+        for (let r = 0; r < rows.length; r++) {
+          const tr = rows[r];
+          const rowNum = r + 1;
+
+          const h = cssSizeToPx(tr?.style?.height) || cssSizeToPx(tr?.getAttribute?.("height"));
+          if (h) rowHeights[String(rowNum)] = h;
+
+          if (!occupied[r]) occupied[r] = [];
+          let col = 1;
+          let lastReal = null;
+
+          const rowCells = Array.from(tr.children).filter((el) => /^(TD|TH)$/i.test(String(el?.tagName || "")));
+          for (const cellEl of rowCells) {
+            while (occupied[r] && occupied[r][col]) col++;
+
+            const flags = parseIgnoreFlags(cellEl);
+            const baseColspan = Math.max(1, Math.floor(Number(cellEl?.getAttribute?.("colspan") || 1)));
+            const baseRowspan = Math.max(1, Math.floor(Number(cellEl?.getAttribute?.("rowspan") || 1)));
+
+            // Excel clipboard HTML often includes extra <td> elements that are removed from layout
+            // via `display:none` (typically for merged-cell fillers). These should not consume a
+            // column position; otherwise content shifts right (colspan becomes effectively 1).
+            if (flags.displayNone) {
+              continue;
+            }
+
+            if (flags.ignoreCol || flags.ignoreRow || flags.visibilityHidden) {
+              let target = null;
+              if (!target && flags.ignoreCol && lastReal) target = lastReal;
+              if (!target && flags.ignoreCol && coverAt?.[r]?.[col - 1]) target = coverAt[r][col - 1];
+              if (!target && flags.ignoreRow && coverAt?.[r - 1]?.[col]) target = coverAt[r - 1][col];
+              if (!target && (flags.ignoreCol || flags.ignoreRow) && coverAt?.[r - 1]?.[col - 1]) target = coverAt[r - 1][col - 1];
+
+              if (target) {
+                const targetEndCol = target.startCol + Math.max(1, Math.floor(Number(target.colspan || 1))) - 1;
+                // Some Excel clipboard HTML contains redundant filler <td> after a real colspan/rowspan cell
+                // (often with `mso-ignore:*`). If the owning cell already has a span > 1 and this filler
+                // appears outside the owner's covered columns (our `col` already moved past the span),
+                // don't advance `col`, otherwise content shifts right and the first visible colSpan looks "stuck" at 1.
+                if ((flags.ignoreCol || flags.ignoreRow) && !flags.visibilityHidden && (target.colspan > 1 || target.rowspan > 1) && col > targetEndCol) {
+                  continue;
+                }
+                if (flags.ignoreCol) {
+                  target.colspan = Math.max(target.colspan, col - target.startCol + baseColspan);
+                }
+                if (flags.ignoreRow) {
+                  target.rowspan = Math.max(target.rowspan, rowNum - target.startRow + baseRowspan);
+                }
+                markCover(target);
+              } else {
+                occupied[r][col] = true;
+              }
+
+              col += baseColspan;
+              continue;
+            }
+
+            const addr = addrFromRC(col, rowNum);
+            const text = getExcelCellText(cellEl);
+            const style = buildExcelCellStyle(cellEl, cssMeta);
+
+            const cellInfo = {
+              startRow: rowNum,
+              startCol: col,
+              rowspan: baseRowspan,
+              colspan: baseColspan,
+              addr,
+              text,
+              style,
+            };
+            startCells.push(cellInfo);
+            markCover(cellInfo);
+            lastReal = cellInfo;
+            col += baseColspan;
+          }
+        }
+
+        const merges = [];
+        const cells = [];
+        for (const c of startCells) {
+          const entry = { addr: c.addr, text: c.text, class: ["cell"] };
+          if (c.style) entry.style = c.style;
+          cells.push(entry);
+          if (c.rowspan > 1 || c.colspan > 1) merges.push({ start: c.addr, rowspan: c.rowspan, colspan: c.colspan });
+        }
+
+        const cfg = {
+          type: "excel-like-table",
+          grid: {
+            rows: Math.max(1, maxRow || rows.length),
+            cols: Math.max(1, maxCol || colEls.length || 1),
+            ...(Object.keys(colWidths).length ? { colWidths } : {}),
+            ...(Object.keys(rowHeights).length ? { rowHeights } : {}),
+            defaultColWidth: 80,
+            defaultRowHeight: 24,
+          },
+          css: {
+            cell: "padding:2px 4px;vertical-align:middle;background:#fff;color:#111;white-space:pre-wrap;",
+          },
+          defaultCellClass: ["cell"],
+          merges,
+          cells,
+        };
+
+        return { ok: true, config: cfg };
+      }
+
+      ns.templateExcelImport = {
+        buildTemplateConfigFromExcelHtml,
+      };
+    })(window.AbapFlow);
+
+    </script>
+        <script>
+    // js/template_excel_export.js
+    (function (ns) {
+      "use strict";
+
+      function cleanCloneOfTable(table) {
+        const clone = table.cloneNode(true);
+
+        const tds = clone.querySelectorAll("td,th");
+        for (const td of tds) {
+          td.classList.remove("is-selected", "is-editing");
+          td.removeAttribute("data-addr");
+          td.removeAttribute("data-bind");
+          td.removeAttribute("title");
+
+          const editor = td.querySelector("textarea.cell-editor");
+          if (editor) {
+            const text = String(editor.value ?? editor.textContent ?? "");
+            td.textContent = text;
+          }
+        }
+
+        clone.querySelectorAll("textarea.cell-editor").forEach((ta) => ta.remove());
+        return clone;
+      }
+
+      function tableToHtml(table) {
+        const clone = cleanCloneOfTable(table);
+        return clone.outerHTML;
+      }
+
+      function tableToTsv(table) {
+        const rows = Array.from(table?.rows || []);
+        const occupied = [];
+        const grid = [];
+        let maxCols = 0;
+
+        for (let r = 0; r < rows.length; r++) {
+          const tr = rows[r];
+          if (!occupied[r]) occupied[r] = [];
+          const row = [];
+          let col = 0;
+
+          const cells = Array.from(tr?.cells || []);
+          for (const cell of cells) {
+            while (occupied[r][col]) col++;
+
+            const rowspan = Math.max(1, Math.floor(Number(cell?.rowSpan || 1)));
+            const colspan = Math.max(1, Math.floor(Number(cell?.colSpan || 1)));
+            const text = String(cell?.innerText ?? cell?.textContent ?? "")
+              .replace(/\r\n/g, "\n")
+              .replace(/\r/g, "\n")
+              .replace(/\u00a0/g, " ")
+              .trimEnd();
+
+            row[col] = text;
+
+            for (let rr = 0; rr < rowspan; rr++) {
+              const rowIdx = r + rr;
+              if (!occupied[rowIdx]) occupied[rowIdx] = [];
+              for (let cc = 0; cc < colspan; cc++) {
+                occupied[rowIdx][col + cc] = true;
+              }
+            }
+
+            col += colspan;
+            maxCols = Math.max(maxCols, col);
+          }
+
+          grid[r] = row;
+        }
+
+        const lines = [];
+        for (let r = 0; r < grid.length; r++) {
+          const row = grid[r] || [];
+          const out = [];
+          for (let c = 0; c < maxCols; c++) out.push(String(row[c] ?? ""));
+          lines.push(out.join("\t"));
+        }
+        return lines.join("\n");
+      }
+
+      async function copyHtmlToClipboard(html, plainText) {
+        const h = String(html || "");
+        const t = String(plainText || "");
+
+        if (navigator?.clipboard?.write && typeof ClipboardItem !== "undefined") {
+          const item = new ClipboardItem({
+            "text/html": new Blob([h], { type: "text/html" }),
+            ...(t ? { "text/plain": new Blob([t], { type: "text/plain" }) } : {}),
+          });
+          await navigator.clipboard.write([item]);
+          return { ok: true, method: "clipboard.write" };
+        }
+
+        if (document?.execCommand) {
+          const host = document.createElement("div");
+          host.contentEditable = "true";
+          host.style.position = "fixed";
+          host.style.left = "-10000px";
+          host.style.top = "0";
+          host.style.width = "1px";
+          host.style.height = "1px";
+          host.style.opacity = "0";
+          host.innerHTML = h;
+
+          document.body.appendChild(host);
+
+          const range = document.createRange();
+          range.selectNodeContents(host);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+
+          let ok = false;
+          try {
+            ok = Boolean(document.execCommand("copy"));
+          } catch (_) {
+            ok = false;
+          }
+
+          sel.removeAllRanges();
+          host.remove();
+
+          if (ok) return { ok: true, method: "execCommand" };
+        }
+
+        if (navigator?.clipboard?.writeText) {
+          await navigator.clipboard.writeText(t || "");
+          return { ok: true, method: "writeText" };
+        }
+
+        return { ok: false, error: "Clipboard API not available." };
+      }
+
+      async function copyExcelLikeTableToClipboard(tableEl) {
+        if (!tableEl) return { ok: false, error: "No table to copy." };
+        const html = tableToHtml(tableEl);
+        const tsv = tableToTsv(tableEl);
+        return await copyHtmlToClipboard(html, tsv);
+      }
+
+      ns.templateExcelExport = {
+        copyExcelLikeTableToClipboard,
+        toExcelHtml: (tableEl) => (tableEl ? tableToHtml(tableEl) : ""),
+        toHtml: (tableEl) => (tableEl ? tableToHtml(tableEl) : ""),
+        toTsv: (tableEl) => (tableEl ? tableToTsv(tableEl) : ""),
+      };
+    })(window.AbapFlow);
+
+    </script>
+        <script>
     // js/template_editor_ui.js
     (function (ns) {
       "use strict";
@@ -5301,7 +5931,7 @@
 
       function setPreviewToolbarEnabled(enabled) {
         const on = Boolean(enabled);
-        const ids = ["btnPreviewDeleteRow", "btnPreviewDeleteCol", "btnClearFormat", "selBgColor", "selTextColor", "selBorder", "btnApplyBorder"];
+        const ids = ["btnPreviewDeleteRow", "btnPreviewDeleteCol", "btnClearFormat", "selBgColor", "selTextColor", "selBorder", "btnApplyBorder", "selColSpan", "selRowSpan", "btnApplyMerge", "btnClearMerge"];
         for (const id of ids) {
           const el = $(id);
           if (el) el.disabled = !on;
@@ -5331,10 +5961,14 @@
         const bgEl = $("selBgColor");
         const fgEl = $("selTextColor");
         const borderEl = $("selBorder");
+        const colSpanEl = $("selColSpan");
+        const rowSpanEl = $("selRowSpan");
 
         if (bgEl && bg) bgEl.value = bg;
         if (fgEl && fg) fgEl.value = fg;
         if (borderEl) borderEl.value = String(css.border || "").trim();
+        if (colSpanEl) colSpanEl.value = String(Math.max(1, Number(td.colSpan || 1)));
+        if (rowSpanEl) rowSpanEl.value = String(Math.max(1, Number(td.rowSpan || 1)));
 
         setPreviewToolbarEnabled(true);
       }
@@ -5483,6 +6117,81 @@
         }
 
         return out;
+      }
+
+      function mergeRegion(start, rowspan, colspan) {
+        const r1 = start.row;
+        const c1 = start.colIndex;
+        const r2 = r1 + Math.max(1, Math.floor(Number(rowspan || 1))) - 1;
+        const c2 = c1 + Math.max(1, Math.floor(Number(colspan || 1))) - 1;
+        return { r1, c1, r2, c2 };
+      }
+
+      function regionsOverlap(a, b) {
+        if (!a || !b) return false;
+        const rowOverlap = a.r1 <= b.r2 && b.r1 <= a.r2;
+        const colOverlap = a.c1 <= b.c2 && b.c1 <= a.c2;
+        return rowOverlap && colOverlap;
+      }
+
+      function applyMergeAtSelected() {
+        if (!selectedAddr) return;
+        const parsed = readTemplateJsonFromEditor();
+        if (!parsed.ok) {
+          setStatus(String(parsed.error || "Invalid template JSON."), true);
+          return;
+        }
+
+        const cfg = parsed.value;
+        if (!cfg?.grid || typeof cfg.grid !== "object") cfg.grid = { rows: 1, cols: 1 };
+
+        const start = parseAddress(selectedAddr);
+        if (!start) return;
+
+        const wantCol = Math.max(1, Math.floor(Number($("selColSpan")?.value || 1)));
+        const wantRow = Math.max(1, Math.floor(Number($("selRowSpan")?.value || 1)));
+
+        const needCols = start.colIndex + wantCol - 1;
+        const needRows = start.row + wantRow - 1;
+        cfg.grid.cols = Math.max(1, Math.floor(Number(cfg.grid.cols || 1)), needCols);
+        cfg.grid.rows = Math.max(1, Math.floor(Number(cfg.grid.rows || 1)), needRows);
+
+        const region = mergeRegion(start, wantRow, wantCol);
+        const merges = Array.isArray(cfg.merges) ? cfg.merges : [];
+        const next = [];
+
+        for (const m of merges) {
+          const ms = parseAddress(m?.start);
+          if (!ms) continue;
+          const mr = mergeRegion(ms, m?.rowspan || 1, m?.colspan || 1);
+          if (regionsOverlap(mr, region)) continue;
+          next.push(m);
+        }
+
+        if (wantRow > 1 || wantCol > 1) {
+          next.push({ start: addrFromRC(start.colIndex, start.row), rowspan: wantRow, colspan: wantCol });
+        }
+
+        cfg.merges = normalizeMerges(next, cfg.grid.rows, cfg.grid.cols);
+        writeTemplateJson(cfg);
+        renderPreview();
+        setStatus(`Merge updated at ${selectedAddr} (${wantRow}x${wantCol}).`, false);
+      }
+
+      function clearMergeAtSelected() {
+        if (!selectedAddr) return;
+        const parsed = readTemplateJsonFromEditor();
+        if (!parsed.ok) {
+          setStatus(String(parsed.error || "Invalid template JSON."), true);
+          return;
+        }
+
+        const cfg = parsed.value;
+        const addr = normalizeAddress(selectedAddr);
+        cfg.merges = (Array.isArray(cfg.merges) ? cfg.merges : []).filter((m) => normalizeAddress(m?.start) !== addr);
+        writeTemplateJson(cfg);
+        renderPreview();
+        setStatus(`Unmerged: ${selectedAddr}`, false);
       }
 
       function deleteRow(cfg, delRow) {
@@ -5908,6 +6617,61 @@
         $("btnDeleteTemplate")?.addEventListener("click", deleteSaved);
         $("btnDeleteRow")?.addEventListener("click", deleteSelectedRow);
         $("btnDeleteCol")?.addEventListener("click", deleteSelectedCol);
+        $("btnCopyExcel")?.addEventListener("click", async () => {
+          const exporter = ns.templateExcelExport || null;
+          const table = $("previewHost")?.querySelector("table.excel-like-table") || null;
+          const res = exporter?.copyExcelLikeTableToClipboard ? await exporter.copyExcelLikeTableToClipboard(table) : { ok: false, error: "Excel export module not loaded." };
+          setStatus(String(res.ok ? `Copied to clipboard (${res.method || "copy"}). Paste into Excel.` : res.error || "Copy failed."), !res.ok);
+        });
+        $("btnPasteExcel")?.addEventListener("click", () => {
+          const modal = $("excelPasteModal");
+          const target = $("excelPasteTarget");
+          if (!modal || !target) return;
+          modal.hidden = false;
+          target.textContent = "";
+          window.setTimeout(() => target.focus(), 0);
+        });
+        $("btnExcelPasteCancel")?.addEventListener("click", () => {
+          const modal = $("excelPasteModal");
+          if (modal) modal.hidden = true;
+        });
+        $("excelPasteModal")?.addEventListener("click", (e) => {
+          const modal = $("excelPasteModal");
+          if (!modal) return;
+          const panel = e?.target?.closest ? e.target.closest(".excel-paste-modal__panel") : null;
+          if (panel) return;
+          modal.hidden = true;
+        });
+        $("excelPasteTarget")?.addEventListener("keydown", (e) => {
+          if (e.key !== "Escape") return;
+          const modal = $("excelPasteModal");
+          if (modal) modal.hidden = true;
+        });
+        $("excelPasteTarget")?.addEventListener("paste", (e) => {
+          const ev = e || window.event;
+          const html = ev?.clipboardData?.getData ? ev.clipboardData.getData("text/html") : "";
+          if (ev?.preventDefault) ev.preventDefault();
+
+          const importer = ns.templateExcelImport || null;
+          if (!importer?.buildTemplateConfigFromExcelHtml) {
+            setStatus("Excel import module not loaded.", true);
+            return;
+          }
+
+          const res = importer.buildTemplateConfigFromExcelHtml(html);
+          if (!res.ok) {
+            setStatus(res.error || "Paste failed.", true);
+            return;
+          }
+
+          writeTemplateJson(res.config);
+          selectedAddr = "";
+          renderPreview();
+          setStatus("Imported from Excel clipboard.", false);
+
+          const modal = $("excelPasteModal");
+          if (modal) modal.hidden = true;
+        });
 
         $("btnPreviewDeleteRow")?.addEventListener("click", deleteSelectedRow);
         $("btnPreviewDeleteCol")?.addEventListener("click", deleteSelectedCol);
@@ -5944,6 +6708,19 @@
           if (e.key !== "Enter") return;
           e.preventDefault();
           $("btnApplyBorder")?.click();
+        });
+
+        $("btnApplyMerge")?.addEventListener("click", applyMergeAtSelected);
+        $("btnClearMerge")?.addEventListener("click", clearMergeAtSelected);
+        $("selColSpan")?.addEventListener("keydown", (e) => {
+          if (e.key !== "Enter") return;
+          e.preventDefault();
+          $("btnApplyMerge")?.click();
+        });
+        $("selRowSpan")?.addEventListener("keydown", (e) => {
+          if (e.key !== "Enter") return;
+          e.preventDefault();
+          $("btnApplyMerge")?.click();
         });
 
         $("btnClearFormat")?.addEventListener("click", () => {
@@ -6012,7 +6789,7 @@
   'use strict';
   var ns = window.AbapFlow = window.AbapFlow || {};
   var map = ns.__inlineScriptBySrc = ns.__inlineScriptBySrc || {};
-  Object.assign(map, {"js/abap_objects/templates/append.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const appendExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 2,\n      cols: 22, // A..V\n      colWidths: {\n        A: 160,\n        B: 520, // merged B..H\n        I: 80,\n        J: 740, // merged J..V\n      },\n      rowHeights: {\n        1: 34,\n        2: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n      center: \"text-align:center;\",\n    },\n    merges: [\n      { start: \"B1\", rowspan: 1, colspan: 7 }, // B..H\n      { start: \"J1\", rowspan: 1, colspan: 13 }, // J..V\n      { start: \"B2\", rowspan: 1, colspan: 7 }, // B..H\n    ],\n    cells: [\n      { addr: \"A1\", text: \"Append\", class: [\"cell\", \"header\"] },\n      { addr: \"B1\", text: \"{line.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"I1\", text: \"TO\", class: [\"cell\", \"header\", \"center\"] },\n      { addr: \"J1\", text: \"{itab.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A2\", text: \"{labels.sortedBy}\", class: [\"cell\", \"header\"] },\n      { addr: \"B2\", text: \"{sortedBy.description}\", class: [\"cell\", \"wrap\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"append.excel-like-table\", appendExcelLikeTable);\n})(window.AbapFlow);\n\n", "js/abap_objects/templates/assignment.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const assignmentExcelLikeTable = {\n    type: \"excel-like-table\",\n    grid: {\n      rows: 2,\n      cols: 14, // A..N\n      colWidths: {\n        A: 420, // merged A..G\n        H: 700, // merged H..N\n      },\n      rowHeights: {\n        1: 34,\n        2: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n    },\n    merges: [\n      { start: \"A1\", rowspan: 1, colspan: 7 },\n      { start: \"H1\", rowspan: 1, colspan: 7 },\n      { start: \"A2\", rowspan: 1, colspan: 7 },\n      { start: \"H2\", rowspan: 1, colspan: 7 },\n    ],\n    cells: [\n      { addr: \"A1\", text: \"Item\", class: [\"cell\", \"header\"] },\n      { addr: \"H1\", text: \"Value\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A2\", text: \"{item.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"H2\", text: \"{value.description}\", class: [\"cell\", \"wrap\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"assignment.excel-like-table\", assignmentExcelLikeTable);\n})(window.AbapFlow);\n\n", "js/abap_objects/templates/if.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const ifExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 3,\n      cols: 20, // A..T\n      colWidths: {\n        A: 420, // merged A..F\n        G: 220, // merged G..J\n        K: 520, // merged K..P\n        Q: 220, // merged Q..T\n      },\n      rowHeights: {\n        1: 34,\n        2: 30,\n        3: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n      center: \"text-align:center;\",\n    },\n    merges: [\n      { start: \"A1\", rowspan: 1, colspan: 6 },\n      { start: \"G1\", rowspan: 1, colspan: 4 },\n      { start: \"K1\", rowspan: 1, colspan: 6 },\n      { start: \"Q1\", rowspan: 1, colspan: 4 },\n\n      { start: \"A2\", rowspan: 1, colspan: 6 },\n      { start: \"G2\", rowspan: 1, colspan: 4 },\n      { start: \"K2\", rowspan: 1, colspan: 6 },\n      { start: \"Q2\", rowspan: 1, colspan: 4 },\n\n      { start: \"A3\", rowspan: 1, colspan: 6 },\n      { start: \"G3\", rowspan: 1, colspan: 4 },\n      { start: \"K3\", rowspan: 1, colspan: 6 },\n      { start: \"Q3\", rowspan: 1, colspan: 4 },\n    ],\n    cells: [\n      { addr: \"A1\", text: \"Item 1\", class: [\"cell\", \"header\"] },\n      { addr: \"G1\", text: \"Operator\", class: [\"cell\", \"header\"] },\n      { addr: \"K1\", text: \"Item 2\", class: [\"cell\", \"header\"] },\n      { addr: \"Q1\", text: \"Associations\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A2\", text: \"{conditions[0].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"G2\", text: \"{conditions[0].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"K2\", text: \"{conditions[0].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"Q2\", text: \"{conditions[0].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A3\", text: \"{conditions[1].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"G3\", text: \"{conditions[1].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"K3\", text: \"{conditions[1].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"Q3\", text: \"{conditions[1].association}\", class: [\"cell\", \"mono\", \"center\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"if.excel-like-table\", ifExcelLikeTable);\n})(window.AbapFlow);\n\n", "js/abap_objects/templates/itabCollect.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const itabCollectExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 7,\n      cols: 20, // A..T\n      colWidths: {\n        A: 420, // merged A..F\n        G: 220, // merged G..J\n        K: 520, // merged K..P\n        Q: 220, // merged Q..T\n      },\n      rowHeights: {\n        1: 30,\n        2: 30,\n        3: 30,\n        4: 30,\n        5: 30,\n        6: 30,\n        7: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n      center: \"text-align:center;\",\n    },\n    merges: [\n      { start: \"A1\", rowspan: 1, colspan: 6 },\n      { start: \"G1\", rowspan: 1, colspan: 14 },\n\n      { start: \"A2\", rowspan: 1, colspan: 6 },\n      { start: \"G2\", rowspan: 1, colspan: 14 },\n\n      { start: \"A3\", rowspan: 1, colspan: 20 },\n\n      { start: \"A4\", rowspan: 1, colspan: 6 },\n      { start: \"G4\", rowspan: 1, colspan: 4 },\n      { start: \"K4\", rowspan: 1, colspan: 6 },\n      { start: \"Q4\", rowspan: 1, colspan: 4 },\n\n      { start: \"A5\", rowspan: 1, colspan: 6 },\n      { start: \"G5\", rowspan: 1, colspan: 4 },\n      { start: \"K5\", rowspan: 1, colspan: 6 },\n      { start: \"Q5\", rowspan: 1, colspan: 4 },\n\n      { start: \"A6\", rowspan: 1, colspan: 6 },\n      { start: \"G6\", rowspan: 1, colspan: 4 },\n      { start: \"K6\", rowspan: 1, colspan: 6 },\n      { start: \"Q6\", rowspan: 1, colspan: 4 },\n\n      { start: \"A7\", rowspan: 1, colspan: 20 },\n    ],\n    cells: [\n      { addr: \"A1\", text: \"Internal table\", class: [\"cell\", \"header\"] },\n      { addr: \"G1\", text: \"{table.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A2\", text: \"{labels.target}\", class: [\"cell\", \"header\"] },\n      { addr: \"G2\", text: \"{target.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A3\", text: \"{labels.conditions}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A4\", text: \"{labels.condItem1}\", class: [\"cell\", \"header\"] },\n      { addr: \"G4\", text: \"{labels.condOperator}\", class: [\"cell\", \"header\"] },\n      { addr: \"K4\", text: \"{labels.condItem2}\", class: [\"cell\", \"header\"] },\n      { addr: \"Q4\", text: \"{labels.condAssoc}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A5\", text: \"{conditions[0].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"G5\", text: \"{conditions[0].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"K5\", text: \"{conditions[0].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"Q5\", text: \"{conditions[0].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A6\", text: \"{conditions[1].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"G6\", text: \"{conditions[1].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"K6\", text: \"{conditions[1].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"Q6\", text: \"{conditions[1].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A7\", text: \"{labels.binarySearch}\", class: [\"cell\", \"header\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"itabCollect.excel-like-table\", itabCollectExcelLikeTable);\n})(window.AbapFlow);\n\n", "js/abap_objects/templates/itabDelete.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const itabDeleteExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 7,\n      cols: 20, // A..T\n      colWidths: {\n        A: 420, // merged A..F\n        G: 220, // merged G..J\n        K: 520, // merged K..P\n        Q: 220, // merged Q..T\n      },\n      rowHeights: {\n        1: 30,\n        2: 30,\n        3: 30,\n        4: 30,\n        5: 30,\n        6: 30,\n        7: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n      center: \"text-align:center;\",\n    },\n    merges: [\n      { start: \"A1\", rowspan: 1, colspan: 6 },\n      { start: \"G1\", rowspan: 1, colspan: 14 },\n\n      { start: \"A2\", rowspan: 1, colspan: 6 },\n      { start: \"G2\", rowspan: 1, colspan: 14 },\n\n      { start: \"A3\", rowspan: 1, colspan: 20 },\n\n      { start: \"A4\", rowspan: 1, colspan: 6 },\n      { start: \"G4\", rowspan: 1, colspan: 4 },\n      { start: \"K4\", rowspan: 1, colspan: 6 },\n      { start: \"Q4\", rowspan: 1, colspan: 4 },\n\n      { start: \"A5\", rowspan: 1, colspan: 6 },\n      { start: \"G5\", rowspan: 1, colspan: 4 },\n      { start: \"K5\", rowspan: 1, colspan: 6 },\n      { start: \"Q5\", rowspan: 1, colspan: 4 },\n\n      { start: \"A6\", rowspan: 1, colspan: 6 },\n      { start: \"G6\", rowspan: 1, colspan: 4 },\n      { start: \"K6\", rowspan: 1, colspan: 6 },\n      { start: \"Q6\", rowspan: 1, colspan: 4 },\n\n      { start: \"A7\", rowspan: 1, colspan: 20 },\n    ],\n    cells: [\n      { addr: \"A1\", text: \"Internal table\", class: [\"cell\", \"header\"] },\n      { addr: \"G1\", text: \"{table.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A2\", text: \"{labels.target}\", class: [\"cell\", \"header\"] },\n      { addr: \"G2\", text: \"{target.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A3\", text: \"{labels.conditions}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A4\", text: \"{labels.condItem1}\", class: [\"cell\", \"header\"] },\n      { addr: \"G4\", text: \"{labels.condOperator}\", class: [\"cell\", \"header\"] },\n      { addr: \"K4\", text: \"{labels.condItem2}\", class: [\"cell\", \"header\"] },\n      { addr: \"Q4\", text: \"{labels.condAssoc}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A5\", text: \"{conditions[0].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"G5\", text: \"{conditions[0].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"K5\", text: \"{conditions[0].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"Q5\", text: \"{conditions[0].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A6\", text: \"{conditions[1].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"G6\", text: \"{conditions[1].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"K6\", text: \"{conditions[1].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"Q6\", text: \"{conditions[1].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A7\", text: \"{labels.binarySearch}\", class: [\"cell\", \"header\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"itabDelete.excel-like-table\", itabDeleteExcelLikeTable);\n})(window.AbapFlow);\n\n", "js/abap_objects/templates/itabModify.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const itabModifyExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 7,\n      cols: 20, // A..T\n      colWidths: {\n        A: 420, // merged A..F\n        G: 220, // merged G..J\n        K: 520, // merged K..P\n        Q: 220, // merged Q..T\n      },\n      rowHeights: {\n        1: 30,\n        2: 30,\n        3: 30,\n        4: 30,\n        5: 30,\n        6: 30,\n        7: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n      center: \"text-align:center;\",\n    },\n    merges: [\n      { start: \"A1\", rowspan: 1, colspan: 6 },\n      { start: \"G1\", rowspan: 1, colspan: 14 },\n\n      { start: \"A2\", rowspan: 1, colspan: 6 },\n      { start: \"G2\", rowspan: 1, colspan: 14 },\n\n      { start: \"A3\", rowspan: 1, colspan: 20 },\n\n      { start: \"A4\", rowspan: 1, colspan: 6 },\n      { start: \"G4\", rowspan: 1, colspan: 4 },\n      { start: \"K4\", rowspan: 1, colspan: 6 },\n      { start: \"Q4\", rowspan: 1, colspan: 4 },\n\n      { start: \"A5\", rowspan: 1, colspan: 6 },\n      { start: \"G5\", rowspan: 1, colspan: 4 },\n      { start: \"K5\", rowspan: 1, colspan: 6 },\n      { start: \"Q5\", rowspan: 1, colspan: 4 },\n\n      { start: \"A6\", rowspan: 1, colspan: 6 },\n      { start: \"G6\", rowspan: 1, colspan: 4 },\n      { start: \"K6\", rowspan: 1, colspan: 6 },\n      { start: \"Q6\", rowspan: 1, colspan: 4 },\n\n      { start: \"A7\", rowspan: 1, colspan: 20 },\n    ],\n    cells: [\n      { addr: \"A1\", text: \"Internal table\", class: [\"cell\", \"header\"] },\n      { addr: \"G1\", text: \"{table.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A2\", text: \"{labels.target}\", class: [\"cell\", \"header\"] },\n      { addr: \"G2\", text: \"{target.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A3\", text: \"{labels.conditions}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A4\", text: \"{labels.condItem1}\", class: [\"cell\", \"header\"] },\n      { addr: \"G4\", text: \"{labels.condOperator}\", class: [\"cell\", \"header\"] },\n      { addr: \"K4\", text: \"{labels.condItem2}\", class: [\"cell\", \"header\"] },\n      { addr: \"Q4\", text: \"{labels.condAssoc}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A5\", text: \"{conditions[0].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"G5\", text: \"{conditions[0].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"K5\", text: \"{conditions[0].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"Q5\", text: \"{conditions[0].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A6\", text: \"{conditions[1].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"G6\", text: \"{conditions[1].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"K6\", text: \"{conditions[1].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"Q6\", text: \"{conditions[1].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A7\", text: \"{labels.binarySearch}\", class: [\"cell\", \"header\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"itabModify.excel-like-table\", itabModifyExcelLikeTable);\n})(window.AbapFlow);\n\n", "js/abap_objects/templates/itabRead.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const itabReadExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 7,\n      cols: 20, // A..T\n      colWidths: {\n        A: 420, // merged A..F\n        G: 220, // merged G..J\n        K: 520, // merged K..P\n        Q: 220, // merged Q..T\n      },\n      rowHeights: {\n        1: 30,\n        2: 30,\n        3: 30,\n        4: 30,\n        5: 30,\n        6: 30,\n        7: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n      center: \"text-align:center;\",\n    },\n    merges: [\n      { start: \"A1\", rowspan: 1, colspan: 6 },\n      { start: \"G1\", rowspan: 1, colspan: 14 },\n\n      { start: \"A2\", rowspan: 1, colspan: 6 },\n      { start: \"G2\", rowspan: 1, colspan: 14 },\n\n      { start: \"A3\", rowspan: 1, colspan: 20 },\n\n      { start: \"A4\", rowspan: 1, colspan: 6 },\n      { start: \"G4\", rowspan: 1, colspan: 4 },\n      { start: \"K4\", rowspan: 1, colspan: 6 },\n      { start: \"Q4\", rowspan: 1, colspan: 4 },\n\n      { start: \"A5\", rowspan: 1, colspan: 6 },\n      { start: \"G5\", rowspan: 1, colspan: 4 },\n      { start: \"K5\", rowspan: 1, colspan: 6 },\n      { start: \"Q5\", rowspan: 1, colspan: 4 },\n\n      { start: \"A6\", rowspan: 1, colspan: 6 },\n      { start: \"G6\", rowspan: 1, colspan: 4 },\n      { start: \"K6\", rowspan: 1, colspan: 6 },\n      { start: \"Q6\", rowspan: 1, colspan: 4 },\n\n      { start: \"A7\", rowspan: 1, colspan: 20 },\n    ],\n    cells: [\n      { addr: \"A1\", text: \"Internal table\", class: [\"cell\", \"header\"] },\n      { addr: \"G1\", text: \"{table.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A2\", text: \"{labels.target}\", class: [\"cell\", \"header\"] },\n      { addr: \"G2\", text: \"{target.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A3\", text: \"{labels.conditions}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A4\", text: \"{labels.condItem1}\", class: [\"cell\", \"header\"] },\n      { addr: \"G4\", text: \"{labels.condOperator}\", class: [\"cell\", \"header\"] },\n      { addr: \"K4\", text: \"{labels.condItem2}\", class: [\"cell\", \"header\"] },\n      { addr: \"Q4\", text: \"{labels.condAssoc}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A5\", text: \"{conditions[0].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"G5\", text: \"{conditions[0].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"K5\", text: \"{conditions[0].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"Q5\", text: \"{conditions[0].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A6\", text: \"{conditions[1].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"G6\", text: \"{conditions[1].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"K6\", text: \"{conditions[1].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"Q6\", text: \"{conditions[1].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A7\", text: \"{labels.binarySearch}\", class: [\"cell\", \"header\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"itabRead.excel-like-table\", itabReadExcelLikeTable);\n})(window.AbapFlow);\n\n", "js/abap_objects/templates/message.excel-like-table.js": "(function (ns) {\n    \"use strict\";\n\n    const messageExcelLikeTable = {\n        type: \"excel-like-table\",\n        compact: {\n            removeEmptyRows: true,\n        },\n        grid: {\n            rows: 8,\n            cols: 20,\n            colWidths: {\n                A: 260,\n                E: 360,\n                I: 220,\n                L: 420,\n                P: 220,\n                R: 260,\n            },\n            rowHeights: {\n                1: 30,\n                2: 30,\n                3: 30,\n                4: 30,\n                5: 30,\n                6: 30,\n                7: 30,\n                8: 30,\n            },\n        },\n        css: {\n            header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n            cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n            mono: \"font-family:Consolas,monospace;\",\n            wrap: \"white-space:normal;line-height:1.25;\",\n            center: \"text-align:center;\",\n        },\n        merges: [\n            {\n                start: \"A1\",\n                rowspan: 1,\n                colspan: 4,\n            },\n            {\n                start: \"E1\",\n                rowspan: 1,\n                colspan: 4,\n            },\n            {\n                start: \"I1\",\n                rowspan: 1,\n                colspan: 3,\n            },\n            {\n                start: \"L1\",\n                rowspan: 1,\n                colspan: 4,\n            },\n            {\n                start: \"P1\",\n                rowspan: 1,\n                colspan: 2,\n            },\n            {\n                start: \"R1\",\n                rowspan: 1,\n                colspan: 3,\n            },\n            {\n                start: \"A2\",\n                rowspan: 1,\n                colspan: 4,\n            },\n            {\n                start: \"E2\",\n                rowspan: 1,\n                colspan: 16,\n            },\n            {\n                start: \"A3\",\n                rowspan: 1,\n                colspan: 4,\n            },\n            {\n                start: \"E3\",\n                rowspan: 1,\n                colspan: 16,\n            },\n            {\n                start: \"A4\",\n                rowspan: 1,\n                colspan: 4,\n            },\n            {\n                start: \"E4\",\n                rowspan: 1,\n                colspan: 16,\n            },\n            {\n                start: \"A5\",\n                rowspan: 1,\n                colspan: 4,\n            },\n            {\n                start: \"E5\",\n                rowspan: 1,\n                colspan: 16,\n            },\n            {\n                start: \"A6\",\n                rowspan: 1,\n                colspan: 4,\n            },\n            {\n                start: \"E6\",\n                rowspan: 1,\n                colspan: 16,\n            },\n            {\n                start: \"A7\",\n                rowspan: 1,\n                colspan: 4,\n            },\n            {\n                start: \"E7\",\n                rowspan: 1,\n                colspan: 16,\n            },\n            {\n                start: \"A8\",\n                rowspan: 1,\n                colspan: 4,\n            },\n            {\n                start: \"E8\",\n                rowspan: 1,\n                colspan: 16,\n            },\n        ],\n        cells: [\n            {\n                addr: \"A1\",\n                text: \"{labels.msgClass}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"E1\",\n                text: \"{msgClass.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"I1\",\n                text: \"{labels.msgNo}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"L1\",\n                text: \"{msgNo.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"P1\",\n                text: \"{labels.displayLike}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"R1\",\n                text: \"{displayLike.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A2\",\n                text: \"{labels.messageText}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"E2\",\n                text: \"{messageText.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A3\",\n                text: \"{labels.with1}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"E3\",\n                text: \"{with[0].description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A4\",\n                text: \"{labels.with2}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"E4\",\n                text: \"{with[1].description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A5\",\n                text: \"{labels.with3}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"E5\",\n                text: \"{with[2].description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A6\",\n                text: \"{labels.with4}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"E6\",\n                text: \"{with[3].description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A7\",\n                text: \"{labels.into}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"E7\",\n                text: \"{into.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A8\",\n                text: \"{labels.raising}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"E8\",\n                text: \"{raising.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n        ],\n    };\n\n    ns.abapObjects?.defineTemplate?.(\"message.excel-like-table\", messageExcelLikeTable);\n})(window.AbapFlow);\n", "js/abap_objects/templates/perform.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const performExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    sectionLabels: {\n      tables: \"Table\",\n      using: \"Using\",\n      changing: \"Changing\",\n      raising: \"Raising\",\n    },\n    grid: {\n      rows: 9,\n      cols: 3,\n      colWidths: {\n        A: 160,\n        B: 190,\n        C: 860,\n      },\n      rowHeights: {\n        1: 34,\n        2: 30,\n        3: 30,\n        4: 30,\n        5: 30,\n        6: 30,\n        7: 30,\n        8: 30,\n        9: 30,\n      },\n    },\n    css: {\n      label: \"background:#f4b183;font-weight:600;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n    },\n    defaultCellClass: [\"gap\"],\n    cells: [\n      { addr: \"A1\", text: \"Thực hiện\", class: [\"cell\", \"label\"] },\n      { addr: \"B1\", text: \"{perform.name}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C1\", text: \"{perform.description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A2\", text: \"{labels.tables}\", class: [\"cell\", \"label\"] },\n      { addr: \"B2\", text: \"{tables[0].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C2\", text: \"{tables[0].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A3\", text: \"\", class: [\"cell\", \"label\"] },\n      { addr: \"B3\", text: \"{tables[1].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C3\", text: \"{tables[1].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A4\", text: \"{labels.using}\", class: [\"cell\", \"label\"] },\n      { addr: \"B4\", text: \"{using[0].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C4\", text: \"{using[0].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A5\", text: \"\", class: [\"cell\", \"label\"] },\n      { addr: \"B5\", text: \"{using[1].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C5\", text: \"{using[1].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A6\", text: \"{labels.changing}\", class: [\"cell\", \"label\"] },\n      { addr: \"B6\", text: \"{changing[0].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C6\", text: \"{changing[0].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A7\", text: \"\", class: [\"cell\", \"label\"] },\n      { addr: \"B7\", text: \"{changing[1].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C7\", text: \"{changing[1].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A8\", text: \"{labels.raising}\", class: [\"cell\", \"label\"] },\n      { addr: \"B8\", text: \"{raising[0].name}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C8\", text: \"{raising[0].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A9\", text: \"\", class: [\"cell\", \"label\"] },\n      { addr: \"B9\", text: \"{raising[1].name}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C9\", text: \"{raising[1].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"perform.excel-like-table\", performExcelLikeTable);\n})(window.AbapFlow);\n\n"});
+  Object.assign(map, {"js/abap_objects/templates/append.excel-like-table.js":"(function (ns) {\n  \"use strict\";\n\n  const appendExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 2,\n      cols: 22, // A..V\n      colWidths: {\n        A: 160,\n        B: 520, // merged B..H\n        I: 80,\n        J: 740, // merged J..V\n      },\n      rowHeights: {\n        1: 34,\n        2: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n      center: \"text-align:center;\",\n    },\n    merges: [\n      { start: \"B1\", rowspan: 1, colspan: 7 }, // B..H\n      { start: \"J1\", rowspan: 1, colspan: 13 }, // J..V\n      { start: \"B2\", rowspan: 1, colspan: 7 }, // B..H\n    ],\n    cells: [\n      { addr: \"A1\", text: \"Append\", class: [\"cell\", \"header\"] },\n      { addr: \"B1\", text: \"{line.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"I1\", text: \"TO\", class: [\"cell\", \"header\", \"center\"] },\n      { addr: \"J1\", text: \"{itab.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A2\", text: \"{labels.sortedBy}\", class: [\"cell\", \"header\"] },\n      { addr: \"B2\", text: \"{sortedBy.description}\", class: [\"cell\", \"wrap\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"append.excel-like-table\", appendExcelLikeTable);\n})(window.AbapFlow);\n\n","js/abap_objects/templates/assignment.excel-like-table.js":"(function (ns) {\n  \"use strict\";\n\n  const assignmentExcelLikeTable = {\n    type: \"excel-like-table\",\n    grid: {\n      rows: 2,\n      cols: 14, // A..N\n      colWidths: {\n        A: 420, // merged A..G\n        H: 700, // merged H..N\n      },\n      rowHeights: {\n        1: 34,\n        2: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n    },\n    merges: [\n      { start: \"A1\", rowspan: 1, colspan: 7 },\n      { start: \"H1\", rowspan: 1, colspan: 7 },\n      { start: \"A2\", rowspan: 1, colspan: 7 },\n      { start: \"H2\", rowspan: 1, colspan: 7 },\n    ],\n    cells: [\n      { addr: \"A1\", text: \"Item\", class: [\"cell\", \"header\"] },\n      { addr: \"H1\", text: \"Value\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A2\", text: \"{item.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"H2\", text: \"{value.description}\", class: [\"cell\", \"wrap\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"assignment.excel-like-table\", assignmentExcelLikeTable);\n})(window.AbapFlow);\n\n","js/abap_objects/templates/if.excel-like-table.js":"(function (ns) {\n  \"use strict\";\n\n  const ifExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 3,\n      cols: 20, // A..T\n      colWidths: {\n        A: 420, // merged A..F\n        G: 220, // merged G..J\n        K: 520, // merged K..P\n        Q: 220, // merged Q..T\n      },\n      rowHeights: {\n        1: 34,\n        2: 30,\n        3: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n      center: \"text-align:center;\",\n    },\n    merges: [\n      { start: \"A1\", rowspan: 1, colspan: 6 },\n      { start: \"G1\", rowspan: 1, colspan: 4 },\n      { start: \"K1\", rowspan: 1, colspan: 6 },\n      { start: \"Q1\", rowspan: 1, colspan: 4 },\n\n      { start: \"A2\", rowspan: 1, colspan: 6 },\n      { start: \"G2\", rowspan: 1, colspan: 4 },\n      { start: \"K2\", rowspan: 1, colspan: 6 },\n      { start: \"Q2\", rowspan: 1, colspan: 4 },\n\n      { start: \"A3\", rowspan: 1, colspan: 6 },\n      { start: \"G3\", rowspan: 1, colspan: 4 },\n      { start: \"K3\", rowspan: 1, colspan: 6 },\n      { start: \"Q3\", rowspan: 1, colspan: 4 },\n    ],\n    cells: [\n      { addr: \"A1\", text: \"Item 1\", class: [\"cell\", \"header\"] },\n      { addr: \"G1\", text: \"Operator\", class: [\"cell\", \"header\"] },\n      { addr: \"K1\", text: \"Item 2\", class: [\"cell\", \"header\"] },\n      { addr: \"Q1\", text: \"Associations\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A2\", text: \"{conditions[0].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"G2\", text: \"{conditions[0].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"K2\", text: \"{conditions[0].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"Q2\", text: \"{conditions[0].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A3\", text: \"{conditions[1].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"G3\", text: \"{conditions[1].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"K3\", text: \"{conditions[1].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"Q3\", text: \"{conditions[1].association}\", class: [\"cell\", \"mono\", \"center\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"if.excel-like-table\", ifExcelLikeTable);\n})(window.AbapFlow);\n\n","js/abap_objects/templates/itabCollect.excel-like-table.js":"(function (ns) {\r\n  \"use strict\";\r\n\r\n  const itabCollectExcelLikeTable = {\r\n    type: \"excel-like-table\",\r\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 7,\n      cols: 20, // A..T\n      colWidths: {\r\n        A: 420, // merged A..F\r\n        G: 220, // merged G..J\r\n        K: 520, // merged K..P\r\n        Q: 220, // merged Q..T\r\n      },\r\n      rowHeights: {\n        1: 30,\n        2: 30,\n        3: 30,\n        4: 30,\n        5: 30,\n        6: 30,\n        7: 30,\n      },\n    },\n    css: {\r\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\r\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\r\n      mono: \"font-family:Consolas,monospace;\",\r\n      wrap: \"white-space:normal;line-height:1.25;\",\r\n      center: \"text-align:center;\",\r\n    },\r\n    merges: [\n      { start: \"A1\", rowspan: 1, colspan: 6 },\n      { start: \"G1\", rowspan: 1, colspan: 14 },\n\n      { start: \"A2\", rowspan: 1, colspan: 6 },\n      { start: \"G2\", rowspan: 1, colspan: 14 },\n\n      { start: \"A3\", rowspan: 1, colspan: 20 },\n\n      { start: \"A4\", rowspan: 1, colspan: 6 },\n      { start: \"G4\", rowspan: 1, colspan: 4 },\n      { start: \"K4\", rowspan: 1, colspan: 6 },\n      { start: \"Q4\", rowspan: 1, colspan: 4 },\n\n      { start: \"A5\", rowspan: 1, colspan: 6 },\n      { start: \"G5\", rowspan: 1, colspan: 4 },\n      { start: \"K5\", rowspan: 1, colspan: 6 },\n      { start: \"Q5\", rowspan: 1, colspan: 4 },\n\n      { start: \"A6\", rowspan: 1, colspan: 6 },\n      { start: \"G6\", rowspan: 1, colspan: 4 },\n      { start: \"K6\", rowspan: 1, colspan: 6 },\n      { start: \"Q6\", rowspan: 1, colspan: 4 },\n\n      { start: \"A7\", rowspan: 1, colspan: 20 },\n    ],\n    cells: [\n      { addr: \"A1\", text: \"Internal table\", class: [\"cell\", \"header\"] },\n      { addr: \"G1\", text: \"{table.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A2\", text: \"{labels.target}\", class: [\"cell\", \"header\"] },\n      { addr: \"G2\", text: \"{target.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A3\", text: \"{labels.conditions}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A4\", text: \"{labels.condItem1}\", class: [\"cell\", \"header\"] },\n      { addr: \"G4\", text: \"{labels.condOperator}\", class: [\"cell\", \"header\"] },\n      { addr: \"K4\", text: \"{labels.condItem2}\", class: [\"cell\", \"header\"] },\n      { addr: \"Q4\", text: \"{labels.condAssoc}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A5\", text: \"{conditions[0].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"G5\", text: \"{conditions[0].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"K5\", text: \"{conditions[0].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"Q5\", text: \"{conditions[0].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A6\", text: \"{conditions[1].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"G6\", text: \"{conditions[1].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"K6\", text: \"{conditions[1].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"Q6\", text: \"{conditions[1].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A7\", text: \"{labels.binarySearch}\", class: [\"cell\", \"header\"] },\n    ],\n  };\n\r\n  ns.abapObjects?.defineTemplate?.(\"itabCollect.excel-like-table\", itabCollectExcelLikeTable);\r\n})(window.AbapFlow);\r\n\r\n","js/abap_objects/templates/itabDelete.excel-like-table.js":"(function (ns) {\r\n  \"use strict\";\r\n\r\n  const itabDeleteExcelLikeTable = {\r\n    type: \"excel-like-table\",\r\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 7,\n      cols: 20, // A..T\n      colWidths: {\r\n        A: 420, // merged A..F\r\n        G: 220, // merged G..J\r\n        K: 520, // merged K..P\r\n        Q: 220, // merged Q..T\r\n      },\r\n      rowHeights: {\n        1: 30,\n        2: 30,\n        3: 30,\n        4: 30,\n        5: 30,\n        6: 30,\n        7: 30,\n      },\n    },\n    css: {\r\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\r\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\r\n      mono: \"font-family:Consolas,monospace;\",\r\n      wrap: \"white-space:normal;line-height:1.25;\",\r\n      center: \"text-align:center;\",\r\n    },\r\n    merges: [\n      { start: \"A1\", rowspan: 1, colspan: 6 },\n      { start: \"G1\", rowspan: 1, colspan: 14 },\n\n      { start: \"A2\", rowspan: 1, colspan: 6 },\n      { start: \"G2\", rowspan: 1, colspan: 14 },\n\n      { start: \"A3\", rowspan: 1, colspan: 20 },\n\n      { start: \"A4\", rowspan: 1, colspan: 6 },\n      { start: \"G4\", rowspan: 1, colspan: 4 },\n      { start: \"K4\", rowspan: 1, colspan: 6 },\n      { start: \"Q4\", rowspan: 1, colspan: 4 },\n\n      { start: \"A5\", rowspan: 1, colspan: 6 },\n      { start: \"G5\", rowspan: 1, colspan: 4 },\n      { start: \"K5\", rowspan: 1, colspan: 6 },\n      { start: \"Q5\", rowspan: 1, colspan: 4 },\n\n      { start: \"A6\", rowspan: 1, colspan: 6 },\n      { start: \"G6\", rowspan: 1, colspan: 4 },\n      { start: \"K6\", rowspan: 1, colspan: 6 },\n      { start: \"Q6\", rowspan: 1, colspan: 4 },\n\n      { start: \"A7\", rowspan: 1, colspan: 20 },\n    ],\n    cells: [\n      { addr: \"A1\", text: \"Internal table\", class: [\"cell\", \"header\"] },\n      { addr: \"G1\", text: \"{table.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A2\", text: \"{labels.target}\", class: [\"cell\", \"header\"] },\n      { addr: \"G2\", text: \"{target.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A3\", text: \"{labels.conditions}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A4\", text: \"{labels.condItem1}\", class: [\"cell\", \"header\"] },\n      { addr: \"G4\", text: \"{labels.condOperator}\", class: [\"cell\", \"header\"] },\n      { addr: \"K4\", text: \"{labels.condItem2}\", class: [\"cell\", \"header\"] },\n      { addr: \"Q4\", text: \"{labels.condAssoc}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A5\", text: \"{conditions[0].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"G5\", text: \"{conditions[0].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"K5\", text: \"{conditions[0].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"Q5\", text: \"{conditions[0].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A6\", text: \"{conditions[1].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"G6\", text: \"{conditions[1].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"K6\", text: \"{conditions[1].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"Q6\", text: \"{conditions[1].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A7\", text: \"{labels.binarySearch}\", class: [\"cell\", \"header\"] },\n    ],\n  };\n\r\n  ns.abapObjects?.defineTemplate?.(\"itabDelete.excel-like-table\", itabDeleteExcelLikeTable);\r\n})(window.AbapFlow);\r\n\r\n","js/abap_objects/templates/itabModify.excel-like-table.js":"(function (ns) {\r\n  \"use strict\";\r\n\r\n  const itabModifyExcelLikeTable = {\r\n    type: \"excel-like-table\",\r\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 7,\n      cols: 20, // A..T\n      colWidths: {\r\n        A: 420, // merged A..F\r\n        G: 220, // merged G..J\r\n        K: 520, // merged K..P\r\n        Q: 220, // merged Q..T\r\n      },\r\n      rowHeights: {\n        1: 30,\n        2: 30,\n        3: 30,\n        4: 30,\n        5: 30,\n        6: 30,\n        7: 30,\n      },\n    },\n    css: {\r\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\r\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\r\n      mono: \"font-family:Consolas,monospace;\",\r\n      wrap: \"white-space:normal;line-height:1.25;\",\r\n      center: \"text-align:center;\",\r\n    },\r\n    merges: [\n      { start: \"A1\", rowspan: 1, colspan: 6 },\n      { start: \"G1\", rowspan: 1, colspan: 14 },\n\n      { start: \"A2\", rowspan: 1, colspan: 6 },\n      { start: \"G2\", rowspan: 1, colspan: 14 },\n\n      { start: \"A3\", rowspan: 1, colspan: 20 },\n\n      { start: \"A4\", rowspan: 1, colspan: 6 },\n      { start: \"G4\", rowspan: 1, colspan: 4 },\n      { start: \"K4\", rowspan: 1, colspan: 6 },\n      { start: \"Q4\", rowspan: 1, colspan: 4 },\n\n      { start: \"A5\", rowspan: 1, colspan: 6 },\n      { start: \"G5\", rowspan: 1, colspan: 4 },\n      { start: \"K5\", rowspan: 1, colspan: 6 },\n      { start: \"Q5\", rowspan: 1, colspan: 4 },\n\n      { start: \"A6\", rowspan: 1, colspan: 6 },\n      { start: \"G6\", rowspan: 1, colspan: 4 },\n      { start: \"K6\", rowspan: 1, colspan: 6 },\n      { start: \"Q6\", rowspan: 1, colspan: 4 },\n\n      { start: \"A7\", rowspan: 1, colspan: 20 },\n    ],\n    cells: [\n      { addr: \"A1\", text: \"Internal table\", class: [\"cell\", \"header\"] },\n      { addr: \"G1\", text: \"{table.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A2\", text: \"{labels.target}\", class: [\"cell\", \"header\"] },\n      { addr: \"G2\", text: \"{target.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A3\", text: \"{labels.conditions}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A4\", text: \"{labels.condItem1}\", class: [\"cell\", \"header\"] },\n      { addr: \"G4\", text: \"{labels.condOperator}\", class: [\"cell\", \"header\"] },\n      { addr: \"K4\", text: \"{labels.condItem2}\", class: [\"cell\", \"header\"] },\n      { addr: \"Q4\", text: \"{labels.condAssoc}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A5\", text: \"{conditions[0].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"G5\", text: \"{conditions[0].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"K5\", text: \"{conditions[0].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"Q5\", text: \"{conditions[0].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A6\", text: \"{conditions[1].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"G6\", text: \"{conditions[1].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"K6\", text: \"{conditions[1].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"Q6\", text: \"{conditions[1].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A7\", text: \"{labels.binarySearch}\", class: [\"cell\", \"header\"] },\n    ],\n  };\n\r\n  ns.abapObjects?.defineTemplate?.(\"itabModify.excel-like-table\", itabModifyExcelLikeTable);\r\n})(window.AbapFlow);\r\n\r\n","js/abap_objects/templates/itabRead.excel-like-table.js":"(function (ns) {\r\n  \"use strict\";\r\n\r\n  const itabReadExcelLikeTable = {\r\n    type: \"excel-like-table\",\r\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 7,\n      cols: 20, // A..T\n      colWidths: {\r\n        A: 420, // merged A..F\r\n        G: 220, // merged G..J\r\n        K: 520, // merged K..P\r\n        Q: 220, // merged Q..T\r\n      },\r\n      rowHeights: {\n        1: 30,\n        2: 30,\n        3: 30,\n        4: 30,\n        5: 30,\n        6: 30,\n        7: 30,\n      },\n    },\n    css: {\r\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\r\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\r\n      mono: \"font-family:Consolas,monospace;\",\r\n      wrap: \"white-space:normal;line-height:1.25;\",\r\n      center: \"text-align:center;\",\r\n    },\r\n    merges: [\n      { start: \"A1\", rowspan: 1, colspan: 6 },\n      { start: \"G1\", rowspan: 1, colspan: 14 },\n\n      { start: \"A2\", rowspan: 1, colspan: 6 },\n      { start: \"G2\", rowspan: 1, colspan: 14 },\n\n      { start: \"A3\", rowspan: 1, colspan: 20 },\n\n      { start: \"A4\", rowspan: 1, colspan: 6 },\n      { start: \"G4\", rowspan: 1, colspan: 4 },\n      { start: \"K4\", rowspan: 1, colspan: 6 },\n      { start: \"Q4\", rowspan: 1, colspan: 4 },\n\n      { start: \"A5\", rowspan: 1, colspan: 6 },\n      { start: \"G5\", rowspan: 1, colspan: 4 },\n      { start: \"K5\", rowspan: 1, colspan: 6 },\n      { start: \"Q5\", rowspan: 1, colspan: 4 },\n\n      { start: \"A6\", rowspan: 1, colspan: 6 },\n      { start: \"G6\", rowspan: 1, colspan: 4 },\n      { start: \"K6\", rowspan: 1, colspan: 6 },\n      { start: \"Q6\", rowspan: 1, colspan: 4 },\n\n      { start: \"A7\", rowspan: 1, colspan: 20 },\n    ],\n    cells: [\n      { addr: \"A1\", text: \"Internal table\", class: [\"cell\", \"header\"] },\n      { addr: \"G1\", text: \"{table.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A2\", text: \"{labels.target}\", class: [\"cell\", \"header\"] },\n      { addr: \"G2\", text: \"{target.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A3\", text: \"{labels.conditions}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A4\", text: \"{labels.condItem1}\", class: [\"cell\", \"header\"] },\n      { addr: \"G4\", text: \"{labels.condOperator}\", class: [\"cell\", \"header\"] },\n      { addr: \"K4\", text: \"{labels.condItem2}\", class: [\"cell\", \"header\"] },\n      { addr: \"Q4\", text: \"{labels.condAssoc}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A5\", text: \"{conditions[0].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"G5\", text: \"{conditions[0].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"K5\", text: \"{conditions[0].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"Q5\", text: \"{conditions[0].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A6\", text: \"{conditions[1].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"G6\", text: \"{conditions[1].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"K6\", text: \"{conditions[1].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"Q6\", text: \"{conditions[1].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A7\", text: \"{labels.binarySearch}\", class: [\"cell\", \"header\"] },\n    ],\n  };\n\r\n  ns.abapObjects?.defineTemplate?.(\"itabRead.excel-like-table\", itabReadExcelLikeTable);\r\n})(window.AbapFlow);\r\n\r\n","js/abap_objects/templates/message.excel-like-table.js":"(function (ns) {\r\n    \"use strict\";\r\n\r\n    const messageExcelLikeTable = {\r\n        type: \"excel-like-table\",\r\n        compact: {\r\n            removeEmptyRows: true,\r\n        },\r\n        grid: {\n            rows: 8,\n            cols: 20,\n            colWidths: {\n                A: 260,\n                E: 360,\n                I: 220,\n                L: 420,\n                P: 220,\n                R: 260,\n            },\n            rowHeights: {\n                1: 30,\n                2: 30,\n                3: 30,\r\n                4: 30,\r\n                5: 30,\r\n                6: 30,\r\n                7: 30,\r\n                8: 30,\r\n            },\r\n        },\r\n        css: {\r\n            header: \"background:#9dc3e6;font-weight:700;color:#111;\",\r\n            cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\r\n            mono: \"font-family:Consolas,monospace;\",\r\n            wrap: \"white-space:normal;line-height:1.25;\",\r\n            center: \"text-align:center;\",\r\n        },\n        merges: [\n            {\n                start: \"A1\",\n                rowspan: 1,\n                colspan: 4,\n            },\n            {\n                start: \"E1\",\n                rowspan: 1,\n                colspan: 4,\n            },\n            {\n                start: \"I1\",\n                rowspan: 1,\n                colspan: 3,\n            },\n            {\n                start: \"L1\",\n                rowspan: 1,\n                colspan: 4,\n            },\n            {\n                start: \"P1\",\n                rowspan: 1,\n                colspan: 2,\n            },\n            {\n                start: \"R1\",\n                rowspan: 1,\n                colspan: 3,\n            },\n            {\n                start: \"A2\",\n                rowspan: 1,\n                colspan: 4,\n            },\n            {\n                start: \"E2\",\n                rowspan: 1,\n                colspan: 16,\n            },\n            {\n                start: \"A3\",\n                rowspan: 1,\n                colspan: 4,\n            },\n            {\n                start: \"E3\",\n                rowspan: 1,\n                colspan: 16,\n            },\n            {\n                start: \"A4\",\n                rowspan: 1,\n                colspan: 4,\n            },\n            {\n                start: \"E4\",\n                rowspan: 1,\n                colspan: 16,\n            },\n            {\n                start: \"A5\",\n                rowspan: 1,\n                colspan: 4,\n            },\n            {\n                start: \"E5\",\n                rowspan: 1,\n                colspan: 16,\n            },\n            {\n                start: \"A6\",\n                rowspan: 1,\n                colspan: 4,\n            },\n            {\n                start: \"E6\",\n                rowspan: 1,\n                colspan: 16,\n            },\n            {\n                start: \"A7\",\n                rowspan: 1,\n                colspan: 4,\n            },\n            {\n                start: \"E7\",\n                rowspan: 1,\n                colspan: 16,\n            },\n            {\n                start: \"A8\",\n                rowspan: 1,\n                colspan: 4,\n            },\n            {\n                start: \"E8\",\n                rowspan: 1,\n                colspan: 16,\n            },\n        ],\n        cells: [\n            {\n                addr: \"A1\",\n                text: \"{labels.msgClass}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"E1\",\n                text: \"{msgClass.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"I1\",\n                text: \"{labels.msgNo}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"L1\",\n                text: \"{msgNo.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"P1\",\n                text: \"{labels.displayLike}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"R1\",\n                text: \"{displayLike.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A2\",\n                text: \"{labels.messageText}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"E2\",\n                text: \"{messageText.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A3\",\n                text: \"{labels.with1}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"E3\",\n                text: \"{with[0].description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A4\",\n                text: \"{labels.with2}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"E4\",\n                text: \"{with[1].description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A5\",\n                text: \"{labels.with3}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"E5\",\n                text: \"{with[2].description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A6\",\n                text: \"{labels.with4}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"E6\",\n                text: \"{with[3].description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A7\",\n                text: \"{labels.into}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"E7\",\n                text: \"{into.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A8\",\n                text: \"{labels.raising}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"E8\",\n                text: \"{raising.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n        ],\n    };\n\r\n    ns.abapObjects?.defineTemplate?.(\"message.excel-like-table\", messageExcelLikeTable);\r\n})(window.AbapFlow);\r\n","js/abap_objects/templates/perform.excel-like-table.js":"(function (ns) {\n  \"use strict\";\n\n  const performExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    sectionLabels: {\n      tables: \"Table\",\n      using: \"Using\",\n      changing: \"Changing\",\n      raising: \"Raising\",\n    },\n    grid: {\n      rows: 9,\n      cols: 3,\n      colWidths: {\n        A: 160,\n        B: 190,\n        C: 860,\n      },\n      rowHeights: {\n        1: 34,\n        2: 30,\n        3: 30,\n        4: 30,\n        5: 30,\n        6: 30,\n        7: 30,\n        8: 30,\n        9: 30,\n      },\n    },\n    css: {\n      label: \"background:#f4b183;font-weight:600;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n    },\n    defaultCellClass: [\"gap\"],\n    cells: [\n      { addr: \"A1\", text: \"Thực hiện\", class: [\"cell\", \"label\"] },\n      { addr: \"B1\", text: \"{perform.name}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C1\", text: \"{perform.description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A2\", text: \"{labels.tables}\", class: [\"cell\", \"label\"] },\n      { addr: \"B2\", text: \"{tables[0].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C2\", text: \"{tables[0].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A3\", text: \"\", class: [\"cell\", \"label\"] },\n      { addr: \"B3\", text: \"{tables[1].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C3\", text: \"{tables[1].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A4\", text: \"{labels.using}\", class: [\"cell\", \"label\"] },\n      { addr: \"B4\", text: \"{using[0].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C4\", text: \"{using[0].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A5\", text: \"\", class: [\"cell\", \"label\"] },\n      { addr: \"B5\", text: \"{using[1].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C5\", text: \"{using[1].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A6\", text: \"{labels.changing}\", class: [\"cell\", \"label\"] },\n      { addr: \"B6\", text: \"{changing[0].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C6\", text: \"{changing[0].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A7\", text: \"\", class: [\"cell\", \"label\"] },\n      { addr: \"B7\", text: \"{changing[1].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C7\", text: \"{changing[1].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A8\", text: \"{labels.raising}\", class: [\"cell\", \"label\"] },\n      { addr: \"B8\", text: \"{raising[0].name}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C8\", text: \"{raising[0].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A9\", text: \"\", class: [\"cell\", \"label\"] },\n      { addr: \"B9\", text: \"{raising[1].name}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C9\", text: \"{raising[1].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"perform.excel-like-table\", performExcelLikeTable);\n})(window.AbapFlow);\n\n"});
 
   var head = document && document.head;
   if (!head || head.__abapflowInlinePatched) return;
