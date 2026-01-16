@@ -67,6 +67,13 @@
             </label>
           </div>
 
+          <div class="template-editor__row">
+            <label>
+              <input id="tplCompactRemoveEmptyRows" type="checkbox" />
+              Xóa dòng rỗng (compact)
+            </label>
+          </div>
+
           <div class="template-editor__actions">
             <button id="btnNewTemplate" class="btn" type="button">New</button>
             <button id="btnSaveTemplate" class="btn btn-primary" type="button">Save</button>
@@ -129,18 +136,6 @@
             </label>
             <button id="btnApplyBorder" class="btn" type="button" disabled>Apply</button>
           </div>
-          <div class="template-editor-preview-toolbar__row">
-            <label class="template-editor-preview-toolbar__field">
-              Colspan
-              <input id="selColSpan" class="input input-span" type="number" min="1" value="1" disabled />
-            </label>
-            <label class="template-editor-preview-toolbar__field">
-              Rowspan
-              <input id="selRowSpan" class="input input-span" type="number" min="1" value="1" disabled />
-            </label>
-            <button id="btnApplyMerge" class="btn" type="button" disabled>Merge</button>
-            <button id="btnClearMerge" class="btn" type="button" disabled>Unmerge</button>
-          </div>
         </div>
         <div id="previewHost" class="template-editor-preview empty">Load a template to preview.</div>
       </section>
@@ -152,7 +147,7 @@
         <div class="excel-paste-modal__title">Paste from Excel</div>
         <div class="excel-paste-modal__hint">
           1) Copy a formatted cell range in Excel (Ctrl+C). 2) Click the box below and paste (Ctrl+V). This will import
-          table + merges + styles into the Template JSON.
+          table + styles into the Template JSON.
         </div>
         <div id="excelPasteTarget" class="excel-paste-modal__target" contenteditable="true" spellcheck="false" tabindex="0"></div>
         <div class="excel-paste-modal__actions">

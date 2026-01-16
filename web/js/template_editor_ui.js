@@ -200,7 +200,7 @@
     const preferredId = store && typeof store.getPreferredTemplateId === "function" ? store.getPreferredTemplateId(meta.source) : "";
     $("tplPreferred").checked = preferredId === id;
 
-    $("tplJson").value = JSON.stringify(cfg, null, 2);
+    writeTemplateJson(cfg);
     renderPreview();
 
     setStatus(`Loaded: ${id}`, false);
@@ -222,8 +222,38 @@
     return parsed;
   }
 
+  function syncCompactFormFromConfig(cfg) {
+    const el = $("tplCompactRemoveEmptyRows");
+    if (!el) return;
+    el.checked = Boolean(cfg?.compact?.removeEmptyRows);
+  }
+
+  function syncCompactFormFromEditorJson() {
+    const parsed = readTemplateJsonFromEditor();
+    if (!parsed.ok) return;
+    syncCompactFormFromConfig(parsed.value);
+  }
+
+  function applyCompactFormToConfig(cfg) {
+    if (!cfg || typeof cfg !== "object") return;
+    const el = $("tplCompactRemoveEmptyRows");
+    if (!el) return;
+
+    if (el.checked) {
+      if (!cfg.compact || typeof cfg.compact !== "object") cfg.compact = {};
+      cfg.compact.removeEmptyRows = true;
+      return;
+    }
+
+    if (cfg.compact && typeof cfg.compact === "object") {
+      delete cfg.compact.removeEmptyRows;
+      if (!Object.keys(cfg.compact).length) delete cfg.compact;
+    }
+  }
+
   function writeTemplateJson(cfg) {
     $("tplJson").value = JSON.stringify(cfg, null, 2);
+    syncCompactFormFromConfig(cfg);
   }
 
   function upsertCellText(cfg, addrRaw, textValue) {
@@ -342,7 +372,7 @@
 
   function setPreviewToolbarEnabled(enabled) {
     const on = Boolean(enabled);
-    const ids = ["btnPreviewDeleteRow", "btnPreviewDeleteCol", "btnClearFormat", "selBgColor", "selTextColor", "selBorder", "btnApplyBorder", "selColSpan", "selRowSpan", "btnApplyMerge", "btnClearMerge"];
+    const ids = ["btnPreviewDeleteRow", "btnPreviewDeleteCol", "btnClearFormat", "selBgColor", "selTextColor", "selBorder", "btnApplyBorder"];
     for (const id of ids) {
       const el = $(id);
       if (el) el.disabled = !on;
@@ -372,14 +402,10 @@
     const bgEl = $("selBgColor");
     const fgEl = $("selTextColor");
     const borderEl = $("selBorder");
-    const colSpanEl = $("selColSpan");
-    const rowSpanEl = $("selRowSpan");
 
     if (bgEl && bg) bgEl.value = bg;
     if (fgEl && fg) fgEl.value = fg;
     if (borderEl) borderEl.value = String(css.border || "").trim();
-    if (colSpanEl) colSpanEl.value = String(Math.max(1, Number(td.colSpan || 1)));
-    if (rowSpanEl) rowSpanEl.value = String(Math.max(1, Number(td.rowSpan || 1)));
 
     setPreviewToolbarEnabled(true);
   }
@@ -509,102 +535,6 @@
     return out;
   }
 
-  function normalizeMerges(merges, rows, cols) {
-    const list = Array.isArray(merges) ? merges : [];
-    const out = [];
-
-    for (const m of list) {
-      const start = parseAddress(m?.start);
-      if (!start) continue;
-      let rowspan = Math.max(1, Math.floor(Number(m?.rowspan || 1)));
-      let colspan = Math.max(1, Math.floor(Number(m?.colspan || 1)));
-
-      if (start.row > rows || start.colIndex > cols) continue;
-      rowspan = Math.min(rowspan, rows - start.row + 1);
-      colspan = Math.min(colspan, cols - start.colIndex + 1);
-
-      if (rowspan < 2 && colspan < 2) continue;
-      out.push({ ...m, start: addrFromRC(start.colIndex, start.row), rowspan, colspan });
-    }
-
-    return out;
-  }
-
-  function mergeRegion(start, rowspan, colspan) {
-    const r1 = start.row;
-    const c1 = start.colIndex;
-    const r2 = r1 + Math.max(1, Math.floor(Number(rowspan || 1))) - 1;
-    const c2 = c1 + Math.max(1, Math.floor(Number(colspan || 1))) - 1;
-    return { r1, c1, r2, c2 };
-  }
-
-  function regionsOverlap(a, b) {
-    if (!a || !b) return false;
-    const rowOverlap = a.r1 <= b.r2 && b.r1 <= a.r2;
-    const colOverlap = a.c1 <= b.c2 && b.c1 <= a.c2;
-    return rowOverlap && colOverlap;
-  }
-
-  function applyMergeAtSelected() {
-    if (!selectedAddr) return;
-    const parsed = readTemplateJsonFromEditor();
-    if (!parsed.ok) {
-      setStatus(String(parsed.error || "Invalid template JSON."), true);
-      return;
-    }
-
-    const cfg = parsed.value;
-    if (!cfg?.grid || typeof cfg.grid !== "object") cfg.grid = { rows: 1, cols: 1 };
-
-    const start = parseAddress(selectedAddr);
-    if (!start) return;
-
-    const wantCol = Math.max(1, Math.floor(Number($("selColSpan")?.value || 1)));
-    const wantRow = Math.max(1, Math.floor(Number($("selRowSpan")?.value || 1)));
-
-    const needCols = start.colIndex + wantCol - 1;
-    const needRows = start.row + wantRow - 1;
-    cfg.grid.cols = Math.max(1, Math.floor(Number(cfg.grid.cols || 1)), needCols);
-    cfg.grid.rows = Math.max(1, Math.floor(Number(cfg.grid.rows || 1)), needRows);
-
-    const region = mergeRegion(start, wantRow, wantCol);
-    const merges = Array.isArray(cfg.merges) ? cfg.merges : [];
-    const next = [];
-
-    for (const m of merges) {
-      const ms = parseAddress(m?.start);
-      if (!ms) continue;
-      const mr = mergeRegion(ms, m?.rowspan || 1, m?.colspan || 1);
-      if (regionsOverlap(mr, region)) continue;
-      next.push(m);
-    }
-
-    if (wantRow > 1 || wantCol > 1) {
-      next.push({ start: addrFromRC(start.colIndex, start.row), rowspan: wantRow, colspan: wantCol });
-    }
-
-    cfg.merges = normalizeMerges(next, cfg.grid.rows, cfg.grid.cols);
-    writeTemplateJson(cfg);
-    renderPreview();
-    setStatus(`Merge updated at ${selectedAddr} (${wantRow}x${wantCol}).`, false);
-  }
-
-  function clearMergeAtSelected() {
-    if (!selectedAddr) return;
-    const parsed = readTemplateJsonFromEditor();
-    if (!parsed.ok) {
-      setStatus(String(parsed.error || "Invalid template JSON."), true);
-      return;
-    }
-
-    const cfg = parsed.value;
-    const addr = normalizeAddress(selectedAddr);
-    cfg.merges = (Array.isArray(cfg.merges) ? cfg.merges : []).filter((m) => normalizeAddress(m?.start) !== addr);
-    writeTemplateJson(cfg);
-    renderPreview();
-    setStatus(`Unmerged: ${selectedAddr}`, false);
-  }
-
   function deleteRow(cfg, delRow) {
     if (!cfg || cfg.type !== "excel-like-table") return { ok: false, error: "Invalid template config." };
     const grid = cfg.grid && typeof cfg.grid === "object" ? cfg.grid : null;
@@ -626,30 +556,9 @@
       })
       .filter(Boolean);
 
-    const merges = Array.isArray(cfg.merges) ? cfg.merges : [];
-    const nextMerges = [];
-    for (const m of merges) {
-      const start = parseAddress(m?.start);
-      if (!start) continue;
-      let startRow = start.row;
-      const startCol = start.colIndex;
-      let rowspan = Math.max(1, Math.floor(Number(m?.rowspan || 1)));
-      const colspan = Math.max(1, Math.floor(Number(m?.colspan || 1)));
-      const endRow = startRow + rowspan - 1;
-
-      if (r < startRow) {
-        startRow -= 1;
-      } else if (r <= endRow) {
-        rowspan -= 1;
-        if (rowspan <= 0) continue;
-      }
-
-      nextMerges.push({ ...m, start: addrFromRC(startCol, startRow), rowspan, colspan });
-    }
-
     grid.rowHeights = shiftRowHeightsOnDelete(grid.rowHeights, r);
     grid.rows = Math.max(1, rows - 1);
-    cfg.merges = normalizeMerges(nextMerges, grid.rows, cols);
+    cfg.merges = [];
 
     return { ok: true, row: r };
   }
@@ -675,30 +584,9 @@
       })
       .filter(Boolean);
 
-    const merges = Array.isArray(cfg.merges) ? cfg.merges : [];
-    const nextMerges = [];
-    for (const m of merges) {
-      const start = parseAddress(m?.start);
-      if (!start) continue;
-      const startRow = start.row;
-      let startCol = start.colIndex;
-      const rowspan = Math.max(1, Math.floor(Number(m?.rowspan || 1)));
-      let colspan = Math.max(1, Math.floor(Number(m?.colspan || 1)));
-      const endCol = startCol + colspan - 1;
-
-      if (cidx < startCol) {
-        startCol -= 1;
-      } else if (cidx <= endCol) {
-        colspan -= 1;
-        if (colspan <= 0) continue;
-      }
-
-      nextMerges.push({ ...m, start: addrFromRC(startCol, startRow), rowspan, colspan });
-    }
-
     grid.colWidths = shiftColWidthsOnDelete(grid.colWidths, cidx);
     grid.cols = Math.max(1, cols - 1);
-    cfg.merges = normalizeMerges(nextMerges, rows, grid.cols);
+    cfg.merges = [];
 
     return { ok: true, colIndex: cidx, col: indexToCol(cidx) };
   }
@@ -928,6 +816,7 @@
     $("tplLabel").value = "";
     $("tplAuto").checked = true;
     $("tplPreferred").checked = false;
+    $("tplCompactRemoveEmptyRows").checked = false;
     $("tplWhenPath").value = "";
     $("tplWhenEquals").value = "";
     if ($("tplSource")?.options?.length) $("tplSource").value = $("tplSource").options[0].value;
@@ -936,18 +825,18 @@
     const skeleton = {
       type: "excel-like-table",
       grid: {
-        rows: 2,
-        cols: 6,
-        colWidths: { A: 160 },
-        rowHeights: { 1: 34, 2: 30 },
+        rows: 8,
+        cols: 8,
+        defaultColWidth: 32,
+        defaultRowHeight: 32,
       },
       css: {
-        cell: "border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;",
+        cell: "border:1px solid #222;padding:2px 4px;vertical-align:middle;background:#fff;color:#111;white-space:pre-wrap;",
       },
       merges: [],
       cells: [{ addr: "A1", text: "Title", class: ["cell"] }],
     };
-    $("tplJson").value = JSON.stringify(skeleton, null, 2);
+    writeTemplateJson(skeleton);
     renderPreview();
     setStatus("New template skeleton created.", false);
   }
@@ -1028,6 +917,18 @@
     $("btnDeleteTemplate")?.addEventListener("click", deleteSaved);
     $("btnDeleteRow")?.addEventListener("click", deleteSelectedRow);
     $("btnDeleteCol")?.addEventListener("click", deleteSelectedCol);
+    $("tplCompactRemoveEmptyRows")?.addEventListener("change", () => {
+      const parsed = readTemplateJsonFromEditor();
+      if (!parsed.ok) {
+        setStatus(String(parsed.error || "Invalid template JSON."), true);
+        return;
+      }
+
+      applyCompactFormToConfig(parsed.value);
+      writeTemplateJson(parsed.value);
+      renderPreview();
+      setStatus(`Compact removeEmptyRows: ${$("tplCompactRemoveEmptyRows").checked ? "ON" : "OFF"}.`, false);
+    });
     $("btnCopyExcel")?.addEventListener("click", async () => {
       const exporter = ns.templateExcelExport || null;
       const table = $("previewHost")?.querySelector("table.excel-like-table") || null;
@@ -1122,19 +1023,6 @@
       $("btnApplyBorder")?.click();
     });
 
-    $("btnApplyMerge")?.addEventListener("click", applyMergeAtSelected);
-    $("btnClearMerge")?.addEventListener("click", clearMergeAtSelected);
-    $("selColSpan")?.addEventListener("keydown", (e) => {
-      if (e.key !== "Enter") return;
-      e.preventDefault();
-      $("btnApplyMerge")?.click();
-    });
-    $("selRowSpan")?.addEventListener("keydown", (e) => {
-      if (e.key !== "Enter") return;
-      e.preventDefault();
-      $("btnApplyMerge")?.click();
-    });
-
     $("btnClearFormat")?.addEventListener("click", () => {
       if (!selectedAddr) return;
       const parsed = readTemplateJsonFromEditor();
@@ -1161,7 +1049,10 @@
     });
 
     $("tplSelect")?.addEventListener("change", () => loadTemplate($("tplSelect")?.value));
-    $("tplJson")?.addEventListener("input", schedulePreview);
+    $("tplJson")?.addEventListener("input", () => {
+      syncCompactFormFromEditorJson();
+      schedulePreview();
+    });
     $("ctxJson")?.addEventListener("input", schedulePreview);
   }
 

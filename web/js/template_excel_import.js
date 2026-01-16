@@ -247,6 +247,29 @@
     return serializeStyleDeclarations(merged);
   }
 
+  function sanitizeExcelText(text) {
+    let s = String(text ?? "")
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n")
+      .replace(/\u00a0/g, " ");
+
+    // Excel/clipboard sometimes injects invisible Unicode chars that break placeholder parsing:
+    // - ZERO WIDTH SPACE/JOINER/NBSP equivalents
+    // - WORD JOINER, BOM, SOFT HYPHEN
+    s = s.replace(/[\u200B-\u200D\u2060\uFEFF\u00AD]/g, "");
+
+    // Drop other ASCII control chars (except \n and \t).
+    s = s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "");
+
+    try {
+      if (typeof s.normalize === "function") s = s.normalize("NFC");
+    } catch (_) {
+      // ignore
+    }
+
+    return s;
+  }
+
   function getExcelCellText(cellEl) {
     if (!cellEl) return "";
     let text = "";
@@ -259,7 +282,7 @@
     } catch (_) {
       text = String(cellEl.textContent || "");
     }
-    return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\u00a0/g, " ").trimEnd();
+    return sanitizeExcelText(text).trimEnd();
   }
 
   function pickBestTable(doc) {
@@ -289,6 +312,35 @@
     return lines.map((l) => String(l).split("\t"));
   }
 
+  function pickSquareCellSize(colWidths, rowHeights, fallbackPx) {
+    const fallback = Math.max(8, Math.floor(Number(fallbackPx || 32)));
+
+    const widths = [];
+    for (const v of Object.values(colWidths || {})) {
+      const n = Math.floor(Number(v));
+      if (Number.isFinite(n) && n > 0) widths.push(n);
+    }
+
+    const heights = [];
+    for (const v of Object.values(rowHeights || {})) {
+      const n = Math.floor(Number(v));
+      if (Number.isFinite(n) && n > 0) heights.push(n);
+    }
+
+    function median(list) {
+      const arr = list.slice().sort((a, b) => a - b);
+      if (!arr.length) return 0;
+      const mid = Math.floor(arr.length / 2);
+      if (arr.length % 2) return arr[mid];
+      return Math.round((arr[mid - 1] + arr[mid]) / 2);
+    }
+
+    const mw = median(widths);
+    const mh = median(heights);
+    const picked = mw && mh ? Math.round((mw + mh) / 2) : mw || mh || fallback;
+    return Math.max(8, Math.min(200, picked));
+  }
+
   function buildTemplateConfigFromPlainGrid(plainGrid) {
     const rows = Math.max(1, plainGrid?.length || 0);
     let cols = 1;
@@ -300,7 +352,7 @@
       for (let c = 0; c < cols; c++) {
         const v = row[c];
         if (v == null) continue;
-        const text = String(v).replace(/\u00a0/g, " ").trimEnd();
+        const text = sanitizeExcelText(v).trimEnd();
         if (!text) continue;
         cells.push({ addr: addrFromRC(c + 1, r + 1), text, class: ["cell"] });
       }
@@ -308,41 +360,12 @@
 
     return {
       type: "excel-like-table",
-      grid: { rows, cols, defaultColWidth: 80, defaultRowHeight: 24 },
+      grid: { rows, cols, defaultColWidth: 32, defaultRowHeight: 32 },
       css: { cell: "padding:2px 4px;vertical-align:middle;background:#fff;color:#111;white-space:pre-wrap;" },
       defaultCellClass: ["cell"],
       merges: [],
       cells,
     };
-  }
-
-  function tryFillFromPlainGrid(cellInfo, plainGrid) {
-    if (!cellInfo || !plainGrid) return;
-    if (String(cellInfo.text || "").trim()) return;
-    const r0 = Number(cellInfo.startRow) - 1;
-    const c0 = Number(cellInfo.startCol) - 1;
-    if (!Number.isFinite(r0) || !Number.isFinite(c0) || r0 < 0 || c0 < 0) return;
-    const row = plainGrid[r0];
-    if (!row) return;
-    const v = row[c0];
-    if (v == null) return;
-    const s = String(v).replace(/\u00a0/g, " ").trimEnd();
-    if (!s) return;
-    cellInfo.text = s;
-  }
-
-  function mergeMissingCellStyle(targetStyle, sourceStyle) {
-    const srcText = String(sourceStyle || "").trim();
-    if (!srcText) return targetStyle;
-    const dstText = String(targetStyle || "").trim();
-    if (!dstText) return srcText;
-
-    const dst = parseStyleDeclarations(dstText);
-    const src = parseStyleDeclarations(srcText);
-    for (const [k, v] of src.entries()) {
-      if (!dst.has(k)) dst.set(k, v);
-    }
-    return serializeStyleDeclarations(dst);
   }
 
   function buildTemplateConfigFromExcelHtml(html, plainText) {
@@ -359,7 +382,6 @@
     if (!table) return { ok: false, error: "No <table> found in clipboard HTML. (Copy from Excel cells, not plain text.)" };
 
     const cssMeta = parseExcelCss(doc);
-    const startCells = [];
     const colWidths = {};
     const rowHeights = {};
 
@@ -372,37 +394,9 @@
     }
 
     const rows = Array.from(table.querySelectorAll("tr"));
-    const occupied = [];
-    const coverAt = [];
     let maxCol = 0;
-    let maxRow = rows.length;
 
-    function markCover(cellInfo) {
-      const startRow0 = cellInfo.startRow - 1;
-      const startCol0 = cellInfo.startCol;
-      for (let rr = 0; rr < cellInfo.rowspan; rr++) {
-        const rowIdx0 = startRow0 + rr;
-        if (!occupied[rowIdx0]) occupied[rowIdx0] = [];
-        if (!coverAt[rowIdx0]) coverAt[rowIdx0] = [];
-        for (let cc = 0; cc < cellInfo.colspan; cc++) {
-          const colIdx = startCol0 + cc;
-          occupied[rowIdx0][colIdx] = true;
-          coverAt[rowIdx0][colIdx] = cellInfo;
-        }
-      }
-      maxCol = Math.max(maxCol, cellInfo.startCol + cellInfo.colspan - 1);
-      maxRow = Math.max(maxRow, cellInfo.startRow + cellInfo.rowspan - 1);
-    }
-
-    function parseIgnoreFlags(cellEl) {
-      const rawStyle = String(cellEl?.getAttribute?.("style") || "");
-      return {
-        ignoreCol: /mso-ignore\s*:\s*colspan/i.test(rawStyle),
-        ignoreRow: /mso-ignore\s*:\s*rowspan/i.test(rawStyle),
-        displayNone: /display\s*:\s*none/i.test(rawStyle),
-        visibilityHidden: /visibility\s*:\s*hidden/i.test(rawStyle),
-      };
-    }
+    const cells = [];
 
     for (let r = 0; r < rows.length; r++) {
       const tr = rows[r];
@@ -411,129 +405,44 @@
       const h = cssSizeToPx(tr?.style?.height) || cssSizeToPx(tr?.getAttribute?.("height"));
       if (h) rowHeights[String(rowNum)] = h;
 
-      if (!occupied[r]) occupied[r] = [];
       let col = 1;
-      let lastReal = null;
-
       const rowCells = Array.from(tr.children).filter((el) => /^(TD|TH)$/i.test(String(el?.tagName || "")));
       for (const cellEl of rowCells) {
-        while (occupied[r] && occupied[r][col]) col++;
-
-        const flags = parseIgnoreFlags(cellEl);
-        const baseColspan = Math.max(1, Math.floor(Number(cellEl?.getAttribute?.("colspan") || 1)));
-        const baseRowspan = Math.max(1, Math.floor(Number(cellEl?.getAttribute?.("rowspan") || 1)));
-
-        // Excel clipboard HTML often includes extra <td> elements that are removed from layout
-        // via `display:none` (typically for merged-cell fillers). These should not consume a
-        // column position; otherwise content shifts right (colspan becomes effectively 1).
-        if (flags.displayNone) {
-          const hiddenText = getExcelCellText(cellEl);
-          if (hiddenText && lastReal && !String(lastReal.text || "").trim()) lastReal.text = hiddenText;
-          continue;
-        }
-
-        if (flags.ignoreCol || flags.ignoreRow || flags.visibilityHidden) {
-          let target = null;
-          if (!target && flags.ignoreCol && lastReal) target = lastReal;
-          if (!target && flags.ignoreCol && coverAt?.[r]?.[col - 1]) target = coverAt[r][col - 1];
-          if (!target && flags.ignoreRow && coverAt?.[r - 1]?.[col]) target = coverAt[r - 1][col];
-          if (!target && (flags.ignoreCol || flags.ignoreRow) && coverAt?.[r - 1]?.[col - 1]) target = coverAt[r - 1][col - 1];
-
-          if (target) {
-            const fillerText = getExcelCellText(cellEl);
-            if (fillerText && !String(target.text || "").trim()) target.text = fillerText;
-            tryFillFromPlainGrid(target, plainGrid);
-
-            const fillerStyle = buildExcelCellStyle(cellEl, cssMeta);
-            target.style = mergeMissingCellStyle(target.style, fillerStyle);
-
-            const targetEndCol = target.startCol + Math.max(1, Math.floor(Number(target.colspan || 1))) - 1;
-            // Some Excel clipboard HTML contains redundant filler <td> after a real colspan/rowspan cell
-            // (often with `mso-ignore:*`). If the owning cell already has a span > 1 and this filler
-            // appears outside the owner's covered columns (our `col` already moved past the span),
-            // don't advance `col`, otherwise content shifts right and the first visible colSpan looks "stuck" at 1.
-            if ((flags.ignoreCol || flags.ignoreRow) && !flags.visibilityHidden && (target.colspan > 1 || target.rowspan > 1) && col > targetEndCol) {
-              continue;
-            }
-            if (flags.ignoreCol) {
-              target.colspan = Math.max(target.colspan, col - target.startCol + baseColspan);
-            }
-            if (flags.ignoreRow) {
-              target.rowspan = Math.max(target.rowspan, rowNum - target.startRow + baseRowspan);
-            }
-            markCover(target);
-          } else {
-            const orphanText = getExcelCellText(cellEl);
-            if (String(orphanText || "").trim()) {
-              const addr = addrFromRC(col, rowNum);
-              const style = buildExcelCellStyle(cellEl, cssMeta);
-              const cellInfo = {
-                startRow: rowNum,
-                startCol: col,
-                rowspan: baseRowspan,
-                colspan: baseColspan,
-                addr,
-                text: orphanText,
-                style,
-              };
-              tryFillFromPlainGrid(cellInfo, plainGrid);
-              startCells.push(cellInfo);
-              markCover(cellInfo);
-              lastReal = cellInfo;
-            } else {
-              occupied[r][col] = true;
-            }
-          }
-
-          col += baseColspan;
-          continue;
-        }
+        const rawStyle = String(cellEl?.getAttribute?.("style") || "");
+        // Ignore hidden filler cells (commonly used for merge artifacts).
+        if (/display\s*:\s*none/i.test(rawStyle)) continue;
+        if (/visibility\s*:\s*hidden/i.test(rawStyle)) continue;
+        if (/mso-ignore\s*:\s*(?:colspan|rowspan)/i.test(rawStyle)) continue;
 
         const addr = addrFromRC(col, rowNum);
         const text = getExcelCellText(cellEl);
         const style = buildExcelCellStyle(cellEl, cssMeta);
-
-        const cellInfo = {
-          startRow: rowNum,
-          startCol: col,
-          rowspan: baseRowspan,
-          colspan: baseColspan,
-          addr,
-          text,
-          style,
-        };
-        tryFillFromPlainGrid(cellInfo, plainGrid);
-        startCells.push(cellInfo);
-        markCover(cellInfo);
-        lastReal = cellInfo;
-        col += baseColspan;
+        if (style || text) {
+          const entry = { addr, text, class: ["cell"] };
+          if (style) entry.style = style;
+          cells.push(entry);
+        }
+        col += 1;
       }
+
+      maxCol = Math.max(maxCol, col - 1);
     }
 
-    const merges = [];
-    const cells = [];
-    for (const c of startCells) {
-      const entry = { addr: c.addr, text: c.text, class: ["cell"] };
-      if (c.style) entry.style = c.style;
-      cells.push(entry);
-      if (c.rowspan > 1 || c.colspan > 1) merges.push({ start: c.addr, rowspan: c.rowspan, colspan: c.colspan });
-    }
+    const cellSize = pickSquareCellSize(colWidths, rowHeights, 32);
 
     const cfg = {
       type: "excel-like-table",
       grid: {
-        rows: Math.max(1, maxRow || rows.length),
+        rows: Math.max(1, rows.length),
         cols: Math.max(1, maxCol || colEls.length || 1),
-        ...(Object.keys(colWidths).length ? { colWidths } : {}),
-        ...(Object.keys(rowHeights).length ? { rowHeights } : {}),
-        defaultColWidth: 80,
-        defaultRowHeight: 24,
+        defaultColWidth: cellSize,
+        defaultRowHeight: cellSize,
       },
       css: {
         cell: "padding:2px 4px;vertical-align:middle;background:#fff;color:#111;white-space:pre-wrap;",
       },
       defaultCellClass: ["cell"],
-      merges,
+      merges: [],
       cells,
     };
 
