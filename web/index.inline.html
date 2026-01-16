@@ -7952,6 +7952,28 @@
         return out;
       }
 
+      function hasVisibleCellText(cellCfg) {
+        const t = cellCfg && typeof cellCfg === "object" ? String(cellCfg.text ?? "") : "";
+        return Boolean(t.trim());
+      }
+
+      function hasCellBlockingContent(cellCfg) {
+        if (!cellCfg || typeof cellCfg !== "object") return false;
+        const t = String(cellCfg.text ?? "").trim();
+        if (t) return true;
+        const bind = String(cellCfg.bind ?? "").trim();
+        return Boolean(bind);
+      }
+
+      function nextBlockingCol(blockColsSorted, col) {
+        if (!Array.isArray(blockColsSorted) || !blockColsSorted.length) return 0;
+        for (let i = 0; i < blockColsSorted.length; i++) {
+          const c = Number(blockColsSorted[i]);
+          if (Number.isFinite(c) && c > col) return c;
+        }
+        return 0;
+      }
+
       function buildColumnWidths(config, cols) {
         const explicit = new Map();
         const colWidths = config?.grid?.colWidths && typeof config.grid.colWidths === "object" ? config.grid.colWidths : {};
@@ -8056,6 +8078,7 @@
 
         const rows = Math.max(1, Math.floor(Number(config?.grid?.rows || 1)));
         const cols = Math.max(1, Math.floor(Number(config?.grid?.cols || 1)));
+        const excelOverflow = Boolean(config?.grid?.excelOverflow);
 
         const table = document.createElement("table");
         table.className = "excel-like-table";
@@ -8064,10 +8087,35 @@
 
         const cellMap = new Map();
         const cells = Array.isArray(config.cells) ? config.cells : [];
+        const rowBlocking = new Map();
         for (const c of cells) {
           const addr = normalizeAddress(c?.addr);
           if (!addr) continue;
           cellMap.set(addr, c);
+
+          if (excelOverflow) {
+            const parsed = parseAddress(addr);
+            if (!parsed) continue;
+            if (!hasCellBlockingContent(c)) continue;
+            if (!rowBlocking.has(parsed.row)) rowBlocking.set(parsed.row, []);
+            rowBlocking.get(parsed.row).push(parsed.col);
+          }
+        }
+        if (excelOverflow) {
+          for (const [r, list] of rowBlocking.entries()) {
+            const sorted = list
+              .map((x) => Number(x))
+              .filter((n) => Number.isFinite(n) && n > 0)
+              .sort((a, b) => a - b);
+            const uniq = [];
+            let last = 0;
+            for (const c of sorted) {
+              if (c === last) continue;
+              uniq.push(c);
+              last = c;
+            }
+            rowBlocking.set(r, uniq);
+          }
         }
 
         const colWidths = buildColumnWidths(config, cols);
@@ -8085,6 +8133,7 @@
 
         const colgroup = document.createElement("colgroup");
         let totalWidth = 0;
+        const colPrefix = [0];
         for (let c = 1; c <= cols; c++) {
           const w = Number(colWidths.get(c));
           const col = document.createElement("col");
@@ -8093,9 +8142,19 @@
             totalWidth += w;
           }
           colgroup.appendChild(col);
+          colPrefix[c] = totalWidth;
         }
         table.appendChild(colgroup);
         if (totalWidth > 0) table.style.width = `${totalWidth}px`;
+
+        function spanWidthPx(fromCol, toCol) {
+          const from = Math.max(1, Math.floor(Number(fromCol || 1)));
+          const to = Math.max(1, Math.floor(Number(toCol || 1)));
+          if (to < from) return 0;
+          const start = colPrefix[from - 1] || 0;
+          const end = colPrefix[to] || 0;
+          return Math.max(0, end - start);
+        }
 
         for (let r = 1; r <= rows; r++) {
           const tr = document.createElement("tr");
@@ -8111,7 +8170,6 @@
 
             const cellCfg = cellMap.get(addr);
             if (cellCfg) {
-              td.textContent = String(cellCfg.text ?? "");
               const bind = String(cellCfg.bind || "").trim();
               if (bind) {
                 td.dataset.bind = bind;
@@ -8142,6 +8200,38 @@
             } else if (cellCfg && typeof cellCfg === "object") {
               const cellStyle = String(cellCfg.style || "").trim();
               if (cellStyle) td.style.cssText = cellStyle.endsWith(";") ? cellStyle : `${cellStyle};`;
+            }
+
+            if (excelOverflow) {
+              td.style.position = "relative";
+              td.style.zIndex = String(Math.max(1, cols - c + 1));
+            }
+
+            if (cellCfg) {
+              const text = String(cellCfg.text ?? "");
+              const allowOverflow = excelOverflow && hasVisibleCellText(cellCfg);
+
+              if (allowOverflow) {
+                td.style.overflow = "visible";
+
+                const nextBlock = nextBlockingCol(rowBlocking.get(r), c);
+                const limitCol = nextBlock ? Math.max(c, nextBlock - 1) : cols;
+                const maxWidth = spanWidthPx(c, limitCol);
+
+                const content = document.createElement("div");
+                content.className = "cell-content";
+                content.textContent = text;
+                content.style.pointerEvents = "none";
+                content.style.position = "relative";
+                content.style.zIndex = "2";
+                content.style.display = "inline-block";
+                content.style.whiteSpace = "nowrap";
+                if (maxWidth) content.style.maxWidth = `${maxWidth}px`;
+                content.style.overflow = "hidden";
+                td.appendChild(content);
+              } else {
+                td.textContent = text;
+              }
             }
 
             const merge = startMap.get(addr);

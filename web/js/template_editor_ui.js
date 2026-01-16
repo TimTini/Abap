@@ -822,20 +822,21 @@
     if ($("tplSource")?.options?.length) $("tplSource").value = $("tplSource").options[0].value;
     $("ctxJson").value = "";
 
-    const skeleton = {
-      type: "excel-like-table",
-      grid: {
-        rows: 8,
-        cols: 8,
-        defaultColWidth: 32,
-        defaultRowHeight: 32,
-      },
-      css: {
-        cell: "border:1px solid #222;padding:2px 4px;vertical-align:middle;background:#fff;color:#111;white-space:pre-wrap;",
-      },
-      merges: [],
-      cells: [{ addr: "A1", text: "Title", class: ["cell"] }],
-    };
+      const skeleton = {
+        type: "excel-like-table",
+        grid: {
+          rows: 8,
+          cols: 8,
+          defaultColWidth: 20,
+          defaultRowHeight: 20,
+          excelOverflow: true,
+        },
+        css: {
+          cell: "border:1px solid #222;padding:2px 4px;vertical-align:middle;background:#fff;color:#111;white-space:nowrap;",
+        },
+        merges: [],
+        cells: [{ addr: "A1", text: "Title", class: ["cell"] }],
+      };
     writeTemplateJson(skeleton);
     renderPreview();
     setStatus("New template skeleton created.", false);

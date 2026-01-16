@@ -1,6 +1,10 @@
 (function (ns) {
   "use strict";
 
+  // Fixed square cell size for the editor (px).
+  // Keep this small; users can edit text via double-click (textarea) even when clipped.
+  const DEFAULT_CELL_SIZE_PX = 20;
+
   function stripCssComments(cssText) {
     return String(cssText || "")
       .replace(/<!--|-->/g, "")
@@ -49,24 +53,6 @@
       .map(([k, v]) => `${k}:${v}`)
       .join(";")
       .concat(";");
-  }
-
-  function cssSizeToPx(value) {
-    const raw = String(value ?? "").trim().toLowerCase();
-    if (!raw) return 0;
-
-    const m = /^(-?\d+(?:\.\d+)?)(px|pt|in|cm|mm)?$/.exec(raw);
-    if (!m) return 0;
-
-    const n = Number(m[1]);
-    if (!Number.isFinite(n)) return 0;
-    const unit = String(m[2] || "px").toLowerCase();
-
-    const factors = { px: 1, pt: 96 / 72, in: 96, cm: 96 / 2.54, mm: 96 / 25.4 };
-    const f = factors[unit] || 1;
-    const px = n * f;
-    if (!Number.isFinite(px) || px <= 0) return 0;
-    return Math.max(1, Math.round(px));
   }
 
   function normalizeExcelCssValue(prop, valueRaw) {
@@ -312,35 +298,6 @@
     return lines.map((l) => String(l).split("\t"));
   }
 
-  function pickSquareCellSize(colWidths, rowHeights, fallbackPx) {
-    const fallback = Math.max(8, Math.floor(Number(fallbackPx || 32)));
-
-    const widths = [];
-    for (const v of Object.values(colWidths || {})) {
-      const n = Math.floor(Number(v));
-      if (Number.isFinite(n) && n > 0) widths.push(n);
-    }
-
-    const heights = [];
-    for (const v of Object.values(rowHeights || {})) {
-      const n = Math.floor(Number(v));
-      if (Number.isFinite(n) && n > 0) heights.push(n);
-    }
-
-    function median(list) {
-      const arr = list.slice().sort((a, b) => a - b);
-      if (!arr.length) return 0;
-      const mid = Math.floor(arr.length / 2);
-      if (arr.length % 2) return arr[mid];
-      return Math.round((arr[mid - 1] + arr[mid]) / 2);
-    }
-
-    const mw = median(widths);
-    const mh = median(heights);
-    const picked = mw && mh ? Math.round((mw + mh) / 2) : mw || mh || fallback;
-    return Math.max(8, Math.min(200, picked));
-  }
-
   function buildTemplateConfigFromPlainGrid(plainGrid) {
     const rows = Math.max(1, plainGrid?.length || 0);
     let cols = 1;
@@ -360,8 +317,8 @@
 
     return {
       type: "excel-like-table",
-      grid: { rows, cols, defaultColWidth: 32, defaultRowHeight: 32 },
-      css: { cell: "padding:2px 4px;vertical-align:middle;background:#fff;color:#111;white-space:pre-wrap;" },
+      grid: { rows, cols, defaultColWidth: DEFAULT_CELL_SIZE_PX, defaultRowHeight: DEFAULT_CELL_SIZE_PX, excelOverflow: true },
+      css: { cell: "padding:2px 4px;vertical-align:middle;background:#fff;color:#111;white-space:nowrap;" },
       defaultCellClass: ["cell"],
       merges: [],
       cells,
@@ -382,131 +339,56 @@
     if (!table) return { ok: false, error: "No <table> found in clipboard HTML. (Copy from Excel cells, not plain text.)" };
 
     const cssMeta = parseExcelCss(doc);
-    const colWidths = {};
-    const rowHeights = {};
-
-    const colEls = Array.from(table.querySelectorAll("col"));
-    for (let i = 0; i < colEls.length; i++) {
-      const el = colEls[i];
-      const w = cssSizeToPx(el?.style?.width) || cssSizeToPx(el?.getAttribute?.("width"));
-      if (!w) continue;
-      colWidths[indexToCol(i + 1)] = w;
-    }
 
     const rows = Array.from(table.querySelectorAll("tr"));
-    const occupied = [];
     let maxCol = 0;
-    let maxRow = 0;
 
     const cells = [];
 
     for (let r = 0; r < rows.length; r++) {
       const tr = rows[r];
       const rowNum = r + 1;
-      maxRow = Math.max(maxRow, rowNum);
-
-      const h = cssSizeToPx(tr?.style?.height) || cssSizeToPx(tr?.getAttribute?.("height"));
-      if (h) rowHeights[String(rowNum)] = h;
-
-      if (!occupied[r]) occupied[r] = [];
       let col = 1;
-      let lastReal = null;
-      let lastRealColspan = 1;
 
       const rowCells = Array.from(tr.children).filter((el) => /^(TD|TH)$/i.test(String(el?.tagName || "")));
       for (const cellEl of rowCells) {
-        while (occupied[r] && occupied[r][col]) col++;
-
         const rawStyle = String(cellEl?.getAttribute?.("style") || "");
-        const flags = {
-          ignoreCol: /mso-ignore\s*:\s*colspan/i.test(rawStyle),
-          ignoreRow: /mso-ignore\s*:\s*rowspan/i.test(rawStyle),
-          displayNone: /display\s*:\s*none/i.test(rawStyle),
-          visibilityHidden: /visibility\s*:\s*hidden/i.test(rawStyle),
-        };
-
-        const spanCols = Math.max(1, Math.floor(Number(cellEl?.getAttribute?.("colspan") || 1)));
-        const spanRows = Math.max(1, Math.floor(Number(cellEl?.getAttribute?.("rowspan") || 1)));
-        const text = getExcelCellText(cellEl);
-        maxRow = Math.max(maxRow, rowNum + spanRows - 1);
-
-        function markOccupied(startRowIdx0, startCol1, rowspan, colspan) {
-          const rs = Math.max(1, Math.floor(Number(rowspan || 1)));
-          const cs = Math.max(1, Math.floor(Number(colspan || 1)));
-          for (let rr = 0; rr < rs; rr++) {
-            const rowIdx = startRowIdx0 + rr;
-            if (!occupied[rowIdx]) occupied[rowIdx] = [];
-            for (let cc = 0; cc < cs; cc++) occupied[rowIdx][startCol1 + cc] = true;
-          }
-        }
-
-        if (flags.displayNone) {
-          if (text && lastReal && !String(lastReal.text || "").trim()) lastReal.text = text;
+        if (/display\s*:\s*none/i.test(rawStyle)) {
+          col++;
           continue;
         }
 
-        // Excel clipboard may use colspan/rowspan or "mso-ignore:*" filler cells to represent overflow text.
-        // We don't import merges, but we must still keep column positions aligned.
-        const isFiller = flags.ignoreCol || flags.ignoreRow || flags.visibilityHidden;
-        if (isFiller) {
-          const hasOwnText = Boolean(String(text || "").trim());
-          if (hasOwnText && (!lastReal || String(lastReal.text || "").trim())) {
-            // If a filler-marked cell actually contains text, keep it as a real cell.
-          } else {
-            if (text && lastReal && !String(lastReal.text || "").trim()) lastReal.text = text;
-
-            // If the previous real cell already has colspan > 1, filler "mso-ignore:colspan" cells are usually redundant.
-            if (flags.ignoreCol && !flags.ignoreRow && !flags.visibilityHidden && lastReal && lastRealColspan > 1 && spanCols === 1 && spanRows === 1) {
-              continue;
-            }
-
-            markOccupied(r, col, spanRows, spanCols);
-            maxCol = Math.max(maxCol, col + spanCols - 1);
-            col += spanCols;
-            continue;
-          }
-        }
-
+        const text = getExcelCellText(cellEl);
         const style = buildExcelCellStyle(cellEl, cssMeta);
-        let entry = null;
         if (style || text) {
-          for (let rr = 0; rr < spanRows; rr++) {
-            for (let cc = 0; cc < spanCols; cc++) {
-              const addr = addrFromRC(col + cc, rowNum + rr);
-              const isStart = rr === 0 && cc === 0;
-              const cellText = isStart ? text : "";
-              if (!style && !cellText) continue;
-              const next = { addr, class: ["cell"] };
-              if (cellText) next.text = cellText;
-              if (style) next.style = style;
-              cells.push(next);
-              if (isStart) entry = next;
-            }
-          }
+          const addr = addrFromRC(col, rowNum);
+          const entry = { addr, class: ["cell"] };
+          if (text) entry.text = text;
+          if (style) entry.style = style;
+          cells.push(entry);
         }
 
-        markOccupied(r, col, spanRows, spanCols);
-        maxCol = Math.max(maxCol, col + spanCols - 1);
-        col += spanCols;
-        if (entry) {
-          lastReal = entry;
-          lastRealColspan = spanCols;
-        }
+        maxCol = Math.max(maxCol, col);
+        col++;
       }
     }
 
-    const cellSize = pickSquareCellSize(colWidths, rowHeights, 32);
+    const colCountHint = table.querySelectorAll("col").length;
+    if (colCountHint) maxCol = Math.max(maxCol, colCountHint);
+
+    const cellSize = DEFAULT_CELL_SIZE_PX;
 
     const cfg = {
       type: "excel-like-table",
       grid: {
-        rows: Math.max(1, maxRow || rows.length),
-        cols: Math.max(1, maxCol || colEls.length || 1),
+        rows: Math.max(1, rows.length),
+        cols: Math.max(1, maxCol || 1),
         defaultColWidth: cellSize,
         defaultRowHeight: cellSize,
+        excelOverflow: true,
       },
       css: {
-        cell: "padding:2px 4px;vertical-align:middle;background:#fff;color:#111;white-space:pre-wrap;",
+        cell: "padding:2px 4px;vertical-align:middle;background:#fff;color:#111;white-space:nowrap;",
       },
       defaultCellClass: ["cell"],
       merges: [],
