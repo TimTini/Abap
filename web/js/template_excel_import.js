@@ -396,12 +396,14 @@
     const rows = Array.from(table.querySelectorAll("tr"));
     const occupied = [];
     let maxCol = 0;
+    let maxRow = 0;
 
     const cells = [];
 
     for (let r = 0; r < rows.length; r++) {
       const tr = rows[r];
       const rowNum = r + 1;
+      maxRow = Math.max(maxRow, rowNum);
 
       const h = cssSizeToPx(tr?.style?.height) || cssSizeToPx(tr?.getAttribute?.("height"));
       if (h) rowHeights[String(rowNum)] = h;
@@ -426,6 +428,7 @@
         const spanCols = Math.max(1, Math.floor(Number(cellEl?.getAttribute?.("colspan") || 1)));
         const spanRows = Math.max(1, Math.floor(Number(cellEl?.getAttribute?.("rowspan") || 1)));
         const text = getExcelCellText(cellEl);
+        maxRow = Math.max(maxRow, rowNum + spanRows - 1);
 
         function markOccupied(startRowIdx0, startCol1, rowspan, colspan) {
           const rs = Math.max(1, Math.floor(Number(rowspan || 1)));
@@ -464,13 +467,22 @@
           }
         }
 
-        const addr = addrFromRC(col, rowNum);
         const style = buildExcelCellStyle(cellEl, cssMeta);
         let entry = null;
         if (style || text) {
-          entry = { addr, text, class: ["cell"] };
-          if (style) entry.style = style;
-          cells.push(entry);
+          for (let rr = 0; rr < spanRows; rr++) {
+            for (let cc = 0; cc < spanCols; cc++) {
+              const addr = addrFromRC(col + cc, rowNum + rr);
+              const isStart = rr === 0 && cc === 0;
+              const cellText = isStart ? text : "";
+              if (!style && !cellText) continue;
+              const next = { addr, class: ["cell"] };
+              if (cellText) next.text = cellText;
+              if (style) next.style = style;
+              cells.push(next);
+              if (isStart) entry = next;
+            }
+          }
         }
 
         markOccupied(r, col, spanRows, spanCols);
@@ -488,7 +500,7 @@
     const cfg = {
       type: "excel-like-table",
       grid: {
-        rows: Math.max(1, rows.length),
+        rows: Math.max(1, maxRow || rows.length),
         cols: Math.max(1, maxCol || colEls.length || 1),
         defaultColWidth: cellSize,
         defaultRowHeight: cellSize,

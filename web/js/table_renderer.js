@@ -257,6 +257,14 @@
           if (merge.colspan > 1) td.colSpan = merge.colspan;
         }
 
+        // Keep Excel-like fixed cell size: don't let long text expand rows/cols and hide adjacent cell formatting.
+        td.style.boxSizing = "border-box";
+        if (!td.style.overflow) td.style.overflow = "hidden";
+        if (Number.isFinite(h) && h > 0) {
+          td.style.height = `${h}px`;
+          td.style.maxHeight = `${h}px`;
+        }
+
         tr.appendChild(td);
       }
 
