@@ -394,6 +394,7 @@
     }
 
     const rows = Array.from(table.querySelectorAll("tr"));
+    const occupied = [];
     let maxCol = 0;
 
     const cells = [];
@@ -405,27 +406,81 @@
       const h = cssSizeToPx(tr?.style?.height) || cssSizeToPx(tr?.getAttribute?.("height"));
       if (h) rowHeights[String(rowNum)] = h;
 
+      if (!occupied[r]) occupied[r] = [];
       let col = 1;
+      let lastReal = null;
+      let lastRealColspan = 1;
+
       const rowCells = Array.from(tr.children).filter((el) => /^(TD|TH)$/i.test(String(el?.tagName || "")));
       for (const cellEl of rowCells) {
+        while (occupied[r] && occupied[r][col]) col++;
+
         const rawStyle = String(cellEl?.getAttribute?.("style") || "");
-        // Ignore hidden filler cells (commonly used for merge artifacts).
-        if (/display\s*:\s*none/i.test(rawStyle)) continue;
-        if (/visibility\s*:\s*hidden/i.test(rawStyle)) continue;
-        if (/mso-ignore\s*:\s*(?:colspan|rowspan)/i.test(rawStyle)) continue;
+        const flags = {
+          ignoreCol: /mso-ignore\s*:\s*colspan/i.test(rawStyle),
+          ignoreRow: /mso-ignore\s*:\s*rowspan/i.test(rawStyle),
+          displayNone: /display\s*:\s*none/i.test(rawStyle),
+          visibilityHidden: /visibility\s*:\s*hidden/i.test(rawStyle),
+        };
+
+        const spanCols = Math.max(1, Math.floor(Number(cellEl?.getAttribute?.("colspan") || 1)));
+        const spanRows = Math.max(1, Math.floor(Number(cellEl?.getAttribute?.("rowspan") || 1)));
+        const text = getExcelCellText(cellEl);
+
+        function markOccupied(startRowIdx0, startCol1, rowspan, colspan) {
+          const rs = Math.max(1, Math.floor(Number(rowspan || 1)));
+          const cs = Math.max(1, Math.floor(Number(colspan || 1)));
+          for (let rr = 0; rr < rs; rr++) {
+            const rowIdx = startRowIdx0 + rr;
+            if (!occupied[rowIdx]) occupied[rowIdx] = [];
+            for (let cc = 0; cc < cs; cc++) occupied[rowIdx][startCol1 + cc] = true;
+          }
+        }
+
+        if (flags.displayNone) {
+          if (text && lastReal && !String(lastReal.text || "").trim()) lastReal.text = text;
+          continue;
+        }
+
+        // Excel clipboard may use colspan/rowspan or "mso-ignore:*" filler cells to represent overflow text.
+        // We don't import merges, but we must still keep column positions aligned.
+        const isFiller = flags.ignoreCol || flags.ignoreRow || flags.visibilityHidden;
+        if (isFiller) {
+          const hasOwnText = Boolean(String(text || "").trim());
+          if (hasOwnText && (!lastReal || String(lastReal.text || "").trim())) {
+            // If a filler-marked cell actually contains text, keep it as a real cell.
+          } else {
+            if (text && lastReal && !String(lastReal.text || "").trim()) lastReal.text = text;
+
+            // If the previous real cell already has colspan > 1, filler "mso-ignore:colspan" cells are usually redundant.
+            if (flags.ignoreCol && !flags.ignoreRow && !flags.visibilityHidden && lastReal && lastRealColspan > 1 && spanCols === 1 && spanRows === 1) {
+              continue;
+            }
+
+            markOccupied(r, col, spanRows, spanCols);
+            maxCol = Math.max(maxCol, col + spanCols - 1);
+            col += spanCols;
+            continue;
+          }
+        }
 
         const addr = addrFromRC(col, rowNum);
-        const text = getExcelCellText(cellEl);
         const style = buildExcelCellStyle(cellEl, cssMeta);
+        let entry = null;
         if (style || text) {
-          const entry = { addr, text, class: ["cell"] };
+          entry = { addr, text, class: ["cell"] };
           if (style) entry.style = style;
           cells.push(entry);
         }
-        col += 1;
-      }
 
-      maxCol = Math.max(maxCol, col - 1);
+        markOccupied(r, col, spanRows, spanCols);
+        maxCol = Math.max(maxCol, col + spanCols - 1);
+        col += spanCols;
+        if (entry) {
+          lastReal = entry;
+          lastRealColspan = spanCols;
+        }
+      }
     }
 
     const cellSize = pickSquareCellSize(colWidths, rowHeights, 32);
