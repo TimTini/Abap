@@ -6,12 +6,12 @@
     compact: { removeEmptyRows: true },
     grid: {
       rows: 2,
-      cols: 22, // A..V
+      cols: 4,
       colWidths: {
         A: 160,
-        B: 520, // merged B..H
-        I: 80,
-        J: 740, // merged J..V
+        B: 520,
+        C: 80,
+        D: 740,
       },
       rowHeights: {
         1: 34,
@@ -24,16 +24,11 @@
       wrap: "white-space:normal;line-height:1.25;",
       center: "text-align:center;",
     },
-    merges: [
-      { start: "B1", rowspan: 1, colspan: 7 }, // B..H
-      { start: "J1", rowspan: 1, colspan: 13 }, // J..V
-      { start: "B2", rowspan: 1, colspan: 7 }, // B..H
-    ],
     cells: [
       { addr: "A1", text: "Append", class: ["cell", "header"] },
       { addr: "B1", text: "{line.description}", class: ["cell", "wrap"] },
-      { addr: "I1", text: "TO", class: ["cell", "header", "center"] },
-      { addr: "J1", text: "{itab.description}", class: ["cell", "wrap"] },
+      { addr: "C1", text: "TO", class: ["cell", "header", "center"] },
+      { addr: "D1", text: "{itab.description}", class: ["cell", "wrap"] },
 
       { addr: "A2", text: "{labels.sortedBy}", class: ["cell", "header"] },
       { addr: "B2", text: "{sortedBy.description}", class: ["cell", "wrap"] },
@@ -42,4 +37,3 @@
 
   ns.abapObjects?.defineTemplate?.("append.excel-like-table", appendExcelLikeTable);
 })(window.AbapFlow);
-

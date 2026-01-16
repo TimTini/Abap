@@ -8,14 +8,14 @@
         },
         grid: {
             rows: 8,
-            cols: 20,
+            cols: 6,
             colWidths: {
                 A: 260,
-                E: 360,
-                I: 220,
-                L: 420,
-                P: 220,
-                R: 260,
+                B: 360,
+                C: 220,
+                D: 420,
+                E: 220,
+                F: 260,
             },
             rowHeights: {
                 1: 30,
@@ -35,108 +35,6 @@
             wrap: "white-space:normal;line-height:1.25;",
             center: "text-align:center;",
         },
-        merges: [
-            {
-                start: "A1",
-                rowspan: 1,
-                colspan: 4,
-            },
-            {
-                start: "E1",
-                rowspan: 1,
-                colspan: 4,
-            },
-            {
-                start: "I1",
-                rowspan: 1,
-                colspan: 3,
-            },
-            {
-                start: "L1",
-                rowspan: 1,
-                colspan: 4,
-            },
-            {
-                start: "P1",
-                rowspan: 1,
-                colspan: 2,
-            },
-            {
-                start: "R1",
-                rowspan: 1,
-                colspan: 3,
-            },
-            {
-                start: "A2",
-                rowspan: 1,
-                colspan: 4,
-            },
-            {
-                start: "E2",
-                rowspan: 1,
-                colspan: 16,
-            },
-            {
-                start: "A3",
-                rowspan: 1,
-                colspan: 4,
-            },
-            {
-                start: "E3",
-                rowspan: 1,
-                colspan: 16,
-            },
-            {
-                start: "A4",
-                rowspan: 1,
-                colspan: 4,
-            },
-            {
-                start: "E4",
-                rowspan: 1,
-                colspan: 16,
-            },
-            {
-                start: "A5",
-                rowspan: 1,
-                colspan: 4,
-            },
-            {
-                start: "E5",
-                rowspan: 1,
-                colspan: 16,
-            },
-            {
-                start: "A6",
-                rowspan: 1,
-                colspan: 4,
-            },
-            {
-                start: "E6",
-                rowspan: 1,
-                colspan: 16,
-            },
-            {
-                start: "A7",
-                rowspan: 1,
-                colspan: 4,
-            },
-            {
-                start: "E7",
-                rowspan: 1,
-                colspan: 16,
-            },
-            {
-                start: "A8",
-                rowspan: 1,
-                colspan: 4,
-            },
-            {
-                start: "E8",
-                rowspan: 1,
-                colspan: 16,
-            },
-        ],
         cells: [
             {
                 addr: "A1",
@@ -144,27 +42,27 @@
                 class: ["cell", "header"],
             },
             {
-                addr: "E1",
+                addr: "B1",
                 text: "{msgClass.description}",
                 class: ["cell", "wrap"],
             },
             {
-                addr: "I1",
+                addr: "C1",
                 text: "{labels.msgNo}",
                 class: ["cell", "header"],
             },
             {
-                addr: "L1",
+                addr: "D1",
                 text: "{msgNo.description}",
                 class: ["cell", "wrap"],
             },
             {
-                addr: "P1",
+                addr: "E1",
                 text: "{labels.displayLike}",
                 class: ["cell", "header"],
             },
             {
-                addr: "R1",
+                addr: "F1",
                 text: "{displayLike.description}",
                 class: ["cell", "wrap"],
             },
@@ -174,7 +72,7 @@
                 class: ["cell", "header"],
             },
             {
-                addr: "E2",
+                addr: "B2",
                 text: "{messageText.description}",
                 class: ["cell", "wrap"],
             },
@@ -184,7 +82,7 @@
                 class: ["cell", "header"],
             },
             {
-                addr: "E3",
+                addr: "B3",
                 text: "{with[0].description}",
                 class: ["cell", "wrap"],
             },
@@ -194,7 +92,7 @@
                 class: ["cell", "header"],
             },
             {
-                addr: "E4",
+                addr: "B4",
                 text: "{with[1].description}",
                 class: ["cell", "wrap"],
             },
@@ -204,7 +102,7 @@
                 class: ["cell", "header"],
             },
             {
-                addr: "E5",
+                addr: "B5",
                 text: "{with[2].description}",
                 class: ["cell", "wrap"],
             },
@@ -214,7 +112,7 @@
                 class: ["cell", "header"],
             },
             {
-                addr: "E6",
+                addr: "B6",
                 text: "{with[3].description}",
                 class: ["cell", "wrap"],
             },
@@ -224,7 +122,7 @@
                 class: ["cell", "header"],
             },
             {
-                addr: "E7",
+                addr: "B7",
                 text: "{into.description}",
                 class: ["cell", "wrap"],
             },
@@ -234,7 +132,7 @@
                 class: ["cell", "header"],
             },
             {
-                addr: "E8",
+                addr: "B8",
                 text: "{raising.description}",
                 class: ["cell", "wrap"],
             },

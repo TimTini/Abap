@@ -122,9 +122,9 @@ test("template_converter fills excel-like-table binds", async () => {
 
   const byAddr = new Map(filled.cells.map((c) => [String(c.addr || "").toUpperCase(), c]));
   assert.equal(byAddr.get("A2").text, "Counter");
-  assert.equal(byAddr.get("H2").text, "Counter + 1");
+  assert.equal(byAddr.get("B2").text, "Counter + 1");
   assert.equal(byAddr.get("A2").bind, "item.description");
-  assert.equal(byAddr.get("H2").bind, "value.description");
+  assert.equal(byAddr.get("B2").bind, "value.description");
 });
 
 test("mapping builder supports exprlist from string (merges 'LINES OF')", async () => {

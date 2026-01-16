@@ -781,7 +781,7 @@
       } else if (ns.templateConverter) {
         try {
           const expanded = ns.templateConverter.expandExcelLikeTableTemplate(cfg, ctxParsed.value);
-          const filled = ns.templateConverter.fillTemplateConfig(expanded, ctxParsed.value);
+          const filled = ns.templateConverter.fillTemplateConfig(expanded, ctxParsed.value, { preserveUnresolved: true });
           cfg = ns.templateConverter.compactExcelLikeTableConfig(filled);
         } catch (e) {
           setStatus(`Preview build error: ${String(e?.message || e)}`, true);

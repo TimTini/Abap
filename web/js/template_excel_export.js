@@ -18,6 +18,67 @@
     cellEl.innerHTML = escapeHtml(normalized).replace(/\n/g, "<br>");
   }
 
+  function normalizeColorToHex(colorRaw) {
+    const raw = String(colorRaw || "").trim();
+    if (!raw) return "";
+    if (/^(transparent|none)$/i.test(raw)) return "";
+
+    const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(raw);
+    if (hex) {
+      const h = hex[1].toLowerCase();
+      if (h.length === 3) return `#${h[0]}${h[0]}${h[1]}${h[1]}${h[2]}${h[2]}`;
+      return `#${h}`;
+    }
+
+    const rgb = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+)\s*)?\)$/i.exec(raw);
+    if (rgb) {
+      const alpha = rgb[4] != null ? Number(rgb[4]) : 1;
+      if (!Number.isFinite(alpha) || alpha <= 0) return "";
+      const r = Math.max(0, Math.min(255, Number(rgb[1])));
+      const g = Math.max(0, Math.min(255, Number(rgb[2])));
+      const b = Math.max(0, Math.min(255, Number(rgb[3])));
+      const toHex = (n) => n.toString(16).padStart(2, "0");
+      return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    }
+
+    return raw;
+  }
+
+  function parseCssBorder(cssBorder) {
+    const raw = String(cssBorder || "").trim();
+    if (!raw) return null;
+    if (/^0(?:px|pt)?\s+/i.test(raw)) return null;
+
+    const m = /^(\d+(?:\.\d+)?)(px|pt)?\s+([a-z]+)\s+(.+)$/i.exec(raw);
+    if (!m) return null;
+
+    const width = Number(m[1]);
+    if (!Number.isFinite(width) || width <= 0) return null;
+
+    const unit = String(m[2] || "px").toLowerCase();
+    const style = String(m[3] || "").toLowerCase();
+    const color = normalizeColorToHex(m[4]);
+
+    if (!style || style === "none" || style === "hidden") return null;
+    if (!color) return null;
+
+    let pt = width;
+    if (unit === "px") pt = (width * 72) / 96;
+    pt = Math.max(0.25, pt);
+    const ptText = `${Math.round(pt * 100) / 100}pt`;
+
+    return { style, color, ptText };
+  }
+
+  function borderToExcelCss(cssBorder) {
+    const parts = parseCssBorder(cssBorder);
+    if (!parts) return { css: "", msoAlt: "" };
+    return {
+      css: `${parts.ptText} ${parts.style} ${parts.color}`,
+      msoAlt: `${parts.style} ${parts.color} ${parts.ptText}`,
+    };
+  }
+
   function inlineComputedCellStyles(dstCell, srcCell) {
     if (!dstCell || !srcCell || typeof window === "undefined" || typeof window.getComputedStyle !== "function") return;
 
@@ -29,10 +90,25 @@
     }
     if (!cs) return;
 
-    dstCell.style.borderTop = cs.borderTop;
-    dstCell.style.borderRight = cs.borderRight;
-    dstCell.style.borderBottom = cs.borderBottom;
-    dstCell.style.borderLeft = cs.borderLeft;
+    const top = borderToExcelCss(cs.borderTop);
+    const right = borderToExcelCss(cs.borderRight);
+    const bottom = borderToExcelCss(cs.borderBottom);
+    const left = borderToExcelCss(cs.borderLeft);
+
+    dstCell.style.border = "none";
+    if (top.css) dstCell.style.borderTop = top.css;
+    if (right.css) dstCell.style.borderRight = right.css;
+    if (bottom.css) dstCell.style.borderBottom = bottom.css;
+    if (left.css) dstCell.style.borderLeft = left.css;
+
+    if (top.msoAlt) dstCell.style.setProperty("mso-border-top-alt", top.msoAlt);
+    if (right.msoAlt) dstCell.style.setProperty("mso-border-right-alt", right.msoAlt);
+    if (bottom.msoAlt) dstCell.style.setProperty("mso-border-bottom-alt", bottom.msoAlt);
+    if (left.msoAlt) dstCell.style.setProperty("mso-border-left-alt", left.msoAlt);
+
+    if (top.msoAlt && top.msoAlt === right.msoAlt && top.msoAlt === bottom.msoAlt && top.msoAlt === left.msoAlt) {
+      dstCell.style.setProperty("mso-border-alt", top.msoAlt);
+    }
 
     if (cs.backgroundColor && cs.backgroundColor !== "rgba(0, 0, 0, 0)" && cs.backgroundColor !== "transparent") {
       dstCell.style.backgroundColor = cs.backgroundColor;
@@ -66,12 +142,15 @@
 
     clone.setAttribute("cellpadding", "0");
     clone.setAttribute("cellspacing", "0");
-    clone.setAttribute("border", "0");
+    clone.setAttribute("border", "1");
     clone.style.borderCollapse = "collapse";
     clone.style.borderSpacing = "0";
+    clone.style.setProperty("mso-table-lspace", "0pt");
+    clone.style.setProperty("mso-table-rspace", "0pt");
 
     const srcCells = table.querySelectorAll("td,th");
     const dstCells = clone.querySelectorAll("td,th");
+    let tableBorderAlt = "";
     for (let i = 0; i < dstCells.length; i++) {
       const td = dstCells[i];
       const src = srcCells[i] || null;
@@ -86,9 +165,32 @@
 
       td.querySelectorAll("textarea.cell-editor").forEach((ta) => ta.remove());
       inlineComputedCellStyles(td, src);
+
+      if (!tableBorderAlt) {
+        const s = String(td.getAttribute("style") || "");
+        const m = /mso-border-alt\s*:\s*([^;]+);?/i.exec(s);
+        if (m) tableBorderAlt = String(m[1] || "").trim();
+      }
+    }
+
+    if (tableBorderAlt) {
+      clone.style.setProperty("mso-border-alt", tableBorderAlt);
+      clone.style.setProperty("mso-border-insideh", tableBorderAlt);
+      clone.style.setProperty("mso-border-insidev", tableBorderAlt);
     }
 
     return clone;
+  }
+
+  function wrapExcelHtmlFragment(fragmentHtml) {
+    const frag = String(fragmentHtml || "");
+    return (
+      '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">' +
+      "<head><meta charset=\"utf-8\"></head>" +
+      "<body><!--StartFragment-->" +
+      frag +
+      "<!--EndFragment--></body></html>"
+    );
   }
 
   function tableToHtml(table) {
@@ -151,15 +253,6 @@
     const h = String(html || "");
     const t = String(plainText || "");
 
-    if (navigator?.clipboard?.write && typeof ClipboardItem !== "undefined") {
-      const item = new ClipboardItem({
-        "text/html": new Blob([h], { type: "text/html" }),
-        ...(t ? { "text/plain": new Blob([t], { type: "text/plain" }) } : {}),
-      });
-      await navigator.clipboard.write([item]);
-      return { ok: true, method: "clipboard.write" };
-    }
-
     if (document?.execCommand) {
       const host = document.createElement("div");
       host.contentEditable = "true";
@@ -172,6 +265,9 @@
       host.innerHTML = h;
 
       document.body.appendChild(host);
+      try {
+        host.focus();
+      } catch (_) {}
 
       const range = document.createRange();
       range.selectNodeContents(host);
@@ -192,6 +288,16 @@
       if (ok) return { ok: true, method: "execCommand" };
     }
 
+    if (navigator?.clipboard?.write && typeof ClipboardItem !== "undefined") {
+      const wrapped = wrapExcelHtmlFragment(h);
+      const item = new ClipboardItem({
+        "text/html": new Blob([wrapped], { type: "text/html" }),
+        ...(t ? { "text/plain": new Blob([t], { type: "text/plain" }) } : {}),
+      });
+      await navigator.clipboard.write([item]);
+      return { ok: true, method: "clipboard.write" };
+    }
+
     if (navigator?.clipboard?.writeText) {
       await navigator.clipboard.writeText(t || "");
       return { ok: true, method: "writeText" };
@@ -209,7 +315,7 @@
 
   ns.templateExcelExport = {
     copyExcelLikeTableToClipboard,
-    toExcelHtml: (tableEl) => (tableEl ? tableToHtml(tableEl) : ""),
+    toExcelHtml: (tableEl) => (tableEl ? wrapExcelHtmlFragment(tableToHtml(tableEl)) : ""),
     toHtml: (tableEl) => (tableEl ? tableToHtml(tableEl) : ""),
     toTsv: (tableEl) => (tableEl ? tableToTsv(tableEl) : ""),
   };

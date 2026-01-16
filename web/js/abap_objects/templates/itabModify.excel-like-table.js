@@ -6,12 +6,12 @@
     compact: { removeEmptyRows: true },
     grid: {
       rows: 7,
-      cols: 20, // A..T
+      cols: 4,
       colWidths: {
-        A: 420, // merged A..F
-        G: 220, // merged G..J
-        K: 520, // merged K..P
-        Q: 220, // merged Q..T
+        A: 420,
+        B: 220,
+        C: 520,
+        D: 220,
       },
       rowHeights: {
         1: 30,
@@ -30,55 +30,29 @@
       wrap: "white-space:normal;line-height:1.25;",
       center: "text-align:center;",
     },
-    merges: [
-      { start: "A1", rowspan: 1, colspan: 6 },
-      { start: "G1", rowspan: 1, colspan: 14 },
-
-      { start: "A2", rowspan: 1, colspan: 6 },
-      { start: "G2", rowspan: 1, colspan: 14 },
-
-      { start: "A3", rowspan: 1, colspan: 20 },
-
-      { start: "A4", rowspan: 1, colspan: 6 },
-      { start: "G4", rowspan: 1, colspan: 4 },
-      { start: "K4", rowspan: 1, colspan: 6 },
-      { start: "Q4", rowspan: 1, colspan: 4 },
-
-      { start: "A5", rowspan: 1, colspan: 6 },
-      { start: "G5", rowspan: 1, colspan: 4 },
-      { start: "K5", rowspan: 1, colspan: 6 },
-      { start: "Q5", rowspan: 1, colspan: 4 },
-
-      { start: "A6", rowspan: 1, colspan: 6 },
-      { start: "G6", rowspan: 1, colspan: 4 },
-      { start: "K6", rowspan: 1, colspan: 6 },
-      { start: "Q6", rowspan: 1, colspan: 4 },
-
-      { start: "A7", rowspan: 1, colspan: 20 },
-    ],
     cells: [
       { addr: "A1", text: "Internal table", class: ["cell", "header"] },
-      { addr: "G1", text: "{table.description}", class: ["cell", "wrap"] },
+      { addr: "B1", text: "{table.description}", class: ["cell", "wrap"] },
 
       { addr: "A2", text: "{labels.target}", class: ["cell", "header"] },
-      { addr: "G2", text: "{target.description}", class: ["cell", "wrap"] },
+      { addr: "B2", text: "{target.description}", class: ["cell", "wrap"] },
 
       { addr: "A3", text: "{labels.conditions}", class: ["cell", "header"] },
 
       { addr: "A4", text: "{labels.condItem1}", class: ["cell", "header"] },
-      { addr: "G4", text: "{labels.condOperator}", class: ["cell", "header"] },
-      { addr: "K4", text: "{labels.condItem2}", class: ["cell", "header"] },
-      { addr: "Q4", text: "{labels.condAssoc}", class: ["cell", "header"] },
+      { addr: "B4", text: "{labels.condOperator}", class: ["cell", "header"] },
+      { addr: "C4", text: "{labels.condItem2}", class: ["cell", "header"] },
+      { addr: "D4", text: "{labels.condAssoc}", class: ["cell", "header"] },
 
       { addr: "A5", text: "{conditions[0].item1.description}", class: ["cell", "wrap"] },
-      { addr: "G5", text: "{conditions[0].operator}", class: ["cell", "mono", "center"] },
-      { addr: "K5", text: "{conditions[0].item2.description}", class: ["cell", "wrap"] },
-      { addr: "Q5", text: "{conditions[0].association}", class: ["cell", "mono", "center"] },
+      { addr: "B5", text: "{conditions[0].operator}", class: ["cell", "mono", "center"] },
+      { addr: "C5", text: "{conditions[0].item2.description}", class: ["cell", "wrap"] },
+      { addr: "D5", text: "{conditions[0].association}", class: ["cell", "mono", "center"] },
 
       { addr: "A6", text: "{conditions[1].item1.description}", class: ["cell", "wrap"] },
-      { addr: "G6", text: "{conditions[1].operator}", class: ["cell", "mono", "center"] },
-      { addr: "K6", text: "{conditions[1].item2.description}", class: ["cell", "wrap"] },
-      { addr: "Q6", text: "{conditions[1].association}", class: ["cell", "mono", "center"] },
+      { addr: "B6", text: "{conditions[1].operator}", class: ["cell", "mono", "center"] },
+      { addr: "C6", text: "{conditions[1].item2.description}", class: ["cell", "wrap"] },
+      { addr: "D6", text: "{conditions[1].association}", class: ["cell", "mono", "center"] },
 
       { addr: "A7", text: "{labels.binarySearch}", class: ["cell", "header"] },
     ],

@@ -584,14 +584,15 @@
     return cur;
   }
 
-  function fillText(text, context) {
+  function fillText(text, context, options) {
     const s = String(text ?? "");
-    return s.replace(/\{([^}]+)\}/g, (_m, expr) => {
+    const preserveUnresolved = Boolean(options?.preserveUnresolved);
+    return s.replace(/\{([^}]+)\}/g, (m, expr) => {
       const value = resolvePath(context, expr);
-      if (value == null) return "";
+      if (value == null) return preserveUnresolved ? m : "";
       if (typeof value === "string") return value;
       if (typeof value === "number" || typeof value === "boolean") return String(value);
-      return "";
+      return preserveUnresolved ? m : "";
     });
   }
 
@@ -604,7 +605,7 @@
     return s.replace(re, `{${listName}[${to}]`);
   }
 
-  function fillTemplateConfig(templateConfig, context) {
+  function fillTemplateConfig(templateConfig, context, options) {
     const cfg = JSON.parse(JSON.stringify(templateConfig || {}));
     if (!cfg || typeof cfg !== "object") return cfg;
 
@@ -629,7 +630,7 @@
         const bindMatch = /^\{([^}]+)\}$/.exec(rawText.trim());
         if (bindMatch) cell.bind = String(bindMatch[1] || "").trim();
 
-        cell.text = fillText(rawText, ctx);
+        cell.text = fillText(rawText, ctx, options);
       }
     }
 
