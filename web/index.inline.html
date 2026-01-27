@@ -314,6 +314,95 @@
       border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     }
 
+    .toolbar--row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .toolbar--row .input {
+      flex: 1;
+    }
+
+    .toolbar-check {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      font-size: 12px;
+      color: var(--muted);
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .cell-mono {
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    .cell-muted {
+      color: var(--muted);
+    }
+
+    .objects-name--sub {
+      padding-left: 28px;
+    }
+
+    .objects-tree {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .objects-tree--lvl1 {
+      padding-left: 16px;
+    }
+
+    .objects-tree--lvl2 {
+      padding-left: 32px;
+    }
+
+    .objects-tree-toggle {
+      appearance: none;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      width: 18px;
+      height: 18px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 6px;
+      padding: 0;
+      flex: 0 0 auto;
+    }
+
+    .objects-tree-toggle:hover {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+    }
+
+    .objects-tree-toggle:focus-visible {
+      outline: 2px solid rgba(96, 165, 250, 0.85);
+      outline-offset: 2px;
+    }
+
+    .objects-tree-spacer {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 auto;
+    }
+
+    .objects-tree-bullet {
+      color: var(--muted);
+      flex: 0 0 auto;
+    }
+
+    .objects-row--source td {
+      padding-top: 6px;
+      padding-bottom: 6px;
+    }
+
     .objcfg-toolbar {
       display: flex;
       gap: 10px;
@@ -854,6 +943,13 @@
 
     .param-item {
       margin: 8px 0;
+    }
+
+    .param-item.is-selected {
+      background: rgba(96, 165, 250, 0.12);
+      border: 1px solid rgba(96, 165, 250, 0.25);
+      border-radius: 8px;
+      padding: 4px 6px;
     }
 
     .param-notes {
@@ -1682,8 +1778,12 @@
           <section class="tab-panel is-active" id="tab-objects">
             <div class="split">
               <div class="split__left">
-                <div class="toolbar">
+                <div class="toolbar toolbar--row">
                   <input id="objectSearch" class="input" type="search" placeholder="Search (FORM, EVENT, name)..." />
+                  <label class="toolbar-check">
+                    <input id="objectNoDescOnly" type="checkbox" />
+                    Chưa có mô tả
+                  </label>
                 </div>
                 <div class="table-wrap">
                   <table class="table" id="objectsTable">
@@ -1691,14 +1791,7 @@
                       <tr>
                         <th>Kind</th>
                         <th>Name</th>
-                        <th>Depth</th>
-                        <th>Params</th>
-                        <th>DATA</th>
-                        <th>CONST</th>
-                        <th>Writes</th>
-                        <th>Assign</th>
-                        <th>Defined</th>
-                        <th>Cycle</th>
+                        <th>Mô tả</th>
                       </tr>
                     </thead>
                     <tbody></tbody>
@@ -8835,8 +8928,115 @@
       "use strict";
 
       const utils = ns.utils;
+      const desc = ns.desc;
       const ui = ns.ui;
       const state = ui.state;
+
+      function getRoutineDescription(obj, model) {
+        if (!obj) return "";
+        if (obj.key === "PROGRAM") {
+          const u = String(model?.userDescription || "").trim();
+          const c = String(model?.description || "").trim();
+          return u || c || "";
+        }
+
+        const user = String(obj.userDescription || "").trim();
+        const code = String(obj.description || "").trim();
+        return user || code || "";
+      }
+
+      function getParamDescription(param) {
+        const user = String(param?.userDescription || "").trim();
+        const code = String(param?.description || "").trim();
+        return user || code || "";
+      }
+
+      function buildParamIndexMap(routine) {
+        const params = Array.isArray(routine?.params) ? routine.params : [];
+        const counters = { TABLES: 0, USING: 0, CHANGING: 0, RAISING: 0 };
+        const out = new Map();
+
+        for (const p of params) {
+          const kind = String(p?.kind || "").trim().toUpperCase();
+          const nameLower = String(p?.name || "").trim().toLowerCase();
+          if (!nameLower) continue;
+          const idx = Number(counters[kind] || 0);
+          counters[kind] = idx + 1;
+          out.set(`${kind}:${nameLower}`, idx);
+        }
+
+        return out;
+      }
+
+      function firstSourceForParam(model, routine, param, incomingEdges, paramIndexMap) {
+        const kindUpper = String(param?.kind || "").trim().toUpperCase();
+        const nameLower = String(param?.name || "").trim().toLowerCase();
+        if (!kindUpper || !nameLower) return null;
+
+        if (kindUpper === "RAISING") {
+          return {
+            callerKey: "",
+            callerName: "",
+            actualExpr: "",
+            originSourceRef: null,
+            descText: "",
+            statusText: "(RAISING)",
+          };
+        }
+
+        const argsKey = kindUpper === "TABLES" ? "tables" : kindUpper === "USING" ? "using" : kindUpper === "CHANGING" ? "changing" : "";
+        if (!argsKey) return null;
+
+        const idx = paramIndexMap?.get ? paramIndexMap.get(`${kindUpper}:${nameLower}`) : -1;
+        if (!Number.isFinite(idx) || idx < 0) return null;
+
+        const edges = Array.isArray(incomingEdges) ? incomingEdges : [];
+        for (const e of edges) {
+          const actual = String(e?.args?.[argsKey]?.[idx] || "").trim();
+          if (!actual) continue;
+
+          const callerKey = String(e?.fromKey || "").trim();
+          const caller = callerKey && model?.nodes?.get ? model.nodes.get(callerKey) : null;
+          const callerName = caller ? `${caller.kind} ${caller.name}` : callerKey;
+
+          let originSourceRef = null;
+          let descText = "";
+          if (typeof desc?.describeExpressionWithOrigin === "function" && callerKey) {
+            const d = desc.describeExpressionWithOrigin(model, callerKey, actual);
+            originSourceRef = d?.primary?.entity?.sourceRef || null;
+            descText = String(d?.text || "").trim();
+          }
+
+          return {
+            callerKey,
+            callerName,
+            actualExpr: actual,
+            originSourceRef,
+            descText,
+            statusText: "",
+          };
+        }
+
+        if ((routine?.calledBy?.length || 0) === 0) {
+          return {
+            callerKey: "",
+            callerName: "",
+            actualExpr: "",
+            originSourceRef: null,
+            descText: "",
+            statusText: "(no caller)",
+          };
+        }
+
+        return {
+          callerKey: "",
+          callerName: "",
+          actualExpr: "",
+          originSourceRef: null,
+          descText: "",
+          statusText: "(not passed)",
+        };
+      }
 
       function getDisplayObjects(model) {
         const out = [];
@@ -8844,14 +9044,8 @@
           key: "PROGRAM",
           kind: "PROGRAM",
           name: "(Globals)",
-          depth: "",
-          isDefined: true,
-          isInCycle: false,
-          paramsCount: 0,
-          localDataCount: model.globalData.length,
-          localConstCount: model.globalConstants.length,
-          writesCount: 0,
-          assignmentsCount: 0,
+          description: String(model?.description || "").trim(),
+          userDescription: String(model?.userDescription || "").trim(),
         });
 
         const nodes = Array.from(model.nodes.values()).sort((a, b) => {
@@ -8866,8 +9060,9 @@
         return out;
       }
 
-      function selectObject(key) {
+      function selectObject(key, options) {
         state.selectedKey = key;
+        state.selectedParamKey = String(options?.paramKey || "").trim();
         if (typeof ui.renderObjectsTable === "function") ui.renderObjectsTable();
         if (typeof ui.renderDetails === "function") ui.renderDetails();
       }
@@ -8881,35 +9076,171 @@
         if (!model) return;
 
         const filter = String(ui.$("objectSearch")?.value || "").trim().toLowerCase();
+        const noDescOnly = Boolean(ui.$("objectNoDescOnly")?.checked);
+        const collapseEnabled = !filter && !noDescOnly;
+        state.objectsCollapsed = state.objectsCollapsed && typeof state.objectsCollapsed === "object" ? state.objectsCollapsed : {};
         const objects = getDisplayObjects(model);
-        const filtered = filter
-          ? objects.filter((o) => `${o.kind} ${o.name}`.toLowerCase().includes(filter) || String(o.key).toLowerCase().includes(filter))
-          : objects;
 
-        for (const obj of filtered) {
+        const outRows = [];
+
+        for (const obj of objects) {
+          const routineDesc = getRoutineDescription(obj, model);
+          const baseHay = `${obj.kind} ${obj.name} ${String(obj.key || "")} ${routineDesc}`.toLowerCase();
+          const routineMatchesText = !filter || baseHay.includes(filter);
+          const routineMissingDesc = !routineDesc;
+          const routinePass = routineMatchesText && (!noDescOnly || routineMissingDesc);
+
+          const params = Array.isArray(obj?.params) ? obj.params : [];
+          const paramMatches = [];
+          for (const p of params) {
+            const pDesc = getParamDescription(p);
+            const hay = `${obj.kind} ${obj.name} ${p.kind} ${p.name} ${p.dataType || ""} ${pDesc}`.toLowerCase();
+            const matchesText = !filter || hay.includes(filter);
+            const missingDesc = !pDesc;
+            const pass = matchesText && (!noDescOnly || missingDesc);
+            if (pass) {
+              paramMatches.push({ param: p, desc: pDesc });
+            }
+          }
+
+          if (!routinePass && paramMatches.length === 0) continue;
+
+          const hasParams = params.length > 0;
+          const isCollapsed = Boolean(collapseEnabled && hasParams && state.objectsCollapsed?.[obj.key]);
+
+          outRows.push({ rowKind: "routine", obj, desc: routineDesc, hasParams, isCollapsed, collapseEnabled });
+
+          const showAllParams = !noDescOnly && filter && routinePass;
+          if (!hasParams) continue;
+          if (isCollapsed) continue;
+
+          const incomingEdges = Array.isArray(obj?.calledBy)
+            ? obj.calledBy.slice().sort((a, b) => (a?.sourceRef?.startLine ?? 1e9) - (b?.sourceRef?.startLine ?? 1e9))
+            : [];
+          const paramIndexMap = buildParamIndexMap(obj);
+
+          const paramsToShow =
+            !filter && !noDescOnly ? params : showAllParams ? params : paramMatches.map((x) => x.param);
+
+          for (const p of paramsToShow) {
+            outRows.push({ rowKind: "param", obj, param: p, desc: getParamDescription(p) });
+            outRows.push({
+              rowKind: "source",
+              obj,
+              param: p,
+              source: firstSourceForParam(model, obj, p, incomingEdges, paramIndexMap),
+            });
+          }
+        }
+
+        for (const row of outRows) {
+          const obj = row.obj;
           const tr = document.createElement("tr");
-          tr.dataset.key = obj.key;
-          if (obj.key === state.selectedKey) tr.classList.add("is-selected");
 
-          const isDefined = obj.isDefined !== false;
-          const cycle = obj.isInCycle === true;
-          const definedBadge = isDefined ? '<span class="badge badge-ok">Yes</span>' : '<span class="badge">No</span>';
-          const cycleBadge = cycle ? '<span class="badge badge-danger">Yes</span>' : '<span class="badge">No</span>';
+          if (row.rowKind === "param") {
+            const p = row.param;
+            const kind = String(p?.kind || "").trim();
+            const name = String(p?.name || "").trim();
+            const dt = String(p?.dataType || "").trim();
+            const desc = row.desc || "";
+            const paramKey = `${kind}:${name}`;
 
-          tr.innerHTML = `
-            <td>${utils.escapeHtml(obj.kind)}</td>
-            <td>${utils.escapeHtml(obj.name)}</td>
-            <td>${utils.escapeHtml(String(obj.depth ?? ""))}</td>
-            <td>${utils.escapeHtml(String(obj.paramsCount ?? obj.params?.length ?? 0))}</td>
-            <td>${utils.escapeHtml(String(obj.localDataCount ?? obj.localData?.length ?? 0))}</td>
-            <td>${utils.escapeHtml(String(obj.localConstCount ?? obj.localConstants?.length ?? 0))}</td>
-            <td>${utils.escapeHtml(String(obj.writesCount ?? obj.writes?.length ?? 0))}</td>
-            <td>${utils.escapeHtml(String(obj.assignmentsCount ?? obj.assignments?.length ?? 0))}</td>
-            <td>${definedBadge}</td>
-            <td>${cycleBadge}</td>
-          `;
+            tr.dataset.key = String(obj.key || "");
+            tr.dataset.paramKey = paramKey;
+            tr.classList.add("objects-row--param");
+            if (String(obj.key || "") === state.selectedKey && String(state.selectedParamKey || "") === paramKey) tr.classList.add("is-selected");
 
-          tr.addEventListener("click", () => selectObject(obj.key));
+            const nameText = `${name}${dt ? ` TYPE ${dt}` : ""}`;
+
+            tr.innerHTML = `
+              <td class="cell-mono cell-muted">${utils.escapeHtml(kind || "PARAM")}</td>
+              <td class="cell-mono">
+                <div class="objects-tree objects-tree--lvl1">
+                  <span class="objects-tree-spacer" aria-hidden="true"></span>
+                  <span class="objects-tree-bullet" aria-hidden="true">↳</span>
+                  <span class="objects-tree-text">${utils.escapeHtml(nameText)}</span>
+                </div>
+              </td>
+              <td class="${desc ? "" : "cell-muted"}">${utils.escapeHtml(desc || "(chưa có)")}</td>
+            `;
+
+            tr.addEventListener("click", () => selectObject(obj.key, { paramKey }));
+          } else if (row.rowKind === "source") {
+            const p = row.param;
+            const kind = String(p?.kind || "").trim();
+            const name = String(p?.name || "").trim();
+            const paramKey = `${kind}:${name}`;
+            const s = row.source;
+
+            tr.dataset.key = String(obj.key || "");
+            tr.dataset.paramKey = paramKey;
+            tr.classList.add("objects-row--source");
+            if (String(obj.key || "") === state.selectedKey && String(state.selectedParamKey || "") === paramKey) tr.classList.add("is-selected");
+
+            const actualExpr = String(s?.actualExpr || "").trim();
+            const statusText = String(s?.statusText || "").trim();
+            const callerName = String(s?.callerName || "").trim();
+            const originSourceRef = s?.originSourceRef || null;
+
+            const label = actualExpr ? ui.sourceLink(actualExpr, originSourceRef) : utils.escapeHtml(statusText || "(none)");
+            const callerInfo = callerName ? ` from ${callerName}` : "";
+
+            const rawDescText = String(s?.descText || "").trim();
+            const showDescText = rawDescText && actualExpr && rawDescText.toLowerCase() !== actualExpr.toLowerCase() ? rawDescText : "";
+            const descCell = showDescText ? utils.escapeHtml(showDescText) : '<span class="cell-muted">(chưa có)</span>';
+
+            tr.innerHTML = `
+              <td class="cell-mono cell-muted">SRC</td>
+              <td class="cell-mono">
+                <div class="objects-tree objects-tree--lvl2">
+                  <span class="objects-tree-spacer" aria-hidden="true"></span>
+                  <span class="objects-tree-bullet cell-muted" aria-hidden="true">⤷</span>
+                  <span class="objects-tree-text">${label}${callerInfo ? ` <span class="cell-muted">${utils.escapeHtml(callerInfo)}</span>` : ""}</span>
+                </div>
+              </td>
+              <td>${descCell}</td>
+            `;
+
+            tr.addEventListener("click", () => selectObject(obj.key, { paramKey }));
+          } else {
+            tr.dataset.key = obj.key;
+            if (obj.key === state.selectedKey && !state.selectedParamKey) tr.classList.add("is-selected");
+
+            const desc = row.desc || "";
+            const hasToggle = Boolean(row.hasParams);
+            const canToggle = Boolean(row.collapseEnabled && hasToggle);
+            const isCollapsed = Boolean(row.isCollapsed);
+            const toggle = canToggle
+              ? `<button type="button" class="objects-tree-toggle" aria-label="${isCollapsed ? "Expand" : "Collapse"}" aria-expanded="${isCollapsed ? "false" : "true"}">${
+                  isCollapsed ? "▸" : "▾"
+                }</button>`
+              : `<span class="objects-tree-spacer" aria-hidden="true"></span>`;
+
+            tr.innerHTML = `
+              <td>${utils.escapeHtml(obj.kind)}</td>
+              <td>
+                <div class="objects-tree objects-tree--lvl0">
+                  ${toggle}
+                  <span class="objects-tree-text">${utils.escapeHtml(obj.name)}</span>
+                </div>
+              </td>
+              <td class="${desc ? "" : "cell-muted"}">${utils.escapeHtml(desc || "(chưa có)")}</td>
+            `;
+
+            tr.addEventListener("click", () => selectObject(obj.key, { paramKey: "" }));
+
+            const toggleBtn = tr.querySelector("button.objects-tree-toggle");
+            if (toggleBtn) {
+              toggleBtn.addEventListener("click", (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                const key = String(obj.key || "");
+                if (!key) return;
+                state.objectsCollapsed[key] = !Boolean(state.objectsCollapsed?.[key]);
+                renderObjectsTable();
+              });
+            }
+          }
           tbody.appendChild(tr);
         }
       }
@@ -9172,7 +9503,8 @@
                 })
               : "";
 
-            return `<li class="param-item">${sourceLink(`${p.kind} ${p.name}${dt}${desc}`, p.sourceRef || r.sourceRef)}${summary}${edit}</li>`;
+            const paramKey = `${String(p.kind || "").trim().toUpperCase()}:${String(p.name || "").trim()}`;
+            return `<li class="param-item" data-param-key="${utils.escapeHtml(paramKey)}">${sourceLink(`${p.kind} ${p.name}${dt}${desc}`, p.sourceRef || r.sourceRef)}${summary}${edit}</li>`;
           })
           .join("");
 
@@ -9412,6 +9744,23 @@
         }
 
         el.innerHTML = renderRoutineDetails(r);
+
+        // If a parameter row was selected in the Objects list, scroll it into view.
+        const targetParamKey = String(state.selectedParamKey || "").trim();
+        if (targetParamKey) {
+          const items = Array.from(el.querySelectorAll("li.param-item[data-param-key]"));
+          for (const li of items) li.classList.remove("is-selected");
+          const target = items.find((li) => String(li.dataset.paramKey || "") === targetParamKey) || null;
+          if (target) {
+            target.classList.add("is-selected");
+            try {
+              target.scrollIntoView({ block: "center", behavior: "smooth" });
+            } catch (_) {
+              target.scrollIntoView();
+            }
+          }
+        }
+
         ui.wireNotesEditorForKey(
           r.key,
           (description, note) => {
@@ -13159,6 +13508,7 @@
           if (ns.notes) ns.notes.applyToModel(model);
           state.model = model;
           state.selectedKey = "PROGRAM";
+          state.selectedParamKey = "";
 
           ui.renderObjectsTable();
           ui.renderDetails();
@@ -13180,6 +13530,7 @@
 
         state.model = null;
         state.selectedKey = null;
+        state.selectedParamKey = "";
 
         ui.$("objectsTable")?.querySelector("tbody")?.replaceChildren();
 
@@ -13353,6 +13704,7 @@
         });
 
         ui.$("objectSearch")?.addEventListener("input", () => ui.renderObjectsTable());
+        ui.$("objectNoDescOnly")?.addEventListener("change", () => ui.renderObjectsTable());
 
         ui.$("templatesHost")?.addEventListener("dblclick", ui.handleTemplatesDblClick);
 

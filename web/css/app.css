@@ -306,6 +306,95 @@ body {
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.toolbar--row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.toolbar--row .input {
+  flex: 1;
+}
+
+.toolbar-check {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+  user-select: none;
+  white-space: nowrap;
+}
+
+.cell-mono {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.cell-muted {
+  color: var(--muted);
+}
+
+.objects-name--sub {
+  padding-left: 28px;
+}
+
+.objects-tree {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.objects-tree--lvl1 {
+  padding-left: 16px;
+}
+
+.objects-tree--lvl2 {
+  padding-left: 32px;
+}
+
+.objects-tree-toggle {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 6px;
+  padding: 0;
+  flex: 0 0 auto;
+}
+
+.objects-tree-toggle:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+.objects-tree-toggle:focus-visible {
+  outline: 2px solid rgba(96, 165, 250, 0.85);
+  outline-offset: 2px;
+}
+
+.objects-tree-spacer {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+.objects-tree-bullet {
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+
+.objects-row--source td {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
 .objcfg-toolbar {
   display: flex;
   gap: 10px;
@@ -846,6 +935,13 @@ select.input optgroup {
 
 .param-item {
   margin: 8px 0;
+}
+
+.param-item.is-selected {
+  background: rgba(96, 165, 250, 0.12);
+  border: 1px solid rgba(96, 165, 250, 0.25);
+  border-radius: 8px;
+  padding: 4px 6px;
 }
 
 .param-notes {

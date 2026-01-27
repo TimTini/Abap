@@ -51,8 +51,12 @@
           <section class="tab-panel is-active" id="tab-objects">
             <div class="split">
               <div class="split__left">
-                <div class="toolbar">
+                <div class="toolbar toolbar--row">
                   <input id="objectSearch" class="input" type="search" placeholder="Search (FORM, EVENT, name)..." />
+                  <label class="toolbar-check">
+                    <input id="objectNoDescOnly" type="checkbox" />
+                    Chưa có mô tả
+                  </label>
                 </div>
                 <div class="table-wrap">
                   <table class="table" id="objectsTable">
@@ -60,14 +64,7 @@
                       <tr>
                         <th>Kind</th>
                         <th>Name</th>
-                        <th>Depth</th>
-                        <th>Params</th>
-                        <th>DATA</th>
-                        <th>CONST</th>
-                        <th>Writes</th>
-                        <th>Assign</th>
-                        <th>Defined</th>
-                        <th>Cycle</th>
+                        <th>Mô tả</th>
                       </tr>
                     </thead>
                     <tbody></tbody>

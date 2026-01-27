@@ -249,7 +249,8 @@
             })
           : "";
 
-        return `<li class="param-item">${sourceLink(`${p.kind} ${p.name}${dt}${desc}`, p.sourceRef || r.sourceRef)}${summary}${edit}</li>`;
+        const paramKey = `${String(p.kind || "").trim().toUpperCase()}:${String(p.name || "").trim()}`;
+        return `<li class="param-item" data-param-key="${utils.escapeHtml(paramKey)}">${sourceLink(`${p.kind} ${p.name}${dt}${desc}`, p.sourceRef || r.sourceRef)}${summary}${edit}</li>`;
       })
       .join("");
 
@@ -489,6 +490,23 @@
     }
 
     el.innerHTML = renderRoutineDetails(r);
+
+    // If a parameter row was selected in the Objects list, scroll it into view.
+    const targetParamKey = String(state.selectedParamKey || "").trim();
+    if (targetParamKey) {
+      const items = Array.from(el.querySelectorAll("li.param-item[data-param-key]"));
+      for (const li of items) li.classList.remove("is-selected");
+      const target = items.find((li) => String(li.dataset.paramKey || "") === targetParamKey) || null;
+      if (target) {
+        target.classList.add("is-selected");
+        try {
+          target.scrollIntoView({ block: "center", behavior: "smooth" });
+        } catch (_) {
+          target.scrollIntoView();
+        }
+      }
+    }
+
     ui.wireNotesEditorForKey(
       r.key,
       (description, note) => {

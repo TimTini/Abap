@@ -53,6 +53,7 @@
       if (ns.notes) ns.notes.applyToModel(model);
       state.model = model;
       state.selectedKey = "PROGRAM";
+      state.selectedParamKey = "";
 
       ui.renderObjectsTable();
       ui.renderDetails();
@@ -74,6 +75,7 @@
 
     state.model = null;
     state.selectedKey = null;
+    state.selectedParamKey = "";
 
     ui.$("objectsTable")?.querySelector("tbody")?.replaceChildren();
 
@@ -247,6 +249,7 @@
     });
 
     ui.$("objectSearch")?.addEventListener("input", () => ui.renderObjectsTable());
+    ui.$("objectNoDescOnly")?.addEventListener("change", () => ui.renderObjectsTable());
 
     ui.$("templatesHost")?.addEventListener("dblclick", ui.handleTemplatesDblClick);
 
