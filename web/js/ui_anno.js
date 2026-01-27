@@ -181,9 +181,6 @@
           }
         }
 
-        if (document.getElementById("tab-sequence").classList.contains("is-active") && typeof ui.renderSequence === "function") {
-          ui.renderSequence();
-        }
         if (document.getElementById("tab-templates")?.classList.contains("is-active") && typeof ui.renderTemplates === "function") {
           ui.renderTemplates();
         }
@@ -199,7 +196,7 @@
     }
   }
 
-  function wireNotesEditorForKey(objectKey, applyLocal, options) {
+  function wireNotesEditorForKey(objectKey, applyLocal) {
     if (!objectKey || !ns.notes) return;
     const descEl = ui.$("annoDesc");
     const noteEl = ui.$("annoNote");
@@ -224,9 +221,6 @@
         if (statusEl.textContent === "Saved.") statusEl.textContent = "";
       }, 1200);
 
-      if (options?.rerenderSequence && document.getElementById("tab-sequence").classList.contains("is-active") && typeof ui.renderSequence === "function") {
-        ui.renderSequence();
-      }
       if (document.getElementById("tab-templates")?.classList.contains("is-active") && typeof ui.renderTemplates === "function") {
         ui.renderTemplates();
       }

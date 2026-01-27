@@ -188,7 +188,7 @@
 
     .code-editor .code-input {
       height: 100%;
-      padding-left: 38px;
+      padding-left: 90px;
     }
 
     .code-markers {
@@ -198,8 +198,26 @@
       bottom: 0;
       width: 26px;
       pointer-events: none;
+      background: rgba(15, 23, 42, 0.20);
+    }
+
+    .code-line-numbers {
+      position: absolute;
+      top: 0;
+      left: 26px;
+      bottom: 0;
+      width: 52px;
+      pointer-events: none;
       border-right: 1px solid rgba(255, 255, 255, 0.06);
       background: rgba(15, 23, 42, 0.20);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.45;
+      text-align: right;
+      white-space: pre;
+      overflow: hidden;
+      padding: 12px 10px 12px 0;
     }
 
     .code-marker {
@@ -1406,6 +1424,63 @@
       background: rgba(11, 15, 23, 0.35);
     }
 
+    .template-struct {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 12px;
+    }
+
+    .template-struct__row {
+      display: grid;
+      grid-template-columns: minmax(180px, 320px) 1fr;
+      gap: 12px;
+      padding: 4px 6px;
+      border-radius: 8px;
+    }
+
+    .template-struct__row:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .template-struct__key {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--accent);
+      opacity: 0.9;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .template-struct__value {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .template-struct__value--empty {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .template-struct__value--editable {
+      cursor: text;
+    }
+
+    .template-struct__value--editable:hover {
+      box-shadow: inset 0 0 0 2px rgba(96, 165, 250, 0.55);
+      border-radius: 6px;
+    }
+
+    .template-struct__empty {
+      padding: 6px 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
     .excel-like-table {
       font-size: 12px;
       color: var(--text);
@@ -1576,7 +1651,6 @@
         <button id="btnExportNotes" class="btn" type="button">Export notes</button>
         <button id="btnImportNotes" class="btn" type="button">Import notes</button>
         <input id="notesImportFile" type="file" accept="application/json" style="display:none" />
-        <a class="btn" href="template-editor.html" target="_blank" rel="noopener">Template editor</a>
       </div>
     </header>
 
@@ -1585,6 +1659,7 @@
         <div class="panel__title">ABAP code</div>
         <div class="code-editor">
           <textarea id="abapInput" class="code-input" spellcheck="false" placeholder="Paste ABAP code here..."></textarea>
+          <div id="abapLineNumbers" class="code-line-numbers" aria-hidden="true"></div>
           <div id="abapTemplateMarkers" class="code-markers" aria-hidden="true"></div>
         </div>
         <div class="panel__footer">
@@ -1597,12 +1672,10 @@
       <section class="panel panel-right">
         <div class="tabs">
           <button class="tab is-active" data-tab="objects" type="button">Objects</button>
-          <button class="tab" data-tab="diagram" type="button">Diagram</button>
-          <button class="tab" data-tab="sequence" type="button">Sequence</button>
-          <button class="tab" data-tab="trace" type="button">Trace</button>
           <button class="tab" data-tab="templates" type="button">Templates</button>
           <button class="tab" data-tab="config" type="button">Config</button>
           <button class="tab" data-tab="json" type="button">JSON</button>
+          <button class="tab" data-tab="xml" type="button">XML</button>
         </div>
 
         <div class="tab-panels">
@@ -1637,55 +1710,6 @@
                 <div id="objectDetails" class="details empty">Analyze to see details.</div>
               </div>
             </div>
-          </section>
-
-          <section class="tab-panel" id="tab-diagram">
-            <div class="panel__title">Flow diagram</div>
-            <div id="diagramHost" class="diagram-host"></div>
-            <div class="hint">
-              Tip: click a node to open it in <b>Objects</b> and <b>Trace</b>.
-            </div>
-          </section>
-
-          <section class="tab-panel" id="tab-sequence">
-            <div class="panel__title">Sequence diagram (single-thread)</div>
-
-            <div class="form-grid">
-              <label>
-                View
-                <select id="seqRoot" class="input"></select>
-              </label>
-              <label>
-                Max steps
-                <input id="seqMaxSteps" class="input" type="number" min="10" max="2000" value="200" />
-              </label>
-              <div class="form-grid__actions">
-                <button id="btnSeqRender" class="btn btn-primary" type="button">Render</button>
-              </div>
-            </div>
-
-            <div id="sequenceHost" class="sequence-host empty">Analyze to see sequence.</div>
-            <div class="hint">Tip: click a parameter to jump to <b>Trace</b>.</div>
-          </section>
-
-          <section class="tab-panel" id="tab-trace">
-            <div class="panel__title">Data trace</div>
-
-            <div class="form-grid">
-              <label>
-                Subroutine
-                <select id="traceSubroutine" class="input"></select>
-              </label>
-              <label>
-                Variable
-                <select id="traceVariable" class="input"></select>
-              </label>
-              <div class="form-grid__actions">
-                <button id="btnTrace" class="btn btn-primary" type="button">Trace origin</button>
-              </div>
-            </div>
-
-            <div id="traceResults" class="trace-results empty">Select a subroutine + variable and run trace.</div>
           </section>
 
           <section class="tab-panel" id="tab-templates">
@@ -1736,6 +1760,19 @@
           <section class="tab-panel" id="tab-json">
             <div class="panel__title">Model JSON</div>
             <pre id="jsonOutput" class="json-output empty">Analyze to see JSON.</pre>
+          </section>
+
+          <section class="tab-panel" id="tab-xml">
+            <div class="panel__title">ABAP Objects XML (Templates)</div>
+            <div class="toolbar objcfg-toolbar">
+              <button id="btnCopyXml" class="btn btn-sm btn-primary" type="button">Copy</button>
+              <button id="btnDownloadXml" class="btn btn-sm" type="button">Download</button>
+              <label style="margin-left:auto;display:flex;gap:6px;align-items:center;color:var(--muted);font-size:12px;">
+                Max steps
+                <input id="xmlMaxSteps" class="input" type="number" min="100" step="100" value="5000" style="width:110px;" />
+              </label>
+            </div>
+            <pre id="xmlOutput" class="json-output empty">Analyze to see XML.</pre>
           </section>
         </div>
       </section>
@@ -5839,616 +5876,6 @@
 
     </script>
         <script>
-    // js/diagram.js
-    (function (ns) {
-      "use strict";
-
-      const SVG_NS = "http://www.w3.org/2000/svg";
-
-      function el(name, attrs) {
-        const node = document.createElementNS(SVG_NS, name);
-        for (const [k, v] of Object.entries(attrs || {})) node.setAttribute(k, String(v));
-        return node;
-      }
-
-      function render(model, host, options) {
-        const onNodeClick = options?.onNodeClick || null;
-        host.innerHTML = "";
-
-        const nodes = Array.from(model.nodes.values()).sort((a, b) => {
-          if (a.depth !== b.depth) return a.depth - b.depth;
-          const ka = a.kind === "EVENT" ? 0 : a.kind === "FORM" ? 1 : 2;
-          const kb = b.kind === "EVENT" ? 0 : b.kind === "FORM" ? 1 : 2;
-          if (ka !== kb) return ka - kb;
-          return a.name.localeCompare(b.name);
-        });
-
-        const maxDepth = Math.max(0, ...nodes.map((n) => n.depth ?? 0));
-        const cols = Array.from({ length: maxDepth + 1 }, () => []);
-        for (const n of nodes) cols[n.depth ?? 0].push(n);
-
-        const margin = 18;
-        const nodeW = 230;
-        const nodeH = 72;
-        const colGap = 80;
-        const rowGap = 18;
-
-        const positions = new Map();
-
-        let totalH = 0;
-        for (const col of cols) {
-          const h = margin * 2 + col.length * nodeH + Math.max(0, col.length - 1) * rowGap;
-          totalH = Math.max(totalH, h);
-        }
-        const totalW = margin * 2 + cols.length * nodeW + Math.max(0, cols.length - 1) * colGap;
-
-        const svg = el("svg", { width: totalW, height: totalH, viewBox: `0 0 ${totalW} ${totalH}` });
-
-        const defs = el("defs");
-        const marker = el("marker", { id: "arrow", markerWidth: 10, markerHeight: 10, refX: 9, refY: 5, orient: "auto" });
-        marker.appendChild(el("path", { d: "M0 0 L10 5 L0 10 z", fill: "#64748b" }));
-        defs.appendChild(marker);
-        svg.appendChild(defs);
-
-        for (let d = 0; d < cols.length; d++) {
-          const col = cols[d];
-          const x = margin + d * (nodeW + colGap);
-          let y = margin;
-          for (const n of col) {
-            positions.set(n.key, { x, y, w: nodeW, h: nodeH });
-            y += nodeH + rowGap;
-          }
-        }
-
-        const edgesGroup = el("g", {});
-        for (const edge of model.edges) {
-          const from = positions.get(edge.fromKey);
-          const to = positions.get(edge.toKey);
-          if (!from || !to) continue;
-
-          const sx = from.x + from.w;
-          const sy = from.y + from.h / 2;
-          const ex = to.x;
-          const ey = to.y + to.h / 2;
-          const bend = Math.max(40, Math.min(140, Math.abs(ex - sx) * 0.35));
-          const c1x = sx + bend;
-          const c1y = sy;
-          const c2x = ex - bend;
-          const c2y = ey;
-          const dAttr = `M ${sx} ${sy} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${ex} ${ey}`;
-
-          edgesGroup.appendChild(
-            el("path", {
-              d: dAttr,
-              fill: "none",
-              stroke: edge.isInCycle ? "#ef4444" : "#94a3b8",
-              "stroke-width": edge.isInCycle ? 2.2 : 1.6,
-              "marker-end": "url(#arrow)",
-              opacity: edge.isInCycle ? 0.95 : 0.75,
-            }),
-          );
-        }
-        svg.appendChild(edgesGroup);
-
-        const nodesGroup = el("g", {});
-        for (const n of nodes) {
-          const pos = positions.get(n.key);
-          if (!pos) continue;
-
-          const g = el("g", { class: "node", "data-key": n.key });
-          const fill = n.isDefined ? "#f8fafc" : "#e5e7eb";
-          const stroke = n.isInCycle ? "#ef4444" : n.kind === "EVENT" ? "#60a5fa" : "#64748b";
-
-          const rect = el("rect", {
-            x: pos.x,
-            y: pos.y,
-            width: pos.w,
-            height: pos.h,
-            rx: 12,
-            ry: 12,
-            fill,
-            stroke,
-            "stroke-width": n.isInCycle ? 2.4 : 1.6,
-          });
-          if (!n.isDefined) rect.setAttribute("stroke-dasharray", "6 4");
-
-          const title = el("text", { x: pos.x + 12, y: pos.y + 24, fill: "#0b1020", "font-size": 13, "font-family": "system-ui, sans-serif" });
-          title.textContent = `${n.kind} ${n.name}`;
-
-          const meta = el("text", { x: pos.x + 12, y: pos.y + 46, fill: "#0b1020", "font-size": 11, "font-family": "ui-monospace, monospace" });
-          meta.textContent = `P:${n.paramsCount} D:${n.localDataCount} C:${n.localConstCount} W:${n.writesCount}`;
-
-          g.appendChild(rect);
-          g.appendChild(title);
-          g.appendChild(meta);
-
-          if (onNodeClick) {
-            g.style.cursor = "pointer";
-            g.addEventListener("click", () => onNodeClick(n.key));
-          }
-
-          nodesGroup.appendChild(g);
-        }
-        svg.appendChild(nodesGroup);
-
-        host.appendChild(svg);
-
-        return { svg, positions };
-      }
-
-      ns.diagram = { render };
-    })(window.AbapFlow);
-
-
-    </script>
-        <script>
-    // js/sequence.js
-    (function (ns) {
-      "use strict";
-
-      const PROGRAM_ALL_KEY = "SEQUENCE:PROGRAM_ALL";
-
-      function getStartCandidates(model) {
-        const nodes = Array.from(model.nodes.values());
-        nodes.sort((a, b) => {
-          const la = a.sourceRef?.startLine ?? 1e9;
-          const lb = b.sourceRef?.startLine ?? 1e9;
-          if (la !== lb) return la - lb;
-          const ka = a.kind === "EVENT" ? 0 : a.kind === "FORM" ? 1 : 2;
-          const kb = b.kind === "EVENT" ? 0 : b.kind === "FORM" ? 1 : 2;
-          if (ka !== kb) return ka - kb;
-          return a.name.localeCompare(b.name);
-        });
-
-        const items = nodes.map((n) => ({
-          key: n.key,
-          label: `${n.kind} ${n.name}${n.isDefined ? "" : " (external)"}`,
-        }));
-
-        items.unshift({ key: PROGRAM_ALL_KEY, label: "PROGRAM (All entrypoints)" });
-        return items;
-      }
-
-      function getProgramEntrypoints(model) {
-        const nodes = Array.from(model.nodes.values());
-        const events = nodes
-          .filter((n) => n.kind === "EVENT")
-          .sort((a, b) => (a.sourceRef?.startLine ?? 1e9) - (b.sourceRef?.startLine ?? 1e9))
-          .map((n) => n.key);
-
-        if (events.length > 0) return events;
-
-        const forms = nodes
-          .filter((n) => n.kind === "FORM" && n.isDefined && (n.calledBy?.length || 0) === 0)
-          .sort((a, b) => (a.sourceRef?.startLine ?? 1e9) - (b.sourceRef?.startLine ?? 1e9))
-          .map((n) => n.key);
-
-        return forms;
-      }
-
-      function build(model, startKey, options) {
-        const maxSteps = Math.max(10, Number(options?.maxSteps || 200));
-        const steps = [];
-
-        const rowKeys = [];
-        const rowSet = new Set();
-        function ensureRow(key) {
-          if (!rowSet.has(key)) {
-            rowSet.add(key);
-            rowKeys.push(key);
-          }
-        }
-
-        let truncated = false;
-
-        function walk(routineKey, depth, stack) {
-          if (steps.length >= maxSteps) {
-            truncated = true;
-            return;
-          }
-
-          const routine = model.nodes.get(routineKey);
-          if (!routine) return;
-
-          stack.add(routineKey);
-
-          const calls = (routine.calls || []).slice().sort((a, b) => {
-            const la = a.sourceRef?.startLine ?? 1e9;
-            const lb = b.sourceRef?.startLine ?? 1e9;
-            return la - lb;
-          });
-
-          for (const edge of calls) {
-            if (steps.length >= maxSteps) {
-              truncated = true;
-              break;
-            }
-
-            ensureRow(edge.fromKey);
-            ensureRow(edge.toKey);
-
-            const isRecursion = stack.has(edge.toKey);
-            steps.push({
-              kind: "call",
-              depth,
-              fromKey: edge.fromKey,
-              toKey: edge.toKey,
-              edge,
-              isRecursion,
-            });
-
-            if (!isRecursion) walk(edge.toKey, depth + 1, stack);
-          }
-
-          stack.delete(routineKey);
-        }
-
-        if (startKey === PROGRAM_ALL_KEY) {
-          const roots = getProgramEntrypoints(model);
-          for (let r = 0; r < roots.length; r++) {
-            const rootKey = roots[r];
-            const root = model.nodes.get(rootKey);
-            ensureRow(rootKey);
-
-            steps.push({
-              kind: "separator",
-              label: root ? `${root.kind} ${root.name}` : rootKey,
-              rootKey,
-            });
-
-            const stack = new Set();
-            walk(rootKey, 0, stack);
-            if (steps.length >= maxSteps) break;
-          }
-        } else {
-          ensureRow(startKey);
-          const stack = new Set();
-          walk(startKey, 0, stack);
-        }
-
-        return { startKey, steps, rowKeys, truncated, maxSteps };
-      }
-
-      function render(container, model, sequence, options) {
-        const onParamClick = options?.onParamClick || null;
-        const onRowClick = options?.onRowClick || null;
-
-        container.innerHTML = "";
-        container.classList.remove("empty");
-
-        const scroll = document.createElement("div");
-        scroll.className = "seq-scroll";
-
-        const grid = document.createElement("div");
-        grid.className = "seq-grid";
-
-        const labels = document.createElement("div");
-        labels.className = "seq-labels";
-
-        const canvas = document.createElement("div");
-        canvas.className = "seq-canvas";
-
-        const header = document.createElement("div");
-        header.className = "seq-header";
-        header.textContent = sequence.truncated
-          ? `Sequence truncated at ${sequence.maxSteps} steps.`
-          : `Steps: ${sequence.steps.length}`;
-        labels.appendChild(header);
-
-        function createChip(param, routineKey) {
-          const b = document.createElement("button");
-          b.type = "button";
-          b.className = "chip";
-          b.dataset.key = routineKey;
-          b.dataset.var = param.name;
-          const dt = param.dataType ? ` TYPE ${param.dataType}` : "";
-          const descText = String(param.userDescription || param.description || "").trim();
-          const desc = descText ? ` - ${descText}` : "";
-          b.textContent = `${param.kind} ${param.name}${dt}${desc}`;
-          b.title = "Jump to Trace";
-          b.addEventListener("click", (ev) => {
-            ev.stopPropagation();
-            if (onParamClick) onParamClick({ routineKey, varName: param.name });
-          });
-          return b;
-        }
-
-        for (const key of sequence.rowKeys) {
-          const routine = model.nodes.get(key);
-          if (!routine) continue;
-
-          const row = document.createElement("div");
-          row.className = "seq-row-label";
-          row.dataset.key = key;
-
-          const title = document.createElement("div");
-          title.className = "seq-row-title";
-          title.textContent = `${routine.kind} ${routine.name}${routine.isDefined ? "" : " (external)"}`;
-          row.appendChild(title);
-
-          const descText = String(routine.userDescription || routine.description || "").trim();
-          if (descText) {
-            const desc = document.createElement("div");
-            desc.className = "seq-row-desc";
-            desc.textContent = descText;
-            row.appendChild(desc);
-          }
-
-          if (routine.params && routine.params.length > 0) {
-            const params = document.createElement("div");
-            params.className = "seq-row-params";
-            for (const p of routine.params) params.appendChild(createChip(p, key));
-            row.appendChild(params);
-          }
-
-          if (onRowClick) {
-            row.style.cursor = "pointer";
-            row.addEventListener("click", () => onRowClick({ routineKey: key }));
-          }
-
-          labels.appendChild(row);
-        }
-
-        grid.appendChild(labels);
-        grid.appendChild(canvas);
-        scroll.appendChild(grid);
-        container.appendChild(scroll);
-
-        const gridRect = grid.getBoundingClientRect();
-        const rowEls = Array.from(labels.querySelectorAll(".seq-row-label"));
-        const rowCenters = new Map();
-        const rowRanges = [];
-        const rowElByKey = new Map();
-        for (const rowEl of rowEls) {
-          const key = rowEl.dataset.key;
-          if (!key) continue;
-          rowElByKey.set(key, rowEl);
-
-          const anchorEl = rowEl.querySelector(".seq-row-title") || rowEl;
-          const rect = anchorEl.getBoundingClientRect();
-          const y = Math.round(rect.top - gridRect.top + rect.height / 2);
-          rowCenters.set(key, y);
-
-          const rowRect = rowEl.getBoundingClientRect();
-          rowRanges.push({
-            key,
-            top: rowRect.top - gridRect.top,
-            bottom: rowRect.bottom - gridRect.top,
-          });
-        }
-
-        const steps = sequence.steps || [];
-        const colW = 140;
-        const marginX = 18;
-        const marginY = 10;
-        const headerH = header.offsetHeight;
-
-        const width = Math.max(720, marginX * 2 + steps.length * colW);
-        const height = Math.max(520, labels.scrollHeight);
-
-        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        svg.classList.add("seq-svg");
-        svg.setAttribute("width", String(width));
-        svg.setAttribute("height", String(height));
-        svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-
-        const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
-        function addMarker(id, fill) {
-          const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
-          marker.setAttribute("id", id);
-          marker.setAttribute("markerWidth", "10");
-          marker.setAttribute("markerHeight", "10");
-          marker.setAttribute("refX", "9");
-          marker.setAttribute("refY", "5");
-          marker.setAttribute("orient", "auto");
-          const mPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-          mPath.setAttribute("d", "M0 0 L10 5 L0 10 z");
-          mPath.setAttribute("fill", fill);
-          marker.appendChild(mPath);
-          defs.appendChild(marker);
-        }
-
-        addMarker("seq-arrow", "#64748b");
-        addMarker("seq-arrow-danger", "#ef4444");
-        svg.appendChild(defs);
-
-        function line(x1, y1, x2, y2, stroke, w, dash) {
-          const p = document.createElementNS("http://www.w3.org/2000/svg", "line");
-          p.setAttribute("x1", String(x1));
-          p.setAttribute("y1", String(y1));
-          p.setAttribute("x2", String(x2));
-          p.setAttribute("y2", String(y2));
-          p.setAttribute("stroke", stroke);
-          p.setAttribute("stroke-width", String(w || 1));
-          if (dash) p.setAttribute("stroke-dasharray", dash);
-          svg.appendChild(p);
-        }
-
-        for (let i = 0; i < steps.length; i++) {
-          const x = marginX + i * colW + colW / 2;
-          line(x, headerH + marginY, x, height, "rgba(255,255,255,0.05)", 1);
-
-          const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
-          t.setAttribute("x", String(x - 6));
-          t.setAttribute("y", String(headerH - 10));
-          t.setAttribute("fill", "rgba(255,255,255,0.45)");
-          t.setAttribute("font-size", "11");
-          t.setAttribute("font-family", "ui-monospace, monospace");
-          t.textContent = String(i + 1);
-          svg.appendChild(t);
-
-          const step = steps[i];
-          if (step && step.kind === "separator") {
-            const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
-            label.setAttribute("x", String(x + 10));
-            label.setAttribute("y", String(headerH - 28));
-            label.setAttribute("fill", "rgba(96,165,250,0.85)");
-            label.setAttribute("font-size", "11");
-            label.setAttribute("font-family", "system-ui, sans-serif");
-            label.textContent = step.label || "Section";
-            svg.appendChild(label);
-
-            line(x, headerH + marginY, x, height, "rgba(96,165,250,0.10)", 3, "8 6");
-          }
-        }
-
-        for (const [key, y] of rowCenters.entries()) {
-          line(0, y, width, y, "rgba(255,255,255,0.06)", 1);
-
-          const routine = model.nodes.get(key);
-          if (routine && routine.isInCycle) {
-            line(0, y + 1, width, y + 1, "rgba(239,68,68,0.18)", 2);
-          }
-        }
-
-        const hoverLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
-        hoverLine.classList.add("seq-hover-line");
-        hoverLine.setAttribute("x1", "0");
-        hoverLine.setAttribute("x2", String(width));
-        hoverLine.setAttribute("y1", "0");
-        hoverLine.setAttribute("y2", "0");
-        hoverLine.style.opacity = "0";
-        svg.appendChild(hoverLine);
-
-        const connectorGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-        connectorGroup.setAttribute("opacity", "0.85");
-        svg.appendChild(connectorGroup);
-
-        function bezierConnector(x1, y1, x2, y2, stroke, width) {
-          const dx = Math.max(30, Math.min(70, Math.abs(x2 - x1) * 0.45));
-          const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
-          p.setAttribute("d", `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`);
-          p.setAttribute("fill", "none");
-          p.setAttribute("stroke", stroke);
-          p.setAttribute("stroke-width", String(width));
-          p.setAttribute("stroke-linecap", "round");
-          p.setAttribute("stroke-linejoin", "round");
-          connectorGroup.appendChild(p);
-        }
-
-        const arrowsGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-        svg.appendChild(arrowsGroup);
-
-        for (let i = 0; i < steps.length; i++) {
-          const st = steps[i];
-          if (!st || st.kind !== "call") continue;
-
-          const x = marginX + i * colW + colW / 2;
-          const y1 = rowCenters.get(st.fromKey) ?? 0;
-          const y2 = rowCenters.get(st.toKey) ?? 0;
-          const isCycle = st.edge?.isInCycle || st.isRecursion;
-          const isExternal = model.nodes.get(st.toKey)?.isDefined === false;
-
-          const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
-          p.setAttribute("d", `M ${x} ${y1} L ${x} ${y2}`);
-          p.setAttribute("fill", "none");
-          p.setAttribute("stroke", isCycle ? "#ef4444" : "#94a3b8");
-          p.setAttribute("stroke-width", isCycle ? "2.2" : "1.6");
-          p.setAttribute("marker-end", isCycle ? "url(#seq-arrow-danger)" : "url(#seq-arrow)");
-          p.setAttribute("opacity", isCycle ? "0.95" : "0.8");
-          if (isExternal) p.setAttribute("stroke-dasharray", "6 4");
-
-          const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
-          const from = model.nodes.get(st.fromKey);
-          const to = model.nodes.get(st.toKey);
-          title.textContent = `${from ? from.name : st.fromKey} -> ${to ? to.name : st.toKey}`;
-          p.appendChild(title);
-          arrowsGroup.appendChild(p);
-
-          const next = steps[i + 1];
-          if (!next || next.kind !== "call") continue;
-          const x2 = marginX + (i + 1) * colW + colW / 2;
-          const yNext = rowCenters.get(next.fromKey);
-          if (yNext == null) continue;
-
-          const isCycle2 = isCycle || next.edge?.isInCycle || next.isRecursion;
-          bezierConnector(x, y2, x2, yNext, isCycle2 ? "rgba(239,68,68,0.35)" : "rgba(96,165,250,0.35)", 3.4);
-        }
-
-        canvas.appendChild(svg);
-
-        let labelHoverKey = null;
-        let svgHoverKey = null;
-        let activeHoverKey = null;
-
-        function applyHover(key) {
-          if (key === activeHoverKey) return;
-          if (activeHoverKey) {
-            rowElByKey.get(activeHoverKey)?.classList.remove("is-hover");
-          }
-
-          activeHoverKey = key || null;
-          if (!activeHoverKey) {
-            hoverLine.style.opacity = "0";
-            return;
-          }
-
-          rowElByKey.get(activeHoverKey)?.classList.add("is-hover");
-
-          const y = rowCenters.get(activeHoverKey);
-          if (y == null) {
-            hoverLine.style.opacity = "0";
-            return;
-          }
-
-          hoverLine.setAttribute("y1", String(y));
-          hoverLine.setAttribute("y2", String(y));
-          hoverLine.style.opacity = "1";
-        }
-
-        function updateHover() {
-          applyHover(labelHoverKey || svgHoverKey);
-        }
-
-        for (const rowEl of rowEls) {
-          const key = rowEl.dataset.key;
-          if (!key) continue;
-          rowEl.addEventListener("mouseenter", () => {
-            labelHoverKey = key;
-            updateHover();
-          });
-          rowEl.addEventListener("mouseleave", () => {
-            if (labelHoverKey === key) {
-              labelHoverKey = null;
-              updateHover();
-            }
-          });
-        }
-
-        function findRowKeyAtY(y) {
-          for (let i = 0; i < rowRanges.length; i++) {
-            const r = rowRanges[i];
-            if (y >= r.top && y <= r.bottom) return r.key;
-          }
-          return null;
-        }
-
-        svg.addEventListener("mousemove", (ev) => {
-          const rect = grid.getBoundingClientRect();
-          const y = ev.clientY - rect.top;
-          const key = findRowKeyAtY(y);
-          if (key !== svgHoverKey) {
-            svgHoverKey = key;
-            updateHover();
-          }
-        });
-
-        svg.addEventListener("mouseleave", () => {
-          if (svgHoverKey) {
-            svgHoverKey = null;
-            updateHover();
-          }
-        });
-
-        const gridW = 360 + width;
-        grid.style.width = `${gridW}px`;
-      }
-
-      ns.sequence = { PROGRAM_ALL_KEY, getStartCandidates, build, render };
-    })(window.AbapFlow);
-
-    </script>
-        <script>
     // js/parser.js
     (function (ns) {
       "use strict";
@@ -7890,380 +7317,6 @@
 
     </script>
         <script>
-    // js/table_renderer.js
-    (function (ns) {
-      "use strict";
-
-      function normalizeAddress(addr) {
-        const s = String(addr || "").trim().toUpperCase();
-        const m = /^([A-Z]+)(\d+)$/.exec(s);
-        if (!m) return "";
-        return `${m[1]}${Number(m[2])}`;
-      }
-
-      function colToIndex(colLetters) {
-        const s = String(colLetters || "").trim().toUpperCase();
-        if (!/^[A-Z]+$/.test(s)) return 0;
-        let n = 0;
-        for (let i = 0; i < s.length; i++) {
-          n = n * 26 + (s.charCodeAt(i) - 64);
-        }
-        return n;
-      }
-
-      function indexToCol(index1) {
-        let n = Number(index1);
-        if (!Number.isFinite(n) || n <= 0) return "";
-        n = Math.floor(n);
-        let s = "";
-        while (n > 0) {
-          const rem = (n - 1) % 26;
-          s = String.fromCharCode(65 + rem) + s;
-          n = Math.floor((n - 1) / 26);
-        }
-        return s;
-      }
-
-      function parseAddress(addr) {
-        const s = String(addr || "").trim().toUpperCase();
-        const m = /^([A-Z]+)(\d+)$/.exec(s);
-        if (!m) return null;
-        const col = colToIndex(m[1]);
-        const row = Number(m[2]);
-        if (!Number.isFinite(col) || !Number.isFinite(row) || col <= 0 || row <= 0) return null;
-        return { col, row };
-      }
-
-      function addrFromRC(col1, row1) {
-        return `${indexToCol(col1)}${row1}`;
-      }
-
-      function cssTextForClasses(css, classes) {
-        if (!css || typeof css !== "object") return "";
-        if (!Array.isArray(classes)) return "";
-        let out = "";
-        for (const cls of classes) {
-          const rule = css[String(cls || "").trim()];
-          if (!rule) continue;
-          const t = String(rule).trim();
-          if (!t) continue;
-          out += t.endsWith(";") ? t : `${t};`;
-        }
-        return out;
-      }
-
-      function hasVisibleCellText(cellCfg) {
-        const t = cellCfg && typeof cellCfg === "object" ? String(cellCfg.text ?? "") : "";
-        return Boolean(t.trim());
-      }
-
-      function hasCellBlockingContent(cellCfg) {
-        if (!cellCfg || typeof cellCfg !== "object") return false;
-        const t = String(cellCfg.text ?? "").trim();
-        if (t) return true;
-        const bind = String(cellCfg.bind ?? "").trim();
-        return Boolean(bind);
-      }
-
-      function nextBlockingCol(blockColsSorted, col) {
-        if (!Array.isArray(blockColsSorted) || !blockColsSorted.length) return 0;
-        for (let i = 0; i < blockColsSorted.length; i++) {
-          const c = Number(blockColsSorted[i]);
-          if (Number.isFinite(c) && c > col) return c;
-        }
-        return 0;
-      }
-
-      function buildColumnWidths(config, cols) {
-        const explicit = new Map();
-        const colWidths = config?.grid?.colWidths && typeof config.grid.colWidths === "object" ? config.grid.colWidths : {};
-
-        for (const [key, value] of Object.entries(colWidths)) {
-          const idx = colToIndex(key);
-          const w = Number(value);
-          if (!idx || idx > cols || !Number.isFinite(w) || w <= 0) continue;
-          explicit.set(idx, w);
-        }
-
-        const widths = new Map(explicit);
-
-        const merges = Array.isArray(config?.merges) ? config.merges : [];
-        for (const merge of merges) {
-          const start = parseAddress(merge?.start);
-          if (!start) continue;
-          const colspan = Number(merge?.colspan || 1);
-          if (!Number.isFinite(colspan) || colspan < 2) continue;
-
-          const startCol = start.col;
-          const endCol = Math.min(cols, startCol + colspan - 1);
-          const total = explicit.get(startCol);
-          if (!Number.isFinite(total)) continue;
-
-          let hasOtherExplicit = false;
-          for (let c = startCol + 1; c <= endCol; c++) {
-            if (explicit.has(c)) {
-              hasOtherExplicit = true;
-              break;
-            }
-          }
-          if (hasOtherExplicit) continue;
-
-          const each = total / (endCol - startCol + 1);
-          for (let c = startCol; c <= endCol; c++) widths.set(c, each);
-        }
-
-        const fallback = Number(config?.grid?.defaultColWidth);
-        const defaultColWidth = Number.isFinite(fallback) && fallback > 0 ? fallback : 40;
-        for (let c = 1; c <= cols; c++) {
-          if (!widths.has(c)) widths.set(c, defaultColWidth);
-        }
-        return widths;
-      }
-
-      function buildRowHeights(config, rows) {
-        const rowHeights = config?.grid?.rowHeights && typeof config.grid.rowHeights === "object" ? config.grid.rowHeights : {};
-        const heights = new Map();
-        for (const [key, value] of Object.entries(rowHeights)) {
-          const r = Number(key);
-          const h = Number(value);
-          if (!Number.isFinite(r) || !Number.isFinite(h) || r <= 0 || h <= 0) continue;
-          heights.set(r, h);
-        }
-
-        const fallback = Number(config?.grid?.defaultRowHeight);
-        const defaultRowHeight = Number.isFinite(fallback) && fallback > 0 ? fallback : 30;
-        for (let r = 1; r <= rows; r++) {
-          if (!heights.has(r)) heights.set(r, defaultRowHeight);
-        }
-        return heights;
-      }
-
-      function buildMergeMaps(config, rows, cols) {
-        const skip = new Set();
-        const startMap = new Map();
-        const merges = Array.isArray(config?.merges) ? config.merges : [];
-
-        for (const merge of merges) {
-          const start = parseAddress(merge?.start);
-          if (!start) continue;
-          const rowspan = Math.max(1, Math.floor(Number(merge?.rowspan || 1)));
-          const colspan = Math.max(1, Math.floor(Number(merge?.colspan || 1)));
-          const startRow = start.row;
-          const startCol = start.col;
-          if (startRow > rows || startCol > cols) continue;
-
-          const endRow = Math.min(rows, startRow + rowspan - 1);
-          const endCol = Math.min(cols, startCol + colspan - 1);
-          const startAddr = addrFromRC(startCol, startRow);
-          startMap.set(startAddr, { rowspan: endRow - startRow + 1, colspan: endCol - startCol + 1 });
-
-          for (let r = startRow; r <= endRow; r++) {
-            for (let c = startCol; c <= endCol; c++) {
-              if (r === startRow && c === startCol) continue;
-              skip.add(addrFromRC(c, r));
-            }
-          }
-        }
-
-        return { skip, startMap };
-      }
-
-      function renderExcelLikeTable(config) {
-        if (!config || config.type !== "excel-like-table") {
-          const el = document.createElement("div");
-          el.className = "demo-error";
-          el.textContent = "Unsupported template type.";
-          return el;
-        }
-
-        const rows = Math.max(1, Math.floor(Number(config?.grid?.rows || 1)));
-        const cols = Math.max(1, Math.floor(Number(config?.grid?.cols || 1)));
-        const excelOverflow = Boolean(config?.grid?.excelOverflow);
-
-        const table = document.createElement("table");
-        table.className = "excel-like-table";
-        table.style.borderCollapse = "collapse";
-        table.style.tableLayout = "fixed";
-
-        const cellMap = new Map();
-        const cells = Array.isArray(config.cells) ? config.cells : [];
-        const rowBlocking = new Map();
-        for (const c of cells) {
-          const addr = normalizeAddress(c?.addr);
-          if (!addr) continue;
-          cellMap.set(addr, c);
-
-          if (excelOverflow) {
-            const parsed = parseAddress(addr);
-            if (!parsed) continue;
-            if (!hasCellBlockingContent(c)) continue;
-            if (!rowBlocking.has(parsed.row)) rowBlocking.set(parsed.row, []);
-            rowBlocking.get(parsed.row).push(parsed.col);
-          }
-        }
-        if (excelOverflow) {
-          for (const [r, list] of rowBlocking.entries()) {
-            const sorted = list
-              .map((x) => Number(x))
-              .filter((n) => Number.isFinite(n) && n > 0)
-              .sort((a, b) => a - b);
-            const uniq = [];
-            let last = 0;
-            for (const c of sorted) {
-              if (c === last) continue;
-              uniq.push(c);
-              last = c;
-            }
-            rowBlocking.set(r, uniq);
-          }
-        }
-
-        const colWidths = buildColumnWidths(config, cols);
-        const rowHeights = buildRowHeights(config, rows);
-        const { skip, startMap } = buildMergeMaps(config, rows, cols);
-
-        let baseClasses = [];
-        if (Array.isArray(config?.defaultCellClass)) {
-          baseClasses = config.defaultCellClass.map((x) => String(x || "").trim()).filter(Boolean);
-        } else if (typeof config?.defaultCellClass === "string" && config.defaultCellClass.trim()) {
-          baseClasses = [config.defaultCellClass.trim()];
-        } else if (config?.css?.cell) {
-          baseClasses = ["cell"];
-        }
-
-        const colgroup = document.createElement("colgroup");
-        let totalWidth = 0;
-        const colPrefix = [0];
-        for (let c = 1; c <= cols; c++) {
-          const w = Number(colWidths.get(c));
-          const col = document.createElement("col");
-          if (Number.isFinite(w) && w > 0) {
-            col.style.width = `${w}px`;
-            totalWidth += w;
-          }
-          colgroup.appendChild(col);
-          colPrefix[c] = totalWidth;
-        }
-        table.appendChild(colgroup);
-        if (totalWidth > 0) table.style.width = `${totalWidth}px`;
-
-        function spanWidthPx(fromCol, toCol) {
-          const from = Math.max(1, Math.floor(Number(fromCol || 1)));
-          const to = Math.max(1, Math.floor(Number(toCol || 1)));
-          if (to < from) return 0;
-          const start = colPrefix[from - 1] || 0;
-          const end = colPrefix[to] || 0;
-          return Math.max(0, end - start);
-        }
-
-        for (let r = 1; r <= rows; r++) {
-          const tr = document.createElement("tr");
-          const h = Number(rowHeights.get(r));
-          if (Number.isFinite(h) && h > 0) tr.style.height = `${h}px`;
-
-          for (let c = 1; c <= cols; c++) {
-            const addr = addrFromRC(c, r);
-            if (skip.has(addr)) continue;
-
-            const td = document.createElement("td");
-            td.dataset.addr = addr;
-
-            const cellCfg = cellMap.get(addr);
-            if (cellCfg) {
-              const bind = String(cellCfg.bind || "").trim();
-              if (bind) {
-                td.dataset.bind = bind;
-                if (/\.description$/.test(bind)) td.title = "Double-click để sửa mô tả (local/global).";
-              }
-            }
-
-            const combined = [];
-            for (const cls of baseClasses) combined.push(cls);
-            if (Array.isArray(cellCfg?.class)) {
-              for (const cls of cellCfg.class) combined.push(String(cls || "").trim());
-            }
-
-            const seen = new Set();
-            const classes = combined.filter((x) => {
-              const t = String(x || "").trim();
-              if (!t || seen.has(t)) return false;
-              seen.add(t);
-              return true;
-            });
-
-            if (classes.length) {
-              td.className = classes.join(" ");
-              const styleText = cssTextForClasses(config.css, classes);
-              const cellStyle = cellCfg && typeof cellCfg === "object" ? String(cellCfg.style || "").trim() : "";
-              const mergedStyle = `${styleText || ""}${cellStyle ? (cellStyle.endsWith(";") ? cellStyle : `${cellStyle};`) : ""}`;
-              if (mergedStyle) td.style.cssText = mergedStyle;
-            } else if (cellCfg && typeof cellCfg === "object") {
-              const cellStyle = String(cellCfg.style || "").trim();
-              if (cellStyle) td.style.cssText = cellStyle.endsWith(";") ? cellStyle : `${cellStyle};`;
-            }
-
-            if (excelOverflow) {
-              td.style.position = "relative";
-              td.style.zIndex = String(Math.max(1, cols - c + 1));
-            }
-
-            if (cellCfg) {
-              const text = String(cellCfg.text ?? "");
-              const allowOverflow = excelOverflow && hasVisibleCellText(cellCfg);
-
-              if (allowOverflow) {
-                td.style.overflow = "visible";
-
-                const nextBlock = nextBlockingCol(rowBlocking.get(r), c);
-                const limitCol = nextBlock ? Math.max(c, nextBlock - 1) : cols;
-                const maxWidth = spanWidthPx(c, limitCol);
-
-                const content = document.createElement("div");
-                content.className = "cell-content";
-                content.textContent = text;
-                content.style.pointerEvents = "none";
-                content.style.position = "relative";
-                content.style.zIndex = "2";
-                content.style.display = "inline-block";
-                content.style.whiteSpace = "nowrap";
-                if (maxWidth) content.style.maxWidth = `${maxWidth}px`;
-                content.style.overflow = "hidden";
-                td.appendChild(content);
-              } else {
-                td.textContent = text;
-              }
-            }
-
-            const merge = startMap.get(addr);
-            if (merge) {
-              if (merge.rowspan > 1) td.rowSpan = merge.rowspan;
-              if (merge.colspan > 1) td.colSpan = merge.colspan;
-            }
-
-            // Keep Excel-like fixed cell size: don't let long text expand rows/cols and hide adjacent cell formatting.
-            td.style.boxSizing = "border-box";
-            if (!td.style.overflow) td.style.overflow = "hidden";
-            if (Number.isFinite(h) && h > 0) {
-              td.style.height = `${h}px`;
-              td.style.maxHeight = `${h}px`;
-            }
-
-            tr.appendChild(td);
-          }
-
-          table.appendChild(tr);
-        }
-
-        return table;
-      }
-
-      ns.tableRenderer = {
-        renderExcelLikeTable,
-      };
-    })(window.AbapFlow);
-
-    </script>
-        <script>
     // js/template_converter.js
     (function (ns) {
       "use strict";
@@ -9181,332 +8234,6 @@
 
     </script>
         <script>
-    // js/template_excel_export.js
-    (function (ns) {
-      "use strict";
-
-      function escapeHtml(text) {
-        return String(text ?? "")
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
-          .replace(/'/g, "&#39;");
-      }
-
-      function setCellHtmlFromText(cellEl, text) {
-        const normalized = String(text ?? "")
-          .replace(/\r\n/g, "\n")
-          .replace(/\r/g, "\n")
-          .replace(/\u00a0/g, " ");
-        cellEl.innerHTML = escapeHtml(normalized).replace(/\n/g, "<br>");
-      }
-
-      function normalizeColorToHex(colorRaw) {
-        const raw = String(colorRaw || "").trim();
-        if (!raw) return "";
-        if (/^(transparent|none)$/i.test(raw)) return "";
-
-        const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(raw);
-        if (hex) {
-          const h = hex[1].toLowerCase();
-          if (h.length === 3) return `#${h[0]}${h[0]}${h[1]}${h[1]}${h[2]}${h[2]}`;
-          return `#${h}`;
-        }
-
-        const rgb = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+)\s*)?\)$/i.exec(raw);
-        if (rgb) {
-          const alpha = rgb[4] != null ? Number(rgb[4]) : 1;
-          if (!Number.isFinite(alpha) || alpha <= 0) return "";
-          const r = Math.max(0, Math.min(255, Number(rgb[1])));
-          const g = Math.max(0, Math.min(255, Number(rgb[2])));
-          const b = Math.max(0, Math.min(255, Number(rgb[3])));
-          const toHex = (n) => n.toString(16).padStart(2, "0");
-          return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-        }
-
-        return raw;
-      }
-
-      function parseCssBorder(cssBorder) {
-        const raw = String(cssBorder || "").trim();
-        if (!raw) return null;
-        if (/^0(?:px|pt)?\s+/i.test(raw)) return null;
-
-        const m = /^(\d+(?:\.\d+)?)(px|pt)?\s+([a-z]+)\s+(.+)$/i.exec(raw);
-        if (!m) return null;
-
-        const width = Number(m[1]);
-        if (!Number.isFinite(width) || width <= 0) return null;
-
-        const unit = String(m[2] || "px").toLowerCase();
-        const style = String(m[3] || "").toLowerCase();
-        const color = normalizeColorToHex(m[4]);
-
-        if (!style || style === "none" || style === "hidden") return null;
-        if (!color) return null;
-
-        let pt = width;
-        if (unit === "px") pt = (width * 72) / 96;
-        pt = Math.max(0.25, pt);
-        const ptText = `${Math.round(pt * 100) / 100}pt`;
-
-        return { style, color, ptText };
-      }
-
-      function borderToExcelCss(cssBorder) {
-        const parts = parseCssBorder(cssBorder);
-        if (!parts) return { css: "", msoAlt: "" };
-        return {
-          css: `${parts.ptText} ${parts.style} ${parts.color}`,
-          msoAlt: `${parts.style} ${parts.color} ${parts.ptText}`,
-        };
-      }
-
-      function inlineComputedCellStyles(dstCell, srcCell) {
-        if (!dstCell || !srcCell || typeof window === "undefined" || typeof window.getComputedStyle !== "function") return;
-
-        let cs = null;
-        try {
-          cs = window.getComputedStyle(srcCell);
-        } catch (_) {
-          cs = null;
-        }
-        if (!cs) return;
-
-        const top = borderToExcelCss(cs.borderTop);
-        const right = borderToExcelCss(cs.borderRight);
-        const bottom = borderToExcelCss(cs.borderBottom);
-        const left = borderToExcelCss(cs.borderLeft);
-
-        dstCell.style.border = "none";
-        if (top.css) dstCell.style.borderTop = top.css;
-        if (right.css) dstCell.style.borderRight = right.css;
-        if (bottom.css) dstCell.style.borderBottom = bottom.css;
-        if (left.css) dstCell.style.borderLeft = left.css;
-
-        if (top.msoAlt) dstCell.style.setProperty("mso-border-top-alt", top.msoAlt);
-        if (right.msoAlt) dstCell.style.setProperty("mso-border-right-alt", right.msoAlt);
-        if (bottom.msoAlt) dstCell.style.setProperty("mso-border-bottom-alt", bottom.msoAlt);
-        if (left.msoAlt) dstCell.style.setProperty("mso-border-left-alt", left.msoAlt);
-
-        if (top.msoAlt && top.msoAlt === right.msoAlt && top.msoAlt === bottom.msoAlt && top.msoAlt === left.msoAlt) {
-          dstCell.style.setProperty("mso-border-alt", top.msoAlt);
-        }
-
-        if (cs.backgroundColor && cs.backgroundColor !== "rgba(0, 0, 0, 0)" && cs.backgroundColor !== "transparent") {
-          dstCell.style.backgroundColor = cs.backgroundColor;
-        }
-        if (cs.color) dstCell.style.color = cs.color;
-
-        if (cs.fontWeight) dstCell.style.fontWeight = cs.fontWeight;
-        if (cs.fontStyle) dstCell.style.fontStyle = cs.fontStyle;
-        if (cs.fontSize) dstCell.style.fontSize = cs.fontSize;
-        if (cs.fontFamily) dstCell.style.fontFamily = cs.fontFamily;
-        if (cs.lineHeight) dstCell.style.lineHeight = cs.lineHeight;
-
-        if (cs.textAlign) dstCell.style.textAlign = cs.textAlign;
-        if (cs.verticalAlign) dstCell.style.verticalAlign = cs.verticalAlign;
-        if (cs.whiteSpace) dstCell.style.whiteSpace = cs.whiteSpace;
-
-        if (cs.paddingTop) dstCell.style.paddingTop = cs.paddingTop;
-        if (cs.paddingRight) dstCell.style.paddingRight = cs.paddingRight;
-        if (cs.paddingBottom) dstCell.style.paddingBottom = cs.paddingBottom;
-        if (cs.paddingLeft) dstCell.style.paddingLeft = cs.paddingLeft;
-
-        const styleAttr = String(dstCell.getAttribute("style") || "").trim();
-        if (!/mso-number-format\s*:/i.test(styleAttr)) {
-          const suffix = 'mso-number-format:"\\@";';
-          dstCell.setAttribute("style", (styleAttr ? (styleAttr.endsWith(";") ? styleAttr : `${styleAttr};`) : "") + suffix);
-        }
-      }
-
-      function cleanCloneOfTable(table) {
-        const clone = table.cloneNode(true);
-
-        clone.setAttribute("cellpadding", "0");
-        clone.setAttribute("cellspacing", "0");
-        clone.setAttribute("border", "1");
-        clone.style.borderCollapse = "collapse";
-        clone.style.borderSpacing = "0";
-        clone.style.setProperty("mso-table-lspace", "0pt");
-        clone.style.setProperty("mso-table-rspace", "0pt");
-
-        const srcCells = table.querySelectorAll("td,th");
-        const dstCells = clone.querySelectorAll("td,th");
-        let tableBorderAlt = "";
-        for (let i = 0; i < dstCells.length; i++) {
-          const td = dstCells[i];
-          const src = srcCells[i] || null;
-          td.classList.remove("is-selected", "is-editing");
-          td.removeAttribute("data-addr");
-          td.removeAttribute("data-bind");
-          td.removeAttribute("title");
-
-          const editor = td.querySelector("textarea.cell-editor");
-          const text = editor ? String(editor.value ?? editor.textContent ?? "") : String(td.textContent ?? "");
-          setCellHtmlFromText(td, text);
-
-          td.querySelectorAll("textarea.cell-editor").forEach((ta) => ta.remove());
-          inlineComputedCellStyles(td, src);
-
-          if (!tableBorderAlt) {
-            const s = String(td.getAttribute("style") || "");
-            const m = /mso-border-alt\s*:\s*([^;]+);?/i.exec(s);
-            if (m) tableBorderAlt = String(m[1] || "").trim();
-          }
-        }
-
-        if (tableBorderAlt) {
-          clone.style.setProperty("mso-border-alt", tableBorderAlt);
-          clone.style.setProperty("mso-border-insideh", tableBorderAlt);
-          clone.style.setProperty("mso-border-insidev", tableBorderAlt);
-        }
-
-        return clone;
-      }
-
-      function wrapExcelHtmlFragment(fragmentHtml) {
-        const frag = String(fragmentHtml || "");
-        return (
-          '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">' +
-          "<head><meta charset=\"utf-8\"></head>" +
-          "<body><!--StartFragment-->" +
-          frag +
-          "<!--EndFragment--></body></html>"
-        );
-      }
-
-      function tableToHtml(table) {
-        const clone = cleanCloneOfTable(table);
-        return clone.outerHTML;
-      }
-
-      function tableToTsv(table) {
-        const rows = Array.from(table?.rows || []);
-        const occupied = [];
-        const grid = [];
-        let maxCols = 0;
-
-        for (let r = 0; r < rows.length; r++) {
-          const tr = rows[r];
-          if (!occupied[r]) occupied[r] = [];
-          const row = [];
-          let col = 0;
-
-          const cells = Array.from(tr?.cells || []);
-          for (const cell of cells) {
-            while (occupied[r][col]) col++;
-
-            const rowspan = Math.max(1, Math.floor(Number(cell?.rowSpan || 1)));
-            const colspan = Math.max(1, Math.floor(Number(cell?.colSpan || 1)));
-            const text = String(cell?.innerText ?? cell?.textContent ?? "")
-              .replace(/\r\n/g, "\n")
-              .replace(/\r/g, "\n")
-              .replace(/\u00a0/g, " ")
-              .trimEnd();
-
-            row[col] = text;
-
-            for (let rr = 0; rr < rowspan; rr++) {
-              const rowIdx = r + rr;
-              if (!occupied[rowIdx]) occupied[rowIdx] = [];
-              for (let cc = 0; cc < colspan; cc++) {
-                occupied[rowIdx][col + cc] = true;
-              }
-            }
-
-            col += colspan;
-            maxCols = Math.max(maxCols, col);
-          }
-
-          grid[r] = row;
-        }
-
-        const lines = [];
-        for (let r = 0; r < grid.length; r++) {
-          const row = grid[r] || [];
-          const out = [];
-          for (let c = 0; c < maxCols; c++) out.push(String(row[c] ?? ""));
-          lines.push(out.join("\t"));
-        }
-        return lines.join("\n");
-      }
-
-      async function copyHtmlToClipboard(html, plainText) {
-        const h = String(html || "");
-        const t = String(plainText || "");
-
-        if (document?.execCommand) {
-          const host = document.createElement("div");
-          host.contentEditable = "true";
-          host.style.position = "fixed";
-          host.style.left = "-10000px";
-          host.style.top = "0";
-          host.style.width = "1px";
-          host.style.height = "1px";
-          host.style.opacity = "0";
-          host.innerHTML = h;
-
-          document.body.appendChild(host);
-          try {
-            host.focus();
-          } catch (_) {}
-
-          const range = document.createRange();
-          range.selectNodeContents(host);
-          const sel = window.getSelection();
-          sel.removeAllRanges();
-          sel.addRange(range);
-
-          let ok = false;
-          try {
-            ok = Boolean(document.execCommand("copy"));
-          } catch (_) {
-            ok = false;
-          }
-
-          sel.removeAllRanges();
-          host.remove();
-
-          if (ok) return { ok: true, method: "execCommand" };
-        }
-
-        if (navigator?.clipboard?.write && typeof ClipboardItem !== "undefined") {
-          const wrapped = wrapExcelHtmlFragment(h);
-          const item = new ClipboardItem({
-            "text/html": new Blob([wrapped], { type: "text/html" }),
-            ...(t ? { "text/plain": new Blob([t], { type: "text/plain" }) } : {}),
-          });
-          await navigator.clipboard.write([item]);
-          return { ok: true, method: "clipboard.write" };
-        }
-
-        if (navigator?.clipboard?.writeText) {
-          await navigator.clipboard.writeText(t || "");
-          return { ok: true, method: "writeText" };
-        }
-
-        return { ok: false, error: "Clipboard API not available." };
-      }
-
-      async function copyExcelLikeTableToClipboard(tableEl) {
-        if (!tableEl) return { ok: false, error: "No table to copy." };
-        const html = tableToHtml(tableEl);
-        const tsv = tableToTsv(tableEl);
-        return await copyHtmlToClipboard(html, tsv);
-      }
-
-      ns.templateExcelExport = {
-        copyExcelLikeTableToClipboard,
-        toExcelHtml: (tableEl) => (tableEl ? wrapExcelHtmlFragment(tableToHtml(tableEl)) : ""),
-        toHtml: (tableEl) => (tableEl ? tableToHtml(tableEl) : ""),
-        toTsv: (tableEl) => (tableEl ? tableToTsv(tableEl) : ""),
-      };
-    })(window.AbapFlow);
-
-    </script>
-        <script>
     // js/ui_core.js
     (function (ns) {
       "use strict";
@@ -9585,6 +8312,103 @@
           a.remove();
           window.setTimeout(() => URL.revokeObjectURL(url), 1000);
         };
+    })(window.AbapFlow);
+
+
+    </script>
+        <script>
+    // js/ui_abap_line_numbers.js
+    (function (ns) {
+      "use strict";
+
+      ns.ui = ns.ui || {};
+      const ui = ns.ui;
+
+      let rafPending = false;
+      let lastLineCount = 0;
+
+      function getTextArea() {
+        const ta = ui.$ ? ui.$("abapInput") : document.getElementById("abapInput");
+        return ta instanceof HTMLTextAreaElement ? ta : null;
+      }
+
+      function getHost() {
+        const host = ui.$ ? ui.$("abapLineNumbers") : document.getElementById("abapLineNumbers");
+        return host instanceof HTMLElement ? host : null;
+      }
+
+      function countLines(text) {
+        const s = String(text ?? "");
+        if (!s) return 1;
+        let n = 1;
+        for (let i = 0; i < s.length; i++) {
+          if (s.charCodeAt(i) === 10) n++;
+        }
+        return n;
+      }
+
+      function buildLineNumbersText(lineCount) {
+        const n = Math.max(1, Math.floor(Number(lineCount || 1)));
+        const lines = new Array(n);
+        for (let i = 0; i < n; i++) lines[i] = String(i + 1);
+        return lines.join("\n");
+      }
+
+      function applyMetrics(host, ta) {
+        const style = window.getComputedStyle(ta);
+        if (!style) return;
+
+        if (style.lineHeight) host.style.lineHeight = style.lineHeight;
+        if (style.fontFamily) host.style.fontFamily = style.fontFamily;
+        if (style.fontSize) host.style.fontSize = style.fontSize;
+        if (style.paddingTop) host.style.paddingTop = style.paddingTop;
+        if (style.paddingBottom) host.style.paddingBottom = style.paddingBottom;
+      }
+
+      function updateNow() {
+        const ta = getTextArea();
+        const host = getHost();
+        if (!ta || !host) return;
+
+        applyMetrics(host, ta);
+
+        const lineCount = countLines(ta.value);
+        if (lineCount !== lastLineCount) {
+          host.textContent = buildLineNumbersText(lineCount);
+          lastLineCount = lineCount;
+        }
+
+        host.scrollTop = ta.scrollTop;
+      }
+
+      function scheduleUpdate() {
+        if (rafPending) return;
+        rafPending = true;
+        requestAnimationFrame(() => {
+          rafPending = false;
+          updateNow();
+        });
+      }
+
+      function ensureWired() {
+        const ta = getTextArea();
+        if (!ta) return;
+        if (ta.dataset.abapLineNumbersWired === "1") return;
+        ta.dataset.abapLineNumbersWired = "1";
+
+        ta.addEventListener("scroll", scheduleUpdate);
+        ta.addEventListener("input", scheduleUpdate);
+        window.addEventListener("resize", scheduleUpdate);
+
+        scheduleUpdate();
+      }
+
+      ui.updateAbapLineNumbers = function updateAbapLineNumbers() {
+        ensureWired();
+        scheduleUpdate();
+      };
+
+      ensureWired();
     })(window.AbapFlow);
 
 
@@ -9931,9 +8755,6 @@
               }
             }
 
-            if (document.getElementById("tab-sequence").classList.contains("is-active") && typeof ui.renderSequence === "function") {
-              ui.renderSequence();
-            }
             if (document.getElementById("tab-templates")?.classList.contains("is-active") && typeof ui.renderTemplates === "function") {
               ui.renderTemplates();
             }
@@ -9949,7 +8770,7 @@
         }
       }
 
-      function wireNotesEditorForKey(objectKey, applyLocal, options) {
+      function wireNotesEditorForKey(objectKey, applyLocal) {
         if (!objectKey || !ns.notes) return;
         const descEl = ui.$("annoDesc");
         const noteEl = ui.$("annoNote");
@@ -9974,9 +8795,6 @@
             if (statusEl.textContent === "Saved.") statusEl.textContent = "";
           }, 1200);
 
-          if (options?.rerenderSequence && document.getElementById("tab-sequence").classList.contains("is-active") && typeof ui.renderSequence === "function") {
-            ui.renderSequence();
-          }
           if (document.getElementById("tab-templates")?.classList.contains("is-active") && typeof ui.renderTemplates === "function") {
             ui.renderTemplates();
           }
@@ -10048,16 +8866,10 @@
         return out;
       }
 
-      function selectObject(key, syncTrace) {
+      function selectObject(key) {
         state.selectedKey = key;
         if (typeof ui.renderObjectsTable === "function") ui.renderObjectsTable();
         if (typeof ui.renderDetails === "function") ui.renderDetails();
-
-        if (syncTrace && state.model && key !== "PROGRAM") {
-          const sel = ui.$("traceSubroutine");
-          if (sel) sel.value = key;
-          if (typeof ui.updateTraceVariables === "function") ui.updateTraceVariables();
-        }
       }
 
       function renderObjectsTable() {
@@ -10097,7 +8909,7 @@
             <td>${cycleBadge}</td>
           `;
 
-          tr.addEventListener("click", () => selectObject(obj.key, true));
+          tr.addEventListener("click", () => selectObject(obj.key));
           tbody.appendChild(tr);
         }
       }
@@ -10105,7 +8917,6 @@
       ui.selectObject = selectObject;
       ui.renderObjectsTable = renderObjectsTable;
     })(window.AbapFlow);
-
 
     </script>
         <script>
@@ -10589,7 +9400,6 @@
               if (note) model.userNote = note;
               else delete model.userNote;
             },
-            { rerenderSequence: false },
           );
           ui.wireInlineAnnoEditors();
           return;
@@ -10610,7 +9420,6 @@
             if (note) r.userNote = note;
             else delete r.userNote;
           },
-          { rerenderSequence: true },
         );
         ui.wireInlineAnnoEditors();
       }
@@ -12748,7 +11557,6 @@
       let selectedTemplateCard = null;
       let selectedTemplateResultIds = new Set();
       let collapsedTemplateResultIds = new Set();
-      let tableByResultId = new Map();
       let lastRenderOrder = [];
       let lastToolbarUpdate = null;
 
@@ -13353,13 +12161,13 @@
 
       function handleTemplatesDblClick(event) {
         const t = event?.target && event.target.nodeType === 1 ? event.target : event?.target?.parentElement;
-        const td = t?.closest ? t.closest("td[data-bind]") : null;
-        if (!td) return;
+        const el = t?.closest ? t.closest("[data-bind]") : null;
+        if (!el) return;
 
-        const bind = String(td.dataset.bind || "").trim();
+        const bind = String(el.dataset.bind || "").trim();
         if (!isEditableDescriptionBind(bind)) return;
 
-        const card = td.closest(".template-block");
+        const card = el.closest(".template-block");
         const resultId = String(card?.dataset?.resultId || "").trim();
         const templateId = String(card?.dataset?.templateId || "").trim();
         if (!resultId || !templateId) return;
@@ -13500,7 +12308,7 @@
           // ignore and fall back to single-key editor
         }
 
-        const initial = String(td.textContent ?? "");
+        const initial = String(el.textContent ?? "");
 
         openDescriptionEditorDialog({ title, value: initial }).then(({ action, value }) => {
           const nextValue = String(value ?? "").trim();
@@ -13596,59 +12404,324 @@
         updateTemplatesToolbar();
       }
 
-      function cloneTableWithTrailingBlankRow(tableEl) {
-        if (!tableEl || typeof tableEl.cloneNode !== "function") return null;
-        const clone = tableEl.cloneNode(true);
-
-        const colCount = clone.querySelectorAll("colgroup col").length || 1;
-
-        const td = document.createElement("td");
-        td.textContent = "\u00a0";
-        td.style.border = "none";
-        td.style.padding = "0";
-        td.style.height = "18px";
-        td.colSpan = colCount;
-
-        const tr = document.createElement("tr");
-        tr.appendChild(td);
-
-        const tbody = clone.tBodies && clone.tBodies.length ? clone.tBodies[clone.tBodies.length - 1] : clone;
-        tbody.appendChild(tr);
-
-        return clone;
+      function escapeXmlAttr(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&apos;");
       }
 
-      async function copySelectedTables() {
+      function wrapCdata(text) {
+        const raw = String(text ?? "");
+        if (!raw) return "<![CDATA[]]>";
+        return `<![CDATA[${raw.replace(/]]>/g, "]]]]><![CDATA[>")}]]>`;
+      }
+
+      function safeXmlTagName(name) {
+        const raw = String(name ?? "").trim();
+        if (!raw) return "item";
+
+        let out = raw.replace(/[^A-Za-z0-9_.:-]/g, "_");
+        if (!/^[A-Za-z_]/.test(out)) out = `k_${out}`;
+        return out;
+      }
+
+      function appendXmlValue(lines, tagName, value, indent, seen) {
+        const pad = " ".repeat(Math.max(0, Number(indent || 0)));
+        const tag = safeXmlTagName(tagName);
+
+        if (value == null) {
+          lines.push(`${pad}<${tag} />`);
+          return;
+        }
+
+        if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+          lines.push(`${pad}<${tag}>${wrapCdata(String(value))}</${tag}>`);
+          return;
+        }
+
+        if (Array.isArray(value)) {
+          lines.push(`${pad}<${tag}>`);
+          for (const it of value) appendXmlValue(lines, "item", it, indent + 2, seen);
+          lines.push(`${pad}</${tag}>`);
+          return;
+        }
+
+        if (typeof value === "object") {
+          if (seen.has(value)) {
+            lines.push(`${pad}<${tag} />`);
+            return;
+          }
+
+          seen.add(value);
+          lines.push(`${pad}<${tag}>`);
+          for (const [k, v] of Object.entries(value)) appendXmlValue(lines, k, v, indent + 2, seen);
+          lines.push(`${pad}</${tag}>`);
+          seen.delete(value);
+          return;
+        }
+
+        lines.push(`${pad}<${tag}>${wrapCdata(String(value))}</${tag}>`);
+      }
+
+      function buildTemplatesExportXml(items) {
+        const stamp = new Date().toISOString();
+        const lines = [];
+        lines.push('<?xml version="1.0" encoding="utf-8"?>');
+        lines.push(`<abapflowObjects schema="abapflow-objects-export" version="1" createdAt="${escapeXmlAttr(stamp)}">`);
+
+        for (const it of items || []) {
+          if (!it) continue;
+          const src = it.sourceRef || null;
+          const startLine = src?.startLine != null ? String(src.startLine) : "";
+          const endLine = src?.endLine != null ? String(src.endLine) : "";
+          const depth = it.depth != null ? String(it.depth) : "";
+
+          lines.push(
+            `  <object kind="${escapeXmlAttr(it.kind)}" resultId="${escapeXmlAttr(it.resultId)}" objectId="${escapeXmlAttr(it.objectId)}" templateId="${escapeXmlAttr(it.templateId)}"${depth ? ` depth="${escapeXmlAttr(depth)}"` : ""}${startLine ? ` startLine="${escapeXmlAttr(startLine)}"` : ""}${endLine ? ` endLine="${escapeXmlAttr(endLine)}"` : ""}>`,
+          );
+          lines.push(`    <routineKey>${wrapCdata(it.routineKey)}</routineKey>`);
+          lines.push(`    <original>${wrapCdata(it.original)}</original>`);
+
+          lines.push("    <context>");
+          const ctx = it.context && typeof it.context === "object" ? it.context : null;
+          if (ctx) {
+            const seen = new Set();
+            for (const [k, v] of Object.entries(ctx)) appendXmlValue(lines, k, v, 6, seen);
+          }
+          lines.push("    </context>");
+
+          lines.push("  </object>");
+        }
+
+        lines.push("</abapflowObjects>");
+        lines.push("");
+        return lines.join("\n");
+      }
+
+      function getExportResultIds() {
+        const orderedIds = lastRenderOrder.filter((id) => selectedTemplateResultIds.has(id));
+        if (orderedIds.length) return orderedIds;
+        const active = String(selectedTemplateCard?.dataset?.resultId || "").trim();
+        if (active) return [active];
+        return [];
+      }
+
+      function collectTemplatesExportItems(resultIds) {
+        const out = [];
+
+        for (const id of resultIds || []) {
+          const rid = String(id || "").trim();
+          if (!rid) continue;
+          const result = templateResultById.get(rid) || null;
+          if (!result) continue;
+
+          out.push({
+            kind: String(result.kind || ""),
+            resultId: String(result.resultId || rid),
+            objectId: String(result.objectId || ""),
+            templateId: String(result.templateId || ""),
+            routineKey: String(result.routineKey || ""),
+            sourceRef: result.sourceRef || null,
+            original: String(result.original || ""),
+            context: result.context || null,
+          });
+        }
+
+        return out;
+      }
+
+      async function handleTemplatesExport(action) {
+        const ids = getExportResultIds();
+        if (!ids.length) {
+          ui.setStatus("Select a template (click) or tick checkboxes first.", true);
+          return;
+        }
+
+        const items = collectTemplatesExportItems(ids);
+        if (!items.length) {
+          ui.setStatus("Nothing to export.", true);
+          return;
+        }
+
+        const stamp = new Date().toISOString().replace(/[:]/g, "-").slice(0, 19);
+
+        const text = buildTemplatesExportXml(items);
+        const filename = `abapflow-objects-${stamp}.xml`;
+        const mimeType = "application/xml";
+
+        if (action === "download") {
+          ui.downloadTextFile(filename, text, mimeType);
+          ui.setStatus(`Downloaded: ${filename}`, false);
+          return;
+        }
+
         if (!ui.clipboard?.copyHtml) {
           ui.setStatus("Clipboard module not loaded.", true);
           return;
         }
 
-        const exporter = ns.templateExcelExport || null;
+        const ok = await ui.clipboard.copyHtml("", text);
+        ui.setStatus(ok ? `Copied XML export (${items.length} item(s)).` : "Copy failed (browser blocked clipboard).", !ok);
+      }
 
-        const orderedIds = lastRenderOrder.filter((id) => selectedTemplateResultIds.has(id));
-        const tables = orderedIds.map((id) => tableByResultId.get(id)).filter(Boolean);
-        if (!tables.length) {
-          ui.setStatus("No template selected.", true);
-          return;
+      function compareNaturalStrings(a, b) {
+        const aa = String(a ?? "");
+        const bb = String(b ?? "");
+        if (aa === bb) return 0;
+
+        const ra = aa.match(/\d+|\D+/g) || [];
+        const rb = bb.match(/\d+|\D+/g) || [];
+        const n = Math.min(ra.length, rb.length);
+
+        for (let i = 0; i < n; i++) {
+          const ta = ra[i];
+          const tb = rb[i];
+          if (ta === tb) continue;
+
+          const da = /^\d+$/.test(ta);
+          const db = /^\d+$/.test(tb);
+          if (da && db) {
+            const na = Number(ta);
+            const nb = Number(tb);
+            if (na !== nb) return na - nb;
+          }
+
+          const cmp = ta.localeCompare(tb);
+          if (cmp) return cmp;
         }
 
-        const html = tables
-          .map((t, idx) => {
-            if (idx < tables.length - 1) {
-              const clone = cloneTableWithTrailingBlankRow(t);
-              const tableHtml = clone ? (exporter?.toExcelHtml ? exporter.toExcelHtml(clone) : clone.outerHTML) : "";
-              return `<div>${tableHtml}</div>`;
+        return ra.length - rb.length;
+      }
+
+      function parseExcelAddress(addr) {
+        const raw = String(addr ?? "").trim();
+        if (!raw) return null;
+
+        const m = /^([A-Za-z]+)(\d+)$/.exec(raw);
+        if (!m) return null;
+
+        const letters = String(m[1] || "").toUpperCase();
+        const row = Number(m[2]);
+        if (!Number.isFinite(row) || row <= 0) return null;
+
+        let col = 0;
+        for (let i = 0; i < letters.length; i++) {
+          const code = letters.charCodeAt(i);
+          if (code < 65 || code > 90) return null;
+          col = col * 26 + (code - 64);
+        }
+
+        if (!Number.isFinite(col) || col <= 0) return null;
+        return { row, col };
+      }
+
+      function excelPosKey(addr) {
+        const parsed = parseExcelAddress(addr);
+        if (!parsed) return Number.POSITIVE_INFINITY;
+        return parsed.row * 10000 + parsed.col;
+      }
+
+      function renderTemplateStruct(result) {
+        const filled = result?.filledConfig || null;
+        const cells = Array.isArray(filled?.cells) ? filled.cells : [];
+        const bindToEntry = new Map();
+
+        for (const cell of cells) {
+          const bind = String(cell?.bind || "").trim();
+          if (!bind) continue;
+          const text = String(cell?.text ?? "");
+          const pos = excelPosKey(cell?.addr);
+
+          if (!bindToEntry.has(bind)) bindToEntry.set(bind, { text, pos });
+          else {
+            const entry = bindToEntry.get(bind);
+            entry.text = text;
+            entry.pos = Math.min(entry.pos, pos);
+          }
+        }
+
+        const entries = Array.from(bindToEntry.entries())
+          .map(([bind, entry]) => ({ bind, text: entry.text, pos: entry.pos }))
+          .sort((a, b) => {
+            if (a.pos !== b.pos) return a.pos - b.pos;
+            return compareNaturalStrings(a.bind, b.bind);
+          });
+
+        const root = { key: "", bind: "", value: null, children: new Map() };
+
+        for (const { bind, text } of entries) {
+          const parts = bind
+            .split(".")
+            .map((p) => p.trim())
+            .filter(Boolean);
+          if (!parts.length) continue;
+
+          let cur = root;
+          let path = "";
+          for (const part of parts) {
+            path = path ? `${path}.${part}` : part;
+            if (!cur.children.has(part)) cur.children.set(part, { key: part, bind: path, value: null, children: new Map() });
+            cur = cur.children.get(part);
+          }
+          cur.value = text;
+        }
+
+        const host = document.createElement("div");
+        host.className = "template-struct";
+
+        function renderNode(node, depth) {
+          const row = document.createElement("div");
+          row.className = "template-struct__row";
+          row.style.paddingLeft = `${Math.max(0, depth) * 14}px`;
+
+          const keyEl = document.createElement("div");
+          keyEl.className = "template-struct__key";
+          keyEl.textContent = node.key;
+
+          const valueEl = document.createElement("div");
+          valueEl.className = "template-struct__value";
+
+          const hasValue = typeof node.value === "string";
+          if (hasValue) {
+            const raw = String(node.value ?? "");
+            const trimmed = raw.trim();
+            valueEl.textContent = trimmed ? raw : "(empty)";
+            if (!trimmed) valueEl.classList.add("template-struct__value--empty");
+
+            if (isEditableDescriptionBind(node.bind)) {
+              valueEl.dataset.bind = node.bind;
+              valueEl.classList.add("template-struct__value--editable");
+              valueEl.title = "Double-click để sửa mô tả (local/global).";
+            } else {
+              valueEl.title = node.bind;
             }
+          } else if (node.children.size) {
+            valueEl.textContent = "";
+          } else {
+            valueEl.textContent = "(empty)";
+            valueEl.classList.add("template-struct__value--empty");
+          }
 
-            const tableHtml = exporter?.toExcelHtml ? exporter.toExcelHtml(t) : t.outerHTML;
-            return `<div>${tableHtml}</div>`;
-          })
-          .join("\n");
-        const plain = exporter?.toTsv ? tables.map((t) => exporter.toTsv(t)).join("\n\n") : tables.map((t) => t.innerText || "").join("\n\n");
+          row.appendChild(keyEl);
+          row.appendChild(valueEl);
+          host.appendChild(row);
 
-        const ok = await ui.clipboard.copyHtml(html, plain);
-        ui.setStatus(ok ? `Copied ${tables.length} table(s) to clipboard.` : "Copy failed (browser blocked clipboard).", !ok);
+          for (const child of node.children.values()) renderNode(child, depth + 1);
+        }
+
+        if (!root.children.size) {
+          const empty = document.createElement("div");
+          empty.className = "template-struct__empty";
+          empty.textContent = "No bound values.";
+          host.appendChild(empty);
+          return host;
+        }
+
+        for (const child of root.children.values()) renderNode(child, 0);
+        return host;
       }
 
       function renderTemplates(options) {
@@ -13657,7 +12730,6 @@
 
         selectedTemplateCard = null;
         templateResultById = new Map();
-        tableByResultId = new Map();
         lastRenderOrder = [];
         lastToolbarUpdate = null;
 
@@ -13670,7 +12742,7 @@
           return;
         }
 
-        if (!ns.templateRegistry || !ns.templateConverter || !ns.tableRenderer) {
+        if (!ns.templateRegistry || !ns.templateConverter) {
           host.textContent = "Template modules not loaded.";
           host.classList.add("empty");
           return;
@@ -13707,15 +12779,6 @@
         const toolbarActions = document.createElement("div");
         toolbarActions.className = "templates-toolbar__actions";
 
-        const btnCopySelected = document.createElement("button");
-        btnCopySelected.type = "button";
-        btnCopySelected.className = "btn btn-sm btn-primary";
-        btnCopySelected.textContent = "Copy selected";
-        btnCopySelected.addEventListener("click", (e) => {
-          e.preventDefault();
-          copySelectedTables();
-        });
-
         const btnClearSelected = document.createElement("button");
         btnClearSelected.type = "button";
         btnClearSelected.className = "btn btn-sm";
@@ -13728,8 +12791,35 @@
           updateTemplatesToolbar();
         });
 
-        toolbarActions.appendChild(btnCopySelected);
         toolbarActions.appendChild(btnClearSelected);
+
+        const exportLabel = document.createElement("span");
+        exportLabel.textContent = "Export:";
+        exportLabel.style.color = "var(--muted)";
+        exportLabel.style.fontSize = "12px";
+        exportLabel.style.alignSelf = "center";
+
+        const btnCopyExport = document.createElement("button");
+        btnCopyExport.type = "button";
+        btnCopyExport.className = "btn btn-sm";
+        btnCopyExport.textContent = "Copy";
+        btnCopyExport.addEventListener("click", async (e) => {
+          e.preventDefault();
+          await handleTemplatesExport("copy");
+        });
+
+        const btnDownloadExport = document.createElement("button");
+        btnDownloadExport.type = "button";
+        btnDownloadExport.className = "btn btn-sm";
+        btnDownloadExport.textContent = "Download";
+        btnDownloadExport.addEventListener("click", (e) => {
+          e.preventDefault();
+          handleTemplatesExport("download");
+        });
+
+        toolbarActions.appendChild(exportLabel);
+        toolbarActions.appendChild(btnCopyExport);
+        toolbarActions.appendChild(btnDownloadExport);
 
         toolbar.appendChild(toolbarCount);
         toolbar.appendChild(toolbarActions);
@@ -13739,7 +12829,6 @@
         lastToolbarUpdate = () => {
           const n = selectedTemplateResultIds.size;
           toolbarCount.textContent = `Selected: ${n}`;
-          btnCopySelected.disabled = n === 0;
           btnClearSelected.disabled = n === 0;
         };
         updateTemplatesToolbar();
@@ -13867,48 +12956,13 @@
           headerLeft.appendChild(checkbox);
           headerLeft.appendChild(title);
 
-          const headerActions = document.createElement("div");
-          headerActions.className = "template-block__actions";
-
-          const btnCopy = document.createElement("button");
-          btnCopy.type = "button";
-          btnCopy.className = "btn btn-sm";
-          btnCopy.textContent = "Copy";
-          btnCopy.title = "Copy HTML table to clipboard (paste into Excel)";
-          btnCopy.addEventListener("click", async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!ui.clipboard?.copyHtml) {
-              ui.setStatus("Clipboard module not loaded.", true);
-              return;
-            }
-            const t = tableByResultId.get(resultIdStr);
-            if (!t) {
-              ui.setStatus("No table to copy.", true);
-              return;
-            }
-            const exporter = ns.templateExcelExport || null;
-            const html = exporter?.toExcelHtml ? exporter.toExcelHtml(t) : t.outerHTML;
-            const plain = exporter?.toTsv ? exporter.toTsv(t) : t.innerText || title.textContent || "";
-            const ok = await ui.clipboard.copyHtml(`<div>${html}</div>`, plain);
-            ui.setStatus(ok ? "Copied HTML table (paste into Excel)." : "Copy failed (browser blocked clipboard).", !ok);
-          });
-
-          headerActions.appendChild(btnCopy);
-
           header.appendChild(headerLeft);
-          header.appendChild(headerActions);
           card.appendChild(header);
 
-          const tableWrap = document.createElement("div");
-          tableWrap.className = "template-block__table";
-          const tableEl = ns.tableRenderer.renderExcelLikeTable(result.filledConfig);
-          tableWrap.appendChild(tableEl);
-          card.appendChild(tableWrap);
-
-          if (tableEl && tableEl.tagName === "TABLE") {
-            tableByResultId.set(resultIdStr, tableEl);
-          }
+          const contentWrap = document.createElement("div");
+          contentWrap.className = "template-block__table";
+          contentWrap.appendChild(renderTemplateStruct(result));
+          card.appendChild(contentWrap);
 
           card.addEventListener("click", () => {
             if (selectedTemplateCard) selectedTemplateCard.classList.remove("is-selected");
@@ -13946,6 +13000,7 @@
       ui.handleTemplatesDblClick = handleTemplatesDblClick;
       ui.renderTemplates = renderTemplates;
       ui.scrollToTemplateResultId = scrollToTemplateResultId;
+      ui.buildAbapflowObjectsXml = buildTemplatesExportXml;
     })(window.AbapFlow);
 
     </script>
@@ -13954,87 +13009,8 @@
     (function (ns) {
       "use strict";
 
-      const utils = ns.utils;
       const ui = ns.ui;
       const state = ui.state;
-      const TRACE_ALL_GLOBALS_KEY = ui.constants.TRACE_ALL_GLOBALS_KEY;
-
-      const sourceLink = ui.sourceLink;
-      const renderAnnoSummaryHtml = ui.renderAnnoSummaryHtml;
-      const renderInlineAnnoEditorHtml = ui.renderInlineAnnoEditorHtml;
-      const wireInlineAnnoEditors = ui.wireInlineAnnoEditors;
-
-      function renderDiagram() {
-        const model = state.model;
-        const host = ui.$("diagramHost");
-        if (!host) return;
-        host.innerHTML = "";
-        if (!model) return;
-
-        ns.diagram.render(model, host, {
-          onNodeClick: (key) => {
-            ui.selectObject(key, true);
-            ui.setActiveTab("objects");
-          },
-        });
-      }
-
-      function goToTrace(routineKey, varName) {
-        const model = state.model;
-        if (!model) return;
-        ui.setActiveTab("trace");
-        const subSel = ui.$("traceSubroutine");
-        if (subSel) subSel.value = routineKey;
-        updateTraceVariables();
-        const varSel = ui.$("traceVariable");
-        if (varSel) varSel.value = varName;
-        runTrace();
-      }
-
-      function renderSequenceControls() {
-        const model = state.model;
-        const sel = ui.$("seqRoot");
-        if (!sel) return;
-        sel.innerHTML = "";
-        if (!model) return;
-
-        const items = ns.sequence.getStartCandidates(model);
-        for (const it of items) {
-          const opt = document.createElement("option");
-          opt.value = it.key;
-          opt.textContent = it.label;
-          sel.appendChild(opt);
-        }
-
-        const preferred =
-          items.find((x) => x.key === ns.sequence.PROGRAM_ALL_KEY) ||
-          items.find((x) => x.key === "EVENT:START-OF-SELECTION") ||
-          items.find((x) => x.key === "EVENT:INITIALIZATION") ||
-          items[0] ||
-          null;
-        if (preferred) sel.value = preferred.key;
-      }
-
-      function renderSequence() {
-        const model = state.model;
-        const host = ui.$("sequenceHost");
-        if (!host) return;
-
-        if (!model) {
-          host.textContent = "Analyze to see sequence.";
-          host.classList.add("empty");
-          return;
-        }
-
-        host.classList.remove("empty");
-        const startKey = ui.$("seqRoot")?.value;
-        const maxSteps = Number(ui.$("seqMaxSteps")?.value || 200);
-        const seq = ns.sequence.build(model, startKey, { maxSteps });
-        ns.sequence.render(host, model, seq, {
-          onParamClick: ({ routineKey, varName }) => goToTrace(routineKey, varName),
-          onRowClick: ({ routineKey }) => ui.selectObject(routineKey, true),
-        });
-      }
 
       function renderJson() {
         const out = ui.$("jsonOutput");
@@ -14049,410 +13025,80 @@
         out.textContent = JSON.stringify(model.serialize(), null, 2);
       }
 
-      function renderTraceSubroutines() {
+      function buildAllTemplatesObjectsExportXml(options) {
         const model = state.model;
-        const sel = ui.$("traceSubroutine");
-        if (!sel) return;
-        sel.innerHTML = "";
-        if (!model) return;
+        if (!model) return { ok: false, error: "Analyze first." };
 
-        const globalsOpt = document.createElement("option");
-        globalsOpt.value = TRACE_ALL_GLOBALS_KEY;
-        globalsOpt.textContent = "CUSTOMISE (All globals)";
-        sel.appendChild(globalsOpt);
-
-        const sep = document.createElement("option");
-        sep.disabled = true;
-        sep.textContent = "────────────";
-        sel.appendChild(sep);
-
-        const nodes = Array.from(model.nodes.values()).sort((a, b) => {
-          const ka = a.kind === "EVENT" ? 0 : a.kind === "FORM" ? 1 : 2;
-          const kb = b.kind === "EVENT" ? 0 : b.kind === "FORM" ? 1 : 2;
-          if (ka !== kb) return ka - kb;
-          return a.name.localeCompare(b.name);
-        });
-
-        for (const n of nodes) {
-          const opt = document.createElement("option");
-          opt.value = n.key;
-          opt.textContent = `${n.kind} ${n.name}${n.isDefined ? "" : " (external)"}`;
-          sel.appendChild(opt);
+        const tpl = ui.templates || null;
+        if (!tpl?.listTemplateEntries || !tpl?.pickAutoTemplatesBySource || !tpl?.buildTemplatesFlow) {
+          return { ok: false, error: "Template modules not loaded." };
         }
 
-        if (nodes.length > 0) sel.value = nodes[0].key;
-        else sel.value = TRACE_ALL_GLOBALS_KEY;
-        updateTraceVariables();
-      }
+        const maxStepsRaw = Number(options?.maxSteps ?? ui.$("xmlMaxSteps")?.value ?? 5000);
+        const maxSteps = Number.isFinite(maxStepsRaw) && maxStepsRaw > 0 ? Math.floor(maxStepsRaw) : 5000;
 
-      function updateTraceVariables() {
-        const model = state.model;
-        const subKey = ui.$("traceSubroutine")?.value;
-        const sel = ui.$("traceVariable");
-        if (!sel) return;
-        sel.innerHTML = "";
-        if (!model || !subKey) return;
-
-        const vars =
-          subKey === TRACE_ALL_GLOBALS_KEY
-            ? ns.lineage.getGlobalVariables(model)
-            : ns.lineage.getVariablesForRoutine(model, subKey, { globalMode: "used" });
-        for (const v of vars) {
-          const opt = document.createElement("option");
-          opt.value = v.name;
-          opt.textContent = `${v.name} (${v.scope})`;
-          sel.appendChild(opt);
+        const entries = tpl.listTemplateEntries();
+        const templatesBySource = tpl.pickAutoTemplatesBySource(entries);
+        if (!templatesBySource || typeof templatesBySource.size !== "number" || templatesBySource.size === 0) {
+          return { ok: false, error: "No templates configured." };
         }
+
+        const flow = tpl.buildTemplatesFlow(model, templatesBySource, { maxSteps });
+        const items = [];
+
+        for (const it of flow?.items || []) {
+          if (!it || it.kind !== "template") continue;
+          const r = it.result || null;
+          if (!r) continue;
+
+          const depthRaw = Number(it.depth ?? 0);
+          const depth = Number.isFinite(depthRaw) ? Math.max(0, Math.floor(depthRaw)) : 0;
+          items.push({
+            kind: String(r.kind || ""),
+            resultId: String(r.resultId || ""),
+            objectId: String(r.objectId || ""),
+            templateId: String(r.templateId || ""),
+            routineKey: String(r.routineKey || ""),
+            sourceRef: r.sourceRef || null,
+            original: String(r.original || ""),
+            context: r.context || null,
+            depth,
+          });
+        }
+
+        if (!items.length) return { ok: false, error: "No template-mapped statements found." };
+
+        const build = typeof ui.buildAbapflowObjectsXml === "function" ? ui.buildAbapflowObjectsXml : null;
+        if (!build) return { ok: false, error: "XML exporter not loaded." };
+
+        const xml = build(items);
+        return { ok: true, xml, count: items.length, truncated: Boolean(flow?.truncated), maxSteps };
       }
 
-      function renderTraceResults(result) {
-        const el = ui.$("traceResults");
-        if (!el) return;
-        if (!result || result.error) {
-          el.textContent = result?.error || "Trace failed.";
-          el.classList.add("empty");
+      function renderXml(options) {
+        const out = ui.$("xmlOutput");
+        if (!out) return;
+
+        if (!state.model) {
+          out.textContent = "Analyze to see XML.";
+          out.classList.add("empty");
           return;
         }
 
-        const root = result.root;
-        if (!root) {
-          el.textContent = "No results.";
-          el.classList.add("empty");
+        const res = buildAllTemplatesObjectsExportXml(options);
+        if (!res.ok) {
+          out.textContent = String(res.error || "Cannot build XML.");
+          out.classList.add("empty");
           return;
         }
 
-        el.classList.remove("empty");
-
-        function renderNode(node, indent) {
-          const pad = indent * 14;
-          const headerText = `${sourceLink(
-            `${node.routineKind} ${node.routineName} (var ${node.varName})`,
-            node.sourceRef,
-          )}${node.cycle ? ' <span class="badge badge-danger">cycle</span>' : ""}${node.truncated ? ' <span class="badge">truncated</span>' : ""}`;
-          const header = `<div class="trace-node__header" style="padding-left:${pad}px"><button type="button" class="trace-node__toggle" aria-expanded="true" title="Collapse/expand">▾</button><span class="trace-node__header-text">${headerText}</span></div>`;
-
-          const decl = node.resolution?.decl;
-          const declText = decl?.description ? ` - ${utils.escapeHtml(decl.description)}` : "";
-          const scope = node.resolution?.scope ? `${node.resolution.scope}` : "unknown";
-          const declLine = decl?.sourceRef?.startLine ? ` (line ${decl.sourceRef.startLine})` : "";
-          let declStmt = "";
-          if (decl && decl.declKind) {
-            const declUpper = String(decl.declKind || "").toUpperCase();
-            const valueKeyword = declUpper === "PARAMETERS" ? "DEFAULT" : "VALUE";
-            declStmt = `${decl.declKind} ${decl.variableName}${decl.dataType ? ` TYPE ${decl.dataType}` : ""}${decl.value ? ` ${valueKeyword} ${decl.value}` : ""}`;
-          } else if (decl && decl.kind && decl.name) {
-            declStmt = `${decl.kind} ${decl.name}${decl.dataType ? ` TYPE ${decl.dataType}` : ""}`;
-          }
-          const declLinkText = declStmt ? ` | Decl: ${sourceLink(declStmt, decl?.sourceRef || null)}` : "";
-          const meta = `<div class="trace-node__meta" style="padding-left:${pad}px">Scope: ${utils.escapeHtml(scope)}${utils.escapeHtml(declLine)}${declText}${declLinkText}</div>`;
-
-          const routineKey = String(node.routineKey || "");
-          const model = state.model;
-          const routine = routineKey && routineKey !== "PROGRAM" ? model?.nodes?.get(routineKey) || null : null;
-          const codeRoutineDesc = String(routine?.description || "").trim();
-          const userRoutineDesc =
-            routineKey === "PROGRAM" ? String(model?.userDescription || "").trim() : String(routine?.userDescription || "").trim();
-          const userRoutineNote = routineKey === "PROGRAM" ? String(model?.userNote || "").trim() : String(routine?.userNote || "").trim();
-          const routineSummary = renderAnnoSummaryHtml({
-            codeDesc: codeRoutineDesc,
-            userDesc: userRoutineDesc,
-            userNote: userRoutineNote,
-          });
-
-          const routineEdit =
-            routineKey && ns.notes
-              ? renderInlineAnnoEditorHtml({
-                  title: `Edit object notes — ${node.routineKind} ${node.routineName}`,
-                  codeDesc: codeRoutineDesc,
-                  userDesc: userRoutineDesc,
-                  userNote: userRoutineNote,
-                  annoType: "routine",
-                  annoKey: routineKey,
-                  attrs: { "data-routine-key": routineKey },
-                })
-              : "";
-
-          let varSummary = "";
-          let varEdit = "";
-          let varTitle = "";
-          const varCards = [];
-
-          if (decl && ns.notes) {
-            let originNode = node;
-            let originDecl = decl;
-            let originScopeName = String(node.resolution?.scope || "").toLowerCase();
-            let originRoutineKey = routineKey;
-
-            // If this variable is a PARAM, follow the first caller-chain until we reach a declared DATA/CONSTANTS/global.
-            if (originScopeName === "parameter") {
-              const seen = new Set();
-              for (let i = 0; i < 30; i++) {
-                const visitKey = `${originNode?.routineKey || ""}|${String(originNode?.varName || "").toLowerCase()}`;
-                if (seen.has(visitKey)) break;
-                seen.add(visitKey);
-
-                const s = String(originNode?.resolution?.scope || "").toLowerCase();
-                if (s !== "parameter") break;
-
-                const next = (originNode?.calls || []).find((c) => c?.direction === "fromCaller" && c?.child) || null;
-                if (!next?.child) break;
-                originNode = next.child;
-              }
-
-              originRoutineKey = String(originNode?.routineKey || routineKey);
-              originDecl = originNode?.resolution?.decl || null;
-              originScopeName = String(originNode?.resolution?.scope || "").toLowerCase();
-            }
-
-            function isSimpleStructFieldName(name) {
-              const s = String(name || "");
-              if (!s.includes("-")) return false;
-              if (s.includes("->") || s.includes("=>") || s.includes("~")) return false;
-              return true;
-            }
-
-            function resolveTypeFieldForVirtualDecl(declObj) {
-              const origin = declObj?.virtualOrigin && typeof declObj.virtualOrigin === "object" ? declObj.virtualOrigin : null;
-              if (!origin || origin.kind !== "typeField") return null;
-
-              const typeScopeKey = String(origin.typeScopeKey || "").trim() || "PROGRAM";
-              const typeName = String(origin.typeName || "").trim();
-              const fieldPath = String(origin.fieldPath || "").trim();
-              if (!typeName || !fieldPath) return null;
-
-              const typeKey = `${typeScopeKey}|${typeName.toLowerCase()}`;
-              const typeDef = model?.typeDefs?.get ? model.typeDefs.get(typeKey) : null;
-              const field = typeDef?.fields?.get ? typeDef.fields.get(fieldPath.toLowerCase()) : null;
-              if (!field) return null;
-
-              return { typeScopeKey, typeName, fieldPath, field };
-            }
-
-            function findDeclInScope(scopeKey, declKind, varName) {
-              const sk = String(scopeKey || "").trim();
-              const dk = String(declKind || "").trim().toUpperCase();
-              const vnLower = String(varName || "").trim().toLowerCase();
-              if (!sk || !dk || !vnLower) return null;
-
-              if (sk === "PROGRAM") {
-                const list = dk === "CONSTANTS" ? model.globalConstants : model.globalData;
-                return (list || []).find((x) => String(x?.variableName || "").toLowerCase() === vnLower) || null;
-              }
-
-              const rNode = model?.nodes?.get ? model.nodes.get(sk) : null;
-              const list = dk === "CONSTANTS" ? rNode?.localConstants : rNode?.localData;
-              return (list || []).find((x) => String(x?.variableName || "").toLowerCase() === vnLower) || null;
-            }
-
-            function pushDeclVarCard(scopeKey, scopeLabel, declObj, label) {
-              if (!declObj || !declObj.declKind || !declObj.variableName) return;
-              const title = `Variable notes — ${label}${scopeLabel ? ` (${scopeLabel})` : ""}`;
-
-              const typeField = declObj.isVirtual ? resolveTypeFieldForVirtualDecl(declObj) : null;
-              const codeDesc = String((typeField?.field?.description ?? declObj.description) || "").trim();
-              const userDesc = String((typeField?.field?.userDescription ?? declObj.userDescription) || "").trim();
-              const userNote = String((typeField?.field?.userNote ?? declObj.userNote) || "").trim();
-              const summary = renderAnnoSummaryHtml({ codeDesc, userDesc, userNote });
-
-              if (typeField && ns.notes?.makeTypeFieldKey) {
-                const key = ns.notes.makeTypeFieldKey(typeField.typeScopeKey, typeField.typeName, typeField.fieldPath);
-                const editor = key
-                  ? renderInlineAnnoEditorHtml({
-                      title,
-                      codeDesc,
-                      userDesc,
-                      userNote,
-                      annoType: "typefield",
-                      annoKey: key,
-                      attrs: {
-                        "data-type-scope-key": typeField.typeScopeKey,
-                        "data-type-name": typeField.typeName,
-                        "data-field-path": typeField.fieldPath,
-                      },
-                    })
-                  : "";
-                varCards.push(renderNotesCard("var", title, summary, editor));
-                return;
-              }
-
-              if (ns.notes?.makeDeclKey) {
-                const key = ns.notes.makeDeclKey(scopeKey, declObj.declKind, declObj.variableName);
-                const editor = key
-                  ? renderInlineAnnoEditorHtml({
-                      title,
-                      codeDesc,
-                      userDesc,
-                      userNote,
-                      annoType: "decl",
-                      annoKey: key,
-                      attrs: {
-                        "data-scope-key": scopeKey,
-                        "data-decl-kind": declObj.declKind,
-                        "data-var-name": declObj.variableName,
-                      },
-                    })
-                  : "";
-                varCards.push(renderNotesCard("var", title, summary, editor));
-              }
-            }
-
-            if (originDecl && originScopeName === "parameter" && originDecl.name && ns.notes.makeParamKey) {
-              const originRoutine = originRoutineKey && originRoutineKey !== "PROGRAM" ? model?.nodes?.get(originRoutineKey) || null : null;
-              const originRoutineLabel = originRoutine ? `${originRoutine.kind} ${originRoutine.name}` : originRoutineKey || "";
-              varTitle = `Variable notes — PARAM ${String(originDecl.name || "")}${originRoutineLabel ? ` (${originRoutineLabel})` : ""}`;
-              const paramKey = ns.notes.makeParamKey(originRoutineKey, originDecl.name);
-              const codeDesc = String(originDecl.description || "").trim();
-              const userDesc = String(originDecl.userDescription || "").trim();
-              const userNote = String(originDecl.userNote || "").trim();
-              varSummary = renderAnnoSummaryHtml({ codeDesc, userDesc, userNote });
-
-              if (paramKey) {
-                varEdit = renderInlineAnnoEditorHtml({
-                  title: `Edit variable notes — PARAM ${String(originDecl.name || "")}${originRoutineLabel ? ` (${originRoutineLabel})` : ""}`,
-                  codeDesc,
-                  userDesc,
-                  userNote,
-                  annoType: "param",
-                  annoKey: paramKey,
-                  attrs: {
-                    "data-routine-key": originRoutineKey,
-                    "data-param-name": String(originDecl.name || ""),
-                  },
-                });
-              }
-
-              varCards.push(renderNotesCard("var", varTitle, varSummary, varEdit));
-            } else if (
-              originDecl &&
-              (originScopeName === "local" || originScopeName === "global") &&
-              originDecl.declKind &&
-              originDecl.variableName &&
-              ns.notes.makeDeclKey
-            ) {
-              const scopeKey = originScopeName === "global" ? "PROGRAM" : originRoutineKey;
-              const scopeRoutine = scopeKey && scopeKey !== "PROGRAM" ? model?.nodes?.get(scopeKey) || null : null;
-              const scopeLabel = scopeKey === "PROGRAM" ? "PROGRAM (Globals)" : scopeRoutine ? `${scopeRoutine.kind} ${scopeRoutine.name}` : scopeKey || "";
-              varTitle = `Variable notes — ${String(originDecl.declKind || "")} ${String(originDecl.variableName || "")}${
-                scopeLabel ? ` (${scopeLabel})` : ""
-              }`;
-              const declKey = ns.notes.makeDeclKey(scopeKey, originDecl.declKind, originDecl.variableName);
-              const codeDesc = String(originDecl.description || "").trim();
-              const userDesc = String(originDecl.userDescription || "").trim();
-              const userNote = String(originDecl.userNote || "").trim();
-              varSummary = renderAnnoSummaryHtml({ codeDesc, userDesc, userNote });
-
-              if (isSimpleStructFieldName(originDecl.variableName)) {
-                const parts = String(originDecl.variableName || "")
-                  .split("-")
-                  .filter(Boolean);
-                let cur = "";
-                const fullLower = String(originDecl.variableName || "").toLowerCase();
-                for (let i = 0; i < parts.length; i++) {
-                  cur = cur ? `${cur}-${parts[i]}` : parts[i];
-                  const declObj = findDeclInScope(scopeKey, originDecl.declKind, cur) || (cur.toLowerCase() === fullLower ? originDecl : null);
-                  if (!declObj) continue;
-                  const label = `${String(originDecl.declKind || "")} ${cur}`;
-                  pushDeclVarCard(scopeKey, scopeLabel, declObj, label);
-                }
-              }
-
-              if (declKey) {
-                varEdit = renderInlineAnnoEditorHtml({
-                  title: `Edit variable notes — ${String(originDecl.declKind || "")} ${String(originDecl.variableName || "")}${
-                    scopeLabel ? ` (${scopeLabel})` : ""
-                  }`,
-                  codeDesc,
-                  userDesc,
-                  userNote,
-                  annoType: "decl",
-                  annoKey: declKey,
-                  attrs: {
-                    "data-scope-key": scopeKey,
-                    "data-decl-kind": originDecl.declKind,
-                    "data-var-name": originDecl.variableName,
-                  },
-                });
-              }
-            }
-          }
-
-          function renderNotesCard(cardKind, titleText, summaryHtml, editorHtml) {
-            const title = String(titleText || "").trim();
-            if (!title || (!summaryHtml && !editorHtml)) return "";
-            const kind = String(cardKind || "").trim();
-            const kindClass = kind ? ` trace-node__notes--${utils.escapeHtml(kind)}` : "";
-            return `<div class="trace-node__notes${kindClass}" style="margin-left:${pad}px">
-              <div class="trace-node__notes-title">${utils.escapeHtml(title)}</div>
-              ${summaryHtml || ""}
-              ${editorHtml || ""}
-            </div>`;
-          }
-
-          const routineNotes = renderNotesCard("object", `Object notes — ${node.routineKind} ${node.routineName}`, routineSummary, routineEdit);
-          if (varCards.length === 0) {
-            const single = renderNotesCard("var", varTitle, varSummary, varEdit);
-            if (single) varCards.push(single);
-          }
-          const notesHtml = `${routineNotes}${varCards.join("")}`;
-
-          const writes = (node.writes || [])
-            .map((w) => `<li>${sourceLink(`${w.variableName} ⇐ ${w.statement}`, w.sourceRef)}</li>`)
-            .join("");
-          const writesHtml = `<ul class="list trace-node__writes" style="margin-left:${pad}px">${writes || "<li>(no writes)</li>"}</ul>`;
-
-          const children = (node.calls || [])
-            .map((c) => {
-              const dir = c.direction === "fromCaller" ? "from" : "via";
-              const target = c.direction === "fromCaller" ? node.routineName : c.child.routineName;
-              const label = c.label || `${dir} PERFORM ${target}: ${c.fromVar} -> ${c.toVar} (${c.mappingKind})`;
-              const mapText = `<div class="trace-node__call" style="padding-left:${pad + 14}px">${sourceLink(label, c.edge?.sourceRef || null)}</div>`;
-              return mapText + renderNode(c.child, indent + 1);
-            })
-            .join("");
-
-          return `<div class="trace-node">${header}${meta}${notesHtml}${writesHtml}${children}</div>`;
-        }
-
-        el.innerHTML = renderNode(root, 0);
-        wireInlineAnnoEditors(el);
-
-        if (!el.dataset.traceTreeBound) {
-          el.dataset.traceTreeBound = "1";
-          el.addEventListener("click", (ev) => {
-            const t = ev.target;
-            if (!(t instanceof HTMLElement)) return;
-            const btn = t.closest("button.trace-node__toggle");
-            if (!btn) return;
-            const nodeEl = btn.closest(".trace-node");
-            if (!nodeEl) return;
-            ev.preventDefault();
-            ev.stopPropagation();
-            const collapsed = nodeEl.classList.toggle("is-collapsed");
-            btn.setAttribute("aria-expanded", String(!collapsed));
-          });
-        }
+        out.classList.remove("empty");
+        out.textContent = res.xml;
       }
 
-      function runTrace() {
-        const model = state.model;
-        if (!model) return;
-        const subKey = ui.$("traceSubroutine")?.value;
-        const varName = ui.$("traceVariable")?.value;
-        if (!subKey || !varName) return;
-        const result =
-          subKey === TRACE_ALL_GLOBALS_KEY
-            ? ns.lineage.traceGlobalVariable(model, varName, { maxNodes: 400 })
-            : ns.lineage.traceVariable(model, subKey, varName, { maxNodes: 400 });
-        renderTraceResults(result);
-      }
-
-      ui.renderDiagram = renderDiagram;
-      ui.renderSequenceControls = renderSequenceControls;
-      ui.renderSequence = renderSequence;
       ui.renderJson = renderJson;
-      ui.renderTraceSubroutines = renderTraceSubroutines;
-      ui.updateTraceVariables = updateTraceVariables;
-      ui.runTrace = runTrace;
+      ui.buildAllTemplatesObjectsExportXml = buildAllTemplatesObjectsExportXml;
+      ui.renderXml = renderXml;
     })(window.AbapFlow);
 
     </script>
@@ -14493,9 +13139,6 @@
         if (state.model) ns.notes.applyToModel(state.model);
         ui.renderObjectsTable();
         ui.renderDetails();
-        if (document.getElementById("tab-sequence").classList.contains("is-active")) {
-          ui.renderSequence();
-        }
         if (document.getElementById("tab-templates")?.classList.contains("is-active")) {
           ui.renderTemplates();
         }
@@ -14519,20 +13162,8 @@
 
           ui.renderObjectsTable();
           ui.renderDetails();
-          ui.renderDiagram();
-          ui.renderSequenceControls();
-          if (document.getElementById("tab-sequence").classList.contains("is-active")) {
-            ui.renderSequence();
-          } else {
-            const host = ui.$("sequenceHost");
-            if (host) {
-              host.textContent = "Open the Sequence tab (or click Render) to render.";
-              host.classList.add("empty");
-            }
-          }
           ui.renderTemplates();
           ui.renderJson();
-          ui.renderTraceSubroutines();
           ui.setStatus(`Parsed ${model.nodes.size} objects, ${model.edges.length} PERFORM calls.`, false);
         } catch (err) {
           console.error(err);
@@ -14542,7 +13173,10 @@
 
       function clearAll() {
         const input = ui.$("abapInput");
-        if (input) input.value = "";
+        if (input) {
+          input.value = "";
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+        }
 
         state.model = null;
         state.selectedKey = null;
@@ -14555,30 +13189,17 @@
           details.classList.add("empty");
         }
 
-        const diagram = ui.$("diagramHost");
-        if (diagram) diagram.replaceChildren();
-
-        const seqHost = ui.$("sequenceHost");
-        if (seqHost) {
-          seqHost.textContent = "Analyze to see sequence.";
-          seqHost.classList.add("empty");
-        }
-
         const json = ui.$("jsonOutput");
         if (json) {
           json.textContent = "Analyze to see JSON.";
           json.classList.add("empty");
         }
 
-        const trace = ui.$("traceResults");
-        if (trace) {
-          trace.textContent = "Select a subroutine + variable and run trace.";
-          trace.classList.add("empty");
+        const xml = ui.$("xmlOutput");
+        if (xml) {
+          xml.textContent = "Analyze to see XML.";
+          xml.classList.add("empty");
         }
-
-        ui.$("traceSubroutine")?.replaceChildren();
-        ui.$("traceVariable")?.replaceChildren();
-        ui.$("seqRoot")?.replaceChildren();
 
         ui.renderTemplates();
         ui.setStatus("Cleared.", false);
@@ -14696,14 +13317,17 @@
           tab.addEventListener("click", () => {
             const name = tab.dataset.tab;
             ui.setActiveTab(name);
-            if (name === "sequence") {
-              requestAnimationFrame(() => ui.renderSequence());
-            }
             if (name === "templates") {
               requestAnimationFrame(() => ui.renderTemplates());
             }
             if (name === "config") {
               requestAnimationFrame(() => ui.renderAbapObjectsConfig?.());
+            }
+            if (name === "json") {
+              requestAnimationFrame(() => ui.renderJson?.());
+            }
+            if (name === "xml") {
+              requestAnimationFrame(() => ui.renderXml?.());
             }
           });
         });
@@ -14711,7 +13335,10 @@
         ui.$("btnAnalyze")?.addEventListener("click", analyze);
         ui.$("btnLoadSample")?.addEventListener("click", () => {
           const abapInput = ui.$("abapInput");
-          if (abapInput) abapInput.value = ns.sampleCode || "";
+          if (abapInput) {
+            abapInput.value = ns.sampleCode || "";
+            abapInput.dispatchEvent(new Event("input", { bubbles: true }));
+          }
           ui.setStatus("Sample loaded. Click Analyze.", false);
         });
         ui.$("btnClear")?.addEventListener("click", clearAll);
@@ -14726,16 +13353,75 @@
         });
 
         ui.$("objectSearch")?.addEventListener("input", () => ui.renderObjectsTable());
-        ui.$("traceSubroutine")?.addEventListener("change", ui.updateTraceVariables);
-        ui.$("btnTrace")?.addEventListener("click", ui.runTrace);
-        ui.$("btnSeqRender")?.addEventListener("click", ui.renderSequence);
-        ui.$("seqRoot")?.addEventListener("change", ui.renderSequence);
 
         ui.$("templatesHost")?.addEventListener("dblclick", ui.handleTemplatesDblClick);
+
+        ui.$("btnCopyXml")?.addEventListener("click", async (e) => {
+          e?.preventDefault?.();
+          const build = ui.buildAllTemplatesObjectsExportXml;
+          if (typeof build !== "function") {
+            ui.setStatus("XML exporter not loaded.", true);
+            return;
+          }
+
+          const res = build();
+          if (!res?.ok) {
+            ui.renderXml?.();
+            ui.setStatus(String(res?.error || "Cannot build XML."), true);
+            return;
+          }
+
+          const xmlOut = ui.$("xmlOutput");
+          if (xmlOut) {
+            xmlOut.textContent = String(res.xml || "");
+            xmlOut.classList.remove("empty");
+          }
+
+          if (!ui.clipboard?.copyHtml) {
+            ui.setStatus("Clipboard module not loaded.", true);
+            return;
+          }
+
+          const ok = await ui.clipboard.copyHtml("", String(res.xml || ""));
+          const suffix = res.truncated ? ` (truncated at ${res.maxSteps})` : "";
+          ui.setStatus(ok ? `Copied XML export (${res.count} object(s))${suffix}.` : "Copy failed (browser blocked clipboard).", !ok);
+        });
+
+        ui.$("btnDownloadXml")?.addEventListener("click", (e) => {
+          e?.preventDefault?.();
+          const build = ui.buildAllTemplatesObjectsExportXml;
+          if (typeof build !== "function") {
+            ui.setStatus("XML exporter not loaded.", true);
+            return;
+          }
+
+          const res = build();
+          if (!res?.ok) {
+            ui.renderXml?.();
+            ui.setStatus(String(res?.error || "Cannot build XML."), true);
+            return;
+          }
+
+          const xmlOut = ui.$("xmlOutput");
+          if (xmlOut) {
+            xmlOut.textContent = String(res.xml || "");
+            xmlOut.classList.remove("empty");
+          }
+
+          const stamp = new Date().toISOString().replace(/[:]/g, "-").slice(0, 19);
+          const filename = `abapflow-objects-${stamp}.xml`;
+          ui.downloadTextFile(filename, String(res.xml || ""), "application/xml");
+          ui.setStatus(`Downloaded: ${filename}`, false);
+        });
+
+        ui.$("xmlMaxSteps")?.addEventListener("change", () => {
+          if (document.getElementById("tab-xml")?.classList.contains("is-active")) ui.renderXml?.();
+        });
 
         const abapInput = ui.$("abapInput");
         if (abapInput && !abapInput.value.trim() && ns.sampleCode) {
           abapInput.value = ns.sampleCode;
+          abapInput.dispatchEvent(new Event("input", { bubbles: true }));
         }
       }
 

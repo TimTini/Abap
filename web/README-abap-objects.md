@@ -6,7 +6,6 @@ Mục tiêu thiết kế hiện tại:
 - Thêm ABAP Object mới bằng cách **sửa 1 file master config**: `web/abap_objects.config.js`
 - (Nếu cần) thêm/điều chỉnh **1 file template** trong: `web/js/abap_objects/templates/`
 - Không phải copy‑paste logic parse/render ở nhiều nơi
-- Có Template Editor để chỉnh template nhanh và lưu bằng `localStorage`
 
 ---
 
@@ -26,7 +25,7 @@ Mục tiêu thiết kế hiện tại:
    - Template file chạy và gọi `ns.abapObjects.defineTemplate(templateId, templateConfig)`
    - Tạo registry để UI dùng convert → output theo flow
 4) `web/js/ui_templates_flow.js` tạo list “template blocks” theo flow chạy (có indent, chống loop)
-5) `web/js/table_renderer.js` render “excel-like-table” thành HTML table để copy/paste qua Excel giữ format
+5) `web/js/ui_templates_render.js` render output dạng cấu trúc + hỗ trợ sửa text (description)
 
 ---
 
@@ -225,32 +224,11 @@ Ngoài class→css, mỗi cell có thể có:
 ```js
 { addr: "A1", text: "X", style: "background:#fff;color:#111;border:1px solid #222;" }
 ```
-Renderer sẽ ghép style từ class + `cells[].style` (xem `web/js/table_renderer.js`).
+Lưu ý: Web không còn render preview dạng Excel/table; phần tạo & format template được chuyển sang Excel/VBA tool.
 
 ---
 
-## 7) Template Editor (dùng để tạo template nhanh)
-
-Mở `web/template-editor.html` (có link trên header của `web/index.html`).
-
-### 7.1 Bạn có thể làm gì trên editor?
-- Load template từ registry
-- Edit JSON trực tiếp
-- Edit trực tiếp trên preview:
-  - click chọn ô
-  - double-click sửa text
-  - đổi Bg/Text/Border trên toolbar preview
-  - delete row/col để dồn lên ngay
-- Save:
-  - `Save`: override template hiện tại vào localStorage
-  - `Save new`: tạo template “custom” mới vào localStorage
-  - `Active for this object`: set template ưu tiên cho objectId
-
-> Lưu ý: merge hiện chỉnh bằng sửa `merges[]` trong JSON (chưa có nút UI).
-
----
-
-## 8) Ví dụ thực tế: dùng ABAP Objects có sẵn
+## 7) Ví dụ thực tế: dùng ABAP Objects có sẵn
 
 ### Ví dụ A — MESSAGE
 Config (trong `web/abap_objects.config.js`):
@@ -382,9 +360,6 @@ Loader báo: `Template not registered: <id> (<file>)`
 - `when.path` phải trỏ đúng key trong context (VD `itabOp.kind`)
 - `when.equals` so sánh không phân biệt hoa thường
 
-### Save trong Template Editor nhưng tab Templates không đổi
-Override/custom template được loader apply khi init → bạn chỉ cần reload page.
-
 ---
 
 ## 11) Tests
@@ -394,4 +369,3 @@ Chạy tests của web:
 ```bash
 node --test web/tests/*.test.js
 ```
-

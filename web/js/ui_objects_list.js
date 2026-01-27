@@ -33,16 +33,10 @@
     return out;
   }
 
-  function selectObject(key, syncTrace) {
+  function selectObject(key) {
     state.selectedKey = key;
     if (typeof ui.renderObjectsTable === "function") ui.renderObjectsTable();
     if (typeof ui.renderDetails === "function") ui.renderDetails();
-
-    if (syncTrace && state.model && key !== "PROGRAM") {
-      const sel = ui.$("traceSubroutine");
-      if (sel) sel.value = key;
-      if (typeof ui.updateTraceVariables === "function") ui.updateTraceVariables();
-    }
   }
 
   function renderObjectsTable() {
@@ -82,7 +76,7 @@
         <td>${cycleBadge}</td>
       `;
 
-      tr.addEventListener("click", () => selectObject(obj.key, true));
+      tr.addEventListener("click", () => selectObject(obj.key));
       tbody.appendChild(tr);
     }
   }
@@ -90,4 +84,3 @@
   ui.selectObject = selectObject;
   ui.renderObjectsTable = renderObjectsTable;
 })(window.AbapFlow);
-

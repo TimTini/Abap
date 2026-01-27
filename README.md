@@ -33,3 +33,19 @@ Workbook mac dinh: `excel\\AbapFlowDiagram.xlsm`
 - Tab `Diagram`: flow diagram (SVG) va highlight cycle (mau do).
 - Tab `Sequence`: sequence diagram theo luong chay (columns = steps, rows = event/form), click param -> `Trace`.
 - Tab `Trace`: truy vet bien (CHANGING/TABLES + global writes).
+
+## Excel Template Tool (ABAP Objects XML -> filled template)
+- Workbook: `excel\\AbapTemplateTool.xlsm`
+- Muc tieu: export ABAP Objects XML tu tab `Templates` (web) -> Excel VBA doc XML -> gen template tren sheet `Template` (du lieu da fill theo context)
+
+Workflow:
+1) Mo `web\\index.html` -> Analyze -> tab `Templates`
+2) Tick chon template can export -> `Export` -> `Copy` hoac `Download` (XML)
+3) Mo `excel\\AbapTemplateTool.xlsm`
+   - Sheet `Input`: paste XML vao cot A tu `A2` tro xuong (1 dong XML / 1 row) (hoac bam `Load XML file`)
+   - Bam `Generate all`
+4) Sheet `Template`: template da duoc copy tu `Template config` va fill placeholder tu XML
+
+Ghi chu:
+- Sheet `Template config`: chua cac template mau, moi template duoc khoanh vung bang 4 marker o 4 goc (`__ABAPFLOW_TPL_<templateId>_{TL|TR|BL|BR}__`).
+- Co the them template moi bang cach copy 1 block trong `Template config` va doi marker + noi dung ben trong.

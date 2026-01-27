@@ -20,7 +20,6 @@
         <button id="btnExportNotes" class="btn" type="button">Export notes</button>
         <button id="btnImportNotes" class="btn" type="button">Import notes</button>
         <input id="notesImportFile" type="file" accept="application/json" style="display:none" />
-        <a class="btn" href="template-editor.html" target="_blank" rel="noopener">Template editor</a>
       </div>
     </header>
 
@@ -29,6 +28,7 @@
         <div class="panel__title">ABAP code</div>
         <div class="code-editor">
           <textarea id="abapInput" class="code-input" spellcheck="false" placeholder="Paste ABAP code here..."></textarea>
+          <div id="abapLineNumbers" class="code-line-numbers" aria-hidden="true"></div>
           <div id="abapTemplateMarkers" class="code-markers" aria-hidden="true"></div>
         </div>
         <div class="panel__footer">
@@ -41,12 +41,10 @@
       <section class="panel panel-right">
         <div class="tabs">
           <button class="tab is-active" data-tab="objects" type="button">Objects</button>
-          <button class="tab" data-tab="diagram" type="button">Diagram</button>
-          <button class="tab" data-tab="sequence" type="button">Sequence</button>
-          <button class="tab" data-tab="trace" type="button">Trace</button>
           <button class="tab" data-tab="templates" type="button">Templates</button>
           <button class="tab" data-tab="config" type="button">Config</button>
           <button class="tab" data-tab="json" type="button">JSON</button>
+          <button class="tab" data-tab="xml" type="button">XML</button>
         </div>
 
         <div class="tab-panels">
@@ -81,55 +79,6 @@
                 <div id="objectDetails" class="details empty">Analyze to see details.</div>
               </div>
             </div>
-          </section>
-
-          <section class="tab-panel" id="tab-diagram">
-            <div class="panel__title">Flow diagram</div>
-            <div id="diagramHost" class="diagram-host"></div>
-            <div class="hint">
-              Tip: click a node to open it in <b>Objects</b> and <b>Trace</b>.
-            </div>
-          </section>
-
-          <section class="tab-panel" id="tab-sequence">
-            <div class="panel__title">Sequence diagram (single-thread)</div>
-
-            <div class="form-grid">
-              <label>
-                View
-                <select id="seqRoot" class="input"></select>
-              </label>
-              <label>
-                Max steps
-                <input id="seqMaxSteps" class="input" type="number" min="10" max="2000" value="200" />
-              </label>
-              <div class="form-grid__actions">
-                <button id="btnSeqRender" class="btn btn-primary" type="button">Render</button>
-              </div>
-            </div>
-
-            <div id="sequenceHost" class="sequence-host empty">Analyze to see sequence.</div>
-            <div class="hint">Tip: click a parameter to jump to <b>Trace</b>.</div>
-          </section>
-
-          <section class="tab-panel" id="tab-trace">
-            <div class="panel__title">Data trace</div>
-
-            <div class="form-grid">
-              <label>
-                Subroutine
-                <select id="traceSubroutine" class="input"></select>
-              </label>
-              <label>
-                Variable
-                <select id="traceVariable" class="input"></select>
-              </label>
-              <div class="form-grid__actions">
-                <button id="btnTrace" class="btn btn-primary" type="button">Trace origin</button>
-              </div>
-            </div>
-
-            <div id="traceResults" class="trace-results empty">Select a subroutine + variable and run trace.</div>
           </section>
 
           <section class="tab-panel" id="tab-templates">
@@ -181,6 +130,19 @@
             <div class="panel__title">Model JSON</div>
             <pre id="jsonOutput" class="json-output empty">Analyze to see JSON.</pre>
           </section>
+
+          <section class="tab-panel" id="tab-xml">
+            <div class="panel__title">ABAP Objects XML (Templates)</div>
+            <div class="toolbar objcfg-toolbar">
+              <button id="btnCopyXml" class="btn btn-sm btn-primary" type="button">Copy</button>
+              <button id="btnDownloadXml" class="btn btn-sm" type="button">Download</button>
+              <label style="margin-left:auto;display:flex;gap:6px;align-items:center;color:var(--muted);font-size:12px;">
+                Max steps
+                <input id="xmlMaxSteps" class="input" type="number" min="100" step="100" value="5000" style="width:110px;" />
+              </label>
+            </div>
+            <pre id="xmlOutput" class="json-output empty">Analyze to see XML.</pre>
+          </section>
         </div>
       </section>
     </main>
@@ -201,14 +163,11 @@
     <script src="js/graph.js"></script>
     <script src="js/lineage.js"></script>
     <script src="js/desc_resolver.js"></script>
-    <script src="js/diagram.js"></script>
-    <script src="js/sequence.js"></script>
     <script src="js/parser.js"></script>
     <script src="js/sample.js"></script>
-    <script src="js/table_renderer.js"></script>
     <script src="js/template_converter.js"></script>
-    <script src="js/template_excel_export.js"></script>
     <script src="js/ui_core.js"></script>
+    <script src="js/ui_abap_line_numbers.js"></script>
     <script src="js/ui_abap_markers.js"></script>
     <script src="js/ui_anno.js"></script>
     <script src="js/ui_objects_list.js"></script>

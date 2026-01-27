@@ -20,6 +20,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Create/update an .xlsm and sync VBA code via xlwings.")
     parser.add_argument("--workbook", default="excel/AbapFlowDiagram.xlsm", help="Path to .xlsm workbook")
     parser.add_argument("--vba-dir", default="vba", help="Folder containing .bas/.cls/.frm")
+    parser.add_argument(
+        "--required-sheets",
+        default="Sheet1,Sheet2,Objects",
+        help='Comma-separated list of sheet names to ensure exist (default: "Sheet1,Sheet2,Objects")',
+    )
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--import", dest="do_import", action="store_true", help="Import files -> workbook (default)")
     group.add_argument("--export", dest="do_export", action="store_true", help="Export workbook -> files")
@@ -27,6 +32,7 @@ def main() -> int:
 
     workbook_path = Path(args.workbook).resolve()
     vba_dir = Path(args.vba_dir).resolve()
+    required_sheets = [s.strip() for s in str(args.required_sheets or "").split(",") if s.strip()]
 
     do_import = args.do_import or not args.do_export
     do_export = args.do_export
@@ -44,7 +50,7 @@ def main() -> int:
     try:
         book = open_or_create_book(app, workbook_path)
         try:
-            ensure_required_sheets(book)
+            ensure_required_sheets(book, required_sheets=required_sheets)
 
             vbproj = get_vbproject(book)
 
@@ -80,16 +86,17 @@ def save_as_xlsm(book: xw.Book, workbook_path: Path) -> None:
     book.api.SaveAs(str(workbook_path), FileFormat=52)
 
 
-def ensure_required_sheets(book: xw.Book) -> None:
+def ensure_required_sheets(book: xw.Book, required_sheets: list[str]) -> None:
+    wanted = [s.strip() for s in (required_sheets or []) if str(s or "").strip()]
+    if not wanted:
+        wanted = ["Sheet1", "Sheet2", "Objects"]
+
     names = {s.name for s in book.sheets}
-    if "Sheet1" not in names:
-        book.sheets.add(after=book.sheets[-1]).name = "Sheet1"
-    names = {s.name for s in book.sheets}
-    if "Sheet2" not in names:
-        book.sheets.add(after=book.sheets[-1]).name = "Sheet2"
-    names = {s.name for s in book.sheets}
-    if "Objects" not in names:
-        book.sheets.add(after=book.sheets[-1]).name = "Objects"
+    for sheet_name in wanted:
+        if sheet_name in names:
+            continue
+        book.sheets.add(after=book.sheets[-1]).name = sheet_name
+        names.add(sheet_name)
 
 
 def get_vbproject(book: xw.Book):

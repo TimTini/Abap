@@ -9,7 +9,6 @@
   let selectedTemplateCard = null;
   let selectedTemplateResultIds = new Set();
   let collapsedTemplateResultIds = new Set();
-  let tableByResultId = new Map();
   let lastRenderOrder = [];
   let lastToolbarUpdate = null;
 
@@ -614,13 +613,13 @@
 
   function handleTemplatesDblClick(event) {
     const t = event?.target && event.target.nodeType === 1 ? event.target : event?.target?.parentElement;
-    const td = t?.closest ? t.closest("td[data-bind]") : null;
-    if (!td) return;
+    const el = t?.closest ? t.closest("[data-bind]") : null;
+    if (!el) return;
 
-    const bind = String(td.dataset.bind || "").trim();
+    const bind = String(el.dataset.bind || "").trim();
     if (!isEditableDescriptionBind(bind)) return;
 
-    const card = td.closest(".template-block");
+    const card = el.closest(".template-block");
     const resultId = String(card?.dataset?.resultId || "").trim();
     const templateId = String(card?.dataset?.templateId || "").trim();
     if (!resultId || !templateId) return;
@@ -761,7 +760,7 @@
       // ignore and fall back to single-key editor
     }
 
-    const initial = String(td.textContent ?? "");
+    const initial = String(el.textContent ?? "");
 
     openDescriptionEditorDialog({ title, value: initial }).then(({ action, value }) => {
       const nextValue = String(value ?? "").trim();
@@ -857,59 +856,324 @@
     updateTemplatesToolbar();
   }
 
-  function cloneTableWithTrailingBlankRow(tableEl) {
-    if (!tableEl || typeof tableEl.cloneNode !== "function") return null;
-    const clone = tableEl.cloneNode(true);
-
-    const colCount = clone.querySelectorAll("colgroup col").length || 1;
-
-    const td = document.createElement("td");
-    td.textContent = "\u00a0";
-    td.style.border = "none";
-    td.style.padding = "0";
-    td.style.height = "18px";
-    td.colSpan = colCount;
-
-    const tr = document.createElement("tr");
-    tr.appendChild(td);
-
-    const tbody = clone.tBodies && clone.tBodies.length ? clone.tBodies[clone.tBodies.length - 1] : clone;
-    tbody.appendChild(tr);
-
-    return clone;
+  function escapeXmlAttr(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
   }
 
-  async function copySelectedTables() {
+  function wrapCdata(text) {
+    const raw = String(text ?? "");
+    if (!raw) return "<![CDATA[]]>";
+    return `<![CDATA[${raw.replace(/]]>/g, "]]]]><![CDATA[>")}]]>`;
+  }
+
+  function safeXmlTagName(name) {
+    const raw = String(name ?? "").trim();
+    if (!raw) return "item";
+
+    let out = raw.replace(/[^A-Za-z0-9_.:-]/g, "_");
+    if (!/^[A-Za-z_]/.test(out)) out = `k_${out}`;
+    return out;
+  }
+
+  function appendXmlValue(lines, tagName, value, indent, seen) {
+    const pad = " ".repeat(Math.max(0, Number(indent || 0)));
+    const tag = safeXmlTagName(tagName);
+
+    if (value == null) {
+      lines.push(`${pad}<${tag} />`);
+      return;
+    }
+
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      lines.push(`${pad}<${tag}>${wrapCdata(String(value))}</${tag}>`);
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      lines.push(`${pad}<${tag}>`);
+      for (const it of value) appendXmlValue(lines, "item", it, indent + 2, seen);
+      lines.push(`${pad}</${tag}>`);
+      return;
+    }
+
+    if (typeof value === "object") {
+      if (seen.has(value)) {
+        lines.push(`${pad}<${tag} />`);
+        return;
+      }
+
+      seen.add(value);
+      lines.push(`${pad}<${tag}>`);
+      for (const [k, v] of Object.entries(value)) appendXmlValue(lines, k, v, indent + 2, seen);
+      lines.push(`${pad}</${tag}>`);
+      seen.delete(value);
+      return;
+    }
+
+    lines.push(`${pad}<${tag}>${wrapCdata(String(value))}</${tag}>`);
+  }
+
+  function buildTemplatesExportXml(items) {
+    const stamp = new Date().toISOString();
+    const lines = [];
+    lines.push('<?xml version="1.0" encoding="utf-8"?>');
+    lines.push(`<abapflowObjects schema="abapflow-objects-export" version="1" createdAt="${escapeXmlAttr(stamp)}">`);
+
+    for (const it of items || []) {
+      if (!it) continue;
+      const src = it.sourceRef || null;
+      const startLine = src?.startLine != null ? String(src.startLine) : "";
+      const endLine = src?.endLine != null ? String(src.endLine) : "";
+      const depth = it.depth != null ? String(it.depth) : "";
+
+      lines.push(
+        `  <object kind="${escapeXmlAttr(it.kind)}" resultId="${escapeXmlAttr(it.resultId)}" objectId="${escapeXmlAttr(it.objectId)}" templateId="${escapeXmlAttr(it.templateId)}"${depth ? ` depth="${escapeXmlAttr(depth)}"` : ""}${startLine ? ` startLine="${escapeXmlAttr(startLine)}"` : ""}${endLine ? ` endLine="${escapeXmlAttr(endLine)}"` : ""}>`,
+      );
+      lines.push(`    <routineKey>${wrapCdata(it.routineKey)}</routineKey>`);
+      lines.push(`    <original>${wrapCdata(it.original)}</original>`);
+
+      lines.push("    <context>");
+      const ctx = it.context && typeof it.context === "object" ? it.context : null;
+      if (ctx) {
+        const seen = new Set();
+        for (const [k, v] of Object.entries(ctx)) appendXmlValue(lines, k, v, 6, seen);
+      }
+      lines.push("    </context>");
+
+      lines.push("  </object>");
+    }
+
+    lines.push("</abapflowObjects>");
+    lines.push("");
+    return lines.join("\n");
+  }
+
+  function getExportResultIds() {
+    const orderedIds = lastRenderOrder.filter((id) => selectedTemplateResultIds.has(id));
+    if (orderedIds.length) return orderedIds;
+    const active = String(selectedTemplateCard?.dataset?.resultId || "").trim();
+    if (active) return [active];
+    return [];
+  }
+
+  function collectTemplatesExportItems(resultIds) {
+    const out = [];
+
+    for (const id of resultIds || []) {
+      const rid = String(id || "").trim();
+      if (!rid) continue;
+      const result = templateResultById.get(rid) || null;
+      if (!result) continue;
+
+      out.push({
+        kind: String(result.kind || ""),
+        resultId: String(result.resultId || rid),
+        objectId: String(result.objectId || ""),
+        templateId: String(result.templateId || ""),
+        routineKey: String(result.routineKey || ""),
+        sourceRef: result.sourceRef || null,
+        original: String(result.original || ""),
+        context: result.context || null,
+      });
+    }
+
+    return out;
+  }
+
+  async function handleTemplatesExport(action) {
+    const ids = getExportResultIds();
+    if (!ids.length) {
+      ui.setStatus("Select a template (click) or tick checkboxes first.", true);
+      return;
+    }
+
+    const items = collectTemplatesExportItems(ids);
+    if (!items.length) {
+      ui.setStatus("Nothing to export.", true);
+      return;
+    }
+
+    const stamp = new Date().toISOString().replace(/[:]/g, "-").slice(0, 19);
+
+    const text = buildTemplatesExportXml(items);
+    const filename = `abapflow-objects-${stamp}.xml`;
+    const mimeType = "application/xml";
+
+    if (action === "download") {
+      ui.downloadTextFile(filename, text, mimeType);
+      ui.setStatus(`Downloaded: ${filename}`, false);
+      return;
+    }
+
     if (!ui.clipboard?.copyHtml) {
       ui.setStatus("Clipboard module not loaded.", true);
       return;
     }
 
-    const exporter = ns.templateExcelExport || null;
+    const ok = await ui.clipboard.copyHtml("", text);
+    ui.setStatus(ok ? `Copied XML export (${items.length} item(s)).` : "Copy failed (browser blocked clipboard).", !ok);
+  }
 
-    const orderedIds = lastRenderOrder.filter((id) => selectedTemplateResultIds.has(id));
-    const tables = orderedIds.map((id) => tableByResultId.get(id)).filter(Boolean);
-    if (!tables.length) {
-      ui.setStatus("No template selected.", true);
-      return;
+  function compareNaturalStrings(a, b) {
+    const aa = String(a ?? "");
+    const bb = String(b ?? "");
+    if (aa === bb) return 0;
+
+    const ra = aa.match(/\d+|\D+/g) || [];
+    const rb = bb.match(/\d+|\D+/g) || [];
+    const n = Math.min(ra.length, rb.length);
+
+    for (let i = 0; i < n; i++) {
+      const ta = ra[i];
+      const tb = rb[i];
+      if (ta === tb) continue;
+
+      const da = /^\d+$/.test(ta);
+      const db = /^\d+$/.test(tb);
+      if (da && db) {
+        const na = Number(ta);
+        const nb = Number(tb);
+        if (na !== nb) return na - nb;
+      }
+
+      const cmp = ta.localeCompare(tb);
+      if (cmp) return cmp;
     }
 
-    const html = tables
-      .map((t, idx) => {
-        if (idx < tables.length - 1) {
-          const clone = cloneTableWithTrailingBlankRow(t);
-          const tableHtml = clone ? (exporter?.toExcelHtml ? exporter.toExcelHtml(clone) : clone.outerHTML) : "";
-          return `<div>${tableHtml}</div>`;
+    return ra.length - rb.length;
+  }
+
+  function parseExcelAddress(addr) {
+    const raw = String(addr ?? "").trim();
+    if (!raw) return null;
+
+    const m = /^([A-Za-z]+)(\d+)$/.exec(raw);
+    if (!m) return null;
+
+    const letters = String(m[1] || "").toUpperCase();
+    const row = Number(m[2]);
+    if (!Number.isFinite(row) || row <= 0) return null;
+
+    let col = 0;
+    for (let i = 0; i < letters.length; i++) {
+      const code = letters.charCodeAt(i);
+      if (code < 65 || code > 90) return null;
+      col = col * 26 + (code - 64);
+    }
+
+    if (!Number.isFinite(col) || col <= 0) return null;
+    return { row, col };
+  }
+
+  function excelPosKey(addr) {
+    const parsed = parseExcelAddress(addr);
+    if (!parsed) return Number.POSITIVE_INFINITY;
+    return parsed.row * 10000 + parsed.col;
+  }
+
+  function renderTemplateStruct(result) {
+    const filled = result?.filledConfig || null;
+    const cells = Array.isArray(filled?.cells) ? filled.cells : [];
+    const bindToEntry = new Map();
+
+    for (const cell of cells) {
+      const bind = String(cell?.bind || "").trim();
+      if (!bind) continue;
+      const text = String(cell?.text ?? "");
+      const pos = excelPosKey(cell?.addr);
+
+      if (!bindToEntry.has(bind)) bindToEntry.set(bind, { text, pos });
+      else {
+        const entry = bindToEntry.get(bind);
+        entry.text = text;
+        entry.pos = Math.min(entry.pos, pos);
+      }
+    }
+
+    const entries = Array.from(bindToEntry.entries())
+      .map(([bind, entry]) => ({ bind, text: entry.text, pos: entry.pos }))
+      .sort((a, b) => {
+        if (a.pos !== b.pos) return a.pos - b.pos;
+        return compareNaturalStrings(a.bind, b.bind);
+      });
+
+    const root = { key: "", bind: "", value: null, children: new Map() };
+
+    for (const { bind, text } of entries) {
+      const parts = bind
+        .split(".")
+        .map((p) => p.trim())
+        .filter(Boolean);
+      if (!parts.length) continue;
+
+      let cur = root;
+      let path = "";
+      for (const part of parts) {
+        path = path ? `${path}.${part}` : part;
+        if (!cur.children.has(part)) cur.children.set(part, { key: part, bind: path, value: null, children: new Map() });
+        cur = cur.children.get(part);
+      }
+      cur.value = text;
+    }
+
+    const host = document.createElement("div");
+    host.className = "template-struct";
+
+    function renderNode(node, depth) {
+      const row = document.createElement("div");
+      row.className = "template-struct__row";
+      row.style.paddingLeft = `${Math.max(0, depth) * 14}px`;
+
+      const keyEl = document.createElement("div");
+      keyEl.className = "template-struct__key";
+      keyEl.textContent = node.key;
+
+      const valueEl = document.createElement("div");
+      valueEl.className = "template-struct__value";
+
+      const hasValue = typeof node.value === "string";
+      if (hasValue) {
+        const raw = String(node.value ?? "");
+        const trimmed = raw.trim();
+        valueEl.textContent = trimmed ? raw : "(empty)";
+        if (!trimmed) valueEl.classList.add("template-struct__value--empty");
+
+        if (isEditableDescriptionBind(node.bind)) {
+          valueEl.dataset.bind = node.bind;
+          valueEl.classList.add("template-struct__value--editable");
+          valueEl.title = "Double-click để sửa mô tả (local/global).";
+        } else {
+          valueEl.title = node.bind;
         }
+      } else if (node.children.size) {
+        valueEl.textContent = "";
+      } else {
+        valueEl.textContent = "(empty)";
+        valueEl.classList.add("template-struct__value--empty");
+      }
 
-        const tableHtml = exporter?.toExcelHtml ? exporter.toExcelHtml(t) : t.outerHTML;
-        return `<div>${tableHtml}</div>`;
-      })
-      .join("\n");
-    const plain = exporter?.toTsv ? tables.map((t) => exporter.toTsv(t)).join("\n\n") : tables.map((t) => t.innerText || "").join("\n\n");
+      row.appendChild(keyEl);
+      row.appendChild(valueEl);
+      host.appendChild(row);
 
-    const ok = await ui.clipboard.copyHtml(html, plain);
-    ui.setStatus(ok ? `Copied ${tables.length} table(s) to clipboard.` : "Copy failed (browser blocked clipboard).", !ok);
+      for (const child of node.children.values()) renderNode(child, depth + 1);
+    }
+
+    if (!root.children.size) {
+      const empty = document.createElement("div");
+      empty.className = "template-struct__empty";
+      empty.textContent = "No bound values.";
+      host.appendChild(empty);
+      return host;
+    }
+
+    for (const child of root.children.values()) renderNode(child, 0);
+    return host;
   }
 
   function renderTemplates(options) {
@@ -918,7 +1182,6 @@
 
     selectedTemplateCard = null;
     templateResultById = new Map();
-    tableByResultId = new Map();
     lastRenderOrder = [];
     lastToolbarUpdate = null;
 
@@ -931,7 +1194,7 @@
       return;
     }
 
-    if (!ns.templateRegistry || !ns.templateConverter || !ns.tableRenderer) {
+    if (!ns.templateRegistry || !ns.templateConverter) {
       host.textContent = "Template modules not loaded.";
       host.classList.add("empty");
       return;
@@ -968,15 +1231,6 @@
     const toolbarActions = document.createElement("div");
     toolbarActions.className = "templates-toolbar__actions";
 
-    const btnCopySelected = document.createElement("button");
-    btnCopySelected.type = "button";
-    btnCopySelected.className = "btn btn-sm btn-primary";
-    btnCopySelected.textContent = "Copy selected";
-    btnCopySelected.addEventListener("click", (e) => {
-      e.preventDefault();
-      copySelectedTables();
-    });
-
     const btnClearSelected = document.createElement("button");
     btnClearSelected.type = "button";
     btnClearSelected.className = "btn btn-sm";
@@ -989,8 +1243,35 @@
       updateTemplatesToolbar();
     });
 
-    toolbarActions.appendChild(btnCopySelected);
     toolbarActions.appendChild(btnClearSelected);
+
+    const exportLabel = document.createElement("span");
+    exportLabel.textContent = "Export:";
+    exportLabel.style.color = "var(--muted)";
+    exportLabel.style.fontSize = "12px";
+    exportLabel.style.alignSelf = "center";
+
+    const btnCopyExport = document.createElement("button");
+    btnCopyExport.type = "button";
+    btnCopyExport.className = "btn btn-sm";
+    btnCopyExport.textContent = "Copy";
+    btnCopyExport.addEventListener("click", async (e) => {
+      e.preventDefault();
+      await handleTemplatesExport("copy");
+    });
+
+    const btnDownloadExport = document.createElement("button");
+    btnDownloadExport.type = "button";
+    btnDownloadExport.className = "btn btn-sm";
+    btnDownloadExport.textContent = "Download";
+    btnDownloadExport.addEventListener("click", (e) => {
+      e.preventDefault();
+      handleTemplatesExport("download");
+    });
+
+    toolbarActions.appendChild(exportLabel);
+    toolbarActions.appendChild(btnCopyExport);
+    toolbarActions.appendChild(btnDownloadExport);
 
     toolbar.appendChild(toolbarCount);
     toolbar.appendChild(toolbarActions);
@@ -1000,7 +1281,6 @@
     lastToolbarUpdate = () => {
       const n = selectedTemplateResultIds.size;
       toolbarCount.textContent = `Selected: ${n}`;
-      btnCopySelected.disabled = n === 0;
       btnClearSelected.disabled = n === 0;
     };
     updateTemplatesToolbar();
@@ -1128,48 +1408,13 @@
       headerLeft.appendChild(checkbox);
       headerLeft.appendChild(title);
 
-      const headerActions = document.createElement("div");
-      headerActions.className = "template-block__actions";
-
-      const btnCopy = document.createElement("button");
-      btnCopy.type = "button";
-      btnCopy.className = "btn btn-sm";
-      btnCopy.textContent = "Copy";
-      btnCopy.title = "Copy HTML table to clipboard (paste into Excel)";
-      btnCopy.addEventListener("click", async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (!ui.clipboard?.copyHtml) {
-          ui.setStatus("Clipboard module not loaded.", true);
-          return;
-        }
-        const t = tableByResultId.get(resultIdStr);
-        if (!t) {
-          ui.setStatus("No table to copy.", true);
-          return;
-        }
-        const exporter = ns.templateExcelExport || null;
-        const html = exporter?.toExcelHtml ? exporter.toExcelHtml(t) : t.outerHTML;
-        const plain = exporter?.toTsv ? exporter.toTsv(t) : t.innerText || title.textContent || "";
-        const ok = await ui.clipboard.copyHtml(`<div>${html}</div>`, plain);
-        ui.setStatus(ok ? "Copied HTML table (paste into Excel)." : "Copy failed (browser blocked clipboard).", !ok);
-      });
-
-      headerActions.appendChild(btnCopy);
-
       header.appendChild(headerLeft);
-      header.appendChild(headerActions);
       card.appendChild(header);
 
-      const tableWrap = document.createElement("div");
-      tableWrap.className = "template-block__table";
-      const tableEl = ns.tableRenderer.renderExcelLikeTable(result.filledConfig);
-      tableWrap.appendChild(tableEl);
-      card.appendChild(tableWrap);
-
-      if (tableEl && tableEl.tagName === "TABLE") {
-        tableByResultId.set(resultIdStr, tableEl);
-      }
+      const contentWrap = document.createElement("div");
+      contentWrap.className = "template-block__table";
+      contentWrap.appendChild(renderTemplateStruct(result));
+      card.appendChild(contentWrap);
 
       card.addEventListener("click", () => {
         if (selectedTemplateCard) selectedTemplateCard.classList.remove("is-selected");
@@ -1207,4 +1452,5 @@
   ui.handleTemplatesDblClick = handleTemplatesDblClick;
   ui.renderTemplates = renderTemplates;
   ui.scrollToTemplateResultId = scrollToTemplateResultId;
+  ui.buildAbapflowObjectsXml = buildTemplatesExportXml;
 })(window.AbapFlow);

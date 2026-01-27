@@ -18,9 +18,9 @@ Tài liệu này dành cho AI/agent để làm việc nhanh trong thư mục `we
 - Schema validate config: `web/js/abap_objects/schema.js`
 - Statement parsers: `web/js/abap_objects/parsers.js`
 - Context/builders + fill template: `web/js/template_converter.js`
-- Render excel-like-table: `web/js/table_renderer.js`
 - Templates UI flow (tab Templates): `web/js/ui_templates_flow.js`
-- Template Editor: `web/template-editor.html`, `web/js/template_editor_ui.js`
+- Templates UI render + XML export: `web/js/ui_templates_render.js`, `web/js/ui_views.js`
+- ABAP input gutter (line numbers/markers): `web/js/ui_abap_line_numbers.js`, `web/js/ui_abap_markers.js`
 - LocalStorage template overrides/custom: `web/js/template_defs_store.js`
 
 ## Cách thêm ABAP Object mới (chuẩn “khai báo”)
@@ -58,16 +58,11 @@ Nếu thêm builder.kind mới:
 - Auto-hide row trống: `compact.removeEmptyRows: true`.
 - Format theo class→`css`, và per-cell qua `cells[].style` (string CSS).
 
-## Template Editor + localStorage (workflow nhanh)
-- Dùng `web/template-editor.html` để:
-  - Edit trực tiếp trên preview (text/bg/text/border, delete row/col)
-  - `Save` (override template id hiện có) hoặc `Save new` (custom id mới)
-  - Set “Active for this object” (preferred template per object)
-- Lưu tại localStorage key: `abapflow-template-defs` (module `web/js/template_defs_store.js`)
-- Loader auto apply override/custom khi init (`web/js/abap_objects/loader.js`).
+## Template editing (lưu ý)
+- Web không còn Template Editor / Excel render.
+- Nếu cần tạo template cho Excel, dùng VBA Excel tool (XML export → Excel generate).
 
 ## Checklist khi hoàn thành task
 - Không phá backward compatibility của `ns.abapObjects.defineTemplate(...)` và template registry.
 - Không đổi cấu trúc JSON model trừ khi cần; nếu có, update UI liên quan + tests.
 - Chạy `node --test web/tests/*.test.js` và sửa tới khi pass.
-

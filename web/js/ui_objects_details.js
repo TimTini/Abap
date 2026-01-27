@@ -477,7 +477,6 @@
           if (note) model.userNote = note;
           else delete model.userNote;
         },
-        { rerenderSequence: false },
       );
       ui.wireInlineAnnoEditors();
       return;
@@ -498,7 +497,6 @@
         if (note) r.userNote = note;
         else delete r.userNote;
       },
-      { rerenderSequence: true },
     );
     ui.wireInlineAnnoEditors();
   }
