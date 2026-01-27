@@ -12,6 +12,63 @@
   let lastRenderOrder = [];
   let lastToolbarUpdate = null;
 
+  const TEMPLATES_FLOW_MAX_STEPS_KEY = "abapflow-templates-flow-max-steps";
+  const TEMPLATES_FLOW_MAX_STEPS_DEFAULT = 900;
+  const TEMPLATES_FLOW_FILTER_TEXT_KEY = "abapflow-templates-flow-filter-text";
+  const TEMPLATES_FLOW_FILTER_SELECTED_KEY = "abapflow-templates-flow-filter-selected";
+  const TEMPLATES_FLOW_FILTER_LOOP_KEY = "abapflow-templates-flow-filter-loop";
+
+  function readTemplatesFlowMaxSteps() {
+    try {
+      const raw = localStorage.getItem(TEMPLATES_FLOW_MAX_STEPS_KEY);
+      const n = Number(raw);
+      return Number.isFinite(n) && n > 0 ? Math.floor(n) : TEMPLATES_FLOW_MAX_STEPS_DEFAULT;
+    } catch (_) {
+      return TEMPLATES_FLOW_MAX_STEPS_DEFAULT;
+    }
+  }
+
+  function writeTemplatesFlowMaxSteps(n) {
+    const v = Number(n);
+    const next = Number.isFinite(v) && v > 0 ? Math.floor(v) : TEMPLATES_FLOW_MAX_STEPS_DEFAULT;
+    try {
+      localStorage.setItem(TEMPLATES_FLOW_MAX_STEPS_KEY, String(next));
+    } catch (_) {}
+    return next;
+  }
+
+  function readStoredText(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw == null) return String(fallback || "");
+      return String(raw);
+    } catch (_) {
+      return String(fallback || "");
+    }
+  }
+
+  function writeStoredText(key, value) {
+    try {
+      localStorage.setItem(key, String(value ?? ""));
+    } catch (_) {}
+  }
+
+  function readStoredBool(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw == null) return Boolean(fallback);
+      return raw === "1" || raw === "true";
+    } catch (_) {
+      return Boolean(fallback);
+    }
+  }
+
+  function writeStoredBool(key, value) {
+    try {
+      localStorage.setItem(key, value ? "1" : "0");
+    } catch (_) {}
+  }
+
   function scrollToTemplateResultId(resultId) {
     const id = String(resultId || "").trim();
     if (!id) return;
@@ -43,22 +100,22 @@
 
     if (b === "item.description") {
       const item = String(ctx?.assignment?.lhs || "").trim();
-      return item ? `Desc Item: ${item}` : "Desc Item";
+      return item ? `Mô tả Item: ${item}` : "Mô tả Item";
     }
 
     if (b === "value.description") {
       const value = String(ctx?.assignment?.rhs || "").trim();
-      return value ? `Desc Value: ${value}` : "Desc Value";
+      return value ? `Mô tả giá trị: ${value}` : "Mô tả giá trị";
     }
 
     if (b === "table.description") {
       const text = String(ctx?.table?.text || "").trim();
-      return text ? `Desc Internal table: ${text}` : "Desc Internal table";
+      return text ? `Mô tả bảng nội bộ: ${text}` : "Mô tả bảng nội bộ";
     }
 
     if (b === "target.description") {
       const text = String(ctx?.target?.text || "").trim();
-      return text ? `Desc Target: ${text}` : "Desc Target";
+      return text ? `Mô tả đích: ${text}` : "Mô tả đích";
     }
 
     const msgMatch = /^(msgClass|msgNo|displayLike|messageText|into|raising)\.description$/.exec(b);
@@ -68,19 +125,19 @@
       const text = String(node?.text || "").trim();
       const label =
         prop === "msgClass"
-          ? "Message class"
+          ? "Nhóm message"
           : prop === "msgNo"
-            ? "Message No."
+            ? "Số message"
             : prop === "displayLike"
-              ? "Display like"
+              ? "Hiển thị như"
               : prop === "messageText"
-                ? "Message text"
+                ? "Nội dung message"
                 : prop === "into"
-                  ? "Destination"
+                  ? "Đích"
                   : prop === "raising"
-                    ? "Raising"
+                    ? "Ngoại lệ"
                     : prop;
-      return text ? `Desc ${label}: ${text}` : `Desc ${label}`;
+      return text ? `Mô tả ${label}: ${text}` : `Mô tả ${label}`;
     }
 
     const withMatch = /^with\[(\d+)\]\.description$/.exec(b);
@@ -88,8 +145,8 @@
       const idx = Number(withMatch[1]);
       const node = ctx?.with?.[idx] || null;
       const text = String(node?.text || "").trim();
-      const label = `Message &${idx + 1}`;
-      return text ? `Desc ${label}: ${text}` : `Desc ${label}`;
+      const label = `Biến message &${idx + 1}`;
+      return text ? `Mô tả ${label}: ${text}` : `Mô tả ${label}`;
     }
 
     const condMatch = /^conditions\[(\d+)\]\.(item1|item2)\.description$/.exec(b);
@@ -99,9 +156,9 @@
       const cond = ctx?.conditions?.[idx] || null;
       const itemText = side === "item2" ? String(cond?.item2?.text || "").trim() : String(cond?.item1?.text || "").trim();
       const op = String(cond?.operator || "").trim();
-      const label = side === "item2" ? "Item 2" : "Item 1";
+      const label = side === "item2" ? "Mục 2" : "Mục 1";
       const tail = itemText ? `${itemText}${op ? ` (${op})` : ""}` : `#${idx + 1}`;
-      return `Desc ${label}: ${tail}`;
+      return `Mô tả ${label}: ${tail}`;
     }
     if (!b) return "Mô tả";
 
@@ -272,7 +329,7 @@
 
   function labelForDescriptionBind(result, bind) {
     const b = String(bind || "").trim();
-    if (!b || !isEditableDescriptionBind(b)) return "Edit description";
+    if (!b || !isEditableDescriptionBind(b)) return "Sửa mô tả";
 
     const ctx = result?.context || null;
     const basePath = b.slice(0, -".description".length);
@@ -280,12 +337,12 @@
 
     if (basePath === "perform") {
       const performName = String(ctx?.perform?.name || "").trim();
-      return performName ? `Description FORM ${performName}` : "Description FORM";
+      return performName ? `Mô tả FORM ${performName}` : "Mô tả FORM";
     }
 
     const text = String(node?.text ?? node?.actual ?? node?.name ?? "").trim();
-    if (text) return `Description: ${text}`;
-    return `Description: ${basePath}`;
+    if (text) return `Mô tả: ${text}`;
+    return `Mô tả: ${basePath}`;
   }
 
   function resolveGlobalDescriptionKey(result, bind) {
@@ -350,7 +407,7 @@
   }
 
   function openDescriptionEditorDialog(options) {
-    const titleText = String(options?.title || "Edit description");
+    const titleText = String(options?.title || "Sửa mô tả");
     const initialValue = String(options?.value ?? "");
 
     return new Promise((resolve) => {
@@ -465,7 +522,7 @@
   }
 
   function openDescriptionEditorDialogForTargets(options) {
-    const titleText = String(options?.title || "Edit description");
+    const titleText = String(options?.title || "Sửa mô tả");
     const targets = Array.isArray(options?.targets) ? options.targets : [];
     const initialByKey = options?.initialByKey && typeof options.initialByKey === "object" ? options.initialByKey : {};
     const initialKey = String(options?.initialKey || (targets[0] ? targets[0].key : "") || "").trim();
@@ -505,7 +562,7 @@
         row.style.marginBottom = "8px";
 
         const label = document.createElement("div");
-        label.textContent = "Object:";
+        label.textContent = "Đối tượng:";
         label.style.minWidth = "64px";
         row.appendChild(label);
 
@@ -703,7 +760,7 @@
               const nextValue = String(value ?? "").trim();
               if (action === "cancel") return;
               if (!tk) {
-                ui.setStatus("Cannot resolve object for this cell.", true);
+                ui.setStatus("Không thể xác định đối tượng cho ô này.", true);
                 return;
               }
 
@@ -711,12 +768,12 @@
                 if (hasLocalOverrideForTarget(tk)) {
                   tpl.setLocalTemplateOverrideByOriginKey?.(templateId, resultId, bind, tk, "", baseOriginKey);
                   renderTemplates({ autoSelectResultId: resultId });
-                  ui.setStatus("Cleared description (local).", false);
+                  ui.setStatus("Đã xóa mô tả (cục bộ).", false);
                   return;
                 }
 
                 if (!ns.notes?.setEntry) {
-                  ui.setStatus("Cannot clear description for this cell.", true);
+                  ui.setStatus("Không thể xóa mô tả cho ô này.", true);
                   return;
                 }
 
@@ -724,7 +781,7 @@
                 ns.notes.setEntry(tk, { description: "" });
                 if (state.model && ns.notes?.applyToModel) ns.notes.applyToModel(state.model);
                 renderTemplates({ autoSelectResultId: resultId });
-                ui.setStatus("Cleared description.", false);
+                ui.setStatus("Đã xóa mô tả.", false);
                 return;
               }
 
@@ -735,20 +792,20 @@
                   tpl.setLocalTemplateOverride?.(templateId, resultId, bind, nextValue);
                 }
                 renderTemplates({ autoSelectResultId: resultId });
-                ui.setStatus("Saved description (local).", false);
+                ui.setStatus("Đã lưu mô tả (cục bộ).", false);
                 return;
               }
 
               if (action === "global") {
                 if (!ns.notes?.setEntry) {
-                  ui.setStatus("Cannot update global description for this cell.", true);
+                  ui.setStatus("Không thể cập nhật mô tả toàn cục cho ô này.", true);
                   return;
                 }
                 tpl.setLocalTemplateOverrideByOriginKey?.(templateId, resultId, bind, tk, "", baseOriginKey);
                 ns.notes.setEntry(tk, { description: nextValue });
                 if (state.model && ns.notes?.applyToModel) ns.notes.applyToModel(state.model);
                 renderTemplates({ autoSelectResultId: resultId });
-                ui.setStatus("Saved description (global).", false);
+                ui.setStatus("Đã lưu mô tả (toàn cục).", false);
               }
             },
           );
@@ -988,13 +1045,13 @@
   async function handleTemplatesExport(action) {
     const ids = getExportResultIds();
     if (!ids.length) {
-      ui.setStatus("Select a template (click) or tick checkboxes first.", true);
+      ui.setStatus("Hãy chọn mẫu (bấm) hoặc tick checkbox trước.", true);
       return;
     }
 
     const items = collectTemplatesExportItems(ids);
     if (!items.length) {
-      ui.setStatus("Nothing to export.", true);
+      ui.setStatus("Không có gì để xuất.", true);
       return;
     }
 
@@ -1006,17 +1063,17 @@
 
     if (action === "download") {
       ui.downloadTextFile(filename, text, mimeType);
-      ui.setStatus(`Downloaded: ${filename}`, false);
+      ui.setStatus(`Đã tải xuống: ${filename}`, false);
       return;
     }
 
     if (!ui.clipboard?.copyHtml) {
-      ui.setStatus("Clipboard module not loaded.", true);
+      ui.setStatus("Chưa tải module clipboard.", true);
       return;
     }
 
     const ok = await ui.clipboard.copyHtml("", text);
-    ui.setStatus(ok ? `Copied XML export (${items.length} item(s)).` : "Copy failed (browser blocked clipboard).", !ok);
+    ui.setStatus(ok ? `Đã sao chép XML (${items.length} mục).` : "Sao chép thất bại (trình duyệt chặn clipboard).", !ok);
   }
 
   function compareNaturalStrings(a, b) {
@@ -1140,20 +1197,20 @@
       if (hasValue) {
         const raw = String(node.value ?? "");
         const trimmed = raw.trim();
-        valueEl.textContent = trimmed ? raw : "(empty)";
+        valueEl.textContent = trimmed ? raw : "(trống)";
         if (!trimmed) valueEl.classList.add("template-struct__value--empty");
 
         if (isEditableDescriptionBind(node.bind)) {
           valueEl.dataset.bind = node.bind;
           valueEl.classList.add("template-struct__value--editable");
-          valueEl.title = "Double-click để sửa mô tả (local/global).";
+          valueEl.title = "Double-click để sửa mô tả (cục bộ/toàn cục).";
         } else {
           valueEl.title = node.bind;
         }
       } else if (node.children.size) {
         valueEl.textContent = "";
       } else {
-        valueEl.textContent = "(empty)";
+        valueEl.textContent = "(trống)";
         valueEl.classList.add("template-struct__value--empty");
       }
 
@@ -1167,7 +1224,7 @@
     if (!root.children.size) {
       const empty = document.createElement("div");
       empty.className = "template-struct__empty";
-      empty.textContent = "No bound values.";
+      empty.textContent = "Không có giá trị ràng buộc.";
       host.appendChild(empty);
       return host;
     }
@@ -1189,13 +1246,13 @@
 
     const model = state.model;
     if (!model) {
-      host.textContent = "Analyze to see templates.";
+      host.textContent = "Hãy phân tích để xem mẫu.";
       host.classList.add("empty");
       return;
     }
 
     if (!ns.templateRegistry || !ns.templateConverter) {
-      host.textContent = "Template modules not loaded.";
+      host.textContent = "Chưa tải module mẫu.";
       host.classList.add("empty");
       return;
     }
@@ -1203,14 +1260,84 @@
     const entries = tpl.listTemplateEntries();
     const templatesBySource = tpl.pickAutoTemplatesBySource(entries);
     if (templatesBySource.size === 0) {
-      host.textContent = "No templates configured.";
+      host.textContent = "Chưa cấu hình mẫu.";
       host.classList.add("empty");
       return;
     }
 
-    const flow = tpl.buildTemplatesFlow(model, templatesBySource, { maxSteps: 900 });
+    const maxStepsRaw = Number(options?.maxSteps ?? readTemplatesFlowMaxSteps());
+    const maxSteps = Number.isFinite(maxStepsRaw) && maxStepsRaw > 0 ? Math.floor(maxStepsRaw) : TEMPLATES_FLOW_MAX_STEPS_DEFAULT;
+
+    const filterTextRaw = String(options?.filterText ?? readStoredText(TEMPLATES_FLOW_FILTER_TEXT_KEY, "")).trim();
+    const filterText = filterTextRaw.toLowerCase();
+    const filterSelectedOnly = Boolean(options?.filterSelectedOnly ?? readStoredBool(TEMPLATES_FLOW_FILTER_SELECTED_KEY, false));
+    const filterLoopOnly = Boolean(options?.filterLoopOnly ?? readStoredBool(TEMPLATES_FLOW_FILTER_LOOP_KEY, false));
+    const hasFilter = Boolean(filterText || filterSelectedOnly || filterLoopOnly);
+
+    const flow = tpl.buildTemplatesFlow(model, templatesBySource, { maxSteps });
     if (!flow.items.length) {
-      host.textContent = "No template-mapped statements found.";
+      host.textContent = "Không có câu lệnh khớp mẫu.";
+      host.classList.add("empty");
+      return;
+    }
+
+    templateResultById = new Map();
+    lastRenderOrder = [];
+    for (const it of flow.items) {
+      if (!it || it.kind !== "template") continue;
+      const res = it.result;
+      if (!res) continue;
+      templateResultById.set(String(res.resultId || ""), res);
+      lastRenderOrder.push(String(res.resultId || ""));
+    }
+
+    function matchesFilter(item) {
+      const result = item?.result;
+      if (!result) return false;
+      const rid = String(result.resultId || "");
+      if (filterSelectedOnly && !selectedTemplateResultIds.has(rid)) return false;
+      if (filterLoopOnly && !(item.isRecursion || result.edge?.isInCycle)) return false;
+      if (!filterText) return true;
+      const hay = [
+        result.objectId,
+        result.templateId,
+        result.kind,
+        result.original,
+        result.context?.perform?.name,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(filterText);
+    }
+
+    const renderItems = [];
+    let pendingSeparator = null;
+    let noteText = "";
+    for (const item of flow.items) {
+      if (!item) continue;
+      if (item.kind === "separator") {
+        pendingSeparator = item;
+        continue;
+      }
+      if (item.kind === "note") {
+        noteText = String(item.text || "");
+        continue;
+      }
+      if (item.kind !== "template") continue;
+      if (!hasFilter || matchesFilter(item)) {
+        if (pendingSeparator) {
+          renderItems.push(pendingSeparator);
+          pendingSeparator = null;
+        }
+        renderItems.push(item);
+      }
+    }
+    if (noteText && (!hasFilter || renderItems.length)) renderItems.push({ kind: "note", text: noteText });
+
+    const visibleTemplates = renderItems.reduce((acc, it) => acc + (it?.kind === "template" ? 1 : 0), 0);
+    if (!renderItems.length) {
+      host.textContent = hasFilter ? "Không có mẫu phù hợp với bộ lọc." : "Không có câu lệnh khớp mẫu.";
       host.classList.add("empty");
       return;
     }
@@ -1218,6 +1345,8 @@
     const markerItems = [];
     const autoSelectResultId = String(options?.autoSelectResultId || "");
     let autoSelectCard = null;
+    const totalTemplates = lastRenderOrder.length;
+    let visibleResultIds = [];
 
     host.classList.remove("empty");
     host.textContent = "";
@@ -1228,13 +1357,53 @@
     const toolbarCount = document.createElement("div");
     toolbarCount.className = "templates-toolbar__count";
 
+    const toolbarFilters = document.createElement("div");
+    toolbarFilters.className = "templates-toolbar__filters";
+
+    const searchInput = document.createElement("input");
+    searchInput.type = "search";
+    searchInput.className = "input input-sm";
+    searchInput.placeholder = "Lọc theo object/template/câu lệnh...";
+    searchInput.value = filterTextRaw;
+    toolbarFilters.appendChild(searchInput);
+
+    const filterSelectedLabel = document.createElement("label");
+    filterSelectedLabel.className = "toolbar-check";
+    const filterSelectedInput = document.createElement("input");
+    filterSelectedInput.type = "checkbox";
+    filterSelectedInput.checked = filterSelectedOnly;
+    filterSelectedLabel.appendChild(filterSelectedInput);
+    filterSelectedLabel.appendChild(document.createTextNode("Chỉ đã chọn"));
+    toolbarFilters.appendChild(filterSelectedLabel);
+
+    const filterLoopLabel = document.createElement("label");
+    filterLoopLabel.className = "toolbar-check";
+    const filterLoopInput = document.createElement("input");
+    filterLoopInput.type = "checkbox";
+    filterLoopInput.checked = filterLoopOnly;
+    filterLoopLabel.appendChild(filterLoopInput);
+    filterLoopLabel.appendChild(document.createTextNode("Chỉ vòng lặp"));
+    toolbarFilters.appendChild(filterLoopLabel);
+
+    const btnClearFilter = document.createElement("button");
+    btnClearFilter.type = "button";
+    btnClearFilter.className = "btn btn-sm";
+    btnClearFilter.textContent = "Xóa lọc";
+    btnClearFilter.disabled = !hasFilter;
+    toolbarFilters.appendChild(btnClearFilter);
+
     const toolbarActions = document.createElement("div");
     toolbarActions.className = "templates-toolbar__actions";
+
+    const btnSelectVisible = document.createElement("button");
+    btnSelectVisible.type = "button";
+    btnSelectVisible.className = "btn btn-sm";
+    btnSelectVisible.textContent = "Chọn hiển thị";
 
     const btnClearSelected = document.createElement("button");
     btnClearSelected.type = "button";
     btnClearSelected.className = "btn btn-sm";
-    btnClearSelected.textContent = "Clear selection";
+    btnClearSelected.textContent = "Bỏ chọn";
     btnClearSelected.addEventListener("click", (e) => {
       e.preventDefault();
       selectedTemplateResultIds.clear();
@@ -1243,10 +1412,84 @@
       updateTemplatesToolbar();
     });
 
+    const btnCollapseAll = document.createElement("button");
+    btnCollapseAll.type = "button";
+    btnCollapseAll.className = "btn btn-sm";
+    btnCollapseAll.textContent = "Thu gọn hết";
+
+    const btnExpandAll = document.createElement("button");
+    btnExpandAll.type = "button";
+    btnExpandAll.className = "btn btn-sm";
+    btnExpandAll.textContent = "Mở hết";
+
+    toolbarActions.appendChild(btnSelectVisible);
     toolbarActions.appendChild(btnClearSelected);
+    toolbarActions.appendChild(btnCollapseAll);
+    toolbarActions.appendChild(btnExpandAll);
+
+    const maxStepsLabel = document.createElement("label");
+    maxStepsLabel.className = "toolbar-check";
+
+    const maxStepsText = document.createElement("span");
+    maxStepsText.textContent = "Giới hạn bước";
+
+    const maxStepsInput = document.createElement("input");
+    maxStepsInput.type = "number";
+    maxStepsInput.min = "100";
+    maxStepsInput.step = "100";
+    maxStepsInput.value = String(maxSteps);
+    maxStepsInput.className = "input";
+    maxStepsInput.style.width = "110px";
+
+    maxStepsLabel.appendChild(maxStepsText);
+    maxStepsLabel.appendChild(maxStepsInput);
+    toolbarActions.appendChild(maxStepsLabel);
+
+    function rerenderWithFilters(nextMaxSteps) {
+      const keepActive = String(selectedTemplateCard?.dataset?.resultId || "").trim();
+      const max = Number(nextMaxSteps ?? maxStepsInput?.value ?? maxSteps);
+      renderTemplates({
+        autoSelectResultId: keepActive,
+        maxSteps: max,
+        filterText: searchInput.value,
+        filterSelectedOnly: filterSelectedInput.checked,
+        filterLoopOnly: filterLoopInput.checked,
+      });
+    }
+
+    searchInput.addEventListener("input", () => {
+      writeStoredText(TEMPLATES_FLOW_FILTER_TEXT_KEY, searchInput.value);
+      rerenderWithFilters();
+    });
+
+    filterSelectedInput.addEventListener("change", () => {
+      writeStoredBool(TEMPLATES_FLOW_FILTER_SELECTED_KEY, filterSelectedInput.checked);
+      rerenderWithFilters();
+    });
+
+    filterLoopInput.addEventListener("change", () => {
+      writeStoredBool(TEMPLATES_FLOW_FILTER_LOOP_KEY, filterLoopInput.checked);
+      rerenderWithFilters();
+    });
+
+    btnClearFilter.addEventListener("click", (e) => {
+      e.preventDefault();
+      searchInput.value = "";
+      filterSelectedInput.checked = false;
+      filterLoopInput.checked = false;
+      writeStoredText(TEMPLATES_FLOW_FILTER_TEXT_KEY, "");
+      writeStoredBool(TEMPLATES_FLOW_FILTER_SELECTED_KEY, false);
+      writeStoredBool(TEMPLATES_FLOW_FILTER_LOOP_KEY, false);
+      rerenderWithFilters();
+    });
+
+    maxStepsInput.addEventListener("change", () => {
+      const next = writeTemplatesFlowMaxSteps(maxStepsInput.value);
+      rerenderWithFilters(next);
+    });
 
     const exportLabel = document.createElement("span");
-    exportLabel.textContent = "Export:";
+    exportLabel.textContent = "Xuất (đã chọn):";
     exportLabel.style.color = "var(--muted)";
     exportLabel.style.fontSize = "12px";
     exportLabel.style.alignSelf = "center";
@@ -1254,7 +1497,7 @@
     const btnCopyExport = document.createElement("button");
     btnCopyExport.type = "button";
     btnCopyExport.className = "btn btn-sm";
-    btnCopyExport.textContent = "Copy";
+    btnCopyExport.textContent = "Sao chép";
     btnCopyExport.addEventListener("click", async (e) => {
       e.preventDefault();
       await handleTemplatesExport("copy");
@@ -1263,7 +1506,7 @@
     const btnDownloadExport = document.createElement("button");
     btnDownloadExport.type = "button";
     btnDownloadExport.className = "btn btn-sm";
-    btnDownloadExport.textContent = "Download";
+    btnDownloadExport.textContent = "Tải xuống";
     btnDownloadExport.addEventListener("click", (e) => {
       e.preventDefault();
       handleTemplatesExport("download");
@@ -1274,18 +1517,50 @@
     toolbarActions.appendChild(btnDownloadExport);
 
     toolbar.appendChild(toolbarCount);
+    toolbar.appendChild(toolbarFilters);
     toolbar.appendChild(toolbarActions);
 
     host.appendChild(toolbar);
 
+    btnSelectVisible.addEventListener("click", (e) => {
+      e.preventDefault();
+      const visibleSet = new Set(visibleResultIds.map((id) => String(id || "")));
+      if (!visibleSet.size) return;
+      host.querySelectorAll("input.template-block__select").forEach((cb) => {
+        const card = cb.closest(".template-block");
+        const rid = String(card?.dataset?.resultId || "");
+        if (!visibleSet.has(rid)) return;
+        cb.checked = true;
+        selectedTemplateResultIds.add(rid);
+        card?.classList.add("is-multi-selected");
+      });
+      updateTemplatesToolbar();
+    });
+
+    btnCollapseAll.addEventListener("click", (e) => {
+      e.preventDefault();
+      for (const id of visibleResultIds) collapsedTemplateResultIds.add(String(id || ""));
+      applyTemplateTreeState(host);
+    });
+
+    btnExpandAll.addEventListener("click", (e) => {
+      e.preventDefault();
+      for (const id of visibleResultIds) collapsedTemplateResultIds.delete(String(id || ""));
+      applyTemplateTreeState(host);
+    });
+
     lastToolbarUpdate = () => {
       const n = selectedTemplateResultIds.size;
-      toolbarCount.textContent = `Selected: ${n}`;
+      const visibleText = hasFilter ? ` • Hiển thị: ${visibleTemplates}` : "";
+      toolbarCount.textContent = `Mẫu: ${totalTemplates}${visibleText} • Đã chọn: ${n}`;
       btnClearSelected.disabled = n === 0;
+      btnSelectVisible.disabled = visibleTemplates === 0;
+      btnCollapseAll.disabled = visibleTemplates === 0;
+      btnExpandAll.disabled = visibleTemplates === 0;
     };
     updateTemplatesToolbar();
 
-    for (const item of flow.items) {
+    for (const item of renderItems) {
       if (item.kind === "separator") {
         const sep = document.createElement("div");
         sep.className = "flow-separator";
@@ -1305,8 +1580,8 @@
       if (item.kind !== "template") continue;
 
       const result = item.result;
-      templateResultById.set(result.resultId, result);
-      lastRenderOrder.push(String(result.resultId || ""));
+      if (!result) continue;
+      visibleResultIds.push(String(result.resultId || ""));
 
       if (result?.sourceRef?.startLine) {
         markerItems.push({
@@ -1338,7 +1613,7 @@
       btnToggle.type = "button";
       btnToggle.className = "template-block__toggle";
       btnToggle.textContent = "▾";
-      btnToggle.setAttribute("aria-label", "Collapse/expand");
+      btnToggle.setAttribute("aria-label", "Thu gọn/mở rộng");
       btnToggle.setAttribute("aria-expanded", String(!collapsedTemplateResultIds.has(resultIdStr)));
       btnToggle.addEventListener("click", (e) => {
         e.preventDefault();
@@ -1367,7 +1642,7 @@
           ? ` (L${src.startLine}-L${src.endLine})`
           : ` (L${src.startLine})`
         : "";
-      const loopText = item.isRecursion ? " (loop)" : "";
+      const loopText = item.isRecursion ? " (vòng lặp)" : "";
 
       const ctx = result?.context || null;
       const originalFirstLine = String(result?.original || "")
@@ -1387,7 +1662,7 @@
       } else if (ctx?.assignment) {
         const lhs = String(ctx?.assignment?.lhs || "").trim();
         const rhs = String(ctx?.assignment?.rhs || "").trim();
-        mainText = lhs && rhs ? `${lhs} = ${rhs}` : lhs ? `${lhs} = ...` : "Assignment";
+        mainText = lhs && rhs ? `${lhs} = ${rhs}` : lhs ? `${lhs} = ...` : "Gán";
       } else if (ctx?.message) {
         mainText = String(ctx?.message?.statement || "").trim() || "MESSAGE";
       } else if (ctx?.itabOp) {
@@ -1399,7 +1674,7 @@
       } else if (originalFirstLine) {
         mainText = originalFirstLine;
       } else {
-        mainText = String(result?.objectId || result?.kind || "Template");
+        mainText = String(result?.objectId || result?.kind || "Mẫu");
       }
 
       title.textContent = `${mainText}${lineText}${loopText}`;

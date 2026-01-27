@@ -125,17 +125,17 @@
 
   function generateObjectDefFromSyntaxText(text) {
     const syntax = extractFirstSyntaxStatement(text);
-    if (!syntax) return { ok: false, error: "No ABAP syntax statement found." };
+    if (!syntax) return { ok: false, error: "Không tìm thấy câu lệnh cú pháp ABAP." };
 
     const m = /^([A-Z][A-Z0-9_-]*)\b/.exec(syntax);
     const keyword = String(m?.[1] || "").toUpperCase();
-    if (!keyword) return { ok: false, error: "Could not detect ABAP keyword from syntax." };
+    if (!keyword) return { ok: false, error: "Không nhận diện được keyword ABAP từ cú pháp." };
 
     if (keyword === "CONCATENATE") {
       return { ok: true, keyword, syntax, objectDef: generateConcatenateObject(), warnings: [] };
     }
 
-    return { ok: false, error: `Unsupported keyword: ${keyword}. (Currently supports: CONCATENATE)` };
+    return { ok: false, error: `Keyword chưa hỗ trợ: ${keyword}. (Hiện chỉ hỗ trợ: CONCATENATE)` };
   }
 
   ns.abapObjects = ns.abapObjects || {};

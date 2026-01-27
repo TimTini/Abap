@@ -7,10 +7,10 @@
       type: "excel-like-table",
       compact: { removeEmptyRows: true },
       sectionLabels: {
-        tables: "Table",
-        using: "Using",
-        changing: "Changing",
-        raising: "Raising",
+        tables: "Bảng",
+        using: "Tham số vào",
+        changing: "Tham số thay đổi",
+        raising: "Ngoại lệ",
       },
       grid: {
         rows: 9,
@@ -114,8 +114,8 @@
       { start: "H2", rowspan: 1, colspan: 7 },
     ],
     cells: [
-      { addr: "A1", text: "Item", class: ["cell", "header"] },
-      { addr: "H1", text: "Value", class: ["cell", "header"] },
+      { addr: "A1", text: "Mục", class: ["cell", "header"] },
+      { addr: "H1", text: "Giá trị", class: ["cell", "header"] },
 
       { addr: "A2", text: "{item.description}", class: ["cell", "wrap"] },
       { addr: "H2", text: "{value.description}", class: ["cell", "wrap"] },
@@ -164,10 +164,10 @@
       { start: "Q3", rowspan: 1, colspan: 4 },
     ],
     cells: [
-      { addr: "A1", text: "Item 1", class: ["cell", "header"] },
-      { addr: "G1", text: "Operator", class: ["cell", "header"] },
-      { addr: "K1", text: "Item 2", class: ["cell", "header"] },
-      { addr: "Q1", text: "Associations", class: ["cell", "header"] },
+      { addr: "A1", text: "Mục 1", class: ["cell", "header"] },
+      { addr: "G1", text: "Toán tử", class: ["cell", "header"] },
+      { addr: "K1", text: "Mục 2", class: ["cell", "header"] },
+      { addr: "Q1", text: "Liên kết", class: ["cell", "header"] },
 
       { addr: "A2", text: "{conditions[0].item1.description}", class: ["cell", "wrap"] },
       { addr: "G2", text: "{conditions[0].operator}", class: ["cell", "mono", "center"] },
@@ -244,7 +244,7 @@
       { start: "G9", rowspan: 1, colspan: 14 },
     ],
     cells: [
-      { addr: "A1", text: "Template cho Message", class: ["cell", "header"] },
+      { addr: "A1", text: "Mẫu MESSAGE", class: ["cell", "header"] },
 
       { addr: "A2", text: "{labels.msgClass}", class: ["cell", "header"] },
       { addr: "G2", text: "{msgClass.description}", class: ["cell", "wrap"] },
@@ -335,9 +335,9 @@
       { start: "A8", rowspan: 1, colspan: 20 },
     ],
     cells: [
-      { addr: "A1", text: "Read/collect/modify/delete itab ({itabOp.kind})", class: ["cell", "header"] },
+      { addr: "A1", text: "Thao tác ITAB ({itabOp.kind})", class: ["cell", "header"] },
 
-      { addr: "A2", text: "Internal table", class: ["cell", "header"] },
+      { addr: "A2", text: "Bảng nội bộ", class: ["cell", "header"] },
       { addr: "G2", text: "{table.description}", class: ["cell", "wrap"] },
 
       { addr: "A3", text: "{labels.target}", class: ["cell", "header"] },
@@ -368,31 +368,31 @@
   ns.templateRegistry.templates = ns.templateRegistry.templates || {};
   ns.templateRegistry.templates["perform.excel-like-table"] = {
     id: "perform.excel-like-table",
-    label: "PERFORM → Excel-like table",
+    label: "PERFORM → bảng kiểu Excel",
     source: "performCalls",
     config: performExcelLikeTable,
   };
   ns.templateRegistry.templates["assignment.excel-like-table"] = {
     id: "assignment.excel-like-table",
-    label: "Assignments (lhs = rhs) → Excel-like table",
+    label: "Gán (lhs = rhs) → bảng kiểu Excel",
     source: "assignments",
     config: assignmentExcelLikeTable,
   };
   ns.templateRegistry.templates["if.excel-like-table"] = {
     id: "if.excel-like-table",
-    label: "IF / ELSEIF (logical expressions) ƒ+' Excel-like table",
+    label: "IF / ELSEIF (biểu thức logic) → bảng kiểu Excel",
     source: "ifs",
     config: ifExcelLikeTable,
   };
   ns.templateRegistry.templates["message.excel-like-table"] = {
     id: "message.excel-like-table",
-    label: "MESSAGE Excel-like table",
+    label: "MESSAGE → bảng kiểu Excel",
     source: "messages",
     config: messageExcelLikeTable,
   };
   ns.templateRegistry.templates["itabOps.excel-like-table"] = {
     id: "itabOps.excel-like-table",
-    label: "READ/COLLECT/MODIFY/DELETE ITAB Excel-like table",
+    label: "READ/COLLECT/MODIFY/DELETE ITAB → bảng kiểu Excel",
     source: "itabOps",
     config: itabOpsExcelLikeTable,
   };

@@ -280,6 +280,8 @@ Context tạo ra arrays `tables/using/changing/raising` và template PERFORM có
 
 ## 9) Recipe chuẩn: thêm ABAP Object + template mới
 
+> Gợi ý nhanh: có thể chạy `powershell scripts/new_abap_object.ps1` để scaffold object + template (có hỗ trợ inline template).
+
 ### 9.1 Statement object mới (khuyến nghị: regex + mapping builder)
 Giả sử bạn muốn parse:
 
@@ -307,6 +309,20 @@ Tạo file: `web/js/abap_objects/templates/echo.excel-like-table.js`
 
   ns.abapObjects?.defineTemplate?.("echo.excel-like-table", cfg);
 })(window.AbapFlow);
+```
+
+**Tùy chọn — khai báo template inline (không cần file)**
+Nếu muốn chỉ sửa **1 file**, bạn có thể nhúng config template ngay trong `objects[].templates[].config`:
+
+```js
+templates: [
+  {
+    id: "echo.excel-like-table",
+    label: "ECHO Excel-like table",
+    auto: true,
+    config: { type: "excel-like-table", grid: { rows: 1, cols: 2 }, cells: [/* ... */] },
+  },
+],
 ```
 
 **Bước 2 — khai báo object trong master config**

@@ -30,6 +30,7 @@ Mục tiêu: **không sửa code parser/builder**, chỉ thêm config + template
 
 1. Tạo template file mới: `web/js/abap_objects/templates/<id>.excel-like-table.js`
    - File phải gọi: `ns.abapObjects?.defineTemplate?.("<templateId>", cfg);`
+  - **Tùy chọn**: khai báo inline ngay trong `web/abap_objects.config.js` bằng `templates[].config` (không cần file).
 2. Thêm entry mới vào `objects[]` trong `web/abap_objects.config.js`
    - `kind: "statement"`
    - `parse: { kind:"regex", regex:/.../i, fields:{...} }`

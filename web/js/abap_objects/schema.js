@@ -11,70 +11,74 @@
   }
 
   function pushErr(errors, path, message) {
-    errors.push({ path: String(path || ""), message: String(message || "Invalid value") });
+    errors.push({ path: String(path || ""), message: String(message || "Giá trị không hợp lệ") });
   }
 
   function validateTemplateEntry(tpl, path, errors) {
     if (!isPlainObject(tpl)) {
-      pushErr(errors, path, "Template must be an object.");
+      pushErr(errors, path, "Template phải là object.");
       return;
     }
     const id = asNonEmptyString(tpl.id);
-    if (!id) pushErr(errors, `${path}.id`, "Template id is required.");
+    if (!id) pushErr(errors, `${path}.id`, "Cần template id.");
 
     const label = asNonEmptyString(tpl.label);
-    if (!label) pushErr(errors, `${path}.label`, "Template label is required.");
+    if (!label) pushErr(errors, `${path}.label`, "Cần nhãn template.");
 
     if (tpl.file != null && typeof tpl.file !== "string") {
-      pushErr(errors, `${path}.file`, "Template file path must be a string.");
+      pushErr(errors, `${path}.file`, "Đường dẫn file template phải là chuỗi.");
     }
 
     if (tpl.auto != null && typeof tpl.auto !== "boolean") {
-      pushErr(errors, `${path}.auto`, "Template auto must be boolean.");
+      pushErr(errors, `${path}.auto`, "Thuộc tính auto phải là boolean.");
+    }
+
+    if (tpl.config != null && !isPlainObject(tpl.config)) {
+      pushErr(errors, `${path}.config`, "Template config phải là object.");
     }
   }
 
   function validateObjectDef(obj, index, errors) {
     const path = `objects[${index}]`;
     if (!isPlainObject(obj)) {
-      pushErr(errors, path, "Object must be an object.");
+      pushErr(errors, path, "Object phải là object.");
       return;
     }
 
     const id = asNonEmptyString(obj.id);
-    if (!id) pushErr(errors, `${path}.id`, "Object id is required.");
+    if (!id) pushErr(errors, `${path}.id`, "Cần object id.");
 
     const kind = asNonEmptyString(obj.kind).toLowerCase();
     if (!kind || !["statement", "calledge"].includes(kind)) {
-      pushErr(errors, `${path}.kind`, "Object kind must be 'statement' or 'callEdge'.");
+      pushErr(errors, `${path}.kind`, "Object kind phải là 'statement' hoặc 'callEdge'.");
     }
 
     const builderKind = asNonEmptyString(obj?.builder?.kind);
-    if (!builderKind) pushErr(errors, `${path}.builder.kind`, "Builder kind is required.");
+    if (!builderKind) pushErr(errors, `${path}.builder.kind`, "Cần builder kind.");
 
     if (kind === "statement") {
       const parseKind = asNonEmptyString(obj?.parse?.kind).toLowerCase();
-      if (!parseKind) pushErr(errors, `${path}.parse.kind`, "Parse kind is required for statement objects.");
+      if (!parseKind) pushErr(errors, `${path}.parse.kind`, "Cần parse kind cho statement.");
 
       if (parseKind === "regex") {
         const rx = obj?.parse?.regex;
         const isRe = rx instanceof RegExp;
         const isStr = typeof rx === "string" && asNonEmptyString(rx);
         if (!isRe && !isStr) {
-          pushErr(errors, `${path}.parse.regex`, "parse.regex must be a RegExp or a non-empty pattern string.");
+          pushErr(errors, `${path}.parse.regex`, "parse.regex phải là RegExp hoặc chuỗi pattern không rỗng.");
         }
 
         if (obj?.parse?.flags != null && typeof obj.parse.flags !== "string") {
-          pushErr(errors, `${path}.parse.flags`, "parse.flags must be a string.");
+          pushErr(errors, `${path}.parse.flags`, "parse.flags phải là chuỗi.");
         }
 
         if (obj?.parse?.fields != null && !isPlainObject(obj.parse.fields)) {
-          pushErr(errors, `${path}.parse.fields`, "parse.fields must be an object.");
+          pushErr(errors, `${path}.parse.fields`, "parse.fields phải là object.");
         } else if (isPlainObject(obj?.parse?.fields)) {
           for (const [k, v] of Object.entries(obj.parse.fields)) {
             const n = Number(v);
             if (!asNonEmptyString(k)) continue;
-            if (!Number.isFinite(n) || n < 0) pushErr(errors, `${path}.parse.fields.${k}`, "Field index must be a number >= 0.");
+            if (!Number.isFinite(n) || n < 0) pushErr(errors, `${path}.parse.fields.${k}`, "Chỉ số field phải là số >= 0.");
           }
         }
       }
@@ -82,12 +86,12 @@
 
     if (kind === "calledge") {
       const toKeyPrefix = asNonEmptyString(obj?.match?.toKeyPrefix);
-      if (!toKeyPrefix) pushErr(errors, `${path}.match.toKeyPrefix`, "match.toKeyPrefix is required for callEdge objects.");
+      if (!toKeyPrefix) pushErr(errors, `${path}.match.toKeyPrefix`, "Cần match.toKeyPrefix cho callEdge.");
     }
 
     if (obj.templates != null) {
       if (!Array.isArray(obj.templates)) {
-        pushErr(errors, `${path}.templates`, "templates must be an array.");
+        pushErr(errors, `${path}.templates`, "templates phải là array.");
       } else {
         for (let i = 0; i < obj.templates.length; i++) {
           validateTemplateEntry(obj.templates[i], `${path}.templates[${i}]`, errors);
@@ -100,29 +104,29 @@
     const errors = [];
 
     if (!isPlainObject(config)) {
-      pushErr(errors, "", "Config must be an object.");
+      pushErr(errors, "", "Config phải là object.");
       return { ok: false, errors };
     }
 
     const schema = asNonEmptyString(config.schema);
-    if (!schema) pushErr(errors, "schema", "schema is required.");
+    if (!schema) pushErr(errors, "schema", "Cần schema.");
 
     const version = Number(config.version);
-    if (!Number.isFinite(version) || version <= 0) pushErr(errors, "version", "version must be a positive number.");
+    if (!Number.isFinite(version) || version <= 0) pushErr(errors, "version", "version phải là số dương.");
 
     if (config.parserConfig != null && !isPlainObject(config.parserConfig)) {
-      pushErr(errors, "parserConfig", "parserConfig must be an object.");
+      pushErr(errors, "parserConfig", "parserConfig phải là object.");
     }
 
     if (!Array.isArray(config.objects)) {
-      pushErr(errors, "objects", "objects must be an array.");
+      pushErr(errors, "objects", "objects phải là array.");
     } else {
       const seen = new Set();
       for (let i = 0; i < config.objects.length; i++) {
         const id = asNonEmptyString(config.objects?.[i]?.id);
         if (id) {
           const lower = id.toLowerCase();
-          if (seen.has(lower)) pushErr(errors, `objects[${i}].id`, `Duplicate object id: ${id}`);
+          if (seen.has(lower)) pushErr(errors, `objects[${i}].id`, `Trùng object id: ${id}`);
           else seen.add(lower);
         }
         validateObjectDef(config.objects[i], i, errors);

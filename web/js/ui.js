@@ -4,29 +4,59 @@
   const ui = ns.ui;
   const state = ui.state;
   const MAIN_SPLIT_KEY = "abapflow-main-left-px";
+  const ABAP_INPUT_KEY = "abapflow-abap-input";
+  const ACTIVE_TAB_KEY = "abapflow-active-tab";
+  const VALID_TABS = new Set(["objects", "templates", "config", "json", "xml"]);
+
+  function readStoredText(key) {
+    try {
+      return String(localStorage.getItem(key) || "");
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function writeStoredText(key, value) {
+    try {
+      localStorage.setItem(key, String(value ?? ""));
+    } catch (_) {}
+  }
+
+  function removeStored(key) {
+    try {
+      localStorage.removeItem(key);
+    } catch (_) {}
+  }
+
+  function setAbapInputText(text) {
+    const abapInput = ui.$("abapInput");
+    if (!abapInput) return;
+    abapInput.value = String(text ?? "");
+    abapInput.dispatchEvent(new Event("input", { bubbles: true }));
+  }
 
   function exportNotes() {
     if (!ns.notes) {
-      ui.setStatus("Notes module not loaded.", true);
+      ui.setStatus("Chưa tải module ghi chú.", true);
       return;
     }
     const pid = ns.notes.getActiveProgramId ? ns.notes.getActiveProgramId() : "default";
     const stamp = new Date().toISOString().replace(/[:]/g, "-").slice(0, 19);
     const filename = `abapflow-notes-${pid}-${stamp}.json`;
     ui.downloadTextFile(filename, ns.notes.exportJson(), "application/json");
-    ui.setStatus("Notes exported.", false);
+    ui.setStatus("Đã xuất ghi chú.", false);
   }
 
   async function importNotesFromFile(file) {
     if (!ns.notes) {
-      ui.setStatus("Notes module not loaded.", true);
+      ui.setStatus("Chưa tải module ghi chú.", true);
       return;
     }
     if (!file) return;
     const text = await file.text();
     const res = ns.notes.importJson(text, { mode: "merge" });
     if (!res.ok) {
-      ui.setStatus(res.error || "Import failed.", true);
+      ui.setStatus(res.error || "Nhập thất bại.", true);
       return;
     }
 
@@ -36,15 +66,19 @@
     if (document.getElementById("tab-templates")?.classList.contains("is-active")) {
       ui.renderTemplates();
     }
-    ui.setStatus("Notes imported.", false);
+    ui.setStatus("Đã nhập ghi chú.", false);
   }
 
   async function analyze() {
     const input = ui.$("abapInput")?.value;
     if (!String(input || "").trim()) {
-      ui.setStatus("Paste ABAP code first.", true);
+      ui.setStatus("Vui lòng dán mã ABAP trước.", true);
       return;
     }
+
+    const analyzeBtn = ui.$("btnAnalyze");
+    if (analyzeBtn) analyzeBtn.disabled = true;
+    ui.setStatus("Đang phân tích...", false);
 
     try {
       if (ns.abapObjects?.whenReady) await ns.abapObjects.whenReady();
@@ -59,10 +93,12 @@
       ui.renderDetails();
       ui.renderTemplates();
       ui.renderJson();
-      ui.setStatus(`Parsed ${model.nodes.size} objects, ${model.edges.length} PERFORM calls.`, false);
+      ui.setStatus(`Đã phân tích: ${model.nodes.size} đối tượng, ${model.edges.length} lần gọi PERFORM.`, false);
     } catch (err) {
       console.error(err);
       ui.setStatus(String(err?.message || err), true);
+    } finally {
+      if (analyzeBtn) analyzeBtn.disabled = false;
     }
   }
 
@@ -72,6 +108,7 @@
       input.value = "";
       input.dispatchEvent(new Event("input", { bubbles: true }));
     }
+    removeStored(ABAP_INPUT_KEY);
 
     state.model = null;
     state.selectedKey = null;
@@ -81,24 +118,24 @@
 
     const details = ui.$("objectDetails");
     if (details) {
-      details.textContent = "Analyze to see details.";
+      details.textContent = "Hãy phân tích để xem chi tiết.";
       details.classList.add("empty");
     }
 
     const json = ui.$("jsonOutput");
     if (json) {
-      json.textContent = "Analyze to see JSON.";
+      json.textContent = "Hãy phân tích để xem JSON.";
       json.classList.add("empty");
     }
 
     const xml = ui.$("xmlOutput");
     if (xml) {
-      xml.textContent = "Analyze to see XML.";
+      xml.textContent = "Hãy phân tích để xem XML.";
       xml.classList.add("empty");
     }
 
     ui.renderTemplates();
-    ui.setStatus("Cleared.", false);
+    ui.setStatus("Đã xóa.", false);
   }
 
   function initMainSplitter() {
@@ -201,6 +238,9 @@
   function init() {
     initMainSplitter();
 
+    const storedTab = readStoredText(ACTIVE_TAB_KEY).trim();
+    if (VALID_TABS.has(storedTab)) ui.setActiveTab(storedTab);
+
     document.addEventListener("click", (ev) => {
       const t = ev.target;
       if (!(t instanceof HTMLElement)) return;
@@ -213,6 +253,7 @@
       tab.addEventListener("click", () => {
         const name = tab.dataset.tab;
         ui.setActiveTab(name);
+        if (VALID_TABS.has(String(name || ""))) writeStoredText(ACTIVE_TAB_KEY, String(name));
         if (name === "templates") {
           requestAnimationFrame(() => ui.renderTemplates());
         }
@@ -235,7 +276,17 @@
         abapInput.value = ns.sampleCode || "";
         abapInput.dispatchEvent(new Event("input", { bubbles: true }));
       }
-      ui.setStatus("Sample loaded. Click Analyze.", false);
+      ui.setStatus("Đã nạp mẫu. Bấm Phân tích.", false);
+    });
+    ui.$("btnLoadFile")?.addEventListener("click", () => ui.$("abapImportFile")?.click());
+    ui.$("abapImportFile")?.addEventListener("change", async (ev) => {
+      const input = ev.target;
+      const file = input?.files?.[0] || null;
+      if (!file) return;
+      const text = await file.text();
+      setAbapInputText(text);
+      ui.setStatus(`Đã tải: ${file.name}. Bấm Phân tích.`, false);
+      if (input) input.value = "";
     });
     ui.$("btnClear")?.addEventListener("click", clearAll);
 
@@ -257,14 +308,14 @@
       e?.preventDefault?.();
       const build = ui.buildAllTemplatesObjectsExportXml;
       if (typeof build !== "function") {
-        ui.setStatus("XML exporter not loaded.", true);
+        ui.setStatus("Chưa tải module xuất XML.", true);
         return;
       }
 
       const res = build();
       if (!res?.ok) {
         ui.renderXml?.();
-        ui.setStatus(String(res?.error || "Cannot build XML."), true);
+        ui.setStatus(String(res?.error || "Không thể tạo XML."), true);
         return;
       }
 
@@ -275,27 +326,27 @@
       }
 
       if (!ui.clipboard?.copyHtml) {
-        ui.setStatus("Clipboard module not loaded.", true);
+        ui.setStatus("Chưa tải module clipboard.", true);
         return;
       }
 
       const ok = await ui.clipboard.copyHtml("", String(res.xml || ""));
-      const suffix = res.truncated ? ` (truncated at ${res.maxSteps})` : "";
-      ui.setStatus(ok ? `Copied XML export (${res.count} object(s))${suffix}.` : "Copy failed (browser blocked clipboard).", !ok);
+      const suffix = res.truncated ? ` (đã cắt ở ${res.maxSteps} bước)` : "";
+      ui.setStatus(ok ? `Đã sao chép XML (${res.count} đối tượng)${suffix}.` : "Sao chép thất bại (trình duyệt chặn clipboard).", !ok);
     });
 
     ui.$("btnDownloadXml")?.addEventListener("click", (e) => {
       e?.preventDefault?.();
       const build = ui.buildAllTemplatesObjectsExportXml;
       if (typeof build !== "function") {
-        ui.setStatus("XML exporter not loaded.", true);
+        ui.setStatus("Chưa tải module xuất XML.", true);
         return;
       }
 
       const res = build();
       if (!res?.ok) {
         ui.renderXml?.();
-        ui.setStatus(String(res?.error || "Cannot build XML."), true);
+        ui.setStatus(String(res?.error || "Không thể tạo XML."), true);
         return;
       }
 
@@ -308,7 +359,7 @@
       const stamp = new Date().toISOString().replace(/[:]/g, "-").slice(0, 19);
       const filename = `abapflow-objects-${stamp}.xml`;
       ui.downloadTextFile(filename, String(res.xml || ""), "application/xml");
-      ui.setStatus(`Downloaded: ${filename}`, false);
+      ui.setStatus(`Đã tải xuống: ${filename}`, false);
     });
 
     ui.$("xmlMaxSteps")?.addEventListener("change", () => {
@@ -316,9 +367,59 @@
     });
 
     const abapInput = ui.$("abapInput");
-    if (abapInput && !abapInput.value.trim() && ns.sampleCode) {
-      abapInput.value = ns.sampleCode;
-      abapInput.dispatchEvent(new Event("input", { bubbles: true }));
+    if (abapInput) {
+      let saveTimer = 0;
+      abapInput.addEventListener("input", () => {
+        if (saveTimer) window.clearTimeout(saveTimer);
+        saveTimer = window.setTimeout(() => {
+          saveTimer = 0;
+          const text = String(abapInput.value || "");
+          if (!text.trim()) removeStored(ABAP_INPUT_KEY);
+          else writeStoredText(ABAP_INPUT_KEY, text);
+        }, 350);
+      });
+
+      abapInput.addEventListener("keydown", (e) => {
+        if (!e) return;
+        if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+          e.preventDefault();
+          analyze();
+        }
+      });
+
+      function handleDroppedFile(file) {
+        if (!file || typeof file.text !== "function") return;
+        file
+          .text()
+          .then((text) => {
+            setAbapInputText(text);
+            ui.setStatus(`Đã tải: ${file.name}. Bấm Phân tích.`, false);
+          })
+          .catch(() => ui.setStatus("Không thể đọc file.", true));
+      }
+
+      abapInput.addEventListener("dragover", (e) => {
+        if (!e?.dataTransfer) return;
+        const types = Array.from(e.dataTransfer.types || []);
+        if (!types.includes("Files")) return;
+        e.preventDefault();
+      });
+
+      abapInput.addEventListener("drop", (e) => {
+        if (!e?.dataTransfer?.files?.length) return;
+        e.preventDefault();
+        handleDroppedFile(e.dataTransfer.files[0]);
+      });
+
+      if (!abapInput.value.trim()) {
+        const saved = readStoredText(ABAP_INPUT_KEY);
+        if (saved.trim()) {
+          setAbapInputText(saved);
+          ui.setStatus("Đã khôi phục ABAP lần trước. Bấm Phân tích.", false);
+        } else if (ns.sampleCode) {
+          setAbapInputText(ns.sampleCode);
+        }
+      }
     }
   }
 

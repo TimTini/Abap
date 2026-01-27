@@ -17,13 +17,13 @@
     const userNote = String(options?.userNote || "").trim();
 
     const lines = [];
-    if (userDesc) lines.push(`<div><span class="anno-summary__k">Desc:</span> ${utils.escapeHtml(userDesc)}</div>`);
+    if (userDesc) lines.push(`<div><span class="anno-summary__k">Mô tả:</span> ${utils.escapeHtml(userDesc)}</div>`);
     if (codeDesc && (!userDesc || codeDesc !== userDesc)) {
-      const label = userDesc ? "Desc (code)" : "Desc";
+      const label = userDesc ? "Mô tả (code)" : "Mô tả";
       lines.push(`<div><span class="anno-summary__k">${label}:</span> ${utils.escapeHtml(codeDesc)}</div>`);
     }
     if (userNote) {
-      lines.push(`<div><span class="anno-summary__k">Note:</span> ${utils.escapeHtml(userNote)}</div>`);
+      lines.push(`<div><span class="anno-summary__k">Ghi chú:</span> ${utils.escapeHtml(userNote)}</div>`);
     }
 
     if (!lines.length) return "";
@@ -34,7 +34,7 @@
     const annoKey = String(options?.annoKey || "").trim();
     if (!annoKey) return "";
 
-    const titleText = String(options?.title || "Edit notes");
+    const titleText = String(options?.title || "Sửa ghi chú");
     const codeDesc = String(options?.codeDesc || "").trim();
     const userDesc = String(options?.userDesc || "").trim();
     const userNote = String(options?.userNote || "").trim();
@@ -66,16 +66,16 @@
         <summary class="param-notes__summary">${utils.escapeHtml(titleText)}</summary>
         <div class="param-notes__body">
           <div class="anno-grid">
-            <div class="anno-label">Description (from code)</div>
-            <div class="anno-code${codeDesc ? "" : " anno-code--empty"}">${utils.escapeHtml(codeDesc || "(none)")}</div>
+            <div class="anno-label">Mô tả (từ code)</div>
+            <div class="anno-code${codeDesc ? "" : " anno-code--empty"}">${utils.escapeHtml(codeDesc || "(không có)")}</div>
 
-            <div class="anno-label">Your description</div>
-            <textarea class="textarea param-notes__input" rows="2" ${toDataAttrs("description")} placeholder="Add your description (stored locally)...">${utils.escapeHtml(
+            <div class="anno-label">Mô tả của bạn</div>
+            <textarea class="textarea param-notes__input" rows="2" ${toDataAttrs("description")} placeholder="Nhập mô tả (lưu cục bộ)...">${utils.escapeHtml(
               userDesc,
             )}</textarea>
 
-            <div class="anno-label">Your note</div>
-            <textarea class="textarea param-notes__input" rows="3" ${toDataAttrs("note")} placeholder="Add notes (stored locally)...">${utils.escapeHtml(
+            <div class="anno-label">Ghi chú của bạn</div>
+            <textarea class="textarea param-notes__input" rows="3" ${toDataAttrs("note")} placeholder="Nhập ghi chú (lưu cục bộ)...">${utils.escapeHtml(
               userNote,
             )}</textarea>
           </div>
@@ -216,9 +216,9 @@
       ns.notes.setEntry(objectKey, { description, note });
       if (applyLocal) applyLocal(description, note);
 
-      statusEl.textContent = "Saved.";
+      statusEl.textContent = "Đã lưu.";
       window.setTimeout(() => {
-        if (statusEl.textContent === "Saved.") statusEl.textContent = "";
+        if (statusEl.textContent === "Đã lưu.") statusEl.textContent = "";
       }, 1200);
 
       if (document.getElementById("tab-templates")?.classList.contains("is-active") && typeof ui.renderTemplates === "function") {
@@ -227,7 +227,7 @@
     }
 
     function scheduleSave() {
-      statusEl.textContent = "Saving...";
+      statusEl.textContent = "Đang lưu...";
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = window.setTimeout(saveNow, 350);
     }

@@ -53,6 +53,7 @@
         callerName: "",
         actualExpr: "",
         originSourceRef: null,
+        callSourceRef: null,
         descText: "",
         statusText: "(RAISING)",
       };
@@ -86,6 +87,7 @@
         callerName,
         actualExpr: actual,
         originSourceRef,
+        callSourceRef: e?.sourceRef || null,
         descText,
         statusText: "",
       };
@@ -97,8 +99,9 @@
         callerName: "",
         actualExpr: "",
         originSourceRef: null,
+        callSourceRef: null,
         descText: "",
-        statusText: "(no caller)",
+        statusText: "(không có nơi gọi)",
       };
     }
 
@@ -107,8 +110,9 @@
       callerName: "",
       actualExpr: "",
       originSourceRef: null,
+      callSourceRef: null,
       descText: "",
-      statusText: "(not passed)",
+      statusText: "(không truyền)",
     };
   }
 
@@ -117,7 +121,7 @@
     out.push({
       key: "PROGRAM",
       kind: "PROGRAM",
-      name: "(Globals)",
+      name: "(Toàn cục)",
       description: String(model?.description || "").trim(),
       userDescription: String(model?.userDescription || "").trim(),
     });
@@ -139,6 +143,17 @@
     state.selectedParamKey = String(options?.paramKey || "").trim();
     if (typeof ui.renderObjectsTable === "function") ui.renderObjectsTable();
     if (typeof ui.renderDetails === "function") ui.renderDetails();
+
+    let sourceRef = options?.sourceRef || null;
+    if (!sourceRef && key && key !== "PROGRAM") {
+      const obj = state.model?.nodes?.get ? state.model.nodes.get(key) : null;
+      sourceRef = obj?.sourceRef || null;
+    }
+    if (sourceRef && typeof ui.highlightSource === "function") {
+      const start = Number(sourceRef?.startLine || 0);
+      const end = Number(sourceRef?.endLine || start);
+      if (Number.isFinite(start) && start > 0) ui.highlightSource(start, end || start);
+    }
   }
 
   function renderObjectsTable() {
@@ -238,7 +253,8 @@
           <td class="${desc ? "" : "cell-muted"}">${utils.escapeHtml(desc || "(chưa có)")}</td>
         `;
 
-        tr.addEventListener("click", () => selectObject(obj.key, { paramKey }));
+        const sourceRef = p?.sourceRef || obj?.sourceRef || null;
+        tr.addEventListener("click", () => selectObject(obj.key, { paramKey, sourceRef }));
       } else if (row.rowKind === "source") {
         const p = row.param;
         const kind = String(p?.kind || "").trim();
@@ -264,7 +280,7 @@
         const descCell = showDescText ? utils.escapeHtml(showDescText) : '<span class="cell-muted">(chưa có)</span>';
 
         tr.innerHTML = `
-          <td class="cell-mono cell-muted">SRC</td>
+          <td class="cell-mono cell-muted">NGUỒN</td>
           <td class="cell-mono">
             <div class="objects-tree objects-tree--lvl2">
               <span class="objects-tree-spacer" aria-hidden="true"></span>
@@ -275,7 +291,8 @@
           <td>${descCell}</td>
         `;
 
-        tr.addEventListener("click", () => selectObject(obj.key, { paramKey }));
+        const sourceRef = s?.originSourceRef || s?.callSourceRef || obj?.sourceRef || null;
+        tr.addEventListener("click", () => selectObject(obj.key, { paramKey, sourceRef }));
       } else {
         tr.dataset.key = obj.key;
         if (obj.key === state.selectedKey && !state.selectedParamKey) tr.classList.add("is-selected");
@@ -285,9 +302,9 @@
         const canToggle = Boolean(row.collapseEnabled && hasToggle);
         const isCollapsed = Boolean(row.isCollapsed);
         const toggle = canToggle
-          ? `<button type="button" class="objects-tree-toggle" aria-label="${isCollapsed ? "Expand" : "Collapse"}" aria-expanded="${isCollapsed ? "false" : "true"}">${
-              isCollapsed ? "▸" : "▾"
-            }</button>`
+          ? `<button type="button" class="objects-tree-toggle" aria-label="${isCollapsed ? "Mở rộng" : "Thu gọn"}" aria-expanded="${
+              isCollapsed ? "false" : "true"
+            }">${isCollapsed ? "▸" : "▾"}</button>`
           : `<span class="objects-tree-spacer" aria-hidden="true"></span>`;
 
         tr.innerHTML = `
@@ -301,7 +318,8 @@
           <td class="${desc ? "" : "cell-muted"}">${utils.escapeHtml(desc || "(chưa có)")}</td>
         `;
 
-        tr.addEventListener("click", () => selectObject(obj.key, { paramKey: "" }));
+        const sourceRef = obj?.sourceRef || null;
+        tr.addEventListener("click", () => selectObject(obj.key, { paramKey: "", sourceRef }));
 
         const toggleBtn = tr.querySelector("button.objects-tree-toggle");
         if (toggleBtn) {

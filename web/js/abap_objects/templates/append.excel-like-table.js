@@ -25,9 +25,9 @@
       center: "text-align:center;",
     },
     cells: [
-      { addr: "A1", text: "Append", class: ["cell", "header"] },
+      { addr: "A1", text: "Thêm", class: ["cell", "header"] },
       { addr: "B1", text: "{line.description}", class: ["cell", "wrap"] },
-      { addr: "C1", text: "TO", class: ["cell", "header", "center"] },
+      { addr: "C1", text: "VÀO", class: ["cell", "header", "center"] },
       { addr: "D1", text: "{itab.description}", class: ["cell", "wrap"] },
 
       { addr: "A2", text: "{labels.sortedBy}", class: ["cell", "header"] },

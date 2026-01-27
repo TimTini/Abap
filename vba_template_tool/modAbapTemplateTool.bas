@@ -14,6 +14,20 @@ Private Const MARKER_SUFFIX_BR As String = "_BR__"
 Private Const INDENT_COLS_PER_DEPTH As Long = 2
 Private Const BLOCK_GAP_ROWS As Long = 2
 Private Const MAX_HEADER_TEXT As Long = 240
+Private Const MAX_LIST_ORIGINAL As Long = 140
+
+Private Const STATUS_CELL As String = "C2"
+
+Private Const LIST_HEADER_ROW As Long = 4
+Private Const LIST_FIRST_ROW As Long = 5
+Private Const LIST_COL_SELECT As Long = 2
+Private Const LIST_COL_INDEX As Long = 3
+Private Const LIST_COL_OBJECT_ID As Long = 4
+Private Const LIST_COL_TEMPLATE_ID As Long = 5
+Private Const LIST_COL_KIND As Long = 6
+Private Const LIST_COL_ROUTINE As Long = 7
+Private Const LIST_COL_LINE As Long = 8
+Private Const LIST_COL_ORIGINAL As Long = 9
 
 Public Sub Auto_Open()
     On Error Resume Next
@@ -36,28 +50,41 @@ End Sub
 
 Private Sub SetupInputSheet(ByVal wsIn As Worksheet)
     If Len(CStr(wsIn.Range("A1").Value2)) = 0 Then
-        wsIn.Range("A1").Value2 = "Paste ABAP Objects export XML here starting at A2 (one XML line per row)."
+        wsIn.Range("A1").Value2 = "Dán XML export ABAP Objects vào cột A từ ô A2 (có thể dán toàn bộ XML vào A2; Excel sẽ tự tách dòng)."
         wsIn.Range("A1").Font.Bold = True
         wsIn.Range("A1").WrapText = True
     End If
 
     wsIn.Columns("A").ColumnWidth = 110
-    wsIn.Columns("B").ColumnWidth = 16
-    wsIn.Columns("C").ColumnWidth = 50
+    wsIn.Columns("B").ColumnWidth = 8
+    wsIn.Columns("C").ColumnWidth = 8
+    wsIn.Columns("D").ColumnWidth = 26
+    wsIn.Columns("E").ColumnWidth = 26
+    wsIn.Columns("F").ColumnWidth = 12
+    wsIn.Columns("G").ColumnWidth = 26
+    wsIn.Columns("H").ColumnWidth = 10
+    wsIn.Columns("I").ColumnWidth = 80
 
     wsIn.Columns("A").WrapText = False
 
-    wsIn.Range("B1").Value2 = "Object #"
+    wsIn.Range("B1").Value2 = "Số thứ tự"
     wsIn.Range("B1").Font.Bold = True
     If Len(CStr(wsIn.Range("B2").Value2)) = 0 Then wsIn.Range("B2").Value2 = 1
 
-    wsIn.Range("C1").Value2 = "Selected"
+    wsIn.Range("C1").Value2 = "Trạng thái"
     wsIn.Range("C1").Font.Bold = True
+    If Len(CStr(wsIn.Range(STATUS_CELL).Value2)) = 0 Then wsIn.Range(STATUS_CELL).Value2 = "Sẵn sàng"
 
-    EnsureButton wsIn, "btnLoadXml", "Load XML file", "LoadXmlFromFile", 320, 32
+    EnsureObjectListHeader wsIn
+
+    EnsureButton wsIn, "btnLoadXml", "Nạp XML", "LoadXmlFromFile", 320, 32
+    EnsureButton wsIn, "btnListObjects", "Danh sách đối tượng", "LoadObjectListFromXml", 320, 72
+    EnsureButton wsIn, "btnGenerateOne", "Tạo theo số thứ tự", "GenerateTemplateFromXml", 320, 112
+    EnsureButton wsIn, "btnGenerateAll", "Tạo toàn bộ/đã chọn", "GenerateAllTemplatesFromXml", 320, 152
+    EnsureButton wsIn, "btnResetTplCfg", "Khôi phục template", "ResetTemplateConfig", 320, 192
+    EnsureButton wsIn, "btnSelectAll", "Chọn tất cả", "SelectAllObjects", 320, 232
+    EnsureButton wsIn, "btnClearSelected", "Bỏ chọn", "ClearSelectedObjects", 320, 272
     RemoveButton wsIn, "btnGenerate"
-    EnsureButton wsIn, "btnResetTplCfg", "Reset Template config", "ResetTemplateConfig", 320, 112
-    EnsureButton wsIn, "btnGenerateAll", "Generate all", "GenerateAllTemplatesFromXml", 320, 152
 End Sub
 
 Private Sub SetupTemplateConfigSheet(ByVal wsCfg As Worksheet)
@@ -77,22 +104,23 @@ Public Sub LoadXmlFromFile()
     Set wsIn = GetOrCreateWorksheet(ThisWorkbook, SHEET_INPUT)
 
     Dim filePath As Variant
-    filePath = Application.GetOpenFilename("XML Files (*.xml),*.xml,All Files (*.*),*.*", , "Select ABAP Objects export XML")
+    filePath = Application.GetOpenFilename("XML Files (*.xml),*.xml,All Files (*.*),*.*", , "Chọn file XML export ABAP Objects")
     If VarType(filePath) = vbBoolean And filePath = False Then Exit Sub
 
     WriteXmlInputToSheet wsIn, ReadTextFile(CStr(filePath))
+    LoadObjectListFromXml
 End Sub
 
 Public Sub ResetTemplateConfig()
     Dim wsCfg As Worksheet
     Set wsCfg = GetOrCreateWorksheet(ThisWorkbook, SHEET_TEMPLATE_CONFIG)
 
-    If MsgBox("Reset Template config to defaults? This will clear the sheet.", vbQuestion + vbYesNo) <> vbYes Then Exit Sub
+    If MsgBox("Khôi phục cấu hình template về mặc định? Thao tác sẽ xóa nội dung sheet.", vbQuestion + vbYesNo) <> vbYes Then Exit Sub
 
     wsCfg.Cells.Clear
     SeedDefaultTemplateConfig wsCfg
 
-    MsgBox "Template config reset.", vbInformation
+    MsgBox "Đã khôi phục cấu hình template.", vbInformation
 End Sub
 
 Public Sub GenerateTemplateFromXml()
@@ -108,7 +136,7 @@ Public Sub GenerateTemplateFromXml()
     Dim inputText As String
     inputText = ReadXmlInputFromSheet(wsIn)
     If Len(Trim$(inputText)) = 0 Then
-        MsgBox "Input XML is empty. Paste export XML into Input column A (starting at A2), or click 'Load XML file'.", vbExclamation
+        MsgBox "XML trống. Dán XML export vào cột A từ A2 hoặc bấm 'Nạp XML'.", vbExclamation
         Exit Sub
     End If
 
@@ -123,7 +151,7 @@ Public Sub GenerateTemplateFromXml()
     Dim objNode As Object
     Set objNode = PickObjectNode(objectNodes, index1)
     If objNode Is Nothing Then
-        MsgBox "No object found at index #" & CStr(index1) & ".", vbExclamation
+        MsgBox "Không tìm thấy đối tượng ở số thứ tự #" & CStr(index1) & ".", vbExclamation
         Exit Sub
     End If
 
@@ -138,7 +166,7 @@ Public Sub GenerateTemplateFromXml()
     If Len(templateKey) = 0 Then templateKey = Trim$(objectId)
 
     If Len(templateKey) = 0 Then
-        MsgBox "Selected object has no templateId/objectId.", vbExclamation
+        MsgBox "Đối tượng được chọn không có templateId/objectId.", vbExclamation
         Exit Sub
     End If
 
@@ -147,14 +175,14 @@ Public Sub GenerateTemplateFromXml()
     If sample Is Nothing Then
         Dim available As String
         available = JoinTemplateKeys(wsCfg)
-        MsgBox "Template config not found for: " & templateKey & IIf(Len(available) > 0, vbCrLf & vbCrLf & "Available: " & available, ""), vbExclamation
+        MsgBox "Không tìm thấy cấu hình template cho: " & templateKey & IIf(Len(available) > 0, vbCrLf & vbCrLf & "Có sẵn: " & available, ""), vbExclamation
         Exit Sub
     End If
 
     Dim ctxNode As Object
     Set ctxNode = objNode.selectSingleNode("context")
     If ctxNode Is Nothing Then
-        MsgBox "Selected object has no <context> node.", vbExclamation
+        MsgBox "Đối tượng không có nút <context>.", vbExclamation
         Exit Sub
     End If
 
@@ -168,9 +196,9 @@ Public Sub GenerateTemplateFromXml()
     Set outRange = wsTpl.Range(dest, dest.Offset(sample.Rows.Count - 1, sample.Columns.Count - 1))
     FillRangePlaceholders outRange, ctxNode
 
-    wsIn.Range("C2").Value2 = "templateId=" & templateId & " objectId=" & objectId & " resultId=" & SafeAttr(objNode, "resultId")
+    UpdateStatus wsIn, "Đã tạo: templateId=" & templateId & " objectId=" & objectId & " resultId=" & SafeAttr(objNode, "resultId")
 
-    MsgBox "Done. Template written to '" & SHEET_TEMPLATE & "'.", vbInformation
+    MsgBox "Hoàn tất. Template đã ghi vào sheet '" & SHEET_TEMPLATE & "'.", vbInformation
 End Sub
 
 Private Function ReadXmlInputFromSheet(ByVal wsIn As Worksheet) As String
@@ -231,6 +259,207 @@ Private Sub WriteXmlInputToSheet(ByVal wsIn As Worksheet, ByVal xmlText As Strin
     Next i
 End Sub
 
+Private Sub EnsureObjectListHeader(ByVal wsIn As Worksheet)
+    Dim r As Long
+    r = LIST_HEADER_ROW
+
+    wsIn.Cells(r, LIST_COL_SELECT).Value2 = "Chọn"
+    wsIn.Cells(r, LIST_COL_INDEX).Value2 = "STT"
+    wsIn.Cells(r, LIST_COL_OBJECT_ID).Value2 = "Object ID"
+    wsIn.Cells(r, LIST_COL_TEMPLATE_ID).Value2 = "Template ID"
+    wsIn.Cells(r, LIST_COL_KIND).Value2 = "Loại"
+    wsIn.Cells(r, LIST_COL_ROUTINE).Value2 = "Routine"
+    wsIn.Cells(r, LIST_COL_LINE).Value2 = "Dòng"
+    wsIn.Cells(r, LIST_COL_ORIGINAL).Value2 = "Câu lệnh"
+
+    Dim c As Long
+    For c = LIST_COL_SELECT To LIST_COL_ORIGINAL
+        wsIn.Cells(r, c).Font.Bold = True
+    Next c
+End Sub
+
+Private Sub ClearObjectList(ByVal wsIn As Worksheet, Optional ByVal clearHeader As Boolean = False)
+    Dim lastRow As Long
+    lastRow = wsIn.Cells(wsIn.Rows.Count, LIST_COL_INDEX).End(xlUp).Row
+    If lastRow < LIST_HEADER_ROW Then lastRow = LIST_HEADER_ROW
+
+    Dim startRow As Long
+    If clearHeader Then
+        startRow = LIST_HEADER_ROW
+    Else
+        startRow = LIST_FIRST_ROW
+    End If
+
+    wsIn.Range(wsIn.Cells(startRow, LIST_COL_SELECT), wsIn.Cells(lastRow, LIST_COL_ORIGINAL)).ClearContents
+End Sub
+
+Private Sub UpdateStatus(ByVal wsIn As Worksheet, ByVal text As String)
+    If wsIn Is Nothing Then Exit Sub
+    wsIn.Range(STATUS_CELL).Value2 = text
+    DoEvents
+End Sub
+
+Private Function NormalizeSingleLine(ByVal text As String, ByVal maxLen As Long) As String
+    Dim s As String
+    s = CStr(text)
+    s = Replace(s, vbCrLf, " ")
+    s = Replace(s, vbCr, " ")
+    s = Replace(s, vbLf, " ")
+    s = Trim$(s)
+
+    If maxLen > 0 And Len(s) > maxLen Then
+        If maxLen > 3 Then
+            s = Left$(s, maxLen - 3) & "..."
+        Else
+            s = Left$(s, maxLen)
+        End If
+    End If
+
+    NormalizeSingleLine = s
+End Function
+
+Public Sub LoadObjectListFromXml()
+    Dim wsIn As Worksheet
+    Set wsIn = GetOrCreateWorksheet(ThisWorkbook, SHEET_INPUT)
+
+    EnsureObjectListHeader wsIn
+
+    Dim inputText As String
+    inputText = ReadXmlInputFromSheet(wsIn)
+    If Len(Trim$(inputText)) = 0 Then
+        MsgBox "XML trống. Dán XML export vào cột A từ A2 hoặc bấm 'Nạp XML'.", vbExclamation
+        Exit Sub
+    End If
+
+    Dim doc As Object
+    Dim objectNodes As Object
+    If Not TryLoadObjectsExportXml(inputText, doc, objectNodes) Then Exit Sub
+
+    ClearObjectList wsIn
+
+    Dim i As Long
+    For i = 0 To objectNodes.Length - 1
+        Dim objNode As Object
+        Set objNode = objectNodes.Item(i)
+        If objNode Is Nothing Then GoTo NextRow
+
+        Dim row As Long
+        row = LIST_FIRST_ROW + i
+
+        wsIn.Cells(row, LIST_COL_INDEX).Value2 = i + 1
+        wsIn.Cells(row, LIST_COL_OBJECT_ID).Value2 = SafeAttr(objNode, "objectId")
+        wsIn.Cells(row, LIST_COL_TEMPLATE_ID).Value2 = SafeAttr(objNode, "templateId")
+        wsIn.Cells(row, LIST_COL_KIND).Value2 = SafeAttr(objNode, "kind")
+        wsIn.Cells(row, LIST_COL_ROUTINE).Value2 = SafeChildText(objNode, "routineKey")
+        wsIn.Cells(row, LIST_COL_LINE).Value2 = SafeAttr(objNode, "startLine")
+        wsIn.Cells(row, LIST_COL_ORIGINAL).Value2 = NormalizeSingleLine(SafeChildText(objNode, "original"), MAX_LIST_ORIGINAL)
+
+NextRow:
+    Next i
+
+    UpdateStatus wsIn, "Đã tải " & CStr(objectNodes.Length) & " đối tượng."
+End Sub
+
+Public Sub SelectAllObjects()
+    Dim wsIn As Worksheet
+    Set wsIn = GetOrCreateWorksheet(ThisWorkbook, SHEET_INPUT)
+
+    Dim lastRow As Long
+    lastRow = wsIn.Cells(wsIn.Rows.Count, LIST_COL_INDEX).End(xlUp).Row
+    If lastRow < LIST_FIRST_ROW Then
+        UpdateStatus wsIn, "Chưa có danh sách để chọn."
+        Exit Sub
+    End If
+
+    wsIn.Range(wsIn.Cells(LIST_FIRST_ROW, LIST_COL_SELECT), wsIn.Cells(lastRow, LIST_COL_SELECT)).Value2 = "x"
+    UpdateStatus wsIn, "Đã chọn tất cả."
+End Sub
+
+Public Sub ClearSelectedObjects()
+    Dim wsIn As Worksheet
+    Set wsIn = GetOrCreateWorksheet(ThisWorkbook, SHEET_INPUT)
+
+    Dim lastRow As Long
+    lastRow = wsIn.Cells(wsIn.Rows.Count, LIST_COL_INDEX).End(xlUp).Row
+    If lastRow < LIST_FIRST_ROW Then
+        UpdateStatus wsIn, "Chưa có danh sách để bỏ chọn."
+        Exit Sub
+    End If
+
+    wsIn.Range(wsIn.Cells(LIST_FIRST_ROW, LIST_COL_SELECT), wsIn.Cells(lastRow, LIST_COL_SELECT)).ClearContents
+    UpdateStatus wsIn, "Đã bỏ chọn."
+End Sub
+
+Private Function IsSelectedFlag(ByVal value As Variant) As Boolean
+    If IsEmpty(value) Then Exit Function
+    If VarType(value) = vbBoolean Then
+        IsSelectedFlag = (value = True)
+        Exit Function
+    End If
+
+    Dim s As String
+    s = LCase$(Trim$(CStr(value)))
+
+    If s = "x" Or s = "1" Or s = "y" Or s = "yes" Or s = "true" Or s = "chon" Or s = "chọn" Then
+        IsSelectedFlag = True
+    End If
+End Function
+
+Private Sub AddUniqueLong(ByRef col As Collection, ByVal value As Long)
+    Dim v As Variant
+    For Each v In col
+        If CLng(v) = value Then Exit Sub
+    Next v
+    col.Add value
+End Sub
+
+Private Function GetSelectedObjectIndexes(ByVal wsIn As Worksheet) As Collection
+    Dim out As New Collection
+    Dim lastRow As Long
+    lastRow = wsIn.Cells(wsIn.Rows.Count, LIST_COL_INDEX).End(xlUp).Row
+    If lastRow < LIST_FIRST_ROW Then
+        Set GetSelectedObjectIndexes = out
+        Exit Function
+    End If
+
+    Dim r As Long
+    For r = LIST_FIRST_ROW To lastRow
+        If IsSelectedFlag(wsIn.Cells(r, LIST_COL_SELECT).Value2) Then
+            Dim idx As Long
+            idx = CLng(Val(CStr(wsIn.Cells(r, LIST_COL_INDEX).Value2)))
+            If idx > 0 Then AddUniqueLong out, idx
+        End If
+    Next r
+
+    Set GetSelectedObjectIndexes = out
+End Function
+
+Private Function BuildObjectIndexArray(ByVal objectCount As Long, ByVal selected As Collection) As Variant
+    Dim arr() As Long
+    Dim i As Long
+
+    If selected Is Nothing Or selected.Count = 0 Then
+        If objectCount < 1 Then
+            BuildObjectIndexArray = Array()
+            Exit Function
+        End If
+        ReDim arr(1 To objectCount)
+        For i = 1 To objectCount
+            arr(i) = i
+        Next i
+    Else
+        ReDim arr(1 To selected.Count)
+        i = 1
+        Dim v As Variant
+        For Each v In selected
+            arr(i) = CLng(v)
+            i = i + 1
+        Next v
+    End If
+
+    BuildObjectIndexArray = arr
+End Function
+
 Public Sub GenerateAllTemplatesFromXml()
     Dim wsIn As Worksheet
     Set wsIn = GetOrCreateWorksheet(ThisWorkbook, SHEET_INPUT)
@@ -244,13 +473,28 @@ Public Sub GenerateAllTemplatesFromXml()
     Dim inputText As String
     inputText = ReadXmlInputFromSheet(wsIn)
     If Len(Trim$(inputText)) = 0 Then
-        MsgBox "Input XML is empty. Paste export XML into Input column A (starting at A2), or click 'Load XML file'.", vbExclamation
+        MsgBox "XML trống. Dán XML export vào cột A từ A2 hoặc bấm 'Nạp XML'.", vbExclamation
         Exit Sub
     End If
 
     Dim doc As Object
     Dim objectNodes As Object
     If Not TryLoadObjectsExportXml(inputText, doc, objectNodes) Then Exit Sub
+
+    Dim selectedIdx As Collection
+    Set selectedIdx = GetSelectedObjectIndexes(wsIn)
+
+    Dim indexList As Variant
+    indexList = BuildObjectIndexArray(objectNodes.Length, selectedIdx)
+
+    Dim totalCount As Long
+    On Error Resume Next
+    totalCount = UBound(indexList) - LBound(indexList) + 1
+    On Error GoTo 0
+    If totalCount <= 0 Then
+        MsgBox "Không có đối tượng để tạo.", vbExclamation
+        Exit Sub
+    End If
 
     Dim prevCalc As XlCalculation
     prevCalc = Application.Calculation
@@ -261,6 +505,7 @@ Public Sub GenerateAllTemplatesFromXml()
     Application.Calculation = xlCalculationManual
 
     wsTpl.Cells.Clear
+    UpdateStatus wsIn, "Đang tạo " & CStr(totalCount) & " đối tượng..."
 
     Dim rowPtr As Long
     rowPtr = 1
@@ -269,11 +514,27 @@ Public Sub GenerateAllTemplatesFromXml()
     Set sampleCache = CreateObject("Scripting.Dictionary")
     sampleCache.CompareMode = 1 ' TextCompare
 
+    Dim idxLower As Long
+    Dim idxUpper As Long
+    idxLower = LBound(indexList)
+    idxUpper = UBound(indexList)
+
     Dim i As Long
-    For i = 0 To objectNodes.Length - 1
+    Dim stepIndex As Long
+    Dim processed As Long
+
+    For i = idxLower To idxUpper
+        stepIndex = i - idxLower + 1
+
+        Dim objIndex As Long
+        objIndex = CLng(indexList(i))
+        If objIndex < 1 Or objIndex > objectNodes.Length Then GoTo NextObj
+
         Dim objNode As Object
-        Set objNode = objectNodes.Item(i)
+        Set objNode = objectNodes.Item(objIndex - 1)
         If objNode Is Nothing Then GoTo NextObj
+
+        processed = processed + 1
 
         Dim templateId As String
         templateId = SafeAttr(objNode, "templateId")
@@ -304,7 +565,7 @@ Public Sub GenerateAllTemplatesFromXml()
         originalText = Trim$(originalText)
 
         Dim header As String
-        header = "#" & CStr(i + 1) & " depth=" & CStr(depth) & " " & templateKey
+        header = "#" & CStr(objIndex) & " depth=" & CStr(depth) & " " & templateKey
         If Len(routineKey) > 0 Then header = header & " | " & routineKey
         If Len(originalText) > 0 Then header = header & " | " & originalText
         If Len(header) > MAX_HEADER_TEXT Then header = Left$(header, MAX_HEADER_TEXT - 3) & "..."
@@ -316,7 +577,7 @@ Public Sub GenerateAllTemplatesFromXml()
         rowPtr = rowPtr + 1
 
         If Len(templateKey) = 0 Then
-            wsTpl.Cells(rowPtr, colPtr).Value2 = "[Missing templateId/objectId]"
+            wsTpl.Cells(rowPtr, colPtr).Value2 = "[Thiếu templateId/objectId]"
             rowPtr = rowPtr + BLOCK_GAP_ROWS
             GoTo NextObj
         End If
@@ -330,7 +591,7 @@ Public Sub GenerateAllTemplatesFromXml()
         End If
 
         If sample Is Nothing Then
-            wsTpl.Cells(rowPtr, colPtr).Value2 = "[Missing Template config] " & templateKey
+            wsTpl.Cells(rowPtr, colPtr).Value2 = "[Thiếu cấu hình template] " & templateKey
             rowPtr = rowPtr + BLOCK_GAP_ROWS
             GoTo NextObj
         End If
@@ -338,7 +599,7 @@ Public Sub GenerateAllTemplatesFromXml()
         Dim ctxNode As Object
         Set ctxNode = objNode.selectSingleNode("context")
         If ctxNode Is Nothing Then
-            wsTpl.Cells(rowPtr, colPtr).Value2 = "[Missing <context>]"
+            wsTpl.Cells(rowPtr, colPtr).Value2 = "[Thiếu <context>]"
             rowPtr = rowPtr + BLOCK_GAP_ROWS
             GoTo NextObj
         End If
@@ -354,11 +615,18 @@ Public Sub GenerateAllTemplatesFromXml()
         rowPtr = rowPtr + sample.Rows.Count + BLOCK_GAP_ROWS
 
 NextObj:
+        If stepIndex Mod 20 = 0 Or stepIndex = totalCount Then
+            UpdateStatus wsIn, "Đang tạo " & CStr(stepIndex) & "/" & CStr(totalCount) & "..."
+        End If
     Next i
 
     Application.CutCopyMode = False
 
-    wsIn.Range("C2").Value2 = "Generated " & CStr(objectNodes.Length) & " object(s)."
+    If selectedIdx Is Nothing Or selectedIdx.Count = 0 Then
+        UpdateStatus wsIn, "Đã tạo " & CStr(processed) & " đối tượng."
+    Else
+        UpdateStatus wsIn, "Đã tạo " & CStr(processed) & "/" & CStr(totalCount) & " đối tượng đã chọn."
+    End If
 
 Cleanup:
     Application.Calculation = prevCalc
@@ -366,7 +634,7 @@ Cleanup:
     Application.ScreenUpdating = True
 
     If Err.Number <> 0 Then
-        MsgBox "Generate all failed: " & Err.Description, vbCritical
+        MsgBox "Tạo toàn bộ thất bại: " & Err.Description, vbCritical
     End If
 End Sub
 
@@ -381,15 +649,15 @@ Private Function TryLoadObjectsExportXml(ByVal xmlText As String, ByRef outDoc A
     doc.resolveExternals = False
     doc.setProperty "SelectionLanguage", "XPath"
 
-    If Not doc.LoadXML(xmlText) Then Err.Raise vbObjectError + 3000, , "Invalid XML."
+    If Not doc.LoadXML(xmlText) Then Err.Raise vbObjectError + 3000, , "XML không hợp lệ."
 
     Dim rootName As String
     rootName = LCase$(CStr(doc.documentElement.nodeName))
-    If rootName <> "abapflowobjects" Then Err.Raise vbObjectError + 3001, , "Unexpected root element: " & doc.documentElement.nodeName
+    If rootName <> "abapflowobjects" Then Err.Raise vbObjectError + 3001, , "Sai phần tử gốc: " & doc.documentElement.nodeName
 
     Dim nodes As Object
     Set nodes = doc.SelectNodes("/abapflowObjects/object")
-    If nodes Is Nothing Or nodes.Length = 0 Then Err.Raise vbObjectError + 3002, , "No <object> nodes found."
+    If nodes Is Nothing Or nodes.Length = 0 Then Err.Raise vbObjectError + 3002, , "Không tìm thấy nút <object>."
 
     Set outDoc = doc
     Set outObjectNodes = nodes
@@ -397,7 +665,7 @@ Private Function TryLoadObjectsExportXml(ByVal xmlText As String, ByRef outDoc A
     Exit Function
 
 Fail:
-    MsgBox "XML load failed: " & Err.Description, vbCritical
+    MsgBox "Không đọc được XML: " & Err.Description, vbCritical
     TryLoadObjectsExportXml = False
 End Function
 
@@ -746,9 +1014,9 @@ Private Sub SeedDefaultTemplateConfig(ByVal wsCfg As Worksheet)
 
     ' append.excel-like-table (2x4)
     Set inner = CreateTemplateBlock(wsCfg, startRow, startCol, "append.excel-like-table", 2, 4)
-    SetTemplateCell inner, "A1", "Append"
+    SetTemplateCell inner, "A1", "Thêm"
     SetTemplateCell inner, "B1", "{line.description}"
-    SetTemplateCell inner, "C1", "TO"
+    SetTemplateCell inner, "C1", "VÀO"
     SetTemplateCell inner, "D1", "{itab.description}"
     SetTemplateCell inner, "A2", "{labels.sortedBy}"
     SetTemplateCell inner, "B2", "{sortedBy.description}"
@@ -756,18 +1024,18 @@ Private Sub SeedDefaultTemplateConfig(ByVal wsCfg As Worksheet)
 
     ' assignment.excel-like-table (2x2)
     Set inner = CreateTemplateBlock(wsCfg, startRow, startCol, "assignment.excel-like-table", 2, 2)
-    SetTemplateCell inner, "A1", "Item"
-    SetTemplateCell inner, "B1", "Value"
+    SetTemplateCell inner, "A1", "Mục"
+    SetTemplateCell inner, "B1", "Giá trị"
     SetTemplateCell inner, "A2", "{item.description}"
     SetTemplateCell inner, "B2", "{value.description}"
     startRow = startRow + 2 + 4
 
     ' if.excel-like-table (3x4)
     Set inner = CreateTemplateBlock(wsCfg, startRow, startCol, "if.excel-like-table", 3, 4)
-    SetTemplateCell inner, "A1", "Item 1"
-    SetTemplateCell inner, "B1", "Operator"
-    SetTemplateCell inner, "C1", "Item 2"
-    SetTemplateCell inner, "D1", "Associations"
+    SetTemplateCell inner, "A1", "Mục 1"
+    SetTemplateCell inner, "B1", "Toán tử"
+    SetTemplateCell inner, "C1", "Mục 2"
+    SetTemplateCell inner, "D1", "Liên kết"
     SetTemplateCell inner, "A2", "{conditions[0].item1.description}"
     SetTemplateCell inner, "B2", "{conditions[0].operator}"
     SetTemplateCell inner, "C2", "{conditions[0].item2.description}"
@@ -825,7 +1093,7 @@ Private Sub SeedDefaultTemplateConfig(ByVal wsCfg As Worksheet)
 End Sub
 
 Private Sub SeedItabTemplate(ByVal inner As Range)
-    SetTemplateCell inner, "A1", "Internal table"
+    SetTemplateCell inner, "A1", "Bảng nội bộ"
     SetTemplateCell inner, "B1", "{table.description}"
 
     SetTemplateCell inner, "A2", "{labels.target}"
@@ -852,7 +1120,7 @@ Private Sub SeedItabTemplate(ByVal inner As Range)
 End Sub
 
 Private Sub SeedPerformTemplate(ByVal inner As Range)
-    SetTemplateCell inner, "A1", "Perform"
+    SetTemplateCell inner, "A1", "Thực hiện"
     SetTemplateCell inner, "B1", "{perform.name}"
     SetTemplateCell inner, "C1", "{perform.description}"
 

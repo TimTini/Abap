@@ -31,7 +31,7 @@
       center: "text-align:center;",
     },
     cells: [
-      { addr: "A1", text: "Internal table", class: ["cell", "header"] },
+      { addr: "A1", text: "Bảng nội bộ", class: ["cell", "header"] },
       { addr: "B1", text: "{table.description}", class: ["cell", "wrap"] },
 
       { addr: "A2", text: "{labels.target}", class: ["cell", "header"] },

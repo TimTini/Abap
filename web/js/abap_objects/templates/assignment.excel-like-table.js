@@ -22,8 +22,8 @@
       wrap: "white-space:normal;line-height:1.25;",
     },
     cells: [
-      { addr: "A1", text: "Item", class: ["cell", "header"] },
-      { addr: "B1", text: "Value", class: ["cell", "header"] },
+      { addr: "A1", text: "Mục", class: ["cell", "header"] },
+      { addr: "B1", text: "Giá trị", class: ["cell", "header"] },
 
       { addr: "A2", text: "{item.description}", class: ["cell", "wrap"] },
       { addr: "B2", text: "{value.description}", class: ["cell", "wrap"] },

@@ -58,7 +58,7 @@
       const key = ns.notes.makeTypeFieldKey(typeField.typeScopeKey, typeField.typeName, typeField.fieldPath);
       edit = key
         ? renderInlineAnnoEditorHtml({
-            title: `Edit type field notes — ${typeField.typeName}-${typeField.fieldPath}`,
+            title: `Sửa ghi chú field type — ${typeField.typeName}-${typeField.fieldPath}`,
             codeDesc,
             userDesc,
             userNote,
@@ -75,7 +75,7 @@
       const key = ns.notes.makeDeclKey(scopeKey, declKind, name);
       edit = key
         ? renderInlineAnnoEditorHtml({
-            title: "Edit notes",
+            title: "Sửa ghi chú",
             codeDesc,
             userDesc,
             userNote,
@@ -145,10 +145,10 @@
 
       out.push(`<li class="decl-group">
         <div class="decl-group__header param-item">
-          <button type="button" class="decl-group__toggle" aria-expanded="true" title="Collapse/expand">▾</button>
+          <button type="button" class="decl-group__toggle" aria-expanded="true" title="Thu gọn/mở rộng">▾</button>
           <div class="decl-group__header-content">${headerInner}</div>
         </div>
-        <ul class="list decl-group__fields">${fieldItems || "<li>(none)</li>"}</ul>
+        <ul class="list decl-group__fields">${fieldItems || "<li>(không có)</li>"}</ul>
       </li>`);
     }
 
@@ -184,20 +184,20 @@
     const userNote = String(model.userNote || "").trim();
     const notesSection = `
       <div class="section">
-        <div class="section__title">Notes</div>
+        <div class="section__title">Ghi chú</div>
         <div class="anno-grid">
-          <div class="anno-label">Your description</div>
-          <textarea id="annoDesc" class="textarea" rows="2" placeholder="Add your description (stored locally)...">${utils.escapeHtml(
+          <div class="anno-label">Mô tả của bạn</div>
+          <textarea id="annoDesc" class="textarea" rows="2" placeholder="Nhập mô tả (lưu cục bộ)...">${utils.escapeHtml(
             userDesc,
           )}</textarea>
 
-          <div class="anno-label">Your note</div>
-          <textarea id="annoNote" class="textarea" rows="4" placeholder="Add notes (stored locally)...">${utils.escapeHtml(
+          <div class="anno-label">Ghi chú của bạn</div>
+          <textarea id="annoNote" class="textarea" rows="4" placeholder="Nhập ghi chú (lưu cục bộ)...">${utils.escapeHtml(
             userNote,
           )}</textarea>
 
           <div class="anno-actions">
-            <button id="btnAnnoClear" class="btn" type="button">Clear</button>
+            <button id="btnAnnoClear" class="btn" type="button">Xóa</button>
             <span id="annoSaveState" class="anno-status"></span>
           </div>
         </div>
@@ -205,23 +205,23 @@
     `;
 
     return `
-      <h3>PROGRAM (Globals)</h3>
+      <h3>PROGRAM (Toàn cục)</h3>
       ${notesSection}
-      <div class="meta">Global DATA: ${model.globalData.length} ƒ?› Global CONSTANTS: ${model.globalConstants.length}</div>
+      <div class="meta">DATA toàn cục: ${model.globalData.length} | CONSTANTS toàn cục: ${model.globalConstants.length}</div>
       <div class="section">
-        <div class="section__title">Global DATA</div>
-        <ul class="list">${globalsData || "<li>(none)</li>"}</ul>
+        <div class="section__title">DATA toàn cục</div>
+        <ul class="list">${globalsData || "<li>(không có)</li>"}</ul>
       </div>
       <div class="section">
-        <div class="section__title">Global CONSTANTS</div>
-        <ul class="list">${globalsConst || "<li>(none)</li>"}</ul>
+        <div class="section__title">CONSTANTS toàn cục</div>
+        <ul class="list">${globalsConst || "<li>(không có)</li>"}</ul>
       </div>
     `;
   }
 
   function renderRoutineDetails(r) {
     const model = state.model;
-    const lineInfo = r.sourceRef?.startLine ? `Lines ${r.sourceRef.startLine}-${r.sourceRef.endLine || r.sourceRef.startLine}` : "Lines ?";
+    const lineInfo = r.sourceRef?.startLine ? `Dòng ${r.sourceRef.startLine}-${r.sourceRef.endLine || r.sourceRef.startLine}` : "Dòng ?";
 
     const params = r.params
       .map((p) => {
@@ -236,7 +236,7 @@
 
         const edit = key
           ? renderInlineAnnoEditorHtml({
-              title: "Edit notes",
+              title: "Sửa ghi chú",
               codeDesc,
               userDesc,
               userNote,
@@ -270,7 +270,7 @@
 
         const edit = key
           ? renderInlineAnnoEditorHtml({
-              title: "Edit notes",
+              title: "Sửa ghi chú",
               codeDesc,
               userDesc,
               userNote,
@@ -280,7 +280,7 @@
             })
           : "";
 
-        return `<li class="param-item">${sourceLink(`PERFORM ${name}`, e.sourceRef)}${e.isInCycle ? ' <span class="badge badge-danger">cycle</span>' : ""}${summary}${edit}</li>`;
+        return `<li class="param-item">${sourceLink(`PERFORM ${name}`, e.sourceRef)}${e.isInCycle ? ' <span class="badge badge-danger">vòng lặp</span>' : ""}${summary}${edit}</li>`;
       })
       .join("");
 
@@ -296,7 +296,7 @@
 
         const edit = key
           ? renderInlineAnnoEditorHtml({
-              title: "Edit notes",
+              title: "Sửa ghi chú",
               codeDesc,
               userDesc,
               userNote,
@@ -306,11 +306,11 @@
             })
           : "";
 
-        return `<li class="param-item">${sourceLink(`Called by ${name}`, e.sourceRef)}${summary}${edit}</li>`;
+        return `<li class="param-item">${sourceLink(`Được gọi bởi ${name}`, e.sourceRef)}${summary}${edit}</li>`;
       })
       .join("");
 
-    const writes = r.writes.map((w) => `<li>${sourceLink(`${w.variableName}  ƒØ?  ${w.statement}`, w.sourceRef)}</li>`).join("");
+    const writes = r.writes.map((w) => `<li>${sourceLink(`${w.variableName} - ${w.statement}`, w.sourceRef)}</li>`).join("");
 
     const statementSections = (() => {
       const registry = ns.abapObjects?.getRegistry?.() || null;
@@ -364,7 +364,7 @@
         sections.push(`
           <div class="section">
             <div class="section__title">${utils.escapeHtml(String(def?.label || objectId))}</div>
-            <ul class="list">${rows || "<li>(none)</li>"}</ul>
+            <ul class="list">${rows || "<li>(không có)</li>"}</ul>
           </div>
         `);
       }
@@ -378,23 +378,23 @@
 
     const notesSection = `
       <div class="section">
-        <div class="section__title">Notes</div>
+        <div class="section__title">Ghi chú</div>
         <div class="anno-grid">
-          <div class="anno-label">Description (from code)</div>
-          <div class="anno-code${codeDesc ? "" : " anno-code--empty"}">${utils.escapeHtml(codeDesc || "(none)")}</div>
+          <div class="anno-label">Mô tả (từ code)</div>
+          <div class="anno-code${codeDesc ? "" : " anno-code--empty"}">${utils.escapeHtml(codeDesc || "(không có)")}</div>
 
-          <div class="anno-label">Your description</div>
-          <textarea id="annoDesc" class="textarea" rows="2" placeholder="Add your description (stored locally)...">${utils.escapeHtml(
+          <div class="anno-label">Mô tả của bạn</div>
+          <textarea id="annoDesc" class="textarea" rows="2" placeholder="Nhập mô tả (lưu cục bộ)...">${utils.escapeHtml(
             userDesc,
           )}</textarea>
 
-          <div class="anno-label">Your note</div>
-          <textarea id="annoNote" class="textarea" rows="4" placeholder="Add notes (stored locally)...">${utils.escapeHtml(
+          <div class="anno-label">Ghi chú của bạn</div>
+          <textarea id="annoNote" class="textarea" rows="4" placeholder="Nhập ghi chú (lưu cục bộ)...">${utils.escapeHtml(
             userNote,
           )}</textarea>
 
           <div class="anno-actions">
-            <button id="btnAnnoClear" class="btn" type="button">Clear</button>
+            <button id="btnAnnoClear" class="btn" type="button">Xóa</button>
             <span id="annoSaveState" class="anno-status"></span>
           </div>
         </div>
@@ -403,32 +403,34 @@
 
     return `
       <h3>${utils.escapeHtml(r.kind)} ${utils.escapeHtml(r.name)}</h3>
-      <div class="meta">${utils.escapeHtml(lineInfo)} ƒ?› Defined: ${r.isDefined ? "Yes" : "No"} ƒ?› Cycle: ${r.isInCycle ? "Yes" : "No"} ƒ?› Depth: ${r.depth}</div>
+      <div class="meta">${utils.escapeHtml(lineInfo)} | Định nghĩa: ${r.isDefined ? "Có" : "Không"} | Vòng lặp: ${
+        r.isInCycle ? "Có" : "Không"
+      } | Độ sâu: ${r.depth}</div>
       ${notesSection}
       <div class="section">
-        <div class="section__title">Parameters</div>
-        <ul class="list">${params || "<li>(none)</li>"}</ul>
+        <div class="section__title">Tham số</div>
+        <ul class="list">${params || "<li>(không có)</li>"}</ul>
       </div>
       <div class="section">
-        <div class="section__title">Local DATA</div>
-        <ul class="list">${localsData || "<li>(none)</li>"}</ul>
+        <div class="section__title">DATA cục bộ</div>
+        <ul class="list">${localsData || "<li>(không có)</li>"}</ul>
       </div>
       <div class="section">
-        <div class="section__title">Local CONSTANTS</div>
-        <ul class="list">${localsConst || "<li>(none)</li>"}</ul>
+        <div class="section__title">CONSTANTS cục bộ</div>
+        <ul class="list">${localsConst || "<li>(không có)</li>"}</ul>
       </div>
       <div class="section">
-        <div class="section__title">Writes</div>
-        <ul class="list">${writes || "<li>(none)</li>"}</ul>
+        <div class="section__title">Ghi dữ liệu</div>
+        <ul class="list">${writes || "<li>(không có)</li>"}</ul>
       </div>
       ${statementSections}
       <div class="section">
-        <div class="section__title">Calls (PERFORM)</div>
-        <ul class="list">${calls || "<li>(none)</li>"}</ul>
+        <div class="section__title">Gọi (PERFORM)</div>
+        <ul class="list">${calls || "<li>(không có)</li>"}</ul>
       </div>
       <div class="section">
-        <div class="section__title">Called by</div>
-        <ul class="list">${calledBy || "<li>(none)</li>"}</ul>
+        <div class="section__title">Được gọi bởi</div>
+        <ul class="list">${calledBy || "<li>(không có)</li>"}</ul>
       </div>
     `;
   }
@@ -439,13 +441,13 @@
     if (!el) return;
 
     if (!model) {
-      el.textContent = "Analyze to see details.";
+      el.textContent = "Hãy phân tích để xem chi tiết.";
       el.classList.add("empty");
       return;
     }
 
     if (!state.selectedKey) {
-      el.textContent = "Select an object to see details.";
+      el.textContent = "Chọn một đối tượng để xem chi tiết.";
       el.classList.add("empty");
       return;
     }
@@ -485,7 +487,7 @@
 
     const r = model.nodes.get(state.selectedKey);
     if (!r) {
-      el.textContent = "Object not found.";
+      el.textContent = "Không tìm thấy đối tượng.";
       return;
     }
 

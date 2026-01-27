@@ -104,7 +104,7 @@
       btn.dataset.endLine = String(m.endLine);
 
       const label = m.objectId ? `${m.objectId}${m.templateId ? ` (${m.templateId})` : ""}` : m.templateId || "template";
-      btn.title = `Go to template output - ${label} (L${m.startLine})`;
+      btn.title = `Đến kết quả mẫu - ${label} (L${m.startLine})`;
 
       btn.addEventListener("click", (e) => {
         e.preventDefault();

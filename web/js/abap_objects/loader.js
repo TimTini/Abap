@@ -19,6 +19,10 @@
     return s ? s : "";
   }
 
+  function isPlainObject(x) {
+    return Boolean(x) && typeof x === "object" && !Array.isArray(x);
+  }
+
   function deepCloneJson(value) {
     return deepClone(value);
   }
@@ -120,6 +124,7 @@
           auto: t?.auto !== false,
           when: t?.when || null,
           file: asNonEmptyString(t?.file),
+          config: isPlainObject(t?.config) ? t.config : null,
         });
       }
     }
@@ -349,9 +354,18 @@
 
       const loadScript = typeof options?.loadScript === "function" ? options.loadScript : defaultLoadScript;
 
-      const filesToLoad = compiled.templates.map((t) => t.file).filter(Boolean);
+      const filesToLoad = compiled.templates
+        .filter((t) => !(t?.config && isPlainObject(t.config)))
+        .map((t) => t.file)
+        .filter(Boolean);
       const uniqueFiles = Array.from(new Set(filesToLoad));
       for (const file of uniqueFiles) await loadScript(file);
+
+      for (const t of compiled.templates) {
+        if (t?.config && isPlainObject(t.config)) {
+          defineTemplate(t.id, t.config);
+        }
+      }
 
       const templateDefs = ns.templateDefs || null;
       if (templateDefs && typeof templateDefs.getTemplateConfig === "function") {

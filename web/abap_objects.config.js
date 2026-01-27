@@ -243,6 +243,7 @@
           },
         ],
       },
+      // @abapflow-objects-insert
     ],
   };
 })(window.AbapFlow);

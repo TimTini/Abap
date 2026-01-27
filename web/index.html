@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ABAP Flow Analyzer (Offline)</title>
+    <title>ABAP Flow Analyzer (Ngoại tuyến)</title>
     <link rel="stylesheet" href="css/app.css" />
     <link rel="stylesheet" href="css/templates.css" />
   </head>
@@ -11,28 +11,41 @@
     <header class="app-header">
       <div class="app-header__title">
         <h1>ABAP Flow Analyzer</h1>
-        <div class="app-header__subtitle">Offline - No external libraries</div>
+        <div class="app-header__subtitle">Chạy offline • Không dùng thư viện ngoài</div>
+        <div class="app-header__steps">
+          <span>1) Dán ABAP</span>
+          <span>2) Phân tích</span>
+          <span>3) Xem &amp; chỉnh</span>
+          <span>4) Xuất XML</span>
+        </div>
       </div>
       <div class="app-header__actions">
-        <button id="btnAnalyze" class="btn btn-primary" type="button">Analyze</button>
-        <button id="btnLoadSample" class="btn" type="button">Load sample</button>
-        <button id="btnClear" class="btn" type="button">Clear</button>
-        <button id="btnExportNotes" class="btn" type="button">Export notes</button>
-        <button id="btnImportNotes" class="btn" type="button">Import notes</button>
+        <button id="btnAnalyze" class="btn btn-primary" type="button">Phân tích</button>
+        <button id="btnLoadSample" class="btn" type="button">Nạp mẫu</button>
+        <button id="btnLoadFile" class="btn" type="button">Tải file</button>
+        <button id="btnClear" class="btn" type="button">Xóa</button>
+        <button id="btnExportNotes" class="btn" type="button">Xuất ghi chú</button>
+        <button id="btnImportNotes" class="btn" type="button">Nhập ghi chú</button>
         <input id="notesImportFile" type="file" accept="application/json" style="display:none" />
+        <input id="abapImportFile" type="file" accept=".abap,.txt,text/plain" style="display:none" />
       </div>
     </header>
 
     <main class="app-main app-main--resizable">
       <section class="panel panel-left">
-        <div class="panel__title">ABAP code</div>
+        <div class="panel__title">Mã ABAP</div>
         <div class="code-editor">
-          <textarea id="abapInput" class="code-input" spellcheck="false" placeholder="Paste ABAP code here..."></textarea>
+          <textarea
+            id="abapInput"
+            class="code-input"
+            spellcheck="false"
+            placeholder="Dán mã ABAP tại đây... (hỗ trợ kéo thả file)"
+          ></textarea>
           <div id="abapLineNumbers" class="code-line-numbers" aria-hidden="true"></div>
           <div id="abapTemplateMarkers" class="code-markers" aria-hidden="true"></div>
         </div>
         <div class="panel__footer">
-          <div id="statusBar" class="status-bar">Ready.</div>
+          <div id="statusBar" class="status-bar" role="status" aria-live="polite">Sẵn sàng. Ctrl+Enter để phân tích.</div>
         </div>
       </section>
 
@@ -40,9 +53,9 @@
 
       <section class="panel panel-right">
         <div class="tabs">
-          <button class="tab is-active" data-tab="objects" type="button">Objects</button>
-          <button class="tab" data-tab="templates" type="button">Templates</button>
-          <button class="tab" data-tab="config" type="button">Config</button>
+          <button class="tab is-active" data-tab="objects" type="button">Đối tượng</button>
+          <button class="tab" data-tab="templates" type="button">Mẫu</button>
+          <button class="tab" data-tab="config" type="button">Cấu hình</button>
           <button class="tab" data-tab="json" type="button">JSON</button>
           <button class="tab" data-tab="xml" type="button">XML</button>
         </div>
@@ -52,7 +65,7 @@
             <div class="split">
               <div class="split__left">
                 <div class="toolbar toolbar--row">
-                  <input id="objectSearch" class="input" type="search" placeholder="Search (FORM, EVENT, name)..." />
+                  <input id="objectSearch" class="input" type="search" placeholder="Tìm (FORM, EVENT, tên)..." />
                   <label class="toolbar-check">
                     <input id="objectNoDescOnly" type="checkbox" />
                     Chưa có mô tả
@@ -62,8 +75,8 @@
                   <table class="table" id="objectsTable">
                     <thead>
                       <tr>
-                        <th>Kind</th>
-                        <th>Name</th>
+                        <th>Loại</th>
+                        <th>Tên</th>
                         <th>Mô tả</th>
                       </tr>
                     </thead>
@@ -72,73 +85,95 @@
                 </div>
               </div>
               <div class="split__right">
-                <div class="panel__title">Details</div>
-                <div id="objectDetails" class="details empty">Analyze to see details.</div>
+                <div class="panel__title">Chi tiết</div>
+                <div id="objectDetails" class="details empty">Hãy phân tích để xem chi tiết.</div>
               </div>
             </div>
           </section>
 
           <section class="tab-panel" id="tab-templates">
-            <div class="panel__title">Template output (flow order)</div>
-            <div id="templatesHost" class="trace-results empty">Analyze to see templates.</div>
-            <div class="hint">Tip: click a block to highlight the original statement in the editor.</div>
+            <div class="panel__title">Kết quả mẫu (theo luồng)</div>
+            <div id="templatesHost" class="trace-results empty">Hãy phân tích để xem mẫu.</div>
+            <div class="hint">Mẹo: bấm vào block để highlight câu lệnh trong editor.</div>
           </section>
 
           <section class="tab-panel" id="tab-config">
             <div class="split objcfg">
               <div class="split__left">
                 <div class="toolbar objcfg-toolbar">
-                  <input id="abapObjCfgSearch" class="input" type="search" placeholder="Search (id/label/kind)..." />
-                  <button id="abapObjCfgNew" class="btn" type="button">New</button>
+                  <input id="abapObjCfgSearch" class="input" type="search" placeholder="Tìm (id/nhãn/loại)..." />
+                  <button id="abapObjCfgNew" class="btn" type="button">Mới</button>
                 </div>
                 <div id="abapObjCfgList" class="objcfg-list"></div>
                 <div class="toolbar objcfg-toolbar objcfg-toolbar--bottom">
-                  <button id="abapObjCfgExport" class="btn" type="button">Export</button>
-                  <button id="abapObjCfgImport" class="btn" type="button">Import</button>
-                  <button id="abapObjCfgResetAll" class="btn" type="button">Reset all</button>
+                  <button id="abapObjCfgExport" class="btn" type="button">Xuất</button>
+                  <button id="abapObjCfgImport" class="btn" type="button">Nhập</button>
+                  <button id="abapObjCfgResetAll" class="btn" type="button">Đặt lại hết</button>
                   <input id="abapObjCfgImportFile" type="file" accept="application/json" style="display:none" />
                 </div>
               </div>
               <div class="split__right">
-                <div class="panel__title">ABAP Objects config (localStorage)</div>
+                <div class="panel__title">Cấu hình ABAP Objects (localStorage)</div>
                 <div class="objcfg-right">
                   <details id="abapObjCfgGen" class="objcfg-gen">
-                    <summary class="objcfg-advanced__summary">Generate from ABAP syntax (beta)</summary>
+                    <summary class="objcfg-advanced__summary">Tạo từ cú pháp ABAP (beta)</summary>
                     <textarea
                       id="abapObjCfgGenInput"
                       class="objcfg-json objcfg-json--small"
                       spellcheck="false"
-                      placeholder="Paste ABAP Doc syntax block here (example: CONCATENATE ... INTO result ...)."
+                      placeholder="Dán khối cú pháp ABAP Doc tại đây (ví dụ: CONCATENATE ... INTO result ...)."
                     ></textarea>
                     <div class="objcfg-gen__row">
-                      <input id="abapObjCfgGenId" class="input" type="text" placeholder="Object id (optional)" />
-                      <button id="abapObjCfgGenBtn" class="btn btn-primary" type="button">Generate</button>
+                      <input id="abapObjCfgGenId" class="input" type="text" placeholder="Object id (tuỳ chọn)" />
+                      <button id="abapObjCfgGenBtn" class="btn btn-primary" type="button">Tạo</button>
                     </div>
                     <pre id="abapObjCfgGenOutput" class="objcfg-gen__output"></pre>
                   </details>
 
-                  <div id="abapObjCfgEditor" class="details empty">Select an object on the left.</div>
+                  <div id="abapObjCfgEditor" class="details empty">Chọn đối tượng bên trái.</div>
+
+                  <details id="abapTplMgr" class="objcfg-advanced tplmgr" open>
+                    <summary class="objcfg-advanced__summary">Templates (localStorage)</summary>
+                    <div class="tplmgr__toolbar">
+                      <input id="abapTplSearch" class="input" type="search" placeholder="Tìm template..." />
+                      <button id="abapTplNew" class="btn" type="button">Mới</button>
+                    </div>
+                    <div class="tplmgr__body">
+                      <div id="abapTplList" class="tplmgr__list"></div>
+                      <div id="abapTplEditor" class="tplmgr__editor empty">Chọn template bên trái.</div>
+                    </div>
+                    <div class="tplmgr__actions">
+                      <button id="abapTplSave" class="btn btn-primary" type="button">Lưu</button>
+                      <button id="abapTplDelete" class="btn" type="button">Xóa</button>
+                      <button id="abapTplApply" class="btn" type="button">Áp dụng</button>
+                      <span class="tplmgr__spacer"></span>
+                      <button id="abapTplExport" class="btn" type="button">Xuất</button>
+                      <button id="abapTplImport" class="btn" type="button">Nhập</button>
+                      <button id="abapTplReset" class="btn" type="button">Xóa tất cả</button>
+                      <input id="abapTplImportFile" type="file" accept="application/json" style="display:none" />
+                    </div>
+                  </details>
                 </div>
               </div>
             </div>
           </section>
 
           <section class="tab-panel" id="tab-json">
-            <div class="panel__title">Model JSON</div>
-            <pre id="jsonOutput" class="json-output empty">Analyze to see JSON.</pre>
+            <div class="panel__title">JSON mô hình</div>
+            <pre id="jsonOutput" class="json-output empty">Hãy phân tích để xem JSON.</pre>
           </section>
 
           <section class="tab-panel" id="tab-xml">
-            <div class="panel__title">ABAP Objects XML (Templates)</div>
+            <div class="panel__title">XML ABAP Objects (toàn bộ)</div>
             <div class="toolbar objcfg-toolbar">
-              <button id="btnCopyXml" class="btn btn-sm btn-primary" type="button">Copy</button>
-              <button id="btnDownloadXml" class="btn btn-sm" type="button">Download</button>
+              <button id="btnCopyXml" class="btn btn-sm btn-primary" type="button">Sao chép</button>
+              <button id="btnDownloadXml" class="btn btn-sm" type="button">Tải xuống</button>
               <label style="margin-left:auto;display:flex;gap:6px;align-items:center;color:var(--muted);font-size:12px;">
-                Max steps
+                Giới hạn bước
                 <input id="xmlMaxSteps" class="input" type="number" min="100" step="100" value="5000" style="width:110px;" />
               </label>
             </div>
-            <pre id="xmlOutput" class="json-output empty">Analyze to see XML.</pre>
+            <pre id="xmlOutput" class="json-output empty">Hãy phân tích để xem XML.</pre>
           </section>
         </div>
       </section>
@@ -170,6 +205,7 @@
     <script src="js/ui_objects_list.js"></script>
     <script src="js/ui_objects_details.js"></script>
     <script src="js/ui_abap_objects_config.js"></script>
+    <script src="js/ui_abap_templates_manager.js"></script>
     <script src="js/ui_abap_objects_syntax_generator.js"></script>
     <script src="js/ui_templates_store.js"></script>
     <script src="js/ui_templates_flow.js"></script>

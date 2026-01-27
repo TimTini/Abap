@@ -205,7 +205,7 @@
 
       const meta = document.createElement("div");
       meta.className = "objcfg-item__meta";
-      const origin = e.isCustom ? "custom" : e.isOverride ? "override" : "built-in";
+      const origin = e.isCustom ? "tùy chỉnh" : e.isOverride ? "ghi đè" : "mặc định";
       meta.textContent = `${origin} • ${asNonEmptyString(e.kind) || "?"}`;
 
       btn.appendChild(title);
@@ -274,7 +274,7 @@
 
     const selectedLower = String(state.selectedId || "").trim().toLowerCase();
     if (!selectedLower) {
-      host.textContent = "Select an object on the left.";
+      host.textContent = "Chọn đối tượng bên trái.";
       host.classList.add("empty");
       return;
     }
@@ -282,19 +282,19 @@
     const entries = buildEntries();
     const entry = entries.find((e) => e.idLower === selectedLower) || null;
     if (!entry) {
-      host.textContent = "Object not found.";
+      host.textContent = "Không tìm thấy đối tượng.";
       host.classList.add("empty");
       return;
     }
 
     host.classList.remove("empty");
 
-    const origin = entry.isCustom ? "custom" : entry.isOverride ? "override" : "built-in";
-    const disabledBadge = entry.disabled ? `<span class="badge badge-danger">disabled</span>` : "";
+    const origin = entry.isCustom ? "tùy chỉnh" : entry.isOverride ? "ghi đè" : "mặc định";
+    const disabledBadge = entry.disabled ? `<span class="badge badge-danger">đang tắt</span>` : "";
 
     host.innerHTML = `
       <div class="objcfg-editor__head">
-        <div class="objcfg-editor__title">Object: <code>${escapeHtml(entry.id)}</code></div>
+        <div class="objcfg-editor__title">Đối tượng: <code>${escapeHtml(entry.id)}</code></div>
         <div class="objcfg-editor__badges">
           <span class="badge">${escapeHtml(origin)}</span>
           ${disabledBadge}
@@ -302,34 +302,34 @@
       </div>
 
       <div class="objcfg-editor__actions">
-        <button id="abapObjCfgBtnSave" class="btn btn-primary" type="button">Save</button>
-        <button id="abapObjCfgBtnSaveNew" class="btn" type="button">Save new</button>
-        <button id="abapObjCfgBtnReset" class="btn" type="button">Reset override</button>
-        <button id="abapObjCfgBtnDelete" class="btn" type="button">Delete</button>
-        <button id="abapObjCfgBtnToggleDisable" class="btn" type="button">${entry.disabled ? "Enable" : "Disable"}</button>
-        <button id="abapObjCfgBtnApply" class="btn" type="button">Apply</button>
+        <button id="abapObjCfgBtnSave" class="btn btn-primary" type="button">Lưu</button>
+        <button id="abapObjCfgBtnSaveNew" class="btn" type="button">Lưu mới</button>
+        <button id="abapObjCfgBtnReset" class="btn" type="button">Khôi phục override</button>
+        <button id="abapObjCfgBtnDelete" class="btn" type="button">Xóa</button>
+        <button id="abapObjCfgBtnToggleDisable" class="btn" type="button">${entry.disabled ? "Bật" : "Tắt"}</button>
+        <button id="abapObjCfgBtnApply" class="btn" type="button">Áp dụng</button>
       </div>
 
       <div class="objcfg-quick">
-        <div class="objcfg-label__text">Quick editor</div>
+        <div class="objcfg-label__text">Chỉnh nhanh</div>
         <div id="abapObjCfgQuick" class="objcfg-quick__host"></div>
       </div>
 
       <details class="objcfg-advanced" open>
-        <summary class="objcfg-advanced__summary">Advanced JSON</summary>
+        <summary class="objcfg-advanced__summary">JSON nâng cao</summary>
         <textarea id="abapObjCfgJson" class="objcfg-json" spellcheck="false"></textarea>
       </details>
 
       <div class="objcfg-templates">
-        <div class="objcfg-label__text">Template mappings</div>
+        <div class="objcfg-label__text">Gán template</div>
         <div class="objcfg-templates__row">
           <select id="abapObjCfgTplSelect" class="input"></select>
-          <button id="abapObjCfgTplAdd" class="btn" type="button">Add mapping</button>
+          <button id="abapObjCfgTplAdd" class="btn" type="button">Thêm mapping</button>
         </div>
         <div id="abapObjCfgTplList" class="objcfg-templates__list"></div>
       </div>
 
-      <div class="hint">Saved in localStorage key: <code>${escapeHtml(getCustomStore()?.STORAGE_KEY || "")}</code></div>
+      <div class="hint">Lưu trong localStorage key: <code>${escapeHtml(getCustomStore()?.STORAGE_KEY || "")}</code></div>
     `;
 
     const jsonEl = $("abapObjCfgJson");
@@ -367,13 +367,13 @@
 
     const optEmpty = document.createElement("option");
     optEmpty.value = "";
-    optEmpty.textContent = "Select a template...";
+    optEmpty.textContent = "Chọn template...";
     sel.appendChild(optEmpty);
 
     for (const t of list) {
       const opt = document.createElement("option");
       opt.value = t.id;
-      const origin = t.origin === "built-in" ? "built-in" : "local";
+      const origin = t.origin === "built-in" ? "mặc định" : t.origin === "custom" ? "tùy chỉnh" : "cục bộ";
       opt.textContent = `${t.id} (${origin})`;
       sel.appendChild(opt);
     }
@@ -381,10 +381,10 @@
 
   function getJsonObject() {
     const el = $("abapObjCfgJson");
-    if (!el) return { ok: false, error: "Editor not ready." };
+    if (!el) return { ok: false, error: "Trình soạn thảo chưa sẵn sàng." };
     const parsed = safeJsonParse(el.value);
-    if (!parsed.ok) return { ok: false, error: parsed.error || "Invalid JSON." };
-    if (!isPlainObject(parsed.value)) return { ok: false, error: "Object JSON must be an object." };
+    if (!parsed.ok) return { ok: false, error: parsed.error || "JSON không hợp lệ." };
+    if (!isPlainObject(parsed.value)) return { ok: false, error: "JSON object phải là object." };
     return { ok: true, value: parsed.value };
   }
 
@@ -411,8 +411,8 @@
   function updateJsonObject(mutator, options) {
     const res = getJsonObject();
     if (!res.ok) {
-      ui.setStatus(res.error || "Invalid JSON.", true);
-      return { ok: false, error: res.error || "Invalid JSON." };
+      ui.setStatus(res.error || "JSON không hợp lệ.", true);
+      return { ok: false, error: res.error || "JSON không hợp lệ." };
     }
     const obj = res.value;
     try {
@@ -434,7 +434,7 @@
     if (!host) return;
     const parsed = getJsonObject();
     if (!parsed.ok) {
-      host.innerHTML = `<div class="objcfg-quick__error">Fix JSON to use the quick editor.</div>`;
+      host.innerHTML = `<div class="objcfg-quick__error">Sửa JSON để dùng chỉnh nhanh.</div>`;
       return;
     }
     const obj = parsed.value || {};
@@ -447,12 +447,12 @@
     host.innerHTML = `
       <div class="objcfg-form">
         <label class="objcfg-field">
-          <span class="objcfg-field__label">Label</span>
+          <span class="objcfg-field__label">Nhãn</span>
           <input id="abapObjCfgFieldLabel" class="input" type="text" value="${escapeHtml(asNonEmptyString(obj.label))}" />
         </label>
 
         <label class="objcfg-field">
-          <span class="objcfg-field__label">Kind</span>
+          <span class="objcfg-field__label">Loại</span>
           <select id="abapObjCfgFieldKind" class="input">
             <option value="statement">statement</option>
             <option value="callEdge">callEdge</option>
@@ -460,7 +460,7 @@
         </label>
 
         <label class="objcfg-field">
-          <span class="objcfg-field__label">Builder kind</span>
+          <span class="objcfg-field__label">Kiểu builder</span>
           <input id="abapObjCfgFieldBuilderKind" class="input" list="abapObjCfgBuilderKinds" value="${escapeHtml(builderKind)}" />
           <datalist id="abapObjCfgBuilderKinds">
             <option value="performCall"></option>
@@ -477,7 +477,7 @@
           isStatement
             ? `
           <label class="objcfg-field">
-            <span class="objcfg-field__label">Parse kind</span>
+            <span class="objcfg-field__label">Kiểu parse</span>
             <input id="abapObjCfgFieldParseKind" class="input" list="abapObjCfgParseKinds" value="${escapeHtml(parseKind)}" />
             <datalist id="abapObjCfgParseKinds">
               <option value="regex"></option>
@@ -520,16 +520,16 @@
             </label>
           </div>
 
-          <div class="objcfg-sub__title">Regex fields</div>
+          <div class="objcfg-sub__title">Trường regex</div>
           <div class="objcfg-mini-table">
             <div class="objcfg-mini-table__head">
-              <div>Field</div>
-              <div>Group</div>
+              <div>Trường</div>
+              <div>Nhóm</div>
               <div></div>
             </div>
             <div id="abapObjCfgRegexFields"></div>
           </div>
-          <button id="abapObjCfgRegexAddField" class="btn" type="button">Add regex field</button>
+          <button id="abapObjCfgRegexAddField" class="btn" type="button">Thêm trường regex</button>
         </div>
       `
           : ""
@@ -539,17 +539,17 @@
         isMappingBuilder
           ? `
         <div class="objcfg-sub">
-          <div class="objcfg-sub__title">Builder mapping fields</div>
+          <div class="objcfg-sub__title">Trường mapping (builder)</div>
           <div class="objcfg-mini-table">
             <div class="objcfg-mini-table__head objcfg-mini-table__head--4">
-              <div>Out key</div>
-              <div>Type</div>
-              <div>From</div>
+              <div>Khoá output</div>
+              <div>Kiểu</div>
+              <div>Nguồn</div>
               <div></div>
             </div>
             <div id="abapObjCfgMappingFields"></div>
           </div>
-          <button id="abapObjCfgMapAddField" class="btn" type="button">Add mapping field</button>
+          <button id="abapObjCfgMapAddField" class="btn" type="button">Thêm trường mapping</button>
         </div>
       `
           : ""
@@ -686,7 +686,7 @@
     if (list.length === 0) {
       const empty = document.createElement("div");
       empty.className = "objcfg-mini-table__empty";
-      empty.textContent = "(no fields)";
+      empty.textContent = "(không có trường)";
       host.appendChild(empty);
       return;
     }
@@ -709,7 +709,7 @@
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "btn";
-      btn.textContent = "Remove";
+      btn.textContent = "Xóa";
       btn.addEventListener("click", () => {
         updateJsonObject(
           (o) => {
@@ -748,9 +748,9 @@
   }
 
   function addRegexField() {
-    const key = asNonEmptyString(window.prompt("Field name:", ""));
+    const key = asNonEmptyString(window.prompt("Tên field:", ""));
     if (!key) return;
-    const idx = Number(window.prompt("Group index (number):", "1"));
+    const idx = Number(window.prompt("Chỉ số group (số):", "1"));
     if (!Number.isFinite(idx)) return;
     updateJsonObject(
       (o) => {
@@ -788,7 +788,7 @@
     if (list.length === 0) {
       const empty = document.createElement("div");
       empty.className = "objcfg-mini-table__empty";
-      empty.textContent = "(no fields)";
+      empty.textContent = "(không có trường)";
       host.appendChild(empty);
       return;
     }
@@ -819,7 +819,7 @@
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "btn";
-      btn.textContent = "Remove";
+      btn.textContent = "Xóa";
       btn.addEventListener("click", () => {
         updateJsonObject(
           (o) => {
@@ -861,10 +861,10 @@
   }
 
   function addMappingField() {
-    const outKey = asNonEmptyString(window.prompt("Out key:", ""));
+    const outKey = asNonEmptyString(window.prompt("Khoá output:", ""));
     if (!outKey) return;
-    const from = asNonEmptyString(window.prompt("From (payload field name):", ""));
-    const type = asNonEmptyString(window.prompt("Type (expr|exprlist|text):", "expr")) || "expr";
+    const from = asNonEmptyString(window.prompt("Từ (tên trường payload):", ""));
+    const type = asNonEmptyString(window.prompt("Kiểu (expr|exprlist|text):", "expr")) || "expr";
     updateJsonObject(
       (o) => {
         if (!isPlainObject(o.builder)) o.builder = { kind: "mapping" };
@@ -878,46 +878,46 @@
   function onSave(options) {
     const storeApi = getCustomStore();
     if (!storeApi) {
-      ui.setStatus("ABAP Objects custom store module not loaded.", true);
+      ui.setStatus("Chưa tải module lưu ABAP Objects.", true);
       return;
     }
 
     const res = getJsonObject();
     if (!res.ok) {
-      ui.setStatus(res.error || "Invalid JSON.", true);
+      ui.setStatus(res.error || "JSON không hợp lệ.", true);
       return;
     }
 
     const obj = res.value;
     const id = asNonEmptyString(obj?.id);
     if (!id) {
-      ui.setStatus("Object id is required.", true);
+      ui.setStatus("Cần Object id.", true);
       return;
     }
 
     const validation = validateObjectDef(obj);
     if (!validation.ok) {
       const msg = (validation.errors || [])
-        .map((e) => `${e.path || "(root)"}: ${e.message || "Invalid value"}`)
+        .map((e) => `${e.path || "(gốc)"}: ${e.message || "Giá trị không hợp lệ"}`)
         .join("\n");
-      ui.setStatus(msg || "Invalid object config.", true);
+      ui.setStatus(msg || "Cấu hình object không hợp lệ.", true);
       return;
     }
 
     const mode = asNonEmptyString(options?.mode);
     if (mode === "saveNew") {
       const suggested = `${id}_copy`;
-      const nextId = asNonEmptyString(window.prompt("New object id:", suggested));
+      const nextId = asNonEmptyString(window.prompt("Object id mới:", suggested));
       if (!nextId) return;
       const cloned = deepClone({ ...obj, id: nextId });
       const saved = storeApi.upsertObjectDef(cloned);
       if (!saved.ok) {
-        ui.setStatus(saved.error || "Save failed.", true);
+        ui.setStatus(saved.error || "Lưu thất bại.", true);
         return;
       }
       state.selectedId = nextId;
       state.lastListHash = "";
-      ui.setStatus(`Saved new object: ${nextId}.`, false);
+      ui.setStatus(`Đã lưu object mới: ${nextId}.`, false);
       renderList();
       renderEditor();
       return;
@@ -925,13 +925,13 @@
 
     const saved = storeApi.upsertObjectDef(obj);
     if (!saved.ok) {
-      ui.setStatus(saved.error || "Save failed.", true);
+      ui.setStatus(saved.error || "Lưu thất bại.", true);
       return;
     }
 
     state.selectedId = id;
     state.lastListHash = "";
-    ui.setStatus(`Saved: ${id}.`, false);
+    ui.setStatus(`Đã lưu: ${id}.`, false);
     renderList();
     renderEditor();
   }
@@ -940,11 +940,11 @@
     const storeApi = getCustomStore();
     if (!storeApi) return;
     if (!entry?.isBase || !entry?.isOverride) return;
-    const ok = window.confirm(`Reset override for "${entry.id}"?`);
+    const ok = window.confirm(`Khôi phục override cho "${entry.id}"?`);
     if (!ok) return;
     storeApi.deleteObjectDef(entry.id);
     state.lastListHash = "";
-    ui.setStatus(`Reset override: ${entry.id}.`, false);
+    ui.setStatus(`Đã khôi phục override: ${entry.id}.`, false);
     renderList();
     renderEditor();
   }
@@ -953,12 +953,12 @@
     const storeApi = getCustomStore();
     if (!storeApi) return;
     if (!entry?.isCustom) return;
-    const ok = window.confirm(`Delete custom object "${entry.id}"?`);
+    const ok = window.confirm(`Xóa object tuỳ chỉnh "${entry.id}"?`);
     if (!ok) return;
     storeApi.deleteObjectDef(entry.id);
     state.selectedId = "";
     state.lastListHash = "";
-    ui.setStatus(`Deleted: ${entry.id}.`, false);
+    ui.setStatus(`Đã xóa: ${entry.id}.`, false);
     renderList();
     renderEditor();
   }
@@ -968,14 +968,14 @@
     if (!storeApi) return;
     storeApi.setObjectDisabled(entry.id, !entry.disabled);
     state.lastListHash = "";
-    ui.setStatus(`${entry.disabled ? "Enabled" : "Disabled"}: ${entry.id}.`, false);
+    ui.setStatus(`${entry.disabled ? "Đã bật" : "Đã tắt"}: ${entry.id}.`, false);
     renderList();
     renderEditor();
   }
 
   function onApply() {
     if (ns.abapObjects?.reset) ns.abapObjects.reset();
-    ui.setStatus("Applied ABAP Objects config. Re-analyze to reload.", false);
+    ui.setStatus("Đã áp dụng cấu hình ABAP Objects. Hãy phân tích lại để nạp.", false);
     const input = $("abapInput")?.value || "";
     if (String(input).trim()) $("btnAnalyze")?.click();
   }
@@ -1010,7 +1010,7 @@
     if (list.length === 0) {
       const empty = document.createElement("div");
       empty.className = "objcfg-templates__empty";
-      empty.textContent = "(no mappings)";
+      empty.textContent = "(chưa gán template)";
       host.appendChild(empty);
       return;
     }
@@ -1026,7 +1026,7 @@
       const right = document.createElement("button");
       right.type = "button";
       right.className = "btn objcfg-templates__remove";
-      right.textContent = "Remove";
+      right.textContent = "Xóa";
       right.addEventListener("click", () => removeTemplateMapping(t.id));
 
       row.appendChild(left);
@@ -1042,7 +1042,7 @@
 
     const res = getJsonObject();
     if (!res.ok) {
-      ui.setStatus(res.error || "Invalid JSON.", true);
+      ui.setStatus(res.error || "JSON không hợp lệ.", true);
       return;
     }
 
@@ -1052,7 +1052,7 @@
     const existing = normalizeTemplatesList(obj.templates);
     const exists = existing.some((t) => String(t.id || "").trim().toLowerCase() === tid.toLowerCase());
     if (exists) {
-      ui.setStatus(`Template already mapped: ${tid}.`, true);
+      ui.setStatus(`Template đã được gán: ${tid}.`, true);
       return;
     }
 
@@ -1097,24 +1097,24 @@
   function createNewObject() {
     const storeApi = getCustomStore();
     if (!storeApi) {
-      ui.setStatus("ABAP Objects custom store module not loaded.", true);
+      ui.setStatus("Chưa tải module lưu ABAP Objects.", true);
       return;
     }
 
     const suggested = "newObject";
-    const id = asNonEmptyString(window.prompt("New object id:", suggested));
+    const id = asNonEmptyString(window.prompt("Object id mới:", suggested));
     if (!id) return;
 
     const exists = buildEntries().some((e) => e.idLower === id.toLowerCase());
     if (exists) {
-      const ok = window.confirm(`"${id}" already exists. Overwrite/override it?`);
+      const ok = window.confirm(`"${id}" đã tồn tại. Ghi đè/override?`);
       if (!ok) return;
     }
 
     const obj = {
       id,
       kind: "statement",
-      label: "New object",
+      label: "Object mới",
       parse: { kind: "regex", regex: "^$" },
       builder: { kind: "mapping", fields: {} },
       templates: [],
@@ -1123,7 +1123,7 @@
 
     state.selectedId = id;
     state.lastListHash = "";
-    ui.setStatus(`Created: ${id}.`, false);
+    ui.setStatus(`Đã tạo: ${id}.`, false);
     renderList();
     renderEditor();
   }
@@ -1133,7 +1133,7 @@
     if (!storeApi) return;
     const stamp = new Date().toISOString().replace(/[:]/g, "-").slice(0, 19);
     ui.downloadTextFile(`abapflow-abap-objects-custom-${stamp}.json`, storeApi.exportJson(), "application/json");
-    ui.setStatus("ABAP Objects config exported.", false);
+    ui.setStatus("Đã xuất cấu hình ABAP Objects.", false);
   }
 
   async function importStoreFromFile(file) {
@@ -1144,12 +1144,12 @@
     const text = await file.text();
     const res = storeApi.importJson(text, { mode: "merge" });
     if (!res.ok) {
-      ui.setStatus(res.error || "Import failed.", true);
+      ui.setStatus(res.error || "Nhập thất bại.", true);
       return;
     }
     state.selectedId = "";
     state.lastListHash = "";
-    ui.setStatus("ABAP Objects config imported (merge).", false);
+    ui.setStatus("Đã nhập cấu hình ABAP Objects (gộp).", false);
     renderList();
     renderEditor();
   }
@@ -1157,12 +1157,12 @@
   function resetAll() {
     const storeApi = getCustomStore();
     if (!storeApi) return;
-    const ok = window.confirm("Reset ALL custom ABAP Objects config in localStorage?");
+    const ok = window.confirm("Reset toàn bộ cấu hình ABAP Objects tùy chỉnh trong localStorage?");
     if (!ok) return;
     storeApi.clearStore();
     state.selectedId = "";
     state.lastListHash = "";
-    ui.setStatus("ABAP Objects config reset.", false);
+    ui.setStatus("Đã reset cấu hình ABAP Objects.", false);
     renderList();
     renderEditor();
   }

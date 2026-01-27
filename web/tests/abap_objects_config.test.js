@@ -101,6 +101,52 @@ test("abap_objects loader registers templates from master config", async () => {
   assert.ok(templates["append.excel-like-table"]);
 });
 
+test("abap_objects loader registers inline template config", async () => {
+  const ns = setupAbapFlowWithAbapObjects();
+
+  const master = {
+    schema: "abapflow-abap-objects-master-config",
+    version: 1,
+    parserConfig: { version: 1 },
+    objects: [
+      {
+        id: "echo",
+        kind: "statement",
+        label: "ECHO",
+        parse: { kind: "regex", regex: /^ECHO\\s+(.+)$/i, fields: { value: 1 } },
+        builder: { kind: "mapping", fields: { value: { type: "expr", from: "value" } } },
+        templates: [
+          {
+            id: "echo.excel",
+            label: "ECHO inline template",
+            auto: true,
+            config: {
+              type: "excel-like-table",
+              grid: { rows: 1, cols: 2, colWidths: { A: 160, B: 360 }, rowHeights: { 1: 30 } },
+              css: { cell: "border:1px solid #222;" },
+              cells: [
+                { addr: "A1", text: "ECHO", class: ["cell"] },
+                { addr: "B1", text: "{value.description}", class: ["cell"] },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+  };
+
+  await ns.abapObjects.init({
+    config: master,
+    loadScript: async (url) => {
+      throw new Error(`Unexpected template load: ${url}`);
+    },
+  });
+
+  const tpl = ns.templateRegistry?.templates?.["echo.excel"] || null;
+  assert.ok(tpl);
+  assert.equal(tpl.config?.type, "excel-like-table");
+});
+
 test("template_converter fills excel-like-table binds", async () => {
   const ns = setupAbapFlowWithAbapObjects();
   await ns.abapObjects.init({

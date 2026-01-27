@@ -349,7 +349,7 @@
   function importJson(text, options) {
     const mode = options?.mode === "replace" ? "replace" : "merge";
     const parsed = safeJsonParse(text);
-    if (!parsed.ok) return { ok: false, error: `Invalid JSON: ${parsed.error}` };
+    if (!parsed.ok) return { ok: false, error: `JSON không hợp lệ: ${parsed.error}` };
 
     const incoming = normalizeStore(parsed.value);
     if (incoming.schema !== SCHEMA || incoming.version !== VERSION) {

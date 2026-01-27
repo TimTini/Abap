@@ -5,10 +5,10 @@
     type: "excel-like-table",
     compact: { removeEmptyRows: true },
     sectionLabels: {
-      tables: "Table",
-      using: "Using",
-      changing: "Changing",
-      raising: "Raising",
+      tables: "Bảng",
+      using: "Tham số vào",
+      changing: "Tham số thay đổi",
+      raising: "Ngoại lệ",
     },
     grid: {
       rows: 9,
@@ -78,4 +78,3 @@
 
   ns.abapObjects?.defineTemplate?.("perform.excel-like-table", performExcelLikeTable);
 })(window.AbapFlow);
-

@@ -9,7 +9,7 @@
     const model = state.model;
     if (!out) return;
     if (!model) {
-      out.textContent = "Analyze to see JSON.";
+      out.textContent = "Hãy phân tích để xem JSON.";
       out.classList.add("empty");
       return;
     }
@@ -19,11 +19,11 @@
 
   function buildAllTemplatesObjectsExportXml(options) {
     const model = state.model;
-    if (!model) return { ok: false, error: "Analyze first." };
+    if (!model) return { ok: false, error: "Hãy phân tích trước." };
 
     const tpl = ui.templates || null;
     if (!tpl?.listTemplateEntries || !tpl?.pickAutoTemplatesBySource || !tpl?.buildTemplatesFlow) {
-      return { ok: false, error: "Template modules not loaded." };
+      return { ok: false, error: "Chưa tải module mẫu." };
     }
 
     const maxStepsRaw = Number(options?.maxSteps ?? ui.$("xmlMaxSteps")?.value ?? 5000);
@@ -32,7 +32,7 @@
     const entries = tpl.listTemplateEntries();
     const templatesBySource = tpl.pickAutoTemplatesBySource(entries);
     if (!templatesBySource || typeof templatesBySource.size !== "number" || templatesBySource.size === 0) {
-      return { ok: false, error: "No templates configured." };
+      return { ok: false, error: "Chưa cấu hình mẫu." };
     }
 
     const flow = tpl.buildTemplatesFlow(model, templatesBySource, { maxSteps });
@@ -58,10 +58,10 @@
       });
     }
 
-    if (!items.length) return { ok: false, error: "No template-mapped statements found." };
+    if (!items.length) return { ok: false, error: "Không có câu lệnh khớp mẫu." };
 
     const build = typeof ui.buildAbapflowObjectsXml === "function" ? ui.buildAbapflowObjectsXml : null;
-    if (!build) return { ok: false, error: "XML exporter not loaded." };
+    if (!build) return { ok: false, error: "Chưa tải module xuất XML." };
 
     const xml = build(items);
     return { ok: true, xml, count: items.length, truncated: Boolean(flow?.truncated), maxSteps };
@@ -72,14 +72,14 @@
     if (!out) return;
 
     if (!state.model) {
-      out.textContent = "Analyze to see XML.";
+      out.textContent = "Hãy phân tích để xem XML.";
       out.classList.add("empty");
       return;
     }
 
     const res = buildAllTemplatesObjectsExportXml(options);
     if (!res.ok) {
-      out.textContent = String(res.error || "Cannot build XML.");
+      out.textContent = String(res.error || "Không thể tạo XML.");
       out.classList.add("empty");
       return;
     }

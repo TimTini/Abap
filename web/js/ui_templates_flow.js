@@ -367,7 +367,7 @@
     }
 
     if (truncated) {
-      items.push({ kind: "note", text: `Truncated at ${maxSteps} steps.` });
+      items.push({ kind: "note", text: `Đã cắt ở ${maxSteps} bước.` });
     }
 
     return { items, truncated, maxSteps };

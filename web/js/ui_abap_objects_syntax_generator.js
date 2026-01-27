@@ -26,11 +26,11 @@
       const gen = ns.abapObjects?.syntaxGenerator;
       const store = ns.abapObjects?.customStore;
       if (!gen?.generateObjectDefFromSyntaxText) {
-        ui.setStatus("Syntax generator module not loaded.", true);
+        ui.setStatus("Chưa tải module tạo cú pháp.", true);
         return;
       }
       if (!store?.upsertObjectDef) {
-        ui.setStatus("ABAP Objects custom store module not loaded.", true);
+        ui.setStatus("Chưa tải module lưu cấu hình ABAP Objects.", true);
         return;
       }
 
@@ -39,8 +39,8 @@
       const out = ui.$("abapObjCfgGenOutput");
 
       if (!res?.ok) {
-        if (out) out.textContent = String(res?.error || "Generate failed.");
-        ui.setStatus(String(res?.error || "Generate failed."), true);
+        if (out) out.textContent = String(res?.error || "Tạo thất bại.");
+        ui.setStatus(String(res?.error || "Tạo thất bại."), true);
         return;
       }
 
@@ -48,7 +48,7 @@
       const objectDef = res.objectDef || {};
       const id = asNonEmptyString(idOverride) || asNonEmptyString(objectDef.id) || asNonEmptyString(res.keyword)?.toLowerCase();
       if (!id) {
-        ui.setStatus("Object id is required.", true);
+        ui.setStatus("Cần Object id.", true);
         return;
       }
 
@@ -62,7 +62,7 @@
         : null;
       const existing = Boolean(existingObj);
       if (existing) {
-        const ok = window.confirm(`"${id}" already exists. Override it with generated config?`);
+        const ok = window.confirm(`"${id}" đã tồn tại. Ghi đè bằng cấu hình vừa tạo?`);
         if (!ok) return;
       }
 
@@ -77,25 +77,25 @@
         if (genTpl?.createDefaultKeyValueExcelLikeTableTemplate && defs?.upsertTemplate) {
           const templateId = `${id}.default.excel-like-table`;
 
-          objectDef.templates.push({ id: templateId, label: "Default (key/value)", auto: true });
+          objectDef.templates.push({ id: templateId, label: "Mặc định (key/value)", auto: true });
 
           if (!defs.getTemplateConfig || !defs.getTemplateConfig(templateId)) {
             const cfg = genTpl.createDefaultKeyValueExcelLikeTableTemplate("pairs");
-            defs.upsertTemplate(templateId, cfg, { label: "Default (key/value)", source: id, auto: true });
+            defs.upsertTemplate(templateId, cfg, { label: "Mặc định (key/value)", source: id, auto: true });
           }
         }
       }
 
       const saved = store.upsertObjectDef(objectDef);
       if (!saved.ok) {
-        const msg = saved.error || "Save failed.";
+        const msg = saved.error || "Lưu thất bại.";
         if (out) out.textContent = msg;
         ui.setStatus(msg, true);
         return;
       }
 
       if (out) out.textContent = safeJsonStringify(objectDef);
-      ui.setStatus(`Generated object: ${id}.`, false);
+      ui.setStatus(`Đã tạo object: ${id}.`, false);
 
       if (ns.abapObjects?.reset) ns.abapObjects.reset();
 

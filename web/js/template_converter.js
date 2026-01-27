@@ -431,16 +431,16 @@
       raising,
       messageText,
       labels: {
-        msgClass: msgClass.text ? "Message class" : "",
-        msgNo: msgNo.text ? "Message No." : "",
-        with1: withNodes.length >= 1 ? "Message variable &1" : "",
-        with2: withNodes.length >= 2 ? "Message variable &2" : "",
-        with3: withNodes.length >= 3 ? "Message variable &3" : "",
-        with4: withNodes.length >= 4 ? "Message variable &4" : "",
+        msgClass: msgClass.text ? "Nhóm message" : "",
+        msgNo: msgNo.text ? "Số message" : "",
+        with1: withNodes.length >= 1 ? "Biến message &1" : "",
+        with2: withNodes.length >= 2 ? "Biến message &2" : "",
+        with3: withNodes.length >= 3 ? "Biến message &3" : "",
+        with4: withNodes.length >= 4 ? "Biến message &4" : "",
         into: into.text ? "Đích lưu" : "",
-        raising: raising.text ? "Raising" : "",
-        displayLike: displayLike.text ? "Display like" : "",
-        messageText: messageText.text ? "Message text" : "",
+        raising: raising.text ? "Ngoại lệ" : "",
+        displayLike: displayLike.text ? "Hiển thị như" : "",
+        messageText: messageText.text ? "Nội dung message" : "",
       },
     };
   }
@@ -495,7 +495,7 @@
     const binarySearch = Boolean(op?.binarySearch);
 
     const targetLabelByKind =
-      kind === "READ" ? "Đích lưu" : kind === "COLLECT" ? "Nguồn" : kind === "MODIFY" ? "Nguồn" : kind === "DELETE" ? "Nguồn" : "Target";
+      kind === "READ" ? "Đích lưu" : kind === "COLLECT" ? "Nguồn" : kind === "MODIFY" ? "Nguồn" : kind === "DELETE" ? "Nguồn" : "Đích";
 
     return {
       routine: {
@@ -516,11 +516,11 @@
       labels: {
         target: target.text ? targetLabelByKind : "",
         conditions: conditions.length ? "Điều kiện" : "",
-        condItem1: conditions.length ? "Item 1" : "",
-        condOperator: conditions.length ? "Operator" : "",
-        condItem2: conditions.length ? "Item 2" : "",
-        condAssoc: conditions.length ? "Associations" : "",
-        binarySearch: binarySearch ? "* Binarysearch" : "",
+        condItem1: conditions.length ? "Mục 1" : "",
+        condOperator: conditions.length ? "Toán tử" : "",
+        condItem2: conditions.length ? "Mục 2" : "",
+        condAssoc: conditions.length ? "Liên kết" : "",
+        binarySearch: binarySearch ? "* Tìm kiếm nhị phân" : "",
       },
     };
   }
@@ -551,7 +551,7 @@
       sortedBy,
       result,
       labels: {
-        sortedBy: sortedBy.text ? "Sorted By" : "",
+        sortedBy: sortedBy.text ? "Sắp xếp theo" : "",
       },
     };
   }
@@ -614,10 +614,10 @@
     const presence = context?.presence && typeof context.presence === "object" ? context.presence : {};
     const labels = {
       ...(context?.labels && typeof context.labels === "object" ? context.labels : {}),
-      tables: presence.tables ? String(sectionLabels.tables ?? "Table") : "",
-      using: presence.using ? String(sectionLabels.using ?? "Using") : "",
-      changing: presence.changing ? String(sectionLabels.changing ?? "Changing") : "",
-      raising: presence.raising ? String(sectionLabels.raising ?? "Raising") : "",
+      tables: presence.tables ? String(sectionLabels.tables ?? "Bảng") : "",
+      using: presence.using ? String(sectionLabels.using ?? "Tham số vào") : "",
+      changing: presence.changing ? String(sectionLabels.changing ?? "Tham số thay đổi") : "",
+      raising: presence.raising ? String(sectionLabels.raising ?? "Ngoại lệ") : "",
     };
     const ctx = { ...(context || {}), labels };
 

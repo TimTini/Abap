@@ -30,6 +30,17 @@
     return Boolean(x) && typeof x === "object" && !Array.isArray(x);
   }
 
+  function deepClone(value) {
+    if (value == null) return value;
+    if (Array.isArray(value)) return value.map((x) => deepClone(x));
+    if (typeof value === "object") {
+      const out = {};
+      for (const [k, v] of Object.entries(value)) out[k] = deepClone(v);
+      return out;
+    }
+    return value;
+  }
+
   function normalizeWhen(when) {
     if (!isPlainObject(when)) return null;
     const path = asNonEmptyString(when.path);
@@ -109,6 +120,47 @@
     normalized.updatedAt = nowIso();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
     return normalized;
+  }
+
+  function clearStore() {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (_) {}
+  }
+
+  function exportJson() {
+    return JSON.stringify(loadStore(), null, 2);
+  }
+
+  function importJson(jsonText, options) {
+    const mode = asNonEmptyString(options?.mode).toLowerCase() || "merge";
+    const parsed = safeParse(jsonText);
+    if (!parsed.ok) return { ok: false, error: parsed.error || "JSON khong hop le." };
+    const incoming = normalizeStore(parsed.value);
+
+    if (mode === "replace") {
+      const saved = saveStore(incoming);
+      return { ok: true, store: saved };
+    }
+
+    const store = loadStore();
+    for (const [id, entry] of Object.entries(incoming.templates || {})) {
+      const cfg = isPlainObject(entry?.config) ? deepClone(entry.config) : null;
+      if (!cfg) continue;
+      const meta = isPlainObject(entry?.meta) ? { ...entry.meta } : {};
+      store.templates[id] = {
+        updatedAt: asNonEmptyString(entry?.updatedAt) || nowIso(),
+        config: cfg,
+        meta,
+      };
+    }
+    for (const [src, tid] of Object.entries(incoming.preferredBySource || {})) {
+      if (!asNonEmptyString(src) || !asNonEmptyString(tid)) continue;
+      store.preferredBySource[src] = tid;
+    }
+
+    const saved = saveStore(store);
+    return { ok: true, store: saved };
   }
 
   function getTemplateConfig(templateId) {
@@ -203,12 +255,14 @@
     STORAGE_KEY,
     loadStore,
     saveStore,
+    clearStore,
     getTemplateConfig,
     upsertTemplate,
     deleteTemplate,
     listCustomTemplateEntries,
     getPreferredTemplateId,
     setPreferredTemplateId,
+    exportJson,
+    importJson,
   };
 })(window.AbapFlow);
-

@@ -27,10 +27,10 @@
       center: "text-align:center;",
     },
     cells: [
-      { addr: "A1", text: "Item 1", class: ["cell", "header"] },
-      { addr: "B1", text: "Operator", class: ["cell", "header"] },
-      { addr: "C1", text: "Item 2", class: ["cell", "header"] },
-      { addr: "D1", text: "Associations", class: ["cell", "header"] },
+      { addr: "A1", text: "Mục 1", class: ["cell", "header"] },
+      { addr: "B1", text: "Toán tử", class: ["cell", "header"] },
+      { addr: "C1", text: "Mục 2", class: ["cell", "header"] },
+      { addr: "D1", text: "Liên kết", class: ["cell", "header"] },
 
       { addr: "A2", text: "{conditions[0].item1.description}", class: ["cell", "wrap"] },
       { addr: "B2", text: "{conditions[0].operator}", class: ["cell", "mono", "center"] },

@@ -109,7 +109,7 @@
   function upsertObjectDef(objectDef) {
     const obj = isPlainObject(objectDef) ? objectDef : null;
     const id = asNonEmptyString(obj?.id);
-    if (!id) return { ok: false, error: "Object id is required." };
+    if (!id) return { ok: false, error: "Cần object id." };
 
     const store = loadStore();
     store.objects[id] = deepClone({ ...obj, id });
@@ -119,7 +119,7 @@
 
   function deleteObjectDef(objectId) {
     const id = asNonEmptyString(objectId);
-    if (!id) return { ok: false, error: "Object id is required." };
+    if (!id) return { ok: false, error: "Cần object id." };
 
     const store = loadStore();
     const existed = Boolean(store.objects?.[id]);
@@ -130,7 +130,7 @@
 
   function setObjectDisabled(objectId, disabled) {
     const id = asNonEmptyString(objectId);
-    if (!id) return { ok: false, error: "Object id is required." };
+    if (!id) return { ok: false, error: "Cần object id." };
 
     const store = loadStore();
     if (disabled) store.disabled[id] = true;
@@ -146,7 +146,7 @@
   function importJson(jsonText, options) {
     const mode = asNonEmptyString(options?.mode).toLowerCase() || "merge";
     const parsed = safeParse(jsonText);
-    if (!parsed.ok) return { ok: false, error: parsed.error || "Invalid JSON." };
+    if (!parsed.ok) return { ok: false, error: parsed.error || "JSON không hợp lệ." };
     const incoming = normalizeStore(parsed.value);
 
     if (mode === "replace") {
@@ -221,4 +221,3 @@
     getEffectiveConfig,
   };
 })(window.AbapFlow);
-

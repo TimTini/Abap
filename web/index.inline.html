@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ABAP Flow Analyzer (Offline)</title>
+    <title>ABAP Flow Analyzer (Ngoại tuyến)</title>
         <style>
     /* css/app.css */
     :root {
@@ -65,6 +65,22 @@
       color: var(--muted);
     }
 
+    .app-header__steps {
+      margin-top: 6px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .app-header__steps span {
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(15, 23, 42, 0.35);
+    }
+
     .app-header__actions {
       display: flex;
       gap: 10px;
@@ -87,6 +103,11 @@
 
     .btn:active {
       transform: translateY(1px);
+    }
+
+    .btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
     }
 
     .btn-primary {
@@ -748,6 +769,174 @@
       padding: 7px 10px;
     }
 
+    .tplmgr {
+      margin: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .tplmgr__toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .tplmgr__body {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 10px;
+      min-height: 240px;
+    }
+
+    .tplmgr__list {
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(11, 15, 23, 0.35);
+      border-radius: 12px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow: auto;
+      min-height: 200px;
+    }
+
+    .tplmgr__empty {
+      font-size: 12px;
+      color: var(--muted);
+      padding: 6px;
+    }
+
+    .tplmgr__item {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 8px 9px;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .tplmgr__item:hover {
+      border-color: rgba(255, 255, 255, 0.18);
+    }
+
+    .tplmgr__item.is-active {
+      border-color: rgba(96, 165, 250, 0.55);
+      background: rgba(96, 165, 250, 0.12);
+    }
+
+    .tplmgr__item.is-custom {
+      box-shadow: inset 0 0 0 1px rgba(250, 204, 21, 0.25);
+    }
+
+    .tplmgr__item-title {
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.2;
+    }
+
+    .tplmgr__item-meta {
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .tplmgr__editor {
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(15, 23, 42, 0.18);
+      border-radius: 12px;
+      padding: 10px 12px;
+      overflow: auto;
+      min-height: 200px;
+    }
+
+    .tplmgr__editor.empty {
+      color: var(--muted);
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .tplmgr__head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .tplmgr__title {
+      font-size: 13px;
+      font-weight: 650;
+      color: var(--text);
+    }
+
+    .tplmgr__meta {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .tplmgr__fields {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      align-items: end;
+    }
+
+    .tplmgr__field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .tplmgr__field--checkbox {
+      align-items: center;
+      grid-template-columns: 1fr auto;
+    }
+
+    .tplmgr__field--wide {
+      grid-column: 1 / -1;
+    }
+
+    .tplmgr__label {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .tplmgr__json {
+      min-height: 220px;
+    }
+
+    .tplmgr__hint {
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .tplmgr__actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .tplmgr__spacer {
+      flex: 1;
+    }
+
+    @media (max-width: 900px) {
+      .tplmgr__body {
+        grid-template-columns: 1fr;
+      }
+
+      .tplmgr__list {
+        max-height: 180px;
+      }
+    }
+
     .input {
       width: 100%;
       border: 1px solid rgba(255, 255, 255, 0.10);
@@ -1303,9 +1492,28 @@
     }
 
     @media (max-width: 1100px) {
+      .app-header {
+        flex-wrap: wrap;
+      }
+      .app-header__actions {
+        flex-wrap: wrap;
+        width: 100%;
+        justify-content: flex-start;
+      }
       .app-main {
         grid-template-columns: 1fr;
         height: auto;
+      }
+      .app-main.app-main--resizable {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(320px, 1fr) minmax(420px, 1fr);
+        gap: 14px;
+      }
+      .app-splitter {
+        display: none;
+      }
+      .code-editor {
+        min-height: 320px;
       }
       .split {
         grid-template-columns: 1fr;
@@ -1474,12 +1682,26 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      flex-wrap: wrap;
       gap: 10px;
     }
 
     .templates-toolbar__count {
       font-size: 12px;
       color: var(--muted);
+    }
+
+    .templates-toolbar__filters {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      flex: 1;
+      min-width: 240px;
+    }
+
+    .templates-toolbar__filters .input {
+      min-width: 220px;
     }
 
     .templates-toolbar__actions {
@@ -1490,6 +1712,12 @@
 
     .btn.btn-sm {
       padding: 6px 10px;
+      font-size: 12px;
+      border-radius: 9px;
+    }
+
+    .input.input-sm {
+      padding: 7px 9px;
       font-size: 12px;
       border-radius: 9px;
     }
@@ -1738,28 +1966,41 @@
     <header class="app-header">
       <div class="app-header__title">
         <h1>ABAP Flow Analyzer</h1>
-        <div class="app-header__subtitle">Offline - No external libraries</div>
+        <div class="app-header__subtitle">Chạy offline • Không dùng thư viện ngoài</div>
+        <div class="app-header__steps">
+          <span>1) Dán ABAP</span>
+          <span>2) Phân tích</span>
+          <span>3) Xem &amp; chỉnh</span>
+          <span>4) Xuất XML</span>
+        </div>
       </div>
       <div class="app-header__actions">
-        <button id="btnAnalyze" class="btn btn-primary" type="button">Analyze</button>
-        <button id="btnLoadSample" class="btn" type="button">Load sample</button>
-        <button id="btnClear" class="btn" type="button">Clear</button>
-        <button id="btnExportNotes" class="btn" type="button">Export notes</button>
-        <button id="btnImportNotes" class="btn" type="button">Import notes</button>
+        <button id="btnAnalyze" class="btn btn-primary" type="button">Phân tích</button>
+        <button id="btnLoadSample" class="btn" type="button">Nạp mẫu</button>
+        <button id="btnLoadFile" class="btn" type="button">Tải file</button>
+        <button id="btnClear" class="btn" type="button">Xóa</button>
+        <button id="btnExportNotes" class="btn" type="button">Xuất ghi chú</button>
+        <button id="btnImportNotes" class="btn" type="button">Nhập ghi chú</button>
         <input id="notesImportFile" type="file" accept="application/json" style="display:none" />
+        <input id="abapImportFile" type="file" accept=".abap,.txt,text/plain" style="display:none" />
       </div>
     </header>
 
     <main class="app-main app-main--resizable">
       <section class="panel panel-left">
-        <div class="panel__title">ABAP code</div>
+        <div class="panel__title">Mã ABAP</div>
         <div class="code-editor">
-          <textarea id="abapInput" class="code-input" spellcheck="false" placeholder="Paste ABAP code here..."></textarea>
+          <textarea
+            id="abapInput"
+            class="code-input"
+            spellcheck="false"
+            placeholder="Dán mã ABAP tại đây... (hỗ trợ kéo thả file)"
+          ></textarea>
           <div id="abapLineNumbers" class="code-line-numbers" aria-hidden="true"></div>
           <div id="abapTemplateMarkers" class="code-markers" aria-hidden="true"></div>
         </div>
         <div class="panel__footer">
-          <div id="statusBar" class="status-bar">Ready.</div>
+          <div id="statusBar" class="status-bar" role="status" aria-live="polite">Sẵn sàng. Ctrl+Enter để phân tích.</div>
         </div>
       </section>
 
@@ -1767,9 +2008,9 @@
 
       <section class="panel panel-right">
         <div class="tabs">
-          <button class="tab is-active" data-tab="objects" type="button">Objects</button>
-          <button class="tab" data-tab="templates" type="button">Templates</button>
-          <button class="tab" data-tab="config" type="button">Config</button>
+          <button class="tab is-active" data-tab="objects" type="button">Đối tượng</button>
+          <button class="tab" data-tab="templates" type="button">Mẫu</button>
+          <button class="tab" data-tab="config" type="button">Cấu hình</button>
           <button class="tab" data-tab="json" type="button">JSON</button>
           <button class="tab" data-tab="xml" type="button">XML</button>
         </div>
@@ -1779,7 +2020,7 @@
             <div class="split">
               <div class="split__left">
                 <div class="toolbar toolbar--row">
-                  <input id="objectSearch" class="input" type="search" placeholder="Search (FORM, EVENT, name)..." />
+                  <input id="objectSearch" class="input" type="search" placeholder="Tìm (FORM, EVENT, tên)..." />
                   <label class="toolbar-check">
                     <input id="objectNoDescOnly" type="checkbox" />
                     Chưa có mô tả
@@ -1789,8 +2030,8 @@
                   <table class="table" id="objectsTable">
                     <thead>
                       <tr>
-                        <th>Kind</th>
-                        <th>Name</th>
+                        <th>Loại</th>
+                        <th>Tên</th>
                         <th>Mô tả</th>
                       </tr>
                     </thead>
@@ -1799,73 +2040,95 @@
                 </div>
               </div>
               <div class="split__right">
-                <div class="panel__title">Details</div>
-                <div id="objectDetails" class="details empty">Analyze to see details.</div>
+                <div class="panel__title">Chi tiết</div>
+                <div id="objectDetails" class="details empty">Hãy phân tích để xem chi tiết.</div>
               </div>
             </div>
           </section>
 
           <section class="tab-panel" id="tab-templates">
-            <div class="panel__title">Template output (flow order)</div>
-            <div id="templatesHost" class="trace-results empty">Analyze to see templates.</div>
-            <div class="hint">Tip: click a block to highlight the original statement in the editor.</div>
+            <div class="panel__title">Kết quả mẫu (theo luồng)</div>
+            <div id="templatesHost" class="trace-results empty">Hãy phân tích để xem mẫu.</div>
+            <div class="hint">Mẹo: bấm vào block để highlight câu lệnh trong editor.</div>
           </section>
 
           <section class="tab-panel" id="tab-config">
             <div class="split objcfg">
               <div class="split__left">
                 <div class="toolbar objcfg-toolbar">
-                  <input id="abapObjCfgSearch" class="input" type="search" placeholder="Search (id/label/kind)..." />
-                  <button id="abapObjCfgNew" class="btn" type="button">New</button>
+                  <input id="abapObjCfgSearch" class="input" type="search" placeholder="Tìm (id/nhãn/loại)..." />
+                  <button id="abapObjCfgNew" class="btn" type="button">Mới</button>
                 </div>
                 <div id="abapObjCfgList" class="objcfg-list"></div>
                 <div class="toolbar objcfg-toolbar objcfg-toolbar--bottom">
-                  <button id="abapObjCfgExport" class="btn" type="button">Export</button>
-                  <button id="abapObjCfgImport" class="btn" type="button">Import</button>
-                  <button id="abapObjCfgResetAll" class="btn" type="button">Reset all</button>
+                  <button id="abapObjCfgExport" class="btn" type="button">Xuất</button>
+                  <button id="abapObjCfgImport" class="btn" type="button">Nhập</button>
+                  <button id="abapObjCfgResetAll" class="btn" type="button">Đặt lại hết</button>
                   <input id="abapObjCfgImportFile" type="file" accept="application/json" style="display:none" />
                 </div>
               </div>
               <div class="split__right">
-                <div class="panel__title">ABAP Objects config (localStorage)</div>
+                <div class="panel__title">Cấu hình ABAP Objects (localStorage)</div>
                 <div class="objcfg-right">
                   <details id="abapObjCfgGen" class="objcfg-gen">
-                    <summary class="objcfg-advanced__summary">Generate from ABAP syntax (beta)</summary>
+                    <summary class="objcfg-advanced__summary">Tạo từ cú pháp ABAP (beta)</summary>
                     <textarea
                       id="abapObjCfgGenInput"
                       class="objcfg-json objcfg-json--small"
                       spellcheck="false"
-                      placeholder="Paste ABAP Doc syntax block here (example: CONCATENATE ... INTO result ...)."
+                      placeholder="Dán khối cú pháp ABAP Doc tại đây (ví dụ: CONCATENATE ... INTO result ...)."
                     ></textarea>
                     <div class="objcfg-gen__row">
-                      <input id="abapObjCfgGenId" class="input" type="text" placeholder="Object id (optional)" />
-                      <button id="abapObjCfgGenBtn" class="btn btn-primary" type="button">Generate</button>
+                      <input id="abapObjCfgGenId" class="input" type="text" placeholder="Object id (tuỳ chọn)" />
+                      <button id="abapObjCfgGenBtn" class="btn btn-primary" type="button">Tạo</button>
                     </div>
                     <pre id="abapObjCfgGenOutput" class="objcfg-gen__output"></pre>
                   </details>
 
-                  <div id="abapObjCfgEditor" class="details empty">Select an object on the left.</div>
+                  <div id="abapObjCfgEditor" class="details empty">Chọn đối tượng bên trái.</div>
+
+                  <details id="abapTplMgr" class="objcfg-advanced tplmgr" open>
+                    <summary class="objcfg-advanced__summary">Templates (localStorage)</summary>
+                    <div class="tplmgr__toolbar">
+                      <input id="abapTplSearch" class="input" type="search" placeholder="Tìm template..." />
+                      <button id="abapTplNew" class="btn" type="button">Mới</button>
+                    </div>
+                    <div class="tplmgr__body">
+                      <div id="abapTplList" class="tplmgr__list"></div>
+                      <div id="abapTplEditor" class="tplmgr__editor empty">Chọn template bên trái.</div>
+                    </div>
+                    <div class="tplmgr__actions">
+                      <button id="abapTplSave" class="btn btn-primary" type="button">Lưu</button>
+                      <button id="abapTplDelete" class="btn" type="button">Xóa</button>
+                      <button id="abapTplApply" class="btn" type="button">Áp dụng</button>
+                      <span class="tplmgr__spacer"></span>
+                      <button id="abapTplExport" class="btn" type="button">Xuất</button>
+                      <button id="abapTplImport" class="btn" type="button">Nhập</button>
+                      <button id="abapTplReset" class="btn" type="button">Xóa tất cả</button>
+                      <input id="abapTplImportFile" type="file" accept="application/json" style="display:none" />
+                    </div>
+                  </details>
                 </div>
               </div>
             </div>
           </section>
 
           <section class="tab-panel" id="tab-json">
-            <div class="panel__title">Model JSON</div>
-            <pre id="jsonOutput" class="json-output empty">Analyze to see JSON.</pre>
+            <div class="panel__title">JSON mô hình</div>
+            <pre id="jsonOutput" class="json-output empty">Hãy phân tích để xem JSON.</pre>
           </section>
 
           <section class="tab-panel" id="tab-xml">
-            <div class="panel__title">ABAP Objects XML (Templates)</div>
+            <div class="panel__title">XML ABAP Objects (toàn bộ)</div>
             <div class="toolbar objcfg-toolbar">
-              <button id="btnCopyXml" class="btn btn-sm btn-primary" type="button">Copy</button>
-              <button id="btnDownloadXml" class="btn btn-sm" type="button">Download</button>
+              <button id="btnCopyXml" class="btn btn-sm btn-primary" type="button">Sao chép</button>
+              <button id="btnDownloadXml" class="btn btn-sm" type="button">Tải xuống</button>
               <label style="margin-left:auto;display:flex;gap:6px;align-items:center;color:var(--muted);font-size:12px;">
-                Max steps
+                Giới hạn bước
                 <input id="xmlMaxSteps" class="input" type="number" min="100" step="100" value="5000" style="width:110px;" />
               </label>
             </div>
-            <pre id="xmlOutput" class="json-output empty">Analyze to see XML.</pre>
+            <pre id="xmlOutput" class="json-output empty">Hãy phân tích để xem XML.</pre>
           </section>
         </div>
       </section>
@@ -2134,6 +2397,7 @@
               },
             ],
           },
+          // @abapflow-objects-insert
         ],
       };
     })(window.AbapFlow);
@@ -2385,6 +2649,17 @@
         return Boolean(x) && typeof x === "object" && !Array.isArray(x);
       }
 
+      function deepClone(value) {
+        if (value == null) return value;
+        if (Array.isArray(value)) return value.map((x) => deepClone(x));
+        if (typeof value === "object") {
+          const out = {};
+          for (const [k, v] of Object.entries(value)) out[k] = deepClone(v);
+          return out;
+        }
+        return value;
+      }
+
       function normalizeWhen(when) {
         if (!isPlainObject(when)) return null;
         const path = asNonEmptyString(when.path);
@@ -2464,6 +2739,47 @@
         normalized.updatedAt = nowIso();
         localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
         return normalized;
+      }
+
+      function clearStore() {
+        try {
+          localStorage.removeItem(STORAGE_KEY);
+        } catch (_) {}
+      }
+
+      function exportJson() {
+        return JSON.stringify(loadStore(), null, 2);
+      }
+
+      function importJson(jsonText, options) {
+        const mode = asNonEmptyString(options?.mode).toLowerCase() || "merge";
+        const parsed = safeParse(jsonText);
+        if (!parsed.ok) return { ok: false, error: parsed.error || "JSON khong hop le." };
+        const incoming = normalizeStore(parsed.value);
+
+        if (mode === "replace") {
+          const saved = saveStore(incoming);
+          return { ok: true, store: saved };
+        }
+
+        const store = loadStore();
+        for (const [id, entry] of Object.entries(incoming.templates || {})) {
+          const cfg = isPlainObject(entry?.config) ? deepClone(entry.config) : null;
+          if (!cfg) continue;
+          const meta = isPlainObject(entry?.meta) ? { ...entry.meta } : {};
+          store.templates[id] = {
+            updatedAt: asNonEmptyString(entry?.updatedAt) || nowIso(),
+            config: cfg,
+            meta,
+          };
+        }
+        for (const [src, tid] of Object.entries(incoming.preferredBySource || {})) {
+          if (!asNonEmptyString(src) || !asNonEmptyString(tid)) continue;
+          store.preferredBySource[src] = tid;
+        }
+
+        const saved = saveStore(store);
+        return { ok: true, store: saved };
       }
 
       function getTemplateConfig(templateId) {
@@ -2558,15 +2874,17 @@
         STORAGE_KEY,
         loadStore,
         saveStore,
+        clearStore,
         getTemplateConfig,
         upsertTemplate,
         deleteTemplate,
         listCustomTemplateEntries,
         getPreferredTemplateId,
         setPreferredTemplateId,
+        exportJson,
+        importJson,
       };
     })(window.AbapFlow);
-
 
     </script>
         <script>
@@ -2682,7 +3000,7 @@
       function upsertObjectDef(objectDef) {
         const obj = isPlainObject(objectDef) ? objectDef : null;
         const id = asNonEmptyString(obj?.id);
-        if (!id) return { ok: false, error: "Object id is required." };
+        if (!id) return { ok: false, error: "Cần object id." };
 
         const store = loadStore();
         store.objects[id] = deepClone({ ...obj, id });
@@ -2692,7 +3010,7 @@
 
       function deleteObjectDef(objectId) {
         const id = asNonEmptyString(objectId);
-        if (!id) return { ok: false, error: "Object id is required." };
+        if (!id) return { ok: false, error: "Cần object id." };
 
         const store = loadStore();
         const existed = Boolean(store.objects?.[id]);
@@ -2703,7 +3021,7 @@
 
       function setObjectDisabled(objectId, disabled) {
         const id = asNonEmptyString(objectId);
-        if (!id) return { ok: false, error: "Object id is required." };
+        if (!id) return { ok: false, error: "Cần object id." };
 
         const store = loadStore();
         if (disabled) store.disabled[id] = true;
@@ -2719,7 +3037,7 @@
       function importJson(jsonText, options) {
         const mode = asNonEmptyString(options?.mode).toLowerCase() || "merge";
         const parsed = safeParse(jsonText);
-        if (!parsed.ok) return { ok: false, error: parsed.error || "Invalid JSON." };
+        if (!parsed.ok) return { ok: false, error: parsed.error || "JSON không hợp lệ." };
         const incoming = normalizeStore(parsed.value);
 
         if (mode === "replace") {
@@ -2794,7 +3112,6 @@
         getEffectiveConfig,
       };
     })(window.AbapFlow);
-
 
     </script>
         <script>
@@ -3341,7 +3658,7 @@
       function importJson(text, options) {
         const mode = options?.mode === "replace" ? "replace" : "merge";
         const parsed = safeJsonParse(text);
-        if (!parsed.ok) return { ok: false, error: `Invalid JSON: ${parsed.error}` };
+        if (!parsed.ok) return { ok: false, error: `JSON không hợp lệ: ${parsed.error}` };
 
         const incoming = normalizeStore(parsed.value);
         if (incoming.schema !== SCHEMA || incoming.version !== VERSION) {
@@ -3697,70 +4014,74 @@
       }
 
       function pushErr(errors, path, message) {
-        errors.push({ path: String(path || ""), message: String(message || "Invalid value") });
+        errors.push({ path: String(path || ""), message: String(message || "Giá trị không hợp lệ") });
       }
 
       function validateTemplateEntry(tpl, path, errors) {
         if (!isPlainObject(tpl)) {
-          pushErr(errors, path, "Template must be an object.");
+          pushErr(errors, path, "Template phải là object.");
           return;
         }
         const id = asNonEmptyString(tpl.id);
-        if (!id) pushErr(errors, `${path}.id`, "Template id is required.");
+        if (!id) pushErr(errors, `${path}.id`, "Cần template id.");
 
         const label = asNonEmptyString(tpl.label);
-        if (!label) pushErr(errors, `${path}.label`, "Template label is required.");
+        if (!label) pushErr(errors, `${path}.label`, "Cần nhãn template.");
 
         if (tpl.file != null && typeof tpl.file !== "string") {
-          pushErr(errors, `${path}.file`, "Template file path must be a string.");
+          pushErr(errors, `${path}.file`, "Đường dẫn file template phải là chuỗi.");
         }
 
         if (tpl.auto != null && typeof tpl.auto !== "boolean") {
-          pushErr(errors, `${path}.auto`, "Template auto must be boolean.");
+          pushErr(errors, `${path}.auto`, "Thuộc tính auto phải là boolean.");
+        }
+
+        if (tpl.config != null && !isPlainObject(tpl.config)) {
+          pushErr(errors, `${path}.config`, "Template config phải là object.");
         }
       }
 
       function validateObjectDef(obj, index, errors) {
         const path = `objects[${index}]`;
         if (!isPlainObject(obj)) {
-          pushErr(errors, path, "Object must be an object.");
+          pushErr(errors, path, "Object phải là object.");
           return;
         }
 
         const id = asNonEmptyString(obj.id);
-        if (!id) pushErr(errors, `${path}.id`, "Object id is required.");
+        if (!id) pushErr(errors, `${path}.id`, "Cần object id.");
 
         const kind = asNonEmptyString(obj.kind).toLowerCase();
         if (!kind || !["statement", "calledge"].includes(kind)) {
-          pushErr(errors, `${path}.kind`, "Object kind must be 'statement' or 'callEdge'.");
+          pushErr(errors, `${path}.kind`, "Object kind phải là 'statement' hoặc 'callEdge'.");
         }
 
         const builderKind = asNonEmptyString(obj?.builder?.kind);
-        if (!builderKind) pushErr(errors, `${path}.builder.kind`, "Builder kind is required.");
+        if (!builderKind) pushErr(errors, `${path}.builder.kind`, "Cần builder kind.");
 
         if (kind === "statement") {
           const parseKind = asNonEmptyString(obj?.parse?.kind).toLowerCase();
-          if (!parseKind) pushErr(errors, `${path}.parse.kind`, "Parse kind is required for statement objects.");
+          if (!parseKind) pushErr(errors, `${path}.parse.kind`, "Cần parse kind cho statement.");
 
           if (parseKind === "regex") {
             const rx = obj?.parse?.regex;
             const isRe = rx instanceof RegExp;
             const isStr = typeof rx === "string" && asNonEmptyString(rx);
             if (!isRe && !isStr) {
-              pushErr(errors, `${path}.parse.regex`, "parse.regex must be a RegExp or a non-empty pattern string.");
+              pushErr(errors, `${path}.parse.regex`, "parse.regex phải là RegExp hoặc chuỗi pattern không rỗng.");
             }
 
             if (obj?.parse?.flags != null && typeof obj.parse.flags !== "string") {
-              pushErr(errors, `${path}.parse.flags`, "parse.flags must be a string.");
+              pushErr(errors, `${path}.parse.flags`, "parse.flags phải là chuỗi.");
             }
 
             if (obj?.parse?.fields != null && !isPlainObject(obj.parse.fields)) {
-              pushErr(errors, `${path}.parse.fields`, "parse.fields must be an object.");
+              pushErr(errors, `${path}.parse.fields`, "parse.fields phải là object.");
             } else if (isPlainObject(obj?.parse?.fields)) {
               for (const [k, v] of Object.entries(obj.parse.fields)) {
                 const n = Number(v);
                 if (!asNonEmptyString(k)) continue;
-                if (!Number.isFinite(n) || n < 0) pushErr(errors, `${path}.parse.fields.${k}`, "Field index must be a number >= 0.");
+                if (!Number.isFinite(n) || n < 0) pushErr(errors, `${path}.parse.fields.${k}`, "Chỉ số field phải là số >= 0.");
               }
             }
           }
@@ -3768,12 +4089,12 @@
 
         if (kind === "calledge") {
           const toKeyPrefix = asNonEmptyString(obj?.match?.toKeyPrefix);
-          if (!toKeyPrefix) pushErr(errors, `${path}.match.toKeyPrefix`, "match.toKeyPrefix is required for callEdge objects.");
+          if (!toKeyPrefix) pushErr(errors, `${path}.match.toKeyPrefix`, "Cần match.toKeyPrefix cho callEdge.");
         }
 
         if (obj.templates != null) {
           if (!Array.isArray(obj.templates)) {
-            pushErr(errors, `${path}.templates`, "templates must be an array.");
+            pushErr(errors, `${path}.templates`, "templates phải là array.");
           } else {
             for (let i = 0; i < obj.templates.length; i++) {
               validateTemplateEntry(obj.templates[i], `${path}.templates[${i}]`, errors);
@@ -3786,29 +4107,29 @@
         const errors = [];
 
         if (!isPlainObject(config)) {
-          pushErr(errors, "", "Config must be an object.");
+          pushErr(errors, "", "Config phải là object.");
           return { ok: false, errors };
         }
 
         const schema = asNonEmptyString(config.schema);
-        if (!schema) pushErr(errors, "schema", "schema is required.");
+        if (!schema) pushErr(errors, "schema", "Cần schema.");
 
         const version = Number(config.version);
-        if (!Number.isFinite(version) || version <= 0) pushErr(errors, "version", "version must be a positive number.");
+        if (!Number.isFinite(version) || version <= 0) pushErr(errors, "version", "version phải là số dương.");
 
         if (config.parserConfig != null && !isPlainObject(config.parserConfig)) {
-          pushErr(errors, "parserConfig", "parserConfig must be an object.");
+          pushErr(errors, "parserConfig", "parserConfig phải là object.");
         }
 
         if (!Array.isArray(config.objects)) {
-          pushErr(errors, "objects", "objects must be an array.");
+          pushErr(errors, "objects", "objects phải là array.");
         } else {
           const seen = new Set();
           for (let i = 0; i < config.objects.length; i++) {
             const id = asNonEmptyString(config.objects?.[i]?.id);
             if (id) {
               const lower = id.toLowerCase();
-              if (seen.has(lower)) pushErr(errors, `objects[${i}].id`, `Duplicate object id: ${id}`);
+              if (seen.has(lower)) pushErr(errors, `objects[${i}].id`, `Trùng object id: ${id}`);
               else seen.add(lower);
             }
             validateObjectDef(config.objects[i], i, errors);
@@ -4278,6 +4599,10 @@
         return s ? s : "";
       }
 
+      function isPlainObject(x) {
+        return Boolean(x) && typeof x === "object" && !Array.isArray(x);
+      }
+
       function deepCloneJson(value) {
         return deepClone(value);
       }
@@ -4379,6 +4704,7 @@
               auto: t?.auto !== false,
               when: t?.when || null,
               file: asNonEmptyString(t?.file),
+              config: isPlainObject(t?.config) ? t.config : null,
             });
           }
         }
@@ -4608,9 +4934,18 @@
 
           const loadScript = typeof options?.loadScript === "function" ? options.loadScript : defaultLoadScript;
 
-          const filesToLoad = compiled.templates.map((t) => t.file).filter(Boolean);
+          const filesToLoad = compiled.templates
+            .filter((t) => !(t?.config && isPlainObject(t.config)))
+            .map((t) => t.file)
+            .filter(Boolean);
           const uniqueFiles = Array.from(new Set(filesToLoad));
           for (const file of uniqueFiles) await loadScript(file);
+
+          for (const t of compiled.templates) {
+            if (t?.config && isPlainObject(t.config)) {
+              defineTemplate(t.id, t.config);
+            }
+          }
 
           const templateDefs = ns.templateDefs || null;
           if (templateDefs && typeof templateDefs.getTemplateConfig === "function") {
@@ -4806,17 +5141,17 @@
 
       function generateObjectDefFromSyntaxText(text) {
         const syntax = extractFirstSyntaxStatement(text);
-        if (!syntax) return { ok: false, error: "No ABAP syntax statement found." };
+        if (!syntax) return { ok: false, error: "Không tìm thấy câu lệnh cú pháp ABAP." };
 
         const m = /^([A-Z][A-Z0-9_-]*)\b/.exec(syntax);
         const keyword = String(m?.[1] || "").toUpperCase();
-        if (!keyword) return { ok: false, error: "Could not detect ABAP keyword from syntax." };
+        if (!keyword) return { ok: false, error: "Không nhận diện được keyword ABAP từ cú pháp." };
 
         if (keyword === "CONCATENATE") {
           return { ok: true, keyword, syntax, objectDef: generateConcatenateObject(), warnings: [] };
         }
 
-        return { ok: false, error: `Unsupported keyword: ${keyword}. (Currently supports: CONCATENATE)` };
+        return { ok: false, error: `Keyword chưa hỗ trợ: ${keyword}. (Hiện chỉ hỗ trợ: CONCATENATE)` };
       }
 
       ns.abapObjects = ns.abapObjects || {};
@@ -7844,16 +8179,16 @@
           raising,
           messageText,
           labels: {
-            msgClass: msgClass.text ? "Message class" : "",
-            msgNo: msgNo.text ? "Message No." : "",
-            with1: withNodes.length >= 1 ? "Message variable &1" : "",
-            with2: withNodes.length >= 2 ? "Message variable &2" : "",
-            with3: withNodes.length >= 3 ? "Message variable &3" : "",
-            with4: withNodes.length >= 4 ? "Message variable &4" : "",
+            msgClass: msgClass.text ? "Nhóm message" : "",
+            msgNo: msgNo.text ? "Số message" : "",
+            with1: withNodes.length >= 1 ? "Biến message &1" : "",
+            with2: withNodes.length >= 2 ? "Biến message &2" : "",
+            with3: withNodes.length >= 3 ? "Biến message &3" : "",
+            with4: withNodes.length >= 4 ? "Biến message &4" : "",
             into: into.text ? "Đích lưu" : "",
-            raising: raising.text ? "Raising" : "",
-            displayLike: displayLike.text ? "Display like" : "",
-            messageText: messageText.text ? "Message text" : "",
+            raising: raising.text ? "Ngoại lệ" : "",
+            displayLike: displayLike.text ? "Hiển thị như" : "",
+            messageText: messageText.text ? "Nội dung message" : "",
           },
         };
       }
@@ -7908,7 +8243,7 @@
         const binarySearch = Boolean(op?.binarySearch);
 
         const targetLabelByKind =
-          kind === "READ" ? "Đích lưu" : kind === "COLLECT" ? "Nguồn" : kind === "MODIFY" ? "Nguồn" : kind === "DELETE" ? "Nguồn" : "Target";
+          kind === "READ" ? "Đích lưu" : kind === "COLLECT" ? "Nguồn" : kind === "MODIFY" ? "Nguồn" : kind === "DELETE" ? "Nguồn" : "Đích";
 
         return {
           routine: {
@@ -7929,11 +8264,11 @@
           labels: {
             target: target.text ? targetLabelByKind : "",
             conditions: conditions.length ? "Điều kiện" : "",
-            condItem1: conditions.length ? "Item 1" : "",
-            condOperator: conditions.length ? "Operator" : "",
-            condItem2: conditions.length ? "Item 2" : "",
-            condAssoc: conditions.length ? "Associations" : "",
-            binarySearch: binarySearch ? "* Binarysearch" : "",
+            condItem1: conditions.length ? "Mục 1" : "",
+            condOperator: conditions.length ? "Toán tử" : "",
+            condItem2: conditions.length ? "Mục 2" : "",
+            condAssoc: conditions.length ? "Liên kết" : "",
+            binarySearch: binarySearch ? "* Tìm kiếm nhị phân" : "",
           },
         };
       }
@@ -7964,7 +8299,7 @@
           sortedBy,
           result,
           labels: {
-            sortedBy: sortedBy.text ? "Sorted By" : "",
+            sortedBy: sortedBy.text ? "Sắp xếp theo" : "",
           },
         };
       }
@@ -8027,10 +8362,10 @@
         const presence = context?.presence && typeof context.presence === "object" ? context.presence : {};
         const labels = {
           ...(context?.labels && typeof context.labels === "object" ? context.labels : {}),
-          tables: presence.tables ? String(sectionLabels.tables ?? "Table") : "",
-          using: presence.using ? String(sectionLabels.using ?? "Using") : "",
-          changing: presence.changing ? String(sectionLabels.changing ?? "Changing") : "",
-          raising: presence.raising ? String(sectionLabels.raising ?? "Raising") : "",
+          tables: presence.tables ? String(sectionLabels.tables ?? "Bảng") : "",
+          using: presence.using ? String(sectionLabels.using ?? "Tham số vào") : "",
+          changing: presence.changing ? String(sectionLabels.changing ?? "Tham số thay đổi") : "",
+          raising: presence.raising ? String(sectionLabels.raising ?? "Ngoại lệ") : "",
         };
         const ctx = { ...(context || {}), labels };
 
@@ -8614,7 +8949,7 @@
           btn.dataset.endLine = String(m.endLine);
 
           const label = m.objectId ? `${m.objectId}${m.templateId ? ` (${m.templateId})` : ""}` : m.templateId || "template";
-          btn.title = `Go to template output - ${label} (L${m.startLine})`;
+          btn.title = `Đến kết quả mẫu - ${label} (L${m.startLine})`;
 
           btn.addEventListener("click", (e) => {
             e.preventDefault();
@@ -8684,13 +9019,13 @@
         const userNote = String(options?.userNote || "").trim();
 
         const lines = [];
-        if (userDesc) lines.push(`<div><span class="anno-summary__k">Desc:</span> ${utils.escapeHtml(userDesc)}</div>`);
+        if (userDesc) lines.push(`<div><span class="anno-summary__k">Mô tả:</span> ${utils.escapeHtml(userDesc)}</div>`);
         if (codeDesc && (!userDesc || codeDesc !== userDesc)) {
-          const label = userDesc ? "Desc (code)" : "Desc";
+          const label = userDesc ? "Mô tả (code)" : "Mô tả";
           lines.push(`<div><span class="anno-summary__k">${label}:</span> ${utils.escapeHtml(codeDesc)}</div>`);
         }
         if (userNote) {
-          lines.push(`<div><span class="anno-summary__k">Note:</span> ${utils.escapeHtml(userNote)}</div>`);
+          lines.push(`<div><span class="anno-summary__k">Ghi chú:</span> ${utils.escapeHtml(userNote)}</div>`);
         }
 
         if (!lines.length) return "";
@@ -8701,7 +9036,7 @@
         const annoKey = String(options?.annoKey || "").trim();
         if (!annoKey) return "";
 
-        const titleText = String(options?.title || "Edit notes");
+        const titleText = String(options?.title || "Sửa ghi chú");
         const codeDesc = String(options?.codeDesc || "").trim();
         const userDesc = String(options?.userDesc || "").trim();
         const userNote = String(options?.userNote || "").trim();
@@ -8733,16 +9068,16 @@
             <summary class="param-notes__summary">${utils.escapeHtml(titleText)}</summary>
             <div class="param-notes__body">
               <div class="anno-grid">
-                <div class="anno-label">Description (from code)</div>
-                <div class="anno-code${codeDesc ? "" : " anno-code--empty"}">${utils.escapeHtml(codeDesc || "(none)")}</div>
+                <div class="anno-label">Mô tả (từ code)</div>
+                <div class="anno-code${codeDesc ? "" : " anno-code--empty"}">${utils.escapeHtml(codeDesc || "(không có)")}</div>
 
-                <div class="anno-label">Your description</div>
-                <textarea class="textarea param-notes__input" rows="2" ${toDataAttrs("description")} placeholder="Add your description (stored locally)...">${utils.escapeHtml(
+                <div class="anno-label">Mô tả của bạn</div>
+                <textarea class="textarea param-notes__input" rows="2" ${toDataAttrs("description")} placeholder="Nhập mô tả (lưu cục bộ)...">${utils.escapeHtml(
                   userDesc,
                 )}</textarea>
 
-                <div class="anno-label">Your note</div>
-                <textarea class="textarea param-notes__input" rows="3" ${toDataAttrs("note")} placeholder="Add notes (stored locally)...">${utils.escapeHtml(
+                <div class="anno-label">Ghi chú của bạn</div>
+                <textarea class="textarea param-notes__input" rows="3" ${toDataAttrs("note")} placeholder="Nhập ghi chú (lưu cục bộ)...">${utils.escapeHtml(
                   userNote,
                 )}</textarea>
               </div>
@@ -8883,9 +9218,9 @@
           ns.notes.setEntry(objectKey, { description, note });
           if (applyLocal) applyLocal(description, note);
 
-          statusEl.textContent = "Saved.";
+          statusEl.textContent = "Đã lưu.";
           window.setTimeout(() => {
-            if (statusEl.textContent === "Saved.") statusEl.textContent = "";
+            if (statusEl.textContent === "Đã lưu.") statusEl.textContent = "";
           }, 1200);
 
           if (document.getElementById("tab-templates")?.classList.contains("is-active") && typeof ui.renderTemplates === "function") {
@@ -8894,7 +9229,7 @@
         }
 
         function scheduleSave() {
-          statusEl.textContent = "Saving...";
+          statusEl.textContent = "Đang lưu...";
           if (saveTimer) clearTimeout(saveTimer);
           saveTimer = window.setTimeout(saveNow, 350);
         }
@@ -8979,6 +9314,7 @@
             callerName: "",
             actualExpr: "",
             originSourceRef: null,
+            callSourceRef: null,
             descText: "",
             statusText: "(RAISING)",
           };
@@ -9012,6 +9348,7 @@
             callerName,
             actualExpr: actual,
             originSourceRef,
+            callSourceRef: e?.sourceRef || null,
             descText,
             statusText: "",
           };
@@ -9023,8 +9360,9 @@
             callerName: "",
             actualExpr: "",
             originSourceRef: null,
+            callSourceRef: null,
             descText: "",
-            statusText: "(no caller)",
+            statusText: "(không có nơi gọi)",
           };
         }
 
@@ -9033,8 +9371,9 @@
           callerName: "",
           actualExpr: "",
           originSourceRef: null,
+          callSourceRef: null,
           descText: "",
-          statusText: "(not passed)",
+          statusText: "(không truyền)",
         };
       }
 
@@ -9043,7 +9382,7 @@
         out.push({
           key: "PROGRAM",
           kind: "PROGRAM",
-          name: "(Globals)",
+          name: "(Toàn cục)",
           description: String(model?.description || "").trim(),
           userDescription: String(model?.userDescription || "").trim(),
         });
@@ -9065,6 +9404,17 @@
         state.selectedParamKey = String(options?.paramKey || "").trim();
         if (typeof ui.renderObjectsTable === "function") ui.renderObjectsTable();
         if (typeof ui.renderDetails === "function") ui.renderDetails();
+
+        let sourceRef = options?.sourceRef || null;
+        if (!sourceRef && key && key !== "PROGRAM") {
+          const obj = state.model?.nodes?.get ? state.model.nodes.get(key) : null;
+          sourceRef = obj?.sourceRef || null;
+        }
+        if (sourceRef && typeof ui.highlightSource === "function") {
+          const start = Number(sourceRef?.startLine || 0);
+          const end = Number(sourceRef?.endLine || start);
+          if (Number.isFinite(start) && start > 0) ui.highlightSource(start, end || start);
+        }
       }
 
       function renderObjectsTable() {
@@ -9164,7 +9514,8 @@
               <td class="${desc ? "" : "cell-muted"}">${utils.escapeHtml(desc || "(chưa có)")}</td>
             `;
 
-            tr.addEventListener("click", () => selectObject(obj.key, { paramKey }));
+            const sourceRef = p?.sourceRef || obj?.sourceRef || null;
+            tr.addEventListener("click", () => selectObject(obj.key, { paramKey, sourceRef }));
           } else if (row.rowKind === "source") {
             const p = row.param;
             const kind = String(p?.kind || "").trim();
@@ -9190,7 +9541,7 @@
             const descCell = showDescText ? utils.escapeHtml(showDescText) : '<span class="cell-muted">(chưa có)</span>';
 
             tr.innerHTML = `
-              <td class="cell-mono cell-muted">SRC</td>
+              <td class="cell-mono cell-muted">NGUỒN</td>
               <td class="cell-mono">
                 <div class="objects-tree objects-tree--lvl2">
                   <span class="objects-tree-spacer" aria-hidden="true"></span>
@@ -9201,7 +9552,8 @@
               <td>${descCell}</td>
             `;
 
-            tr.addEventListener("click", () => selectObject(obj.key, { paramKey }));
+            const sourceRef = s?.originSourceRef || s?.callSourceRef || obj?.sourceRef || null;
+            tr.addEventListener("click", () => selectObject(obj.key, { paramKey, sourceRef }));
           } else {
             tr.dataset.key = obj.key;
             if (obj.key === state.selectedKey && !state.selectedParamKey) tr.classList.add("is-selected");
@@ -9211,9 +9563,9 @@
             const canToggle = Boolean(row.collapseEnabled && hasToggle);
             const isCollapsed = Boolean(row.isCollapsed);
             const toggle = canToggle
-              ? `<button type="button" class="objects-tree-toggle" aria-label="${isCollapsed ? "Expand" : "Collapse"}" aria-expanded="${isCollapsed ? "false" : "true"}">${
-                  isCollapsed ? "▸" : "▾"
-                }</button>`
+              ? `<button type="button" class="objects-tree-toggle" aria-label="${isCollapsed ? "Mở rộng" : "Thu gọn"}" aria-expanded="${
+                  isCollapsed ? "false" : "true"
+                }">${isCollapsed ? "▸" : "▾"}</button>`
               : `<span class="objects-tree-spacer" aria-hidden="true"></span>`;
 
             tr.innerHTML = `
@@ -9227,7 +9579,8 @@
               <td class="${desc ? "" : "cell-muted"}">${utils.escapeHtml(desc || "(chưa có)")}</td>
             `;
 
-            tr.addEventListener("click", () => selectObject(obj.key, { paramKey: "" }));
+            const sourceRef = obj?.sourceRef || null;
+            tr.addEventListener("click", () => selectObject(obj.key, { paramKey: "", sourceRef }));
 
             const toggleBtn = tr.querySelector("button.objects-tree-toggle");
             if (toggleBtn) {
@@ -9312,7 +9665,7 @@
           const key = ns.notes.makeTypeFieldKey(typeField.typeScopeKey, typeField.typeName, typeField.fieldPath);
           edit = key
             ? renderInlineAnnoEditorHtml({
-                title: `Edit type field notes — ${typeField.typeName}-${typeField.fieldPath}`,
+                title: `Sửa ghi chú field type — ${typeField.typeName}-${typeField.fieldPath}`,
                 codeDesc,
                 userDesc,
                 userNote,
@@ -9329,7 +9682,7 @@
           const key = ns.notes.makeDeclKey(scopeKey, declKind, name);
           edit = key
             ? renderInlineAnnoEditorHtml({
-                title: "Edit notes",
+                title: "Sửa ghi chú",
                 codeDesc,
                 userDesc,
                 userNote,
@@ -9399,10 +9752,10 @@
 
           out.push(`<li class="decl-group">
             <div class="decl-group__header param-item">
-              <button type="button" class="decl-group__toggle" aria-expanded="true" title="Collapse/expand">▾</button>
+              <button type="button" class="decl-group__toggle" aria-expanded="true" title="Thu gọn/mở rộng">▾</button>
               <div class="decl-group__header-content">${headerInner}</div>
             </div>
-            <ul class="list decl-group__fields">${fieldItems || "<li>(none)</li>"}</ul>
+            <ul class="list decl-group__fields">${fieldItems || "<li>(không có)</li>"}</ul>
           </li>`);
         }
 
@@ -9438,20 +9791,20 @@
         const userNote = String(model.userNote || "").trim();
         const notesSection = `
           <div class="section">
-            <div class="section__title">Notes</div>
+            <div class="section__title">Ghi chú</div>
             <div class="anno-grid">
-              <div class="anno-label">Your description</div>
-              <textarea id="annoDesc" class="textarea" rows="2" placeholder="Add your description (stored locally)...">${utils.escapeHtml(
+              <div class="anno-label">Mô tả của bạn</div>
+              <textarea id="annoDesc" class="textarea" rows="2" placeholder="Nhập mô tả (lưu cục bộ)...">${utils.escapeHtml(
                 userDesc,
               )}</textarea>
 
-              <div class="anno-label">Your note</div>
-              <textarea id="annoNote" class="textarea" rows="4" placeholder="Add notes (stored locally)...">${utils.escapeHtml(
+              <div class="anno-label">Ghi chú của bạn</div>
+              <textarea id="annoNote" class="textarea" rows="4" placeholder="Nhập ghi chú (lưu cục bộ)...">${utils.escapeHtml(
                 userNote,
               )}</textarea>
 
               <div class="anno-actions">
-                <button id="btnAnnoClear" class="btn" type="button">Clear</button>
+                <button id="btnAnnoClear" class="btn" type="button">Xóa</button>
                 <span id="annoSaveState" class="anno-status"></span>
               </div>
             </div>
@@ -9459,23 +9812,23 @@
         `;
 
         return `
-          <h3>PROGRAM (Globals)</h3>
+          <h3>PROGRAM (Toàn cục)</h3>
           ${notesSection}
-          <div class="meta">Global DATA: ${model.globalData.length} ƒ?› Global CONSTANTS: ${model.globalConstants.length}</div>
+          <div class="meta">DATA toàn cục: ${model.globalData.length} | CONSTANTS toàn cục: ${model.globalConstants.length}</div>
           <div class="section">
-            <div class="section__title">Global DATA</div>
-            <ul class="list">${globalsData || "<li>(none)</li>"}</ul>
+            <div class="section__title">DATA toàn cục</div>
+            <ul class="list">${globalsData || "<li>(không có)</li>"}</ul>
           </div>
           <div class="section">
-            <div class="section__title">Global CONSTANTS</div>
-            <ul class="list">${globalsConst || "<li>(none)</li>"}</ul>
+            <div class="section__title">CONSTANTS toàn cục</div>
+            <ul class="list">${globalsConst || "<li>(không có)</li>"}</ul>
           </div>
         `;
       }
 
       function renderRoutineDetails(r) {
         const model = state.model;
-        const lineInfo = r.sourceRef?.startLine ? `Lines ${r.sourceRef.startLine}-${r.sourceRef.endLine || r.sourceRef.startLine}` : "Lines ?";
+        const lineInfo = r.sourceRef?.startLine ? `Dòng ${r.sourceRef.startLine}-${r.sourceRef.endLine || r.sourceRef.startLine}` : "Dòng ?";
 
         const params = r.params
           .map((p) => {
@@ -9490,7 +9843,7 @@
 
             const edit = key
               ? renderInlineAnnoEditorHtml({
-                  title: "Edit notes",
+                  title: "Sửa ghi chú",
                   codeDesc,
                   userDesc,
                   userNote,
@@ -9524,7 +9877,7 @@
 
             const edit = key
               ? renderInlineAnnoEditorHtml({
-                  title: "Edit notes",
+                  title: "Sửa ghi chú",
                   codeDesc,
                   userDesc,
                   userNote,
@@ -9534,7 +9887,7 @@
                 })
               : "";
 
-            return `<li class="param-item">${sourceLink(`PERFORM ${name}`, e.sourceRef)}${e.isInCycle ? ' <span class="badge badge-danger">cycle</span>' : ""}${summary}${edit}</li>`;
+            return `<li class="param-item">${sourceLink(`PERFORM ${name}`, e.sourceRef)}${e.isInCycle ? ' <span class="badge badge-danger">vòng lặp</span>' : ""}${summary}${edit}</li>`;
           })
           .join("");
 
@@ -9550,7 +9903,7 @@
 
             const edit = key
               ? renderInlineAnnoEditorHtml({
-                  title: "Edit notes",
+                  title: "Sửa ghi chú",
                   codeDesc,
                   userDesc,
                   userNote,
@@ -9560,11 +9913,11 @@
                 })
               : "";
 
-            return `<li class="param-item">${sourceLink(`Called by ${name}`, e.sourceRef)}${summary}${edit}</li>`;
+            return `<li class="param-item">${sourceLink(`Được gọi bởi ${name}`, e.sourceRef)}${summary}${edit}</li>`;
           })
           .join("");
 
-        const writes = r.writes.map((w) => `<li>${sourceLink(`${w.variableName}  ƒØ?  ${w.statement}`, w.sourceRef)}</li>`).join("");
+        const writes = r.writes.map((w) => `<li>${sourceLink(`${w.variableName} - ${w.statement}`, w.sourceRef)}</li>`).join("");
 
         const statementSections = (() => {
           const registry = ns.abapObjects?.getRegistry?.() || null;
@@ -9618,7 +9971,7 @@
             sections.push(`
               <div class="section">
                 <div class="section__title">${utils.escapeHtml(String(def?.label || objectId))}</div>
-                <ul class="list">${rows || "<li>(none)</li>"}</ul>
+                <ul class="list">${rows || "<li>(không có)</li>"}</ul>
               </div>
             `);
           }
@@ -9632,23 +9985,23 @@
 
         const notesSection = `
           <div class="section">
-            <div class="section__title">Notes</div>
+            <div class="section__title">Ghi chú</div>
             <div class="anno-grid">
-              <div class="anno-label">Description (from code)</div>
-              <div class="anno-code${codeDesc ? "" : " anno-code--empty"}">${utils.escapeHtml(codeDesc || "(none)")}</div>
+              <div class="anno-label">Mô tả (từ code)</div>
+              <div class="anno-code${codeDesc ? "" : " anno-code--empty"}">${utils.escapeHtml(codeDesc || "(không có)")}</div>
 
-              <div class="anno-label">Your description</div>
-              <textarea id="annoDesc" class="textarea" rows="2" placeholder="Add your description (stored locally)...">${utils.escapeHtml(
+              <div class="anno-label">Mô tả của bạn</div>
+              <textarea id="annoDesc" class="textarea" rows="2" placeholder="Nhập mô tả (lưu cục bộ)...">${utils.escapeHtml(
                 userDesc,
               )}</textarea>
 
-              <div class="anno-label">Your note</div>
-              <textarea id="annoNote" class="textarea" rows="4" placeholder="Add notes (stored locally)...">${utils.escapeHtml(
+              <div class="anno-label">Ghi chú của bạn</div>
+              <textarea id="annoNote" class="textarea" rows="4" placeholder="Nhập ghi chú (lưu cục bộ)...">${utils.escapeHtml(
                 userNote,
               )}</textarea>
 
               <div class="anno-actions">
-                <button id="btnAnnoClear" class="btn" type="button">Clear</button>
+                <button id="btnAnnoClear" class="btn" type="button">Xóa</button>
                 <span id="annoSaveState" class="anno-status"></span>
               </div>
             </div>
@@ -9657,32 +10010,34 @@
 
         return `
           <h3>${utils.escapeHtml(r.kind)} ${utils.escapeHtml(r.name)}</h3>
-          <div class="meta">${utils.escapeHtml(lineInfo)} ƒ?› Defined: ${r.isDefined ? "Yes" : "No"} ƒ?› Cycle: ${r.isInCycle ? "Yes" : "No"} ƒ?› Depth: ${r.depth}</div>
+          <div class="meta">${utils.escapeHtml(lineInfo)} | Định nghĩa: ${r.isDefined ? "Có" : "Không"} | Vòng lặp: ${
+            r.isInCycle ? "Có" : "Không"
+          } | Độ sâu: ${r.depth}</div>
           ${notesSection}
           <div class="section">
-            <div class="section__title">Parameters</div>
-            <ul class="list">${params || "<li>(none)</li>"}</ul>
+            <div class="section__title">Tham số</div>
+            <ul class="list">${params || "<li>(không có)</li>"}</ul>
           </div>
           <div class="section">
-            <div class="section__title">Local DATA</div>
-            <ul class="list">${localsData || "<li>(none)</li>"}</ul>
+            <div class="section__title">DATA cục bộ</div>
+            <ul class="list">${localsData || "<li>(không có)</li>"}</ul>
           </div>
           <div class="section">
-            <div class="section__title">Local CONSTANTS</div>
-            <ul class="list">${localsConst || "<li>(none)</li>"}</ul>
+            <div class="section__title">CONSTANTS cục bộ</div>
+            <ul class="list">${localsConst || "<li>(không có)</li>"}</ul>
           </div>
           <div class="section">
-            <div class="section__title">Writes</div>
-            <ul class="list">${writes || "<li>(none)</li>"}</ul>
+            <div class="section__title">Ghi dữ liệu</div>
+            <ul class="list">${writes || "<li>(không có)</li>"}</ul>
           </div>
           ${statementSections}
           <div class="section">
-            <div class="section__title">Calls (PERFORM)</div>
-            <ul class="list">${calls || "<li>(none)</li>"}</ul>
+            <div class="section__title">Gọi (PERFORM)</div>
+            <ul class="list">${calls || "<li>(không có)</li>"}</ul>
           </div>
           <div class="section">
-            <div class="section__title">Called by</div>
-            <ul class="list">${calledBy || "<li>(none)</li>"}</ul>
+            <div class="section__title">Được gọi bởi</div>
+            <ul class="list">${calledBy || "<li>(không có)</li>"}</ul>
           </div>
         `;
       }
@@ -9693,13 +10048,13 @@
         if (!el) return;
 
         if (!model) {
-          el.textContent = "Analyze to see details.";
+          el.textContent = "Hãy phân tích để xem chi tiết.";
           el.classList.add("empty");
           return;
         }
 
         if (!state.selectedKey) {
-          el.textContent = "Select an object to see details.";
+          el.textContent = "Chọn một đối tượng để xem chi tiết.";
           el.classList.add("empty");
           return;
         }
@@ -9739,7 +10094,7 @@
 
         const r = model.nodes.get(state.selectedKey);
         if (!r) {
-          el.textContent = "Object not found.";
+          el.textContent = "Không tìm thấy đối tượng.";
           return;
         }
 
@@ -9986,7 +10341,7 @@
 
           const meta = document.createElement("div");
           meta.className = "objcfg-item__meta";
-          const origin = e.isCustom ? "custom" : e.isOverride ? "override" : "built-in";
+          const origin = e.isCustom ? "tùy chỉnh" : e.isOverride ? "ghi đè" : "mặc định";
           meta.textContent = `${origin} • ${asNonEmptyString(e.kind) || "?"}`;
 
           btn.appendChild(title);
@@ -10055,7 +10410,7 @@
 
         const selectedLower = String(state.selectedId || "").trim().toLowerCase();
         if (!selectedLower) {
-          host.textContent = "Select an object on the left.";
+          host.textContent = "Chọn đối tượng bên trái.";
           host.classList.add("empty");
           return;
         }
@@ -10063,19 +10418,19 @@
         const entries = buildEntries();
         const entry = entries.find((e) => e.idLower === selectedLower) || null;
         if (!entry) {
-          host.textContent = "Object not found.";
+          host.textContent = "Không tìm thấy đối tượng.";
           host.classList.add("empty");
           return;
         }
 
         host.classList.remove("empty");
 
-        const origin = entry.isCustom ? "custom" : entry.isOverride ? "override" : "built-in";
-        const disabledBadge = entry.disabled ? `<span class="badge badge-danger">disabled</span>` : "";
+        const origin = entry.isCustom ? "tùy chỉnh" : entry.isOverride ? "ghi đè" : "mặc định";
+        const disabledBadge = entry.disabled ? `<span class="badge badge-danger">đang tắt</span>` : "";
 
         host.innerHTML = `
           <div class="objcfg-editor__head">
-            <div class="objcfg-editor__title">Object: <code>${escapeHtml(entry.id)}</code></div>
+            <div class="objcfg-editor__title">Đối tượng: <code>${escapeHtml(entry.id)}</code></div>
             <div class="objcfg-editor__badges">
               <span class="badge">${escapeHtml(origin)}</span>
               ${disabledBadge}
@@ -10083,34 +10438,34 @@
           </div>
 
           <div class="objcfg-editor__actions">
-            <button id="abapObjCfgBtnSave" class="btn btn-primary" type="button">Save</button>
-            <button id="abapObjCfgBtnSaveNew" class="btn" type="button">Save new</button>
-            <button id="abapObjCfgBtnReset" class="btn" type="button">Reset override</button>
-            <button id="abapObjCfgBtnDelete" class="btn" type="button">Delete</button>
-            <button id="abapObjCfgBtnToggleDisable" class="btn" type="button">${entry.disabled ? "Enable" : "Disable"}</button>
-            <button id="abapObjCfgBtnApply" class="btn" type="button">Apply</button>
+            <button id="abapObjCfgBtnSave" class="btn btn-primary" type="button">Lưu</button>
+            <button id="abapObjCfgBtnSaveNew" class="btn" type="button">Lưu mới</button>
+            <button id="abapObjCfgBtnReset" class="btn" type="button">Khôi phục override</button>
+            <button id="abapObjCfgBtnDelete" class="btn" type="button">Xóa</button>
+            <button id="abapObjCfgBtnToggleDisable" class="btn" type="button">${entry.disabled ? "Bật" : "Tắt"}</button>
+            <button id="abapObjCfgBtnApply" class="btn" type="button">Áp dụng</button>
           </div>
 
           <div class="objcfg-quick">
-            <div class="objcfg-label__text">Quick editor</div>
+            <div class="objcfg-label__text">Chỉnh nhanh</div>
             <div id="abapObjCfgQuick" class="objcfg-quick__host"></div>
           </div>
 
           <details class="objcfg-advanced" open>
-            <summary class="objcfg-advanced__summary">Advanced JSON</summary>
+            <summary class="objcfg-advanced__summary">JSON nâng cao</summary>
             <textarea id="abapObjCfgJson" class="objcfg-json" spellcheck="false"></textarea>
           </details>
 
           <div class="objcfg-templates">
-            <div class="objcfg-label__text">Template mappings</div>
+            <div class="objcfg-label__text">Gán template</div>
             <div class="objcfg-templates__row">
               <select id="abapObjCfgTplSelect" class="input"></select>
-              <button id="abapObjCfgTplAdd" class="btn" type="button">Add mapping</button>
+              <button id="abapObjCfgTplAdd" class="btn" type="button">Thêm mapping</button>
             </div>
             <div id="abapObjCfgTplList" class="objcfg-templates__list"></div>
           </div>
 
-          <div class="hint">Saved in localStorage key: <code>${escapeHtml(getCustomStore()?.STORAGE_KEY || "")}</code></div>
+          <div class="hint">Lưu trong localStorage key: <code>${escapeHtml(getCustomStore()?.STORAGE_KEY || "")}</code></div>
         `;
 
         const jsonEl = $("abapObjCfgJson");
@@ -10148,13 +10503,13 @@
 
         const optEmpty = document.createElement("option");
         optEmpty.value = "";
-        optEmpty.textContent = "Select a template...";
+        optEmpty.textContent = "Chọn template...";
         sel.appendChild(optEmpty);
 
         for (const t of list) {
           const opt = document.createElement("option");
           opt.value = t.id;
-          const origin = t.origin === "built-in" ? "built-in" : "local";
+          const origin = t.origin === "built-in" ? "mặc định" : t.origin === "custom" ? "tùy chỉnh" : "cục bộ";
           opt.textContent = `${t.id} (${origin})`;
           sel.appendChild(opt);
         }
@@ -10162,10 +10517,10 @@
 
       function getJsonObject() {
         const el = $("abapObjCfgJson");
-        if (!el) return { ok: false, error: "Editor not ready." };
+        if (!el) return { ok: false, error: "Trình soạn thảo chưa sẵn sàng." };
         const parsed = safeJsonParse(el.value);
-        if (!parsed.ok) return { ok: false, error: parsed.error || "Invalid JSON." };
-        if (!isPlainObject(parsed.value)) return { ok: false, error: "Object JSON must be an object." };
+        if (!parsed.ok) return { ok: false, error: parsed.error || "JSON không hợp lệ." };
+        if (!isPlainObject(parsed.value)) return { ok: false, error: "JSON object phải là object." };
         return { ok: true, value: parsed.value };
       }
 
@@ -10192,8 +10547,8 @@
       function updateJsonObject(mutator, options) {
         const res = getJsonObject();
         if (!res.ok) {
-          ui.setStatus(res.error || "Invalid JSON.", true);
-          return { ok: false, error: res.error || "Invalid JSON." };
+          ui.setStatus(res.error || "JSON không hợp lệ.", true);
+          return { ok: false, error: res.error || "JSON không hợp lệ." };
         }
         const obj = res.value;
         try {
@@ -10215,7 +10570,7 @@
         if (!host) return;
         const parsed = getJsonObject();
         if (!parsed.ok) {
-          host.innerHTML = `<div class="objcfg-quick__error">Fix JSON to use the quick editor.</div>`;
+          host.innerHTML = `<div class="objcfg-quick__error">Sửa JSON để dùng chỉnh nhanh.</div>`;
           return;
         }
         const obj = parsed.value || {};
@@ -10228,12 +10583,12 @@
         host.innerHTML = `
           <div class="objcfg-form">
             <label class="objcfg-field">
-              <span class="objcfg-field__label">Label</span>
+              <span class="objcfg-field__label">Nhãn</span>
               <input id="abapObjCfgFieldLabel" class="input" type="text" value="${escapeHtml(asNonEmptyString(obj.label))}" />
             </label>
 
             <label class="objcfg-field">
-              <span class="objcfg-field__label">Kind</span>
+              <span class="objcfg-field__label">Loại</span>
               <select id="abapObjCfgFieldKind" class="input">
                 <option value="statement">statement</option>
                 <option value="callEdge">callEdge</option>
@@ -10241,7 +10596,7 @@
             </label>
 
             <label class="objcfg-field">
-              <span class="objcfg-field__label">Builder kind</span>
+              <span class="objcfg-field__label">Kiểu builder</span>
               <input id="abapObjCfgFieldBuilderKind" class="input" list="abapObjCfgBuilderKinds" value="${escapeHtml(builderKind)}" />
               <datalist id="abapObjCfgBuilderKinds">
                 <option value="performCall"></option>
@@ -10258,7 +10613,7 @@
               isStatement
                 ? `
               <label class="objcfg-field">
-                <span class="objcfg-field__label">Parse kind</span>
+                <span class="objcfg-field__label">Kiểu parse</span>
                 <input id="abapObjCfgFieldParseKind" class="input" list="abapObjCfgParseKinds" value="${escapeHtml(parseKind)}" />
                 <datalist id="abapObjCfgParseKinds">
                   <option value="regex"></option>
@@ -10301,16 +10656,16 @@
                 </label>
               </div>
 
-              <div class="objcfg-sub__title">Regex fields</div>
+              <div class="objcfg-sub__title">Trường regex</div>
               <div class="objcfg-mini-table">
                 <div class="objcfg-mini-table__head">
-                  <div>Field</div>
-                  <div>Group</div>
+                  <div>Trường</div>
+                  <div>Nhóm</div>
                   <div></div>
                 </div>
                 <div id="abapObjCfgRegexFields"></div>
               </div>
-              <button id="abapObjCfgRegexAddField" class="btn" type="button">Add regex field</button>
+              <button id="abapObjCfgRegexAddField" class="btn" type="button">Thêm trường regex</button>
             </div>
           `
               : ""
@@ -10320,17 +10675,17 @@
             isMappingBuilder
               ? `
             <div class="objcfg-sub">
-              <div class="objcfg-sub__title">Builder mapping fields</div>
+              <div class="objcfg-sub__title">Trường mapping (builder)</div>
               <div class="objcfg-mini-table">
                 <div class="objcfg-mini-table__head objcfg-mini-table__head--4">
-                  <div>Out key</div>
-                  <div>Type</div>
-                  <div>From</div>
+                  <div>Khoá output</div>
+                  <div>Kiểu</div>
+                  <div>Nguồn</div>
                   <div></div>
                 </div>
                 <div id="abapObjCfgMappingFields"></div>
               </div>
-              <button id="abapObjCfgMapAddField" class="btn" type="button">Add mapping field</button>
+              <button id="abapObjCfgMapAddField" class="btn" type="button">Thêm trường mapping</button>
             </div>
           `
               : ""
@@ -10467,7 +10822,7 @@
         if (list.length === 0) {
           const empty = document.createElement("div");
           empty.className = "objcfg-mini-table__empty";
-          empty.textContent = "(no fields)";
+          empty.textContent = "(không có trường)";
           host.appendChild(empty);
           return;
         }
@@ -10490,7 +10845,7 @@
           const btn = document.createElement("button");
           btn.type = "button";
           btn.className = "btn";
-          btn.textContent = "Remove";
+          btn.textContent = "Xóa";
           btn.addEventListener("click", () => {
             updateJsonObject(
               (o) => {
@@ -10529,9 +10884,9 @@
       }
 
       function addRegexField() {
-        const key = asNonEmptyString(window.prompt("Field name:", ""));
+        const key = asNonEmptyString(window.prompt("Tên field:", ""));
         if (!key) return;
-        const idx = Number(window.prompt("Group index (number):", "1"));
+        const idx = Number(window.prompt("Chỉ số group (số):", "1"));
         if (!Number.isFinite(idx)) return;
         updateJsonObject(
           (o) => {
@@ -10569,7 +10924,7 @@
         if (list.length === 0) {
           const empty = document.createElement("div");
           empty.className = "objcfg-mini-table__empty";
-          empty.textContent = "(no fields)";
+          empty.textContent = "(không có trường)";
           host.appendChild(empty);
           return;
         }
@@ -10600,7 +10955,7 @@
           const btn = document.createElement("button");
           btn.type = "button";
           btn.className = "btn";
-          btn.textContent = "Remove";
+          btn.textContent = "Xóa";
           btn.addEventListener("click", () => {
             updateJsonObject(
               (o) => {
@@ -10642,10 +10997,10 @@
       }
 
       function addMappingField() {
-        const outKey = asNonEmptyString(window.prompt("Out key:", ""));
+        const outKey = asNonEmptyString(window.prompt("Khoá output:", ""));
         if (!outKey) return;
-        const from = asNonEmptyString(window.prompt("From (payload field name):", ""));
-        const type = asNonEmptyString(window.prompt("Type (expr|exprlist|text):", "expr")) || "expr";
+        const from = asNonEmptyString(window.prompt("Từ (tên trường payload):", ""));
+        const type = asNonEmptyString(window.prompt("Kiểu (expr|exprlist|text):", "expr")) || "expr";
         updateJsonObject(
           (o) => {
             if (!isPlainObject(o.builder)) o.builder = { kind: "mapping" };
@@ -10659,46 +11014,46 @@
       function onSave(options) {
         const storeApi = getCustomStore();
         if (!storeApi) {
-          ui.setStatus("ABAP Objects custom store module not loaded.", true);
+          ui.setStatus("Chưa tải module lưu ABAP Objects.", true);
           return;
         }
 
         const res = getJsonObject();
         if (!res.ok) {
-          ui.setStatus(res.error || "Invalid JSON.", true);
+          ui.setStatus(res.error || "JSON không hợp lệ.", true);
           return;
         }
 
         const obj = res.value;
         const id = asNonEmptyString(obj?.id);
         if (!id) {
-          ui.setStatus("Object id is required.", true);
+          ui.setStatus("Cần Object id.", true);
           return;
         }
 
         const validation = validateObjectDef(obj);
         if (!validation.ok) {
           const msg = (validation.errors || [])
-            .map((e) => `${e.path || "(root)"}: ${e.message || "Invalid value"}`)
+            .map((e) => `${e.path || "(gốc)"}: ${e.message || "Giá trị không hợp lệ"}`)
             .join("\n");
-          ui.setStatus(msg || "Invalid object config.", true);
+          ui.setStatus(msg || "Cấu hình object không hợp lệ.", true);
           return;
         }
 
         const mode = asNonEmptyString(options?.mode);
         if (mode === "saveNew") {
           const suggested = `${id}_copy`;
-          const nextId = asNonEmptyString(window.prompt("New object id:", suggested));
+          const nextId = asNonEmptyString(window.prompt("Object id mới:", suggested));
           if (!nextId) return;
           const cloned = deepClone({ ...obj, id: nextId });
           const saved = storeApi.upsertObjectDef(cloned);
           if (!saved.ok) {
-            ui.setStatus(saved.error || "Save failed.", true);
+            ui.setStatus(saved.error || "Lưu thất bại.", true);
             return;
           }
           state.selectedId = nextId;
           state.lastListHash = "";
-          ui.setStatus(`Saved new object: ${nextId}.`, false);
+          ui.setStatus(`Đã lưu object mới: ${nextId}.`, false);
           renderList();
           renderEditor();
           return;
@@ -10706,13 +11061,13 @@
 
         const saved = storeApi.upsertObjectDef(obj);
         if (!saved.ok) {
-          ui.setStatus(saved.error || "Save failed.", true);
+          ui.setStatus(saved.error || "Lưu thất bại.", true);
           return;
         }
 
         state.selectedId = id;
         state.lastListHash = "";
-        ui.setStatus(`Saved: ${id}.`, false);
+        ui.setStatus(`Đã lưu: ${id}.`, false);
         renderList();
         renderEditor();
       }
@@ -10721,11 +11076,11 @@
         const storeApi = getCustomStore();
         if (!storeApi) return;
         if (!entry?.isBase || !entry?.isOverride) return;
-        const ok = window.confirm(`Reset override for "${entry.id}"?`);
+        const ok = window.confirm(`Khôi phục override cho "${entry.id}"?`);
         if (!ok) return;
         storeApi.deleteObjectDef(entry.id);
         state.lastListHash = "";
-        ui.setStatus(`Reset override: ${entry.id}.`, false);
+        ui.setStatus(`Đã khôi phục override: ${entry.id}.`, false);
         renderList();
         renderEditor();
       }
@@ -10734,12 +11089,12 @@
         const storeApi = getCustomStore();
         if (!storeApi) return;
         if (!entry?.isCustom) return;
-        const ok = window.confirm(`Delete custom object "${entry.id}"?`);
+        const ok = window.confirm(`Xóa object tuỳ chỉnh "${entry.id}"?`);
         if (!ok) return;
         storeApi.deleteObjectDef(entry.id);
         state.selectedId = "";
         state.lastListHash = "";
-        ui.setStatus(`Deleted: ${entry.id}.`, false);
+        ui.setStatus(`Đã xóa: ${entry.id}.`, false);
         renderList();
         renderEditor();
       }
@@ -10749,14 +11104,14 @@
         if (!storeApi) return;
         storeApi.setObjectDisabled(entry.id, !entry.disabled);
         state.lastListHash = "";
-        ui.setStatus(`${entry.disabled ? "Enabled" : "Disabled"}: ${entry.id}.`, false);
+        ui.setStatus(`${entry.disabled ? "Đã bật" : "Đã tắt"}: ${entry.id}.`, false);
         renderList();
         renderEditor();
       }
 
       function onApply() {
         if (ns.abapObjects?.reset) ns.abapObjects.reset();
-        ui.setStatus("Applied ABAP Objects config. Re-analyze to reload.", false);
+        ui.setStatus("Đã áp dụng cấu hình ABAP Objects. Hãy phân tích lại để nạp.", false);
         const input = $("abapInput")?.value || "";
         if (String(input).trim()) $("btnAnalyze")?.click();
       }
@@ -10791,7 +11146,7 @@
         if (list.length === 0) {
           const empty = document.createElement("div");
           empty.className = "objcfg-templates__empty";
-          empty.textContent = "(no mappings)";
+          empty.textContent = "(chưa gán template)";
           host.appendChild(empty);
           return;
         }
@@ -10807,7 +11162,7 @@
           const right = document.createElement("button");
           right.type = "button";
           right.className = "btn objcfg-templates__remove";
-          right.textContent = "Remove";
+          right.textContent = "Xóa";
           right.addEventListener("click", () => removeTemplateMapping(t.id));
 
           row.appendChild(left);
@@ -10823,7 +11178,7 @@
 
         const res = getJsonObject();
         if (!res.ok) {
-          ui.setStatus(res.error || "Invalid JSON.", true);
+          ui.setStatus(res.error || "JSON không hợp lệ.", true);
           return;
         }
 
@@ -10833,7 +11188,7 @@
         const existing = normalizeTemplatesList(obj.templates);
         const exists = existing.some((t) => String(t.id || "").trim().toLowerCase() === tid.toLowerCase());
         if (exists) {
-          ui.setStatus(`Template already mapped: ${tid}.`, true);
+          ui.setStatus(`Template đã được gán: ${tid}.`, true);
           return;
         }
 
@@ -10878,24 +11233,24 @@
       function createNewObject() {
         const storeApi = getCustomStore();
         if (!storeApi) {
-          ui.setStatus("ABAP Objects custom store module not loaded.", true);
+          ui.setStatus("Chưa tải module lưu ABAP Objects.", true);
           return;
         }
 
         const suggested = "newObject";
-        const id = asNonEmptyString(window.prompt("New object id:", suggested));
+        const id = asNonEmptyString(window.prompt("Object id mới:", suggested));
         if (!id) return;
 
         const exists = buildEntries().some((e) => e.idLower === id.toLowerCase());
         if (exists) {
-          const ok = window.confirm(`"${id}" already exists. Overwrite/override it?`);
+          const ok = window.confirm(`"${id}" đã tồn tại. Ghi đè/override?`);
           if (!ok) return;
         }
 
         const obj = {
           id,
           kind: "statement",
-          label: "New object",
+          label: "Object mới",
           parse: { kind: "regex", regex: "^$" },
           builder: { kind: "mapping", fields: {} },
           templates: [],
@@ -10904,7 +11259,7 @@
 
         state.selectedId = id;
         state.lastListHash = "";
-        ui.setStatus(`Created: ${id}.`, false);
+        ui.setStatus(`Đã tạo: ${id}.`, false);
         renderList();
         renderEditor();
       }
@@ -10914,7 +11269,7 @@
         if (!storeApi) return;
         const stamp = new Date().toISOString().replace(/[:]/g, "-").slice(0, 19);
         ui.downloadTextFile(`abapflow-abap-objects-custom-${stamp}.json`, storeApi.exportJson(), "application/json");
-        ui.setStatus("ABAP Objects config exported.", false);
+        ui.setStatus("Đã xuất cấu hình ABAP Objects.", false);
       }
 
       async function importStoreFromFile(file) {
@@ -10925,12 +11280,12 @@
         const text = await file.text();
         const res = storeApi.importJson(text, { mode: "merge" });
         if (!res.ok) {
-          ui.setStatus(res.error || "Import failed.", true);
+          ui.setStatus(res.error || "Nhập thất bại.", true);
           return;
         }
         state.selectedId = "";
         state.lastListHash = "";
-        ui.setStatus("ABAP Objects config imported (merge).", false);
+        ui.setStatus("Đã nhập cấu hình ABAP Objects (gộp).", false);
         renderList();
         renderEditor();
       }
@@ -10938,12 +11293,12 @@
       function resetAll() {
         const storeApi = getCustomStore();
         if (!storeApi) return;
-        const ok = window.confirm("Reset ALL custom ABAP Objects config in localStorage?");
+        const ok = window.confirm("Reset toàn bộ cấu hình ABAP Objects tùy chỉnh trong localStorage?");
         if (!ok) return;
         storeApi.clearStore();
         state.selectedId = "";
         state.lastListHash = "";
-        ui.setStatus("ABAP Objects config reset.", false);
+        ui.setStatus("Đã reset cấu hình ABAP Objects.", false);
         renderList();
         renderEditor();
       }
@@ -10982,6 +11337,471 @@
 
     </script>
         <script>
+    // js/ui_abap_templates_manager.js
+    (function (ns) {
+      "use strict";
+
+      const ui = ns.ui;
+      const utils = ns.utils;
+
+      const state = {
+        selectedId: "",
+        lastListHash: "",
+      };
+
+      function $(id) {
+        return ui.$(id);
+      }
+
+      function asNonEmptyString(x) {
+        const s = String(x ?? "").trim();
+        return s ? s : "";
+      }
+
+      function isPlainObject(x) {
+        return Boolean(x) && typeof x === "object" && !Array.isArray(x);
+      }
+
+      function safeJsonParse(text) {
+        if (utils && typeof utils.safeJsonParse === "function") return utils.safeJsonParse(text);
+        try {
+          return { ok: true, value: JSON.parse(String(text || "")) };
+        } catch (e) {
+          return { ok: false, error: String(e?.message || e) };
+        }
+      }
+
+      function escapeHtml(s) {
+        if (utils && typeof utils.escapeHtml === "function") return utils.escapeHtml(s);
+        return String(s ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function safeJsonStringify(value) {
+        try {
+          return JSON.stringify(value, null, 2);
+        } catch (e) {
+          return String(e?.message || e || "");
+        }
+      }
+
+      function getDefs() {
+        return ns.templateDefs || null;
+      }
+
+      function buildEntries() {
+        const defs = getDefs();
+        const store = defs?.loadStore ? defs.loadStore() : { templates: {} };
+        const out = [];
+
+        for (const [idRaw, entry] of Object.entries(store.templates || {})) {
+          const id = asNonEmptyString(idRaw);
+          if (!id || !isPlainObject(entry)) continue;
+          const meta = isPlainObject(entry.meta) ? entry.meta : {};
+          const label = asNonEmptyString(meta.label) || id;
+          const source = asNonEmptyString(meta.source);
+          const auto = meta.auto !== false;
+          const custom = Boolean(meta.custom);
+          const when = isPlainObject(meta.when) ? meta.when : null;
+          const updatedAt = asNonEmptyString(entry.updatedAt);
+          out.push({
+            id,
+            idLower: id.toLowerCase(),
+            label,
+            source,
+            auto,
+            custom,
+            when,
+            updatedAt,
+            config: entry.config,
+          });
+        }
+
+        out.sort((a, b) => a.id.localeCompare(b.id));
+        return out;
+      }
+
+      function computeListHash(entries, query) {
+        const q = asNonEmptyString(query).toLowerCase();
+        return `${q}::${entries.map((e) => `${e.idLower}:${e.updatedAt || ""}:${e.custom ? 1 : 0}`).join("|")}`;
+      }
+
+      function listMatchesQuery(entry, query) {
+        const q = asNonEmptyString(query).toLowerCase();
+        if (!q) return true;
+        const id = entry.idLower;
+        const label = String(entry.label || "").toLowerCase();
+        const source = String(entry.source || "").toLowerCase();
+        return id.includes(q) || label.includes(q) || source.includes(q);
+      }
+
+      function setActionState(hasSelection) {
+        const btnSave = $("abapTplSave");
+        const btnDelete = $("abapTplDelete");
+        if (btnSave) btnSave.disabled = !hasSelection;
+        if (btnDelete) btnDelete.disabled = !hasSelection;
+      }
+
+      function renderList() {
+        const host = $("abapTplList");
+        if (!host) return;
+
+        const entries = buildEntries();
+        const q = $("abapTplSearch")?.value || "";
+        const hash = computeListHash(entries, q);
+        if (hash === state.lastListHash) return;
+        state.lastListHash = hash;
+
+        host.replaceChildren();
+
+        const filtered = entries.filter((e) => listMatchesQuery(e, q));
+        if (filtered.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "tplmgr__empty";
+          empty.textContent = "(chưa có template trong localStorage)";
+          host.appendChild(empty);
+          return;
+        }
+
+        for (const e of filtered) {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "tplmgr__item";
+          if (e.idLower === String(state.selectedId || "").toLowerCase()) btn.classList.add("is-active");
+          if (e.custom) btn.classList.add("is-custom");
+
+          const title = document.createElement("div");
+          title.className = "tplmgr__item-title";
+          title.textContent = e.id;
+
+          const meta = document.createElement("div");
+          meta.className = "tplmgr__item-meta";
+          const origin = e.custom ? "tùy chỉnh" : "cục bộ";
+          meta.textContent = `${origin}${e.source ? ` • ${e.source}` : ""}`;
+
+          btn.appendChild(title);
+          btn.appendChild(meta);
+          btn.addEventListener("click", () => selectTemplate(e.id));
+          host.appendChild(btn);
+        }
+      }
+
+      function renderEditor() {
+        const host = $("abapTplEditor");
+        if (!host) return;
+
+        const selected = asNonEmptyString(state.selectedId);
+        if (!selected) {
+          host.textContent = "Chọn template bên trái.";
+          host.classList.add("empty");
+          setActionState(false);
+          return;
+        }
+
+        const entries = buildEntries();
+        const entry = entries.find((e) => e.idLower === selected.toLowerCase()) || null;
+        if (!entry) {
+          host.textContent = "Không tìm thấy template.";
+          host.classList.add("empty");
+          setActionState(false);
+          return;
+        }
+
+        host.classList.remove("empty");
+        setActionState(true);
+
+        const whenPath = asNonEmptyString(entry.when?.path);
+        const whenEquals = asNonEmptyString(entry.when?.equals);
+        const origin = entry.custom ? "tùy chỉnh" : "cục bộ";
+
+        host.innerHTML = `
+          <div class="tplmgr__head">
+            <div class="tplmgr__title">Template: <code>${escapeHtml(entry.id)}</code></div>
+            <div class="tplmgr__meta">${escapeHtml(origin)}${entry.source ? ` • ${escapeHtml(entry.source)}` : ""}</div>
+          </div>
+          <div class="tplmgr__fields">
+            <label class="tplmgr__field">
+              <span class="tplmgr__label">Id</span>
+              <input id="abapTplId" class="input" type="text" value="${escapeHtml(entry.id)}" disabled />
+            </label>
+            <label class="tplmgr__field">
+              <span class="tplmgr__label">Nhãn</span>
+              <input id="abapTplLabel" class="input" type="text" value="${escapeHtml(entry.label)}" />
+            </label>
+            <label class="tplmgr__field">
+              <span class="tplmgr__label">Object nguồn (source)</span>
+              <input id="abapTplSource" class="input" type="text" value="${escapeHtml(entry.source)}" placeholder="vd: append" />
+            </label>
+            <label class="tplmgr__field tplmgr__field--checkbox">
+              <span class="tplmgr__label">Auto</span>
+              <input id="abapTplAuto" type="checkbox" ${entry.auto ? "checked" : ""} />
+            </label>
+            <label class="tplmgr__field">
+              <span class="tplmgr__label">When.path</span>
+              <input id="abapTplWhenPath" class="input" type="text" value="${escapeHtml(whenPath)}" placeholder="payload.mode" />
+            </label>
+            <label class="tplmgr__field">
+              <span class="tplmgr__label">When.equals</span>
+              <input id="abapTplWhenEquals" class="input" type="text" value="${escapeHtml(whenEquals)}" placeholder="BYTE" />
+            </label>
+            <label class="tplmgr__field tplmgr__field--wide">
+              <span class="tplmgr__label">Template JSON</span>
+              <textarea id="abapTplJson" class="objcfg-json tplmgr__json" spellcheck="false"></textarea>
+            </label>
+          </div>
+          <div class="tplmgr__hint">
+            Nếu để trống "Object nguồn", template chỉ override theo id và sẽ không tự thêm vào danh sách.
+          </div>
+        `;
+
+        const jsonEl = $("abapTplJson");
+        if (jsonEl) jsonEl.value = safeJsonStringify(entry.config || {});
+      }
+
+      function renderTemplateManager() {
+        renderList();
+        renderEditor();
+      }
+
+      function selectTemplate(id) {
+        state.selectedId = asNonEmptyString(id);
+        state.lastListHash = "";
+        renderTemplateManager();
+      }
+
+      function createDefaultTemplateConfig() {
+        const gen = ns.abapObjects?.syntaxGenerator;
+        if (gen && typeof gen.createDefaultKeyValueExcelLikeTableTemplate === "function") {
+          return gen.createDefaultKeyValueExcelLikeTableTemplate("pairs");
+        }
+
+        return {
+          type: "excel-like-table",
+          compact: { removeEmptyRows: true },
+          grid: {
+            rows: 2,
+            cols: 2,
+            colWidths: { A: 240, B: 640 },
+            rowHeights: { 1: 30, 2: 30 },
+          },
+          css: {
+            header: "background:#9dc3e6;font-weight:700;color:#111;",
+            cell: "border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;",
+            wrap: "white-space:normal;line-height:1.25;",
+          },
+          cells: [
+            { addr: "A1", text: "Nội dung", class: ["cell", "header"] },
+            { addr: "B1", text: "{line.description}", class: ["cell", "wrap"] },
+            { addr: "A2", text: "Chi tiết", class: ["cell", "header"] },
+            { addr: "B2", text: "{line.text}", class: ["cell", "wrap"] },
+          ],
+        };
+      }
+
+      function onNewTemplate() {
+        const defs = getDefs();
+        if (!defs?.upsertTemplate) {
+          ui.setStatus("Chưa tải module templateDefs.", true);
+          return;
+        }
+
+        const suggested = "new-template.excel-like-table";
+        const id = asNonEmptyString(window.prompt("Template id mới:", suggested));
+        if (!id) return;
+
+        const entries = buildEntries();
+        const existing = entries.find((e) => e.idLower === id.toLowerCase());
+        if (existing) {
+          const ok = window.confirm(`"${id}" đã tồn tại. Ghi đè?`);
+          if (!ok) return;
+        }
+
+        const source = asNonEmptyString(window.prompt("Object nguồn (source) cho template (bỏ trống nếu chỉ override):", ""));
+        const cfg = createDefaultTemplateConfig();
+        const meta = {
+          label: id,
+          source,
+          auto: true,
+          custom: Boolean(source),
+        };
+
+        const saved = defs.upsertTemplate(id, cfg, meta);
+        if (!saved.ok) {
+          ui.setStatus(saved.error || "Lưu template thất bại.", true);
+          return;
+        }
+
+        state.selectedId = id;
+        state.lastListHash = "";
+        ui.setStatus(`Đã tạo template: ${id}.`, false);
+        renderTemplateManager();
+      }
+
+      function onSaveTemplate() {
+        const defs = getDefs();
+        if (!defs?.upsertTemplate) return;
+
+        const id = asNonEmptyString($("abapTplId")?.value || state.selectedId);
+        if (!id) {
+          ui.setStatus("Cần template id.", true);
+          return;
+        }
+
+        const label = asNonEmptyString($("abapTplLabel")?.value) || id;
+        const source = asNonEmptyString($("abapTplSource")?.value);
+        const auto = Boolean($("abapTplAuto")?.checked);
+        const whenPath = asNonEmptyString($("abapTplWhenPath")?.value);
+        const whenEquals = asNonEmptyString($("abapTplWhenEquals")?.value);
+
+        const jsonEl = $("abapTplJson");
+        const parsed = safeJsonParse(jsonEl?.value || "");
+        if (!parsed.ok) {
+          ui.setStatus(parsed.error || "JSON không hợp lệ.", true);
+          return;
+        }
+        if (!isPlainObject(parsed.value)) {
+          ui.setStatus("Template JSON phải là object.", true);
+          return;
+        }
+
+        const when = whenPath && whenEquals ? { path: whenPath, equals: whenEquals } : null;
+        const meta = {
+          label,
+          source,
+          auto,
+          custom: Boolean(source),
+          ...(when ? { when } : {}),
+        };
+
+        const res = defs.upsertTemplate(id, parsed.value, meta);
+        if (!res.ok) {
+          ui.setStatus(res.error || "Lưu template thất bại.", true);
+          return;
+        }
+
+        state.selectedId = id;
+        state.lastListHash = "";
+        ui.setStatus(`Đã lưu template: ${id}. Nhấn "Áp dụng" để nạp.`, false);
+        renderTemplateManager();
+      }
+
+      function onDeleteTemplate() {
+        const defs = getDefs();
+        if (!defs?.deleteTemplate) return;
+
+        const id = asNonEmptyString(state.selectedId);
+        if (!id) return;
+        const ok = window.confirm(`Xóa template "${id}"?`);
+        if (!ok) return;
+
+        const res = defs.deleteTemplate(id);
+        if (!res.ok) {
+          ui.setStatus(res.error || "Xóa thất bại.", true);
+          return;
+        }
+
+        state.selectedId = "";
+        state.lastListHash = "";
+        ui.setStatus(`Đã xóa template: ${id}.`, false);
+        renderTemplateManager();
+      }
+
+      function onApplyTemplates() {
+        if (ns.abapObjects?.reset) ns.abapObjects.reset();
+        ui.setStatus("Đã áp dụng template localStorage. Hãy phân tích lại để nạp.", false);
+        const input = $("abapInput")?.value || "";
+        if (String(input).trim()) $("btnAnalyze")?.click();
+      }
+
+      function exportTemplates() {
+        const defs = getDefs();
+        if (!defs?.exportJson) return;
+        const stamp = new Date().toISOString().replace(/[:]/g, "-").slice(0, 19);
+        ui.downloadTextFile(`abapflow-templates-${stamp}.json`, defs.exportJson(), "application/json");
+        ui.setStatus("Đã xuất templates localStorage.", false);
+      }
+
+      async function importTemplatesFromFile(file) {
+        const defs = getDefs();
+        if (!defs?.importJson || !file) return;
+
+        const text = await file.text();
+        const res = defs.importJson(text, { mode: "merge" });
+        if (!res.ok) {
+          ui.setStatus(res.error || "Nhập thất bại.", true);
+          return;
+        }
+
+        state.lastListHash = "";
+        ui.setStatus("Đã nhập templates (gộp).", false);
+        renderTemplateManager();
+      }
+
+      function resetTemplates() {
+        const defs = getDefs();
+        if (!defs?.clearStore) return;
+        const ok = window.confirm("Xóa toàn bộ template localStorage?");
+        if (!ok) return;
+        defs.clearStore();
+        state.selectedId = "";
+        state.lastListHash = "";
+        ui.setStatus("Đã xóa templates localStorage.", false);
+        renderTemplateManager();
+      }
+
+      function bindOnce() {
+        const mgr = $("abapTplMgr");
+        if (!mgr || mgr.dataset.bound) return;
+        mgr.dataset.bound = "1";
+
+        $("abapTplSearch")?.addEventListener("input", () => {
+          state.lastListHash = "";
+          renderList();
+        });
+        $("abapTplNew")?.addEventListener("click", onNewTemplate);
+        $("abapTplSave")?.addEventListener("click", onSaveTemplate);
+        $("abapTplDelete")?.addEventListener("click", onDeleteTemplate);
+        $("abapTplApply")?.addEventListener("click", onApplyTemplates);
+        $("abapTplExport")?.addEventListener("click", exportTemplates);
+        $("abapTplImport")?.addEventListener("click", () => $("abapTplImportFile")?.click());
+        $("abapTplReset")?.addEventListener("click", resetTemplates);
+        $("abapTplImportFile")?.addEventListener("change", async (ev) => {
+          const input = ev.target;
+          const file = input?.files?.[0] || null;
+          await importTemplatesFromFile(file);
+          if (input) input.value = "";
+        });
+      }
+
+      function hookRender() {
+        if (!ui?.renderAbapObjectsConfig || ui.renderAbapObjectsConfig._tplMgrHooked) return;
+        const prev = ui.renderAbapObjectsConfig;
+        ui.renderAbapObjectsConfig = function renderAbapObjectsConfigWrapped() {
+          prev.apply(this, arguments);
+          renderTemplateManager();
+        };
+        ui.renderAbapObjectsConfig._tplMgrHooked = true;
+      }
+
+      function init() {
+        bindOnce();
+        hookRender();
+        renderTemplateManager();
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", init);
+      } else {
+        init();
+      }
+    })(window.AbapFlow);
+
+    </script>
+        <script>
     // js/ui_abap_objects_syntax_generator.js
     (function (ns) {
       "use strict";
@@ -11011,11 +11831,11 @@
           const gen = ns.abapObjects?.syntaxGenerator;
           const store = ns.abapObjects?.customStore;
           if (!gen?.generateObjectDefFromSyntaxText) {
-            ui.setStatus("Syntax generator module not loaded.", true);
+            ui.setStatus("Chưa tải module tạo cú pháp.", true);
             return;
           }
           if (!store?.upsertObjectDef) {
-            ui.setStatus("ABAP Objects custom store module not loaded.", true);
+            ui.setStatus("Chưa tải module lưu cấu hình ABAP Objects.", true);
             return;
           }
 
@@ -11024,8 +11844,8 @@
           const out = ui.$("abapObjCfgGenOutput");
 
           if (!res?.ok) {
-            if (out) out.textContent = String(res?.error || "Generate failed.");
-            ui.setStatus(String(res?.error || "Generate failed."), true);
+            if (out) out.textContent = String(res?.error || "Tạo thất bại.");
+            ui.setStatus(String(res?.error || "Tạo thất bại."), true);
             return;
           }
 
@@ -11033,7 +11853,7 @@
           const objectDef = res.objectDef || {};
           const id = asNonEmptyString(idOverride) || asNonEmptyString(objectDef.id) || asNonEmptyString(res.keyword)?.toLowerCase();
           if (!id) {
-            ui.setStatus("Object id is required.", true);
+            ui.setStatus("Cần Object id.", true);
             return;
           }
 
@@ -11047,7 +11867,7 @@
             : null;
           const existing = Boolean(existingObj);
           if (existing) {
-            const ok = window.confirm(`"${id}" already exists. Override it with generated config?`);
+            const ok = window.confirm(`"${id}" đã tồn tại. Ghi đè bằng cấu hình vừa tạo?`);
             if (!ok) return;
           }
 
@@ -11062,25 +11882,25 @@
             if (genTpl?.createDefaultKeyValueExcelLikeTableTemplate && defs?.upsertTemplate) {
               const templateId = `${id}.default.excel-like-table`;
 
-              objectDef.templates.push({ id: templateId, label: "Default (key/value)", auto: true });
+              objectDef.templates.push({ id: templateId, label: "Mặc định (key/value)", auto: true });
 
               if (!defs.getTemplateConfig || !defs.getTemplateConfig(templateId)) {
                 const cfg = genTpl.createDefaultKeyValueExcelLikeTableTemplate("pairs");
-                defs.upsertTemplate(templateId, cfg, { label: "Default (key/value)", source: id, auto: true });
+                defs.upsertTemplate(templateId, cfg, { label: "Mặc định (key/value)", source: id, auto: true });
               }
             }
           }
 
           const saved = store.upsertObjectDef(objectDef);
           if (!saved.ok) {
-            const msg = saved.error || "Save failed.";
+            const msg = saved.error || "Lưu thất bại.";
             if (out) out.textContent = msg;
             ui.setStatus(msg, true);
             return;
           }
 
           if (out) out.textContent = safeJsonStringify(objectDef);
-          ui.setStatus(`Generated object: ${id}.`, false);
+          ui.setStatus(`Đã tạo object: ${id}.`, false);
 
           if (ns.abapObjects?.reset) ns.abapObjects.reset();
 
@@ -11792,7 +12612,7 @@
         }
 
         if (truncated) {
-          items.push({ kind: "note", text: `Truncated at ${maxSteps} steps.` });
+          items.push({ kind: "note", text: `Đã cắt ở ${maxSteps} bước.` });
         }
 
         return { items, truncated, maxSteps };
@@ -11909,6 +12729,63 @@
       let lastRenderOrder = [];
       let lastToolbarUpdate = null;
 
+      const TEMPLATES_FLOW_MAX_STEPS_KEY = "abapflow-templates-flow-max-steps";
+      const TEMPLATES_FLOW_MAX_STEPS_DEFAULT = 900;
+      const TEMPLATES_FLOW_FILTER_TEXT_KEY = "abapflow-templates-flow-filter-text";
+      const TEMPLATES_FLOW_FILTER_SELECTED_KEY = "abapflow-templates-flow-filter-selected";
+      const TEMPLATES_FLOW_FILTER_LOOP_KEY = "abapflow-templates-flow-filter-loop";
+
+      function readTemplatesFlowMaxSteps() {
+        try {
+          const raw = localStorage.getItem(TEMPLATES_FLOW_MAX_STEPS_KEY);
+          const n = Number(raw);
+          return Number.isFinite(n) && n > 0 ? Math.floor(n) : TEMPLATES_FLOW_MAX_STEPS_DEFAULT;
+        } catch (_) {
+          return TEMPLATES_FLOW_MAX_STEPS_DEFAULT;
+        }
+      }
+
+      function writeTemplatesFlowMaxSteps(n) {
+        const v = Number(n);
+        const next = Number.isFinite(v) && v > 0 ? Math.floor(v) : TEMPLATES_FLOW_MAX_STEPS_DEFAULT;
+        try {
+          localStorage.setItem(TEMPLATES_FLOW_MAX_STEPS_KEY, String(next));
+        } catch (_) {}
+        return next;
+      }
+
+      function readStoredText(key, fallback) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (raw == null) return String(fallback || "");
+          return String(raw);
+        } catch (_) {
+          return String(fallback || "");
+        }
+      }
+
+      function writeStoredText(key, value) {
+        try {
+          localStorage.setItem(key, String(value ?? ""));
+        } catch (_) {}
+      }
+
+      function readStoredBool(key, fallback) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (raw == null) return Boolean(fallback);
+          return raw === "1" || raw === "true";
+        } catch (_) {
+          return Boolean(fallback);
+        }
+      }
+
+      function writeStoredBool(key, value) {
+        try {
+          localStorage.setItem(key, value ? "1" : "0");
+        } catch (_) {}
+      }
+
       function scrollToTemplateResultId(resultId) {
         const id = String(resultId || "").trim();
         if (!id) return;
@@ -11940,22 +12817,22 @@
 
         if (b === "item.description") {
           const item = String(ctx?.assignment?.lhs || "").trim();
-          return item ? `Desc Item: ${item}` : "Desc Item";
+          return item ? `Mô tả Item: ${item}` : "Mô tả Item";
         }
 
         if (b === "value.description") {
           const value = String(ctx?.assignment?.rhs || "").trim();
-          return value ? `Desc Value: ${value}` : "Desc Value";
+          return value ? `Mô tả giá trị: ${value}` : "Mô tả giá trị";
         }
 
         if (b === "table.description") {
           const text = String(ctx?.table?.text || "").trim();
-          return text ? `Desc Internal table: ${text}` : "Desc Internal table";
+          return text ? `Mô tả bảng nội bộ: ${text}` : "Mô tả bảng nội bộ";
         }
 
         if (b === "target.description") {
           const text = String(ctx?.target?.text || "").trim();
-          return text ? `Desc Target: ${text}` : "Desc Target";
+          return text ? `Mô tả đích: ${text}` : "Mô tả đích";
         }
 
         const msgMatch = /^(msgClass|msgNo|displayLike|messageText|into|raising)\.description$/.exec(b);
@@ -11965,19 +12842,19 @@
           const text = String(node?.text || "").trim();
           const label =
             prop === "msgClass"
-              ? "Message class"
+              ? "Nhóm message"
               : prop === "msgNo"
-                ? "Message No."
+                ? "Số message"
                 : prop === "displayLike"
-                  ? "Display like"
+                  ? "Hiển thị như"
                   : prop === "messageText"
-                    ? "Message text"
+                    ? "Nội dung message"
                     : prop === "into"
-                      ? "Destination"
+                      ? "Đích"
                       : prop === "raising"
-                        ? "Raising"
+                        ? "Ngoại lệ"
                         : prop;
-          return text ? `Desc ${label}: ${text}` : `Desc ${label}`;
+          return text ? `Mô tả ${label}: ${text}` : `Mô tả ${label}`;
         }
 
         const withMatch = /^with\[(\d+)\]\.description$/.exec(b);
@@ -11985,8 +12862,8 @@
           const idx = Number(withMatch[1]);
           const node = ctx?.with?.[idx] || null;
           const text = String(node?.text || "").trim();
-          const label = `Message &${idx + 1}`;
-          return text ? `Desc ${label}: ${text}` : `Desc ${label}`;
+          const label = `Biến message &${idx + 1}`;
+          return text ? `Mô tả ${label}: ${text}` : `Mô tả ${label}`;
         }
 
         const condMatch = /^conditions\[(\d+)\]\.(item1|item2)\.description$/.exec(b);
@@ -11996,9 +12873,9 @@
           const cond = ctx?.conditions?.[idx] || null;
           const itemText = side === "item2" ? String(cond?.item2?.text || "").trim() : String(cond?.item1?.text || "").trim();
           const op = String(cond?.operator || "").trim();
-          const label = side === "item2" ? "Item 2" : "Item 1";
+          const label = side === "item2" ? "Mục 2" : "Mục 1";
           const tail = itemText ? `${itemText}${op ? ` (${op})` : ""}` : `#${idx + 1}`;
-          return `Desc ${label}: ${tail}`;
+          return `Mô tả ${label}: ${tail}`;
         }
         if (!b) return "Mô tả";
 
@@ -12169,7 +13046,7 @@
 
       function labelForDescriptionBind(result, bind) {
         const b = String(bind || "").trim();
-        if (!b || !isEditableDescriptionBind(b)) return "Edit description";
+        if (!b || !isEditableDescriptionBind(b)) return "Sửa mô tả";
 
         const ctx = result?.context || null;
         const basePath = b.slice(0, -".description".length);
@@ -12177,12 +13054,12 @@
 
         if (basePath === "perform") {
           const performName = String(ctx?.perform?.name || "").trim();
-          return performName ? `Description FORM ${performName}` : "Description FORM";
+          return performName ? `Mô tả FORM ${performName}` : "Mô tả FORM";
         }
 
         const text = String(node?.text ?? node?.actual ?? node?.name ?? "").trim();
-        if (text) return `Description: ${text}`;
-        return `Description: ${basePath}`;
+        if (text) return `Mô tả: ${text}`;
+        return `Mô tả: ${basePath}`;
       }
 
       function resolveGlobalDescriptionKey(result, bind) {
@@ -12247,7 +13124,7 @@
       }
 
       function openDescriptionEditorDialog(options) {
-        const titleText = String(options?.title || "Edit description");
+        const titleText = String(options?.title || "Sửa mô tả");
         const initialValue = String(options?.value ?? "");
 
         return new Promise((resolve) => {
@@ -12362,7 +13239,7 @@
       }
 
       function openDescriptionEditorDialogForTargets(options) {
-        const titleText = String(options?.title || "Edit description");
+        const titleText = String(options?.title || "Sửa mô tả");
         const targets = Array.isArray(options?.targets) ? options.targets : [];
         const initialByKey = options?.initialByKey && typeof options.initialByKey === "object" ? options.initialByKey : {};
         const initialKey = String(options?.initialKey || (targets[0] ? targets[0].key : "") || "").trim();
@@ -12402,7 +13279,7 @@
             row.style.marginBottom = "8px";
 
             const label = document.createElement("div");
-            label.textContent = "Object:";
+            label.textContent = "Đối tượng:";
             label.style.minWidth = "64px";
             row.appendChild(label);
 
@@ -12600,7 +13477,7 @@
                   const nextValue = String(value ?? "").trim();
                   if (action === "cancel") return;
                   if (!tk) {
-                    ui.setStatus("Cannot resolve object for this cell.", true);
+                    ui.setStatus("Không thể xác định đối tượng cho ô này.", true);
                     return;
                   }
 
@@ -12608,12 +13485,12 @@
                     if (hasLocalOverrideForTarget(tk)) {
                       tpl.setLocalTemplateOverrideByOriginKey?.(templateId, resultId, bind, tk, "", baseOriginKey);
                       renderTemplates({ autoSelectResultId: resultId });
-                      ui.setStatus("Cleared description (local).", false);
+                      ui.setStatus("Đã xóa mô tả (cục bộ).", false);
                       return;
                     }
 
                     if (!ns.notes?.setEntry) {
-                      ui.setStatus("Cannot clear description for this cell.", true);
+                      ui.setStatus("Không thể xóa mô tả cho ô này.", true);
                       return;
                     }
 
@@ -12621,7 +13498,7 @@
                     ns.notes.setEntry(tk, { description: "" });
                     if (state.model && ns.notes?.applyToModel) ns.notes.applyToModel(state.model);
                     renderTemplates({ autoSelectResultId: resultId });
-                    ui.setStatus("Cleared description.", false);
+                    ui.setStatus("Đã xóa mô tả.", false);
                     return;
                   }
 
@@ -12632,20 +13509,20 @@
                       tpl.setLocalTemplateOverride?.(templateId, resultId, bind, nextValue);
                     }
                     renderTemplates({ autoSelectResultId: resultId });
-                    ui.setStatus("Saved description (local).", false);
+                    ui.setStatus("Đã lưu mô tả (cục bộ).", false);
                     return;
                   }
 
                   if (action === "global") {
                     if (!ns.notes?.setEntry) {
-                      ui.setStatus("Cannot update global description for this cell.", true);
+                      ui.setStatus("Không thể cập nhật mô tả toàn cục cho ô này.", true);
                       return;
                     }
                     tpl.setLocalTemplateOverrideByOriginKey?.(templateId, resultId, bind, tk, "", baseOriginKey);
                     ns.notes.setEntry(tk, { description: nextValue });
                     if (state.model && ns.notes?.applyToModel) ns.notes.applyToModel(state.model);
                     renderTemplates({ autoSelectResultId: resultId });
-                    ui.setStatus("Saved description (global).", false);
+                    ui.setStatus("Đã lưu mô tả (toàn cục).", false);
                   }
                 },
               );
@@ -12885,13 +13762,13 @@
       async function handleTemplatesExport(action) {
         const ids = getExportResultIds();
         if (!ids.length) {
-          ui.setStatus("Select a template (click) or tick checkboxes first.", true);
+          ui.setStatus("Hãy chọn mẫu (bấm) hoặc tick checkbox trước.", true);
           return;
         }
 
         const items = collectTemplatesExportItems(ids);
         if (!items.length) {
-          ui.setStatus("Nothing to export.", true);
+          ui.setStatus("Không có gì để xuất.", true);
           return;
         }
 
@@ -12903,17 +13780,17 @@
 
         if (action === "download") {
           ui.downloadTextFile(filename, text, mimeType);
-          ui.setStatus(`Downloaded: ${filename}`, false);
+          ui.setStatus(`Đã tải xuống: ${filename}`, false);
           return;
         }
 
         if (!ui.clipboard?.copyHtml) {
-          ui.setStatus("Clipboard module not loaded.", true);
+          ui.setStatus("Chưa tải module clipboard.", true);
           return;
         }
 
         const ok = await ui.clipboard.copyHtml("", text);
-        ui.setStatus(ok ? `Copied XML export (${items.length} item(s)).` : "Copy failed (browser blocked clipboard).", !ok);
+        ui.setStatus(ok ? `Đã sao chép XML (${items.length} mục).` : "Sao chép thất bại (trình duyệt chặn clipboard).", !ok);
       }
 
       function compareNaturalStrings(a, b) {
@@ -13037,20 +13914,20 @@
           if (hasValue) {
             const raw = String(node.value ?? "");
             const trimmed = raw.trim();
-            valueEl.textContent = trimmed ? raw : "(empty)";
+            valueEl.textContent = trimmed ? raw : "(trống)";
             if (!trimmed) valueEl.classList.add("template-struct__value--empty");
 
             if (isEditableDescriptionBind(node.bind)) {
               valueEl.dataset.bind = node.bind;
               valueEl.classList.add("template-struct__value--editable");
-              valueEl.title = "Double-click để sửa mô tả (local/global).";
+              valueEl.title = "Double-click để sửa mô tả (cục bộ/toàn cục).";
             } else {
               valueEl.title = node.bind;
             }
           } else if (node.children.size) {
             valueEl.textContent = "";
           } else {
-            valueEl.textContent = "(empty)";
+            valueEl.textContent = "(trống)";
             valueEl.classList.add("template-struct__value--empty");
           }
 
@@ -13064,7 +13941,7 @@
         if (!root.children.size) {
           const empty = document.createElement("div");
           empty.className = "template-struct__empty";
-          empty.textContent = "No bound values.";
+          empty.textContent = "Không có giá trị ràng buộc.";
           host.appendChild(empty);
           return host;
         }
@@ -13086,13 +13963,13 @@
 
         const model = state.model;
         if (!model) {
-          host.textContent = "Analyze to see templates.";
+          host.textContent = "Hãy phân tích để xem mẫu.";
           host.classList.add("empty");
           return;
         }
 
         if (!ns.templateRegistry || !ns.templateConverter) {
-          host.textContent = "Template modules not loaded.";
+          host.textContent = "Chưa tải module mẫu.";
           host.classList.add("empty");
           return;
         }
@@ -13100,14 +13977,84 @@
         const entries = tpl.listTemplateEntries();
         const templatesBySource = tpl.pickAutoTemplatesBySource(entries);
         if (templatesBySource.size === 0) {
-          host.textContent = "No templates configured.";
+          host.textContent = "Chưa cấu hình mẫu.";
           host.classList.add("empty");
           return;
         }
 
-        const flow = tpl.buildTemplatesFlow(model, templatesBySource, { maxSteps: 900 });
+        const maxStepsRaw = Number(options?.maxSteps ?? readTemplatesFlowMaxSteps());
+        const maxSteps = Number.isFinite(maxStepsRaw) && maxStepsRaw > 0 ? Math.floor(maxStepsRaw) : TEMPLATES_FLOW_MAX_STEPS_DEFAULT;
+
+        const filterTextRaw = String(options?.filterText ?? readStoredText(TEMPLATES_FLOW_FILTER_TEXT_KEY, "")).trim();
+        const filterText = filterTextRaw.toLowerCase();
+        const filterSelectedOnly = Boolean(options?.filterSelectedOnly ?? readStoredBool(TEMPLATES_FLOW_FILTER_SELECTED_KEY, false));
+        const filterLoopOnly = Boolean(options?.filterLoopOnly ?? readStoredBool(TEMPLATES_FLOW_FILTER_LOOP_KEY, false));
+        const hasFilter = Boolean(filterText || filterSelectedOnly || filterLoopOnly);
+
+        const flow = tpl.buildTemplatesFlow(model, templatesBySource, { maxSteps });
         if (!flow.items.length) {
-          host.textContent = "No template-mapped statements found.";
+          host.textContent = "Không có câu lệnh khớp mẫu.";
+          host.classList.add("empty");
+          return;
+        }
+
+        templateResultById = new Map();
+        lastRenderOrder = [];
+        for (const it of flow.items) {
+          if (!it || it.kind !== "template") continue;
+          const res = it.result;
+          if (!res) continue;
+          templateResultById.set(String(res.resultId || ""), res);
+          lastRenderOrder.push(String(res.resultId || ""));
+        }
+
+        function matchesFilter(item) {
+          const result = item?.result;
+          if (!result) return false;
+          const rid = String(result.resultId || "");
+          if (filterSelectedOnly && !selectedTemplateResultIds.has(rid)) return false;
+          if (filterLoopOnly && !(item.isRecursion || result.edge?.isInCycle)) return false;
+          if (!filterText) return true;
+          const hay = [
+            result.objectId,
+            result.templateId,
+            result.kind,
+            result.original,
+            result.context?.perform?.name,
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+          return hay.includes(filterText);
+        }
+
+        const renderItems = [];
+        let pendingSeparator = null;
+        let noteText = "";
+        for (const item of flow.items) {
+          if (!item) continue;
+          if (item.kind === "separator") {
+            pendingSeparator = item;
+            continue;
+          }
+          if (item.kind === "note") {
+            noteText = String(item.text || "");
+            continue;
+          }
+          if (item.kind !== "template") continue;
+          if (!hasFilter || matchesFilter(item)) {
+            if (pendingSeparator) {
+              renderItems.push(pendingSeparator);
+              pendingSeparator = null;
+            }
+            renderItems.push(item);
+          }
+        }
+        if (noteText && (!hasFilter || renderItems.length)) renderItems.push({ kind: "note", text: noteText });
+
+        const visibleTemplates = renderItems.reduce((acc, it) => acc + (it?.kind === "template" ? 1 : 0), 0);
+        if (!renderItems.length) {
+          host.textContent = hasFilter ? "Không có mẫu phù hợp với bộ lọc." : "Không có câu lệnh khớp mẫu.";
           host.classList.add("empty");
           return;
         }
@@ -13115,6 +14062,8 @@
         const markerItems = [];
         const autoSelectResultId = String(options?.autoSelectResultId || "");
         let autoSelectCard = null;
+        const totalTemplates = lastRenderOrder.length;
+        let visibleResultIds = [];
 
         host.classList.remove("empty");
         host.textContent = "";
@@ -13125,13 +14074,53 @@
         const toolbarCount = document.createElement("div");
         toolbarCount.className = "templates-toolbar__count";
 
+        const toolbarFilters = document.createElement("div");
+        toolbarFilters.className = "templates-toolbar__filters";
+
+        const searchInput = document.createElement("input");
+        searchInput.type = "search";
+        searchInput.className = "input input-sm";
+        searchInput.placeholder = "Lọc theo object/template/câu lệnh...";
+        searchInput.value = filterTextRaw;
+        toolbarFilters.appendChild(searchInput);
+
+        const filterSelectedLabel = document.createElement("label");
+        filterSelectedLabel.className = "toolbar-check";
+        const filterSelectedInput = document.createElement("input");
+        filterSelectedInput.type = "checkbox";
+        filterSelectedInput.checked = filterSelectedOnly;
+        filterSelectedLabel.appendChild(filterSelectedInput);
+        filterSelectedLabel.appendChild(document.createTextNode("Chỉ đã chọn"));
+        toolbarFilters.appendChild(filterSelectedLabel);
+
+        const filterLoopLabel = document.createElement("label");
+        filterLoopLabel.className = "toolbar-check";
+        const filterLoopInput = document.createElement("input");
+        filterLoopInput.type = "checkbox";
+        filterLoopInput.checked = filterLoopOnly;
+        filterLoopLabel.appendChild(filterLoopInput);
+        filterLoopLabel.appendChild(document.createTextNode("Chỉ vòng lặp"));
+        toolbarFilters.appendChild(filterLoopLabel);
+
+        const btnClearFilter = document.createElement("button");
+        btnClearFilter.type = "button";
+        btnClearFilter.className = "btn btn-sm";
+        btnClearFilter.textContent = "Xóa lọc";
+        btnClearFilter.disabled = !hasFilter;
+        toolbarFilters.appendChild(btnClearFilter);
+
         const toolbarActions = document.createElement("div");
         toolbarActions.className = "templates-toolbar__actions";
+
+        const btnSelectVisible = document.createElement("button");
+        btnSelectVisible.type = "button";
+        btnSelectVisible.className = "btn btn-sm";
+        btnSelectVisible.textContent = "Chọn hiển thị";
 
         const btnClearSelected = document.createElement("button");
         btnClearSelected.type = "button";
         btnClearSelected.className = "btn btn-sm";
-        btnClearSelected.textContent = "Clear selection";
+        btnClearSelected.textContent = "Bỏ chọn";
         btnClearSelected.addEventListener("click", (e) => {
           e.preventDefault();
           selectedTemplateResultIds.clear();
@@ -13140,10 +14129,84 @@
           updateTemplatesToolbar();
         });
 
+        const btnCollapseAll = document.createElement("button");
+        btnCollapseAll.type = "button";
+        btnCollapseAll.className = "btn btn-sm";
+        btnCollapseAll.textContent = "Thu gọn hết";
+
+        const btnExpandAll = document.createElement("button");
+        btnExpandAll.type = "button";
+        btnExpandAll.className = "btn btn-sm";
+        btnExpandAll.textContent = "Mở hết";
+
+        toolbarActions.appendChild(btnSelectVisible);
         toolbarActions.appendChild(btnClearSelected);
+        toolbarActions.appendChild(btnCollapseAll);
+        toolbarActions.appendChild(btnExpandAll);
+
+        const maxStepsLabel = document.createElement("label");
+        maxStepsLabel.className = "toolbar-check";
+
+        const maxStepsText = document.createElement("span");
+        maxStepsText.textContent = "Giới hạn bước";
+
+        const maxStepsInput = document.createElement("input");
+        maxStepsInput.type = "number";
+        maxStepsInput.min = "100";
+        maxStepsInput.step = "100";
+        maxStepsInput.value = String(maxSteps);
+        maxStepsInput.className = "input";
+        maxStepsInput.style.width = "110px";
+
+        maxStepsLabel.appendChild(maxStepsText);
+        maxStepsLabel.appendChild(maxStepsInput);
+        toolbarActions.appendChild(maxStepsLabel);
+
+        function rerenderWithFilters(nextMaxSteps) {
+          const keepActive = String(selectedTemplateCard?.dataset?.resultId || "").trim();
+          const max = Number(nextMaxSteps ?? maxStepsInput?.value ?? maxSteps);
+          renderTemplates({
+            autoSelectResultId: keepActive,
+            maxSteps: max,
+            filterText: searchInput.value,
+            filterSelectedOnly: filterSelectedInput.checked,
+            filterLoopOnly: filterLoopInput.checked,
+          });
+        }
+
+        searchInput.addEventListener("input", () => {
+          writeStoredText(TEMPLATES_FLOW_FILTER_TEXT_KEY, searchInput.value);
+          rerenderWithFilters();
+        });
+
+        filterSelectedInput.addEventListener("change", () => {
+          writeStoredBool(TEMPLATES_FLOW_FILTER_SELECTED_KEY, filterSelectedInput.checked);
+          rerenderWithFilters();
+        });
+
+        filterLoopInput.addEventListener("change", () => {
+          writeStoredBool(TEMPLATES_FLOW_FILTER_LOOP_KEY, filterLoopInput.checked);
+          rerenderWithFilters();
+        });
+
+        btnClearFilter.addEventListener("click", (e) => {
+          e.preventDefault();
+          searchInput.value = "";
+          filterSelectedInput.checked = false;
+          filterLoopInput.checked = false;
+          writeStoredText(TEMPLATES_FLOW_FILTER_TEXT_KEY, "");
+          writeStoredBool(TEMPLATES_FLOW_FILTER_SELECTED_KEY, false);
+          writeStoredBool(TEMPLATES_FLOW_FILTER_LOOP_KEY, false);
+          rerenderWithFilters();
+        });
+
+        maxStepsInput.addEventListener("change", () => {
+          const next = writeTemplatesFlowMaxSteps(maxStepsInput.value);
+          rerenderWithFilters(next);
+        });
 
         const exportLabel = document.createElement("span");
-        exportLabel.textContent = "Export:";
+        exportLabel.textContent = "Xuất (đã chọn):";
         exportLabel.style.color = "var(--muted)";
         exportLabel.style.fontSize = "12px";
         exportLabel.style.alignSelf = "center";
@@ -13151,7 +14214,7 @@
         const btnCopyExport = document.createElement("button");
         btnCopyExport.type = "button";
         btnCopyExport.className = "btn btn-sm";
-        btnCopyExport.textContent = "Copy";
+        btnCopyExport.textContent = "Sao chép";
         btnCopyExport.addEventListener("click", async (e) => {
           e.preventDefault();
           await handleTemplatesExport("copy");
@@ -13160,7 +14223,7 @@
         const btnDownloadExport = document.createElement("button");
         btnDownloadExport.type = "button";
         btnDownloadExport.className = "btn btn-sm";
-        btnDownloadExport.textContent = "Download";
+        btnDownloadExport.textContent = "Tải xuống";
         btnDownloadExport.addEventListener("click", (e) => {
           e.preventDefault();
           handleTemplatesExport("download");
@@ -13171,18 +14234,50 @@
         toolbarActions.appendChild(btnDownloadExport);
 
         toolbar.appendChild(toolbarCount);
+        toolbar.appendChild(toolbarFilters);
         toolbar.appendChild(toolbarActions);
 
         host.appendChild(toolbar);
 
+        btnSelectVisible.addEventListener("click", (e) => {
+          e.preventDefault();
+          const visibleSet = new Set(visibleResultIds.map((id) => String(id || "")));
+          if (!visibleSet.size) return;
+          host.querySelectorAll("input.template-block__select").forEach((cb) => {
+            const card = cb.closest(".template-block");
+            const rid = String(card?.dataset?.resultId || "");
+            if (!visibleSet.has(rid)) return;
+            cb.checked = true;
+            selectedTemplateResultIds.add(rid);
+            card?.classList.add("is-multi-selected");
+          });
+          updateTemplatesToolbar();
+        });
+
+        btnCollapseAll.addEventListener("click", (e) => {
+          e.preventDefault();
+          for (const id of visibleResultIds) collapsedTemplateResultIds.add(String(id || ""));
+          applyTemplateTreeState(host);
+        });
+
+        btnExpandAll.addEventListener("click", (e) => {
+          e.preventDefault();
+          for (const id of visibleResultIds) collapsedTemplateResultIds.delete(String(id || ""));
+          applyTemplateTreeState(host);
+        });
+
         lastToolbarUpdate = () => {
           const n = selectedTemplateResultIds.size;
-          toolbarCount.textContent = `Selected: ${n}`;
+          const visibleText = hasFilter ? ` • Hiển thị: ${visibleTemplates}` : "";
+          toolbarCount.textContent = `Mẫu: ${totalTemplates}${visibleText} • Đã chọn: ${n}`;
           btnClearSelected.disabled = n === 0;
+          btnSelectVisible.disabled = visibleTemplates === 0;
+          btnCollapseAll.disabled = visibleTemplates === 0;
+          btnExpandAll.disabled = visibleTemplates === 0;
         };
         updateTemplatesToolbar();
 
-        for (const item of flow.items) {
+        for (const item of renderItems) {
           if (item.kind === "separator") {
             const sep = document.createElement("div");
             sep.className = "flow-separator";
@@ -13202,8 +14297,8 @@
           if (item.kind !== "template") continue;
 
           const result = item.result;
-          templateResultById.set(result.resultId, result);
-          lastRenderOrder.push(String(result.resultId || ""));
+          if (!result) continue;
+          visibleResultIds.push(String(result.resultId || ""));
 
           if (result?.sourceRef?.startLine) {
             markerItems.push({
@@ -13235,7 +14330,7 @@
           btnToggle.type = "button";
           btnToggle.className = "template-block__toggle";
           btnToggle.textContent = "▾";
-          btnToggle.setAttribute("aria-label", "Collapse/expand");
+          btnToggle.setAttribute("aria-label", "Thu gọn/mở rộng");
           btnToggle.setAttribute("aria-expanded", String(!collapsedTemplateResultIds.has(resultIdStr)));
           btnToggle.addEventListener("click", (e) => {
             e.preventDefault();
@@ -13264,7 +14359,7 @@
               ? ` (L${src.startLine}-L${src.endLine})`
               : ` (L${src.startLine})`
             : "";
-          const loopText = item.isRecursion ? " (loop)" : "";
+          const loopText = item.isRecursion ? " (vòng lặp)" : "";
 
           const ctx = result?.context || null;
           const originalFirstLine = String(result?.original || "")
@@ -13284,7 +14379,7 @@
           } else if (ctx?.assignment) {
             const lhs = String(ctx?.assignment?.lhs || "").trim();
             const rhs = String(ctx?.assignment?.rhs || "").trim();
-            mainText = lhs && rhs ? `${lhs} = ${rhs}` : lhs ? `${lhs} = ...` : "Assignment";
+            mainText = lhs && rhs ? `${lhs} = ${rhs}` : lhs ? `${lhs} = ...` : "Gán";
           } else if (ctx?.message) {
             mainText = String(ctx?.message?.statement || "").trim() || "MESSAGE";
           } else if (ctx?.itabOp) {
@@ -13296,7 +14391,7 @@
           } else if (originalFirstLine) {
             mainText = originalFirstLine;
           } else {
-            mainText = String(result?.objectId || result?.kind || "Template");
+            mainText = String(result?.objectId || result?.kind || "Mẫu");
           }
 
           title.textContent = `${mainText}${lineText}${loopText}`;
@@ -13366,7 +14461,7 @@
         const model = state.model;
         if (!out) return;
         if (!model) {
-          out.textContent = "Analyze to see JSON.";
+          out.textContent = "Hãy phân tích để xem JSON.";
           out.classList.add("empty");
           return;
         }
@@ -13376,11 +14471,11 @@
 
       function buildAllTemplatesObjectsExportXml(options) {
         const model = state.model;
-        if (!model) return { ok: false, error: "Analyze first." };
+        if (!model) return { ok: false, error: "Hãy phân tích trước." };
 
         const tpl = ui.templates || null;
         if (!tpl?.listTemplateEntries || !tpl?.pickAutoTemplatesBySource || !tpl?.buildTemplatesFlow) {
-          return { ok: false, error: "Template modules not loaded." };
+          return { ok: false, error: "Chưa tải module mẫu." };
         }
 
         const maxStepsRaw = Number(options?.maxSteps ?? ui.$("xmlMaxSteps")?.value ?? 5000);
@@ -13389,7 +14484,7 @@
         const entries = tpl.listTemplateEntries();
         const templatesBySource = tpl.pickAutoTemplatesBySource(entries);
         if (!templatesBySource || typeof templatesBySource.size !== "number" || templatesBySource.size === 0) {
-          return { ok: false, error: "No templates configured." };
+          return { ok: false, error: "Chưa cấu hình mẫu." };
         }
 
         const flow = tpl.buildTemplatesFlow(model, templatesBySource, { maxSteps });
@@ -13415,10 +14510,10 @@
           });
         }
 
-        if (!items.length) return { ok: false, error: "No template-mapped statements found." };
+        if (!items.length) return { ok: false, error: "Không có câu lệnh khớp mẫu." };
 
         const build = typeof ui.buildAbapflowObjectsXml === "function" ? ui.buildAbapflowObjectsXml : null;
-        if (!build) return { ok: false, error: "XML exporter not loaded." };
+        if (!build) return { ok: false, error: "Chưa tải module xuất XML." };
 
         const xml = build(items);
         return { ok: true, xml, count: items.length, truncated: Boolean(flow?.truncated), maxSteps };
@@ -13429,14 +14524,14 @@
         if (!out) return;
 
         if (!state.model) {
-          out.textContent = "Analyze to see XML.";
+          out.textContent = "Hãy phân tích để xem XML.";
           out.classList.add("empty");
           return;
         }
 
         const res = buildAllTemplatesObjectsExportXml(options);
         if (!res.ok) {
-          out.textContent = String(res.error || "Cannot build XML.");
+          out.textContent = String(res.error || "Không thể tạo XML.");
           out.classList.add("empty");
           return;
         }
@@ -13459,29 +14554,59 @@
       const ui = ns.ui;
       const state = ui.state;
       const MAIN_SPLIT_KEY = "abapflow-main-left-px";
+      const ABAP_INPUT_KEY = "abapflow-abap-input";
+      const ACTIVE_TAB_KEY = "abapflow-active-tab";
+      const VALID_TABS = new Set(["objects", "templates", "config", "json", "xml"]);
+
+      function readStoredText(key) {
+        try {
+          return String(localStorage.getItem(key) || "");
+        } catch (_) {
+          return "";
+        }
+      }
+
+      function writeStoredText(key, value) {
+        try {
+          localStorage.setItem(key, String(value ?? ""));
+        } catch (_) {}
+      }
+
+      function removeStored(key) {
+        try {
+          localStorage.removeItem(key);
+        } catch (_) {}
+      }
+
+      function setAbapInputText(text) {
+        const abapInput = ui.$("abapInput");
+        if (!abapInput) return;
+        abapInput.value = String(text ?? "");
+        abapInput.dispatchEvent(new Event("input", { bubbles: true }));
+      }
 
       function exportNotes() {
         if (!ns.notes) {
-          ui.setStatus("Notes module not loaded.", true);
+          ui.setStatus("Chưa tải module ghi chú.", true);
           return;
         }
         const pid = ns.notes.getActiveProgramId ? ns.notes.getActiveProgramId() : "default";
         const stamp = new Date().toISOString().replace(/[:]/g, "-").slice(0, 19);
         const filename = `abapflow-notes-${pid}-${stamp}.json`;
         ui.downloadTextFile(filename, ns.notes.exportJson(), "application/json");
-        ui.setStatus("Notes exported.", false);
+        ui.setStatus("Đã xuất ghi chú.", false);
       }
 
       async function importNotesFromFile(file) {
         if (!ns.notes) {
-          ui.setStatus("Notes module not loaded.", true);
+          ui.setStatus("Chưa tải module ghi chú.", true);
           return;
         }
         if (!file) return;
         const text = await file.text();
         const res = ns.notes.importJson(text, { mode: "merge" });
         if (!res.ok) {
-          ui.setStatus(res.error || "Import failed.", true);
+          ui.setStatus(res.error || "Nhập thất bại.", true);
           return;
         }
 
@@ -13491,15 +14616,19 @@
         if (document.getElementById("tab-templates")?.classList.contains("is-active")) {
           ui.renderTemplates();
         }
-        ui.setStatus("Notes imported.", false);
+        ui.setStatus("Đã nhập ghi chú.", false);
       }
 
       async function analyze() {
         const input = ui.$("abapInput")?.value;
         if (!String(input || "").trim()) {
-          ui.setStatus("Paste ABAP code first.", true);
+          ui.setStatus("Vui lòng dán mã ABAP trước.", true);
           return;
         }
+
+        const analyzeBtn = ui.$("btnAnalyze");
+        if (analyzeBtn) analyzeBtn.disabled = true;
+        ui.setStatus("Đang phân tích...", false);
 
         try {
           if (ns.abapObjects?.whenReady) await ns.abapObjects.whenReady();
@@ -13514,10 +14643,12 @@
           ui.renderDetails();
           ui.renderTemplates();
           ui.renderJson();
-          ui.setStatus(`Parsed ${model.nodes.size} objects, ${model.edges.length} PERFORM calls.`, false);
+          ui.setStatus(`Đã phân tích: ${model.nodes.size} đối tượng, ${model.edges.length} lần gọi PERFORM.`, false);
         } catch (err) {
           console.error(err);
           ui.setStatus(String(err?.message || err), true);
+        } finally {
+          if (analyzeBtn) analyzeBtn.disabled = false;
         }
       }
 
@@ -13527,6 +14658,7 @@
           input.value = "";
           input.dispatchEvent(new Event("input", { bubbles: true }));
         }
+        removeStored(ABAP_INPUT_KEY);
 
         state.model = null;
         state.selectedKey = null;
@@ -13536,24 +14668,24 @@
 
         const details = ui.$("objectDetails");
         if (details) {
-          details.textContent = "Analyze to see details.";
+          details.textContent = "Hãy phân tích để xem chi tiết.";
           details.classList.add("empty");
         }
 
         const json = ui.$("jsonOutput");
         if (json) {
-          json.textContent = "Analyze to see JSON.";
+          json.textContent = "Hãy phân tích để xem JSON.";
           json.classList.add("empty");
         }
 
         const xml = ui.$("xmlOutput");
         if (xml) {
-          xml.textContent = "Analyze to see XML.";
+          xml.textContent = "Hãy phân tích để xem XML.";
           xml.classList.add("empty");
         }
 
         ui.renderTemplates();
-        ui.setStatus("Cleared.", false);
+        ui.setStatus("Đã xóa.", false);
       }
 
       function initMainSplitter() {
@@ -13656,6 +14788,9 @@
       function init() {
         initMainSplitter();
 
+        const storedTab = readStoredText(ACTIVE_TAB_KEY).trim();
+        if (VALID_TABS.has(storedTab)) ui.setActiveTab(storedTab);
+
         document.addEventListener("click", (ev) => {
           const t = ev.target;
           if (!(t instanceof HTMLElement)) return;
@@ -13668,6 +14803,7 @@
           tab.addEventListener("click", () => {
             const name = tab.dataset.tab;
             ui.setActiveTab(name);
+            if (VALID_TABS.has(String(name || ""))) writeStoredText(ACTIVE_TAB_KEY, String(name));
             if (name === "templates") {
               requestAnimationFrame(() => ui.renderTemplates());
             }
@@ -13690,7 +14826,17 @@
             abapInput.value = ns.sampleCode || "";
             abapInput.dispatchEvent(new Event("input", { bubbles: true }));
           }
-          ui.setStatus("Sample loaded. Click Analyze.", false);
+          ui.setStatus("Đã nạp mẫu. Bấm Phân tích.", false);
+        });
+        ui.$("btnLoadFile")?.addEventListener("click", () => ui.$("abapImportFile")?.click());
+        ui.$("abapImportFile")?.addEventListener("change", async (ev) => {
+          const input = ev.target;
+          const file = input?.files?.[0] || null;
+          if (!file) return;
+          const text = await file.text();
+          setAbapInputText(text);
+          ui.setStatus(`Đã tải: ${file.name}. Bấm Phân tích.`, false);
+          if (input) input.value = "";
         });
         ui.$("btnClear")?.addEventListener("click", clearAll);
 
@@ -13712,14 +14858,14 @@
           e?.preventDefault?.();
           const build = ui.buildAllTemplatesObjectsExportXml;
           if (typeof build !== "function") {
-            ui.setStatus("XML exporter not loaded.", true);
+            ui.setStatus("Chưa tải module xuất XML.", true);
             return;
           }
 
           const res = build();
           if (!res?.ok) {
             ui.renderXml?.();
-            ui.setStatus(String(res?.error || "Cannot build XML."), true);
+            ui.setStatus(String(res?.error || "Không thể tạo XML."), true);
             return;
           }
 
@@ -13730,27 +14876,27 @@
           }
 
           if (!ui.clipboard?.copyHtml) {
-            ui.setStatus("Clipboard module not loaded.", true);
+            ui.setStatus("Chưa tải module clipboard.", true);
             return;
           }
 
           const ok = await ui.clipboard.copyHtml("", String(res.xml || ""));
-          const suffix = res.truncated ? ` (truncated at ${res.maxSteps})` : "";
-          ui.setStatus(ok ? `Copied XML export (${res.count} object(s))${suffix}.` : "Copy failed (browser blocked clipboard).", !ok);
+          const suffix = res.truncated ? ` (đã cắt ở ${res.maxSteps} bước)` : "";
+          ui.setStatus(ok ? `Đã sao chép XML (${res.count} đối tượng)${suffix}.` : "Sao chép thất bại (trình duyệt chặn clipboard).", !ok);
         });
 
         ui.$("btnDownloadXml")?.addEventListener("click", (e) => {
           e?.preventDefault?.();
           const build = ui.buildAllTemplatesObjectsExportXml;
           if (typeof build !== "function") {
-            ui.setStatus("XML exporter not loaded.", true);
+            ui.setStatus("Chưa tải module xuất XML.", true);
             return;
           }
 
           const res = build();
           if (!res?.ok) {
             ui.renderXml?.();
-            ui.setStatus(String(res?.error || "Cannot build XML."), true);
+            ui.setStatus(String(res?.error || "Không thể tạo XML."), true);
             return;
           }
 
@@ -13763,7 +14909,7 @@
           const stamp = new Date().toISOString().replace(/[:]/g, "-").slice(0, 19);
           const filename = `abapflow-objects-${stamp}.xml`;
           ui.downloadTextFile(filename, String(res.xml || ""), "application/xml");
-          ui.setStatus(`Downloaded: ${filename}`, false);
+          ui.setStatus(`Đã tải xuống: ${filename}`, false);
         });
 
         ui.$("xmlMaxSteps")?.addEventListener("change", () => {
@@ -13771,9 +14917,59 @@
         });
 
         const abapInput = ui.$("abapInput");
-        if (abapInput && !abapInput.value.trim() && ns.sampleCode) {
-          abapInput.value = ns.sampleCode;
-          abapInput.dispatchEvent(new Event("input", { bubbles: true }));
+        if (abapInput) {
+          let saveTimer = 0;
+          abapInput.addEventListener("input", () => {
+            if (saveTimer) window.clearTimeout(saveTimer);
+            saveTimer = window.setTimeout(() => {
+              saveTimer = 0;
+              const text = String(abapInput.value || "");
+              if (!text.trim()) removeStored(ABAP_INPUT_KEY);
+              else writeStoredText(ABAP_INPUT_KEY, text);
+            }, 350);
+          });
+
+          abapInput.addEventListener("keydown", (e) => {
+            if (!e) return;
+            if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+              e.preventDefault();
+              analyze();
+            }
+          });
+
+          function handleDroppedFile(file) {
+            if (!file || typeof file.text !== "function") return;
+            file
+              .text()
+              .then((text) => {
+                setAbapInputText(text);
+                ui.setStatus(`Đã tải: ${file.name}. Bấm Phân tích.`, false);
+              })
+              .catch(() => ui.setStatus("Không thể đọc file.", true));
+          }
+
+          abapInput.addEventListener("dragover", (e) => {
+            if (!e?.dataTransfer) return;
+            const types = Array.from(e.dataTransfer.types || []);
+            if (!types.includes("Files")) return;
+            e.preventDefault();
+          });
+
+          abapInput.addEventListener("drop", (e) => {
+            if (!e?.dataTransfer?.files?.length) return;
+            e.preventDefault();
+            handleDroppedFile(e.dataTransfer.files[0]);
+          });
+
+          if (!abapInput.value.trim()) {
+            const saved = readStoredText(ABAP_INPUT_KEY);
+            if (saved.trim()) {
+              setAbapInputText(saved);
+              ui.setStatus("Đã khôi phục ABAP lần trước. Bấm Phân tích.", false);
+            } else if (ns.sampleCode) {
+              setAbapInputText(ns.sampleCode);
+            }
+          }
         }
       }
 
@@ -13790,7 +14986,7 @@
   'use strict';
   var ns = window.AbapFlow = window.AbapFlow || {};
   var map = ns.__inlineScriptBySrc = ns.__inlineScriptBySrc || {};
-  Object.assign(map, {"js/abap_objects/templates/append.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const appendExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 2,\n      cols: 4,\n      colWidths: {\n        A: 160,\n        B: 520,\n        C: 80,\n        D: 740,\n      },\n      rowHeights: {\n        1: 34,\n        2: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n      center: \"text-align:center;\",\n    },\n    cells: [\n      { addr: \"A1\", text: \"Append\", class: [\"cell\", \"header\"] },\n      { addr: \"B1\", text: \"{line.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"C1\", text: \"TO\", class: [\"cell\", \"header\", \"center\"] },\n      { addr: \"D1\", text: \"{itab.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A2\", text: \"{labels.sortedBy}\", class: [\"cell\", \"header\"] },\n      { addr: \"B2\", text: \"{sortedBy.description}\", class: [\"cell\", \"wrap\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"append.excel-like-table\", appendExcelLikeTable);\n})(window.AbapFlow);\n", "js/abap_objects/templates/assignment.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const assignmentExcelLikeTable = {\n    type: \"excel-like-table\",\n    grid: {\n      rows: 2,\n      cols: 2,\n      colWidths: {\n        A: 420,\n        B: 700,\n      },\n      rowHeights: {\n        1: 34,\n        2: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n    },\n    cells: [\n      { addr: \"A1\", text: \"Item\", class: [\"cell\", \"header\"] },\n      { addr: \"B1\", text: \"Value\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A2\", text: \"{item.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"B2\", text: \"{value.description}\", class: [\"cell\", \"wrap\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"assignment.excel-like-table\", assignmentExcelLikeTable);\n})(window.AbapFlow);\n", "js/abap_objects/templates/if.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const ifExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 3,\n      cols: 4,\n      colWidths: {\n        A: 420,\n        B: 220,\n        C: 520,\n        D: 220,\n      },\n      rowHeights: {\n        1: 34,\n        2: 30,\n        3: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n      center: \"text-align:center;\",\n    },\n    cells: [\n      { addr: \"A1\", text: \"Item 1\", class: [\"cell\", \"header\"] },\n      { addr: \"B1\", text: \"Operator\", class: [\"cell\", \"header\"] },\n      { addr: \"C1\", text: \"Item 2\", class: [\"cell\", \"header\"] },\n      { addr: \"D1\", text: \"Associations\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A2\", text: \"{conditions[0].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"B2\", text: \"{conditions[0].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"C2\", text: \"{conditions[0].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"D2\", text: \"{conditions[0].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A3\", text: \"{conditions[1].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"B3\", text: \"{conditions[1].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"C3\", text: \"{conditions[1].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"D3\", text: \"{conditions[1].association}\", class: [\"cell\", \"mono\", \"center\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"if.excel-like-table\", ifExcelLikeTable);\n})(window.AbapFlow);\n", "js/abap_objects/templates/itabCollect.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const itabCollectExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 7,\n      cols: 4,\n      colWidths: {\n        A: 420,\n        B: 220,\n        C: 520,\n        D: 220,\n      },\n      rowHeights: {\n        1: 30,\n        2: 30,\n        3: 30,\n        4: 30,\n        5: 30,\n        6: 30,\n        7: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n      center: \"text-align:center;\",\n    },\n    cells: [\n      { addr: \"A1\", text: \"Internal table\", class: [\"cell\", \"header\"] },\n      { addr: \"B1\", text: \"{table.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A2\", text: \"{labels.target}\", class: [\"cell\", \"header\"] },\n      { addr: \"B2\", text: \"{target.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A3\", text: \"{labels.conditions}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A4\", text: \"{labels.condItem1}\", class: [\"cell\", \"header\"] },\n      { addr: \"B4\", text: \"{labels.condOperator}\", class: [\"cell\", \"header\"] },\n      { addr: \"C4\", text: \"{labels.condItem2}\", class: [\"cell\", \"header\"] },\n      { addr: \"D4\", text: \"{labels.condAssoc}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A5\", text: \"{conditions[0].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"B5\", text: \"{conditions[0].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"C5\", text: \"{conditions[0].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"D5\", text: \"{conditions[0].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A6\", text: \"{conditions[1].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"B6\", text: \"{conditions[1].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"C6\", text: \"{conditions[1].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"D6\", text: \"{conditions[1].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A7\", text: \"{labels.binarySearch}\", class: [\"cell\", \"header\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"itabCollect.excel-like-table\", itabCollectExcelLikeTable);\n})(window.AbapFlow);\n\n", "js/abap_objects/templates/itabDelete.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const itabDeleteExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 7,\n      cols: 4,\n      colWidths: {\n        A: 420,\n        B: 220,\n        C: 520,\n        D: 220,\n      },\n      rowHeights: {\n        1: 30,\n        2: 30,\n        3: 30,\n        4: 30,\n        5: 30,\n        6: 30,\n        7: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n      center: \"text-align:center;\",\n    },\n    cells: [\n      { addr: \"A1\", text: \"Internal table\", class: [\"cell\", \"header\"] },\n      { addr: \"B1\", text: \"{table.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A2\", text: \"{labels.target}\", class: [\"cell\", \"header\"] },\n      { addr: \"B2\", text: \"{target.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A3\", text: \"{labels.conditions}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A4\", text: \"{labels.condItem1}\", class: [\"cell\", \"header\"] },\n      { addr: \"B4\", text: \"{labels.condOperator}\", class: [\"cell\", \"header\"] },\n      { addr: \"C4\", text: \"{labels.condItem2}\", class: [\"cell\", \"header\"] },\n      { addr: \"D4\", text: \"{labels.condAssoc}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A5\", text: \"{conditions[0].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"B5\", text: \"{conditions[0].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"C5\", text: \"{conditions[0].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"D5\", text: \"{conditions[0].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A6\", text: \"{conditions[1].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"B6\", text: \"{conditions[1].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"C6\", text: \"{conditions[1].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"D6\", text: \"{conditions[1].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A7\", text: \"{labels.binarySearch}\", class: [\"cell\", \"header\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"itabDelete.excel-like-table\", itabDeleteExcelLikeTable);\n})(window.AbapFlow);\n\n", "js/abap_objects/templates/itabModify.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const itabModifyExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 7,\n      cols: 4,\n      colWidths: {\n        A: 420,\n        B: 220,\n        C: 520,\n        D: 220,\n      },\n      rowHeights: {\n        1: 30,\n        2: 30,\n        3: 30,\n        4: 30,\n        5: 30,\n        6: 30,\n        7: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n      center: \"text-align:center;\",\n    },\n    cells: [\n      { addr: \"A1\", text: \"Internal table\", class: [\"cell\", \"header\"] },\n      { addr: \"B1\", text: \"{table.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A2\", text: \"{labels.target}\", class: [\"cell\", \"header\"] },\n      { addr: \"B2\", text: \"{target.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A3\", text: \"{labels.conditions}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A4\", text: \"{labels.condItem1}\", class: [\"cell\", \"header\"] },\n      { addr: \"B4\", text: \"{labels.condOperator}\", class: [\"cell\", \"header\"] },\n      { addr: \"C4\", text: \"{labels.condItem2}\", class: [\"cell\", \"header\"] },\n      { addr: \"D4\", text: \"{labels.condAssoc}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A5\", text: \"{conditions[0].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"B5\", text: \"{conditions[0].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"C5\", text: \"{conditions[0].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"D5\", text: \"{conditions[0].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A6\", text: \"{conditions[1].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"B6\", text: \"{conditions[1].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"C6\", text: \"{conditions[1].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"D6\", text: \"{conditions[1].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A7\", text: \"{labels.binarySearch}\", class: [\"cell\", \"header\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"itabModify.excel-like-table\", itabModifyExcelLikeTable);\n})(window.AbapFlow);\n\n", "js/abap_objects/templates/itabRead.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const itabReadExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 7,\n      cols: 4,\n      colWidths: {\n        A: 420,\n        B: 220,\n        C: 520,\n        D: 220,\n      },\n      rowHeights: {\n        1: 30,\n        2: 30,\n        3: 30,\n        4: 30,\n        5: 30,\n        6: 30,\n        7: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n      center: \"text-align:center;\",\n    },\n    cells: [\n      { addr: \"A1\", text: \"Internal table\", class: [\"cell\", \"header\"] },\n      { addr: \"B1\", text: \"{table.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A2\", text: \"{labels.target}\", class: [\"cell\", \"header\"] },\n      { addr: \"B2\", text: \"{target.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A3\", text: \"{labels.conditions}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A4\", text: \"{labels.condItem1}\", class: [\"cell\", \"header\"] },\n      { addr: \"B4\", text: \"{labels.condOperator}\", class: [\"cell\", \"header\"] },\n      { addr: \"C4\", text: \"{labels.condItem2}\", class: [\"cell\", \"header\"] },\n      { addr: \"D4\", text: \"{labels.condAssoc}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A5\", text: \"{conditions[0].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"B5\", text: \"{conditions[0].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"C5\", text: \"{conditions[0].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"D5\", text: \"{conditions[0].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A6\", text: \"{conditions[1].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"B6\", text: \"{conditions[1].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"C6\", text: \"{conditions[1].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"D6\", text: \"{conditions[1].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A7\", text: \"{labels.binarySearch}\", class: [\"cell\", \"header\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"itabRead.excel-like-table\", itabReadExcelLikeTable);\n})(window.AbapFlow);\n\n", "js/abap_objects/templates/message.excel-like-table.js": "(function (ns) {\n    \"use strict\";\n\n    const messageExcelLikeTable = {\n        type: \"excel-like-table\",\n        compact: {\n            removeEmptyRows: true,\n        },\n        grid: {\n            rows: 8,\n            cols: 6,\n            colWidths: {\n                A: 260,\n                B: 360,\n                C: 220,\n                D: 420,\n                E: 220,\n                F: 260,\n            },\n            rowHeights: {\n                1: 30,\n                2: 30,\n                3: 30,\n                4: 30,\n                5: 30,\n                6: 30,\n                7: 30,\n                8: 30,\n            },\n        },\n        css: {\n            header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n            cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n            mono: \"font-family:Consolas,monospace;\",\n            wrap: \"white-space:normal;line-height:1.25;\",\n            center: \"text-align:center;\",\n        },\n        cells: [\n            {\n                addr: \"A1\",\n                text: \"{labels.msgClass}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"B1\",\n                text: \"{msgClass.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"C1\",\n                text: \"{labels.msgNo}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"D1\",\n                text: \"{msgNo.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"E1\",\n                text: \"{labels.displayLike}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"F1\",\n                text: \"{displayLike.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A2\",\n                text: \"{labels.messageText}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"B2\",\n                text: \"{messageText.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A3\",\n                text: \"{labels.with1}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"B3\",\n                text: \"{with[0].description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A4\",\n                text: \"{labels.with2}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"B4\",\n                text: \"{with[1].description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A5\",\n                text: \"{labels.with3}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"B5\",\n                text: \"{with[2].description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A6\",\n                text: \"{labels.with4}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"B6\",\n                text: \"{with[3].description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A7\",\n                text: \"{labels.into}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"B7\",\n                text: \"{into.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A8\",\n                text: \"{labels.raising}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"B8\",\n                text: \"{raising.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n        ],\n    };\n\n    ns.abapObjects?.defineTemplate?.(\"message.excel-like-table\", messageExcelLikeTable);\n})(window.AbapFlow);\n", "js/abap_objects/templates/perform.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const performExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    sectionLabels: {\n      tables: \"Table\",\n      using: \"Using\",\n      changing: \"Changing\",\n      raising: \"Raising\",\n    },\n    grid: {\n      rows: 9,\n      cols: 3,\n      colWidths: {\n        A: 160,\n        B: 190,\n        C: 860,\n      },\n      rowHeights: {\n        1: 34,\n        2: 30,\n        3: 30,\n        4: 30,\n        5: 30,\n        6: 30,\n        7: 30,\n        8: 30,\n        9: 30,\n      },\n    },\n    css: {\n      label: \"background:#f4b183;font-weight:600;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n    },\n    defaultCellClass: [\"gap\"],\n    cells: [\n      { addr: \"A1\", text: \"Thực hiện\", class: [\"cell\", \"label\"] },\n      { addr: \"B1\", text: \"{perform.name}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C1\", text: \"{perform.description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A2\", text: \"{labels.tables}\", class: [\"cell\", \"label\"] },\n      { addr: \"B2\", text: \"{tables[0].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C2\", text: \"{tables[0].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A3\", text: \"\", class: [\"cell\", \"label\"] },\n      { addr: \"B3\", text: \"{tables[1].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C3\", text: \"{tables[1].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A4\", text: \"{labels.using}\", class: [\"cell\", \"label\"] },\n      { addr: \"B4\", text: \"{using[0].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C4\", text: \"{using[0].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A5\", text: \"\", class: [\"cell\", \"label\"] },\n      { addr: \"B5\", text: \"{using[1].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C5\", text: \"{using[1].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A6\", text: \"{labels.changing}\", class: [\"cell\", \"label\"] },\n      { addr: \"B6\", text: \"{changing[0].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C6\", text: \"{changing[0].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A7\", text: \"\", class: [\"cell\", \"label\"] },\n      { addr: \"B7\", text: \"{changing[1].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C7\", text: \"{changing[1].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A8\", text: \"{labels.raising}\", class: [\"cell\", \"label\"] },\n      { addr: \"B8\", text: \"{raising[0].name}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C8\", text: \"{raising[0].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A9\", text: \"\", class: [\"cell\", \"label\"] },\n      { addr: \"B9\", text: \"{raising[1].name}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C9\", text: \"{raising[1].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"perform.excel-like-table\", performExcelLikeTable);\n})(window.AbapFlow);\n\n"});
+  Object.assign(map, {"js/abap_objects/templates/append.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const appendExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 2,\n      cols: 4,\n      colWidths: {\n        A: 160,\n        B: 520,\n        C: 80,\n        D: 740,\n      },\n      rowHeights: {\n        1: 34,\n        2: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n      center: \"text-align:center;\",\n    },\n    cells: [\n      { addr: \"A1\", text: \"Thêm\", class: [\"cell\", \"header\"] },\n      { addr: \"B1\", text: \"{line.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"C1\", text: \"VÀO\", class: [\"cell\", \"header\", \"center\"] },\n      { addr: \"D1\", text: \"{itab.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A2\", text: \"{labels.sortedBy}\", class: [\"cell\", \"header\"] },\n      { addr: \"B2\", text: \"{sortedBy.description}\", class: [\"cell\", \"wrap\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"append.excel-like-table\", appendExcelLikeTable);\n})(window.AbapFlow);\n", "js/abap_objects/templates/assignment.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const assignmentExcelLikeTable = {\n    type: \"excel-like-table\",\n    grid: {\n      rows: 2,\n      cols: 2,\n      colWidths: {\n        A: 420,\n        B: 700,\n      },\n      rowHeights: {\n        1: 34,\n        2: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n    },\n    cells: [\n      { addr: \"A1\", text: \"Mục\", class: [\"cell\", \"header\"] },\n      { addr: \"B1\", text: \"Giá trị\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A2\", text: \"{item.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"B2\", text: \"{value.description}\", class: [\"cell\", \"wrap\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"assignment.excel-like-table\", assignmentExcelLikeTable);\n})(window.AbapFlow);\n", "js/abap_objects/templates/if.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const ifExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 3,\n      cols: 4,\n      colWidths: {\n        A: 420,\n        B: 220,\n        C: 520,\n        D: 220,\n      },\n      rowHeights: {\n        1: 34,\n        2: 30,\n        3: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n      center: \"text-align:center;\",\n    },\n    cells: [\n      { addr: \"A1\", text: \"Mục 1\", class: [\"cell\", \"header\"] },\n      { addr: \"B1\", text: \"Toán tử\", class: [\"cell\", \"header\"] },\n      { addr: \"C1\", text: \"Mục 2\", class: [\"cell\", \"header\"] },\n      { addr: \"D1\", text: \"Liên kết\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A2\", text: \"{conditions[0].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"B2\", text: \"{conditions[0].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"C2\", text: \"{conditions[0].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"D2\", text: \"{conditions[0].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A3\", text: \"{conditions[1].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"B3\", text: \"{conditions[1].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"C3\", text: \"{conditions[1].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"D3\", text: \"{conditions[1].association}\", class: [\"cell\", \"mono\", \"center\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"if.excel-like-table\", ifExcelLikeTable);\n})(window.AbapFlow);\n", "js/abap_objects/templates/itabCollect.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const itabCollectExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 7,\n      cols: 4,\n      colWidths: {\n        A: 420,\n        B: 220,\n        C: 520,\n        D: 220,\n      },\n      rowHeights: {\n        1: 30,\n        2: 30,\n        3: 30,\n        4: 30,\n        5: 30,\n        6: 30,\n        7: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n      center: \"text-align:center;\",\n    },\n    cells: [\n      { addr: \"A1\", text: \"Bảng nội bộ\", class: [\"cell\", \"header\"] },\n      { addr: \"B1\", text: \"{table.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A2\", text: \"{labels.target}\", class: [\"cell\", \"header\"] },\n      { addr: \"B2\", text: \"{target.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A3\", text: \"{labels.conditions}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A4\", text: \"{labels.condItem1}\", class: [\"cell\", \"header\"] },\n      { addr: \"B4\", text: \"{labels.condOperator}\", class: [\"cell\", \"header\"] },\n      { addr: \"C4\", text: \"{labels.condItem2}\", class: [\"cell\", \"header\"] },\n      { addr: \"D4\", text: \"{labels.condAssoc}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A5\", text: \"{conditions[0].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"B5\", text: \"{conditions[0].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"C5\", text: \"{conditions[0].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"D5\", text: \"{conditions[0].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A6\", text: \"{conditions[1].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"B6\", text: \"{conditions[1].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"C6\", text: \"{conditions[1].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"D6\", text: \"{conditions[1].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A7\", text: \"{labels.binarySearch}\", class: [\"cell\", \"header\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"itabCollect.excel-like-table\", itabCollectExcelLikeTable);\n})(window.AbapFlow);\n\n", "js/abap_objects/templates/itabDelete.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const itabDeleteExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 7,\n      cols: 4,\n      colWidths: {\n        A: 420,\n        B: 220,\n        C: 520,\n        D: 220,\n      },\n      rowHeights: {\n        1: 30,\n        2: 30,\n        3: 30,\n        4: 30,\n        5: 30,\n        6: 30,\n        7: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n      center: \"text-align:center;\",\n    },\n    cells: [\n      { addr: \"A1\", text: \"Bảng nội bộ\", class: [\"cell\", \"header\"] },\n      { addr: \"B1\", text: \"{table.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A2\", text: \"{labels.target}\", class: [\"cell\", \"header\"] },\n      { addr: \"B2\", text: \"{target.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A3\", text: \"{labels.conditions}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A4\", text: \"{labels.condItem1}\", class: [\"cell\", \"header\"] },\n      { addr: \"B4\", text: \"{labels.condOperator}\", class: [\"cell\", \"header\"] },\n      { addr: \"C4\", text: \"{labels.condItem2}\", class: [\"cell\", \"header\"] },\n      { addr: \"D4\", text: \"{labels.condAssoc}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A5\", text: \"{conditions[0].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"B5\", text: \"{conditions[0].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"C5\", text: \"{conditions[0].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"D5\", text: \"{conditions[0].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A6\", text: \"{conditions[1].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"B6\", text: \"{conditions[1].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"C6\", text: \"{conditions[1].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"D6\", text: \"{conditions[1].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A7\", text: \"{labels.binarySearch}\", class: [\"cell\", \"header\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"itabDelete.excel-like-table\", itabDeleteExcelLikeTable);\n})(window.AbapFlow);\n\n", "js/abap_objects/templates/itabModify.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const itabModifyExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 7,\n      cols: 4,\n      colWidths: {\n        A: 420,\n        B: 220,\n        C: 520,\n        D: 220,\n      },\n      rowHeights: {\n        1: 30,\n        2: 30,\n        3: 30,\n        4: 30,\n        5: 30,\n        6: 30,\n        7: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n      center: \"text-align:center;\",\n    },\n    cells: [\n      { addr: \"A1\", text: \"Bảng nội bộ\", class: [\"cell\", \"header\"] },\n      { addr: \"B1\", text: \"{table.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A2\", text: \"{labels.target}\", class: [\"cell\", \"header\"] },\n      { addr: \"B2\", text: \"{target.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A3\", text: \"{labels.conditions}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A4\", text: \"{labels.condItem1}\", class: [\"cell\", \"header\"] },\n      { addr: \"B4\", text: \"{labels.condOperator}\", class: [\"cell\", \"header\"] },\n      { addr: \"C4\", text: \"{labels.condItem2}\", class: [\"cell\", \"header\"] },\n      { addr: \"D4\", text: \"{labels.condAssoc}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A5\", text: \"{conditions[0].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"B5\", text: \"{conditions[0].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"C5\", text: \"{conditions[0].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"D5\", text: \"{conditions[0].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A6\", text: \"{conditions[1].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"B6\", text: \"{conditions[1].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"C6\", text: \"{conditions[1].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"D6\", text: \"{conditions[1].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A7\", text: \"{labels.binarySearch}\", class: [\"cell\", \"header\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"itabModify.excel-like-table\", itabModifyExcelLikeTable);\n})(window.AbapFlow);\n\n", "js/abap_objects/templates/itabRead.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const itabReadExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    grid: {\n      rows: 7,\n      cols: 4,\n      colWidths: {\n        A: 420,\n        B: 220,\n        C: 520,\n        D: 220,\n      },\n      rowHeights: {\n        1: 30,\n        2: 30,\n        3: 30,\n        4: 30,\n        5: 30,\n        6: 30,\n        7: 30,\n      },\n    },\n    css: {\n      header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n      center: \"text-align:center;\",\n    },\n    cells: [\n      { addr: \"A1\", text: \"Bảng nội bộ\", class: [\"cell\", \"header\"] },\n      { addr: \"B1\", text: \"{table.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A2\", text: \"{labels.target}\", class: [\"cell\", \"header\"] },\n      { addr: \"B2\", text: \"{target.description}\", class: [\"cell\", \"wrap\"] },\n\n      { addr: \"A3\", text: \"{labels.conditions}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A4\", text: \"{labels.condItem1}\", class: [\"cell\", \"header\"] },\n      { addr: \"B4\", text: \"{labels.condOperator}\", class: [\"cell\", \"header\"] },\n      { addr: \"C4\", text: \"{labels.condItem2}\", class: [\"cell\", \"header\"] },\n      { addr: \"D4\", text: \"{labels.condAssoc}\", class: [\"cell\", \"header\"] },\n\n      { addr: \"A5\", text: \"{conditions[0].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"B5\", text: \"{conditions[0].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"C5\", text: \"{conditions[0].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"D5\", text: \"{conditions[0].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A6\", text: \"{conditions[1].item1.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"B6\", text: \"{conditions[1].operator}\", class: [\"cell\", \"mono\", \"center\"] },\n      { addr: \"C6\", text: \"{conditions[1].item2.description}\", class: [\"cell\", \"wrap\"] },\n      { addr: \"D6\", text: \"{conditions[1].association}\", class: [\"cell\", \"mono\", \"center\"] },\n\n      { addr: \"A7\", text: \"{labels.binarySearch}\", class: [\"cell\", \"header\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"itabRead.excel-like-table\", itabReadExcelLikeTable);\n})(window.AbapFlow);\n\n", "js/abap_objects/templates/message.excel-like-table.js": "(function (ns) {\n    \"use strict\";\n\n    const messageExcelLikeTable = {\n        type: \"excel-like-table\",\n        compact: {\n            removeEmptyRows: true,\n        },\n        grid: {\n            rows: 8,\n            cols: 6,\n            colWidths: {\n                A: 260,\n                B: 360,\n                C: 220,\n                D: 420,\n                E: 220,\n                F: 260,\n            },\n            rowHeights: {\n                1: 30,\n                2: 30,\n                3: 30,\n                4: 30,\n                5: 30,\n                6: 30,\n                7: 30,\n                8: 30,\n            },\n        },\n        css: {\n            header: \"background:#9dc3e6;font-weight:700;color:#111;\",\n            cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n            mono: \"font-family:Consolas,monospace;\",\n            wrap: \"white-space:normal;line-height:1.25;\",\n            center: \"text-align:center;\",\n        },\n        cells: [\n            {\n                addr: \"A1\",\n                text: \"{labels.msgClass}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"B1\",\n                text: \"{msgClass.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"C1\",\n                text: \"{labels.msgNo}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"D1\",\n                text: \"{msgNo.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"E1\",\n                text: \"{labels.displayLike}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"F1\",\n                text: \"{displayLike.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A2\",\n                text: \"{labels.messageText}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"B2\",\n                text: \"{messageText.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A3\",\n                text: \"{labels.with1}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"B3\",\n                text: \"{with[0].description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A4\",\n                text: \"{labels.with2}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"B4\",\n                text: \"{with[1].description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A5\",\n                text: \"{labels.with3}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"B5\",\n                text: \"{with[2].description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A6\",\n                text: \"{labels.with4}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"B6\",\n                text: \"{with[3].description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A7\",\n                text: \"{labels.into}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"B7\",\n                text: \"{into.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n            {\n                addr: \"A8\",\n                text: \"{labels.raising}\",\n                class: [\"cell\", \"header\"],\n            },\n            {\n                addr: \"B8\",\n                text: \"{raising.description}\",\n                class: [\"cell\", \"wrap\"],\n            },\n        ],\n    };\n\n    ns.abapObjects?.defineTemplate?.(\"message.excel-like-table\", messageExcelLikeTable);\n})(window.AbapFlow);\n", "js/abap_objects/templates/perform.excel-like-table.js": "(function (ns) {\n  \"use strict\";\n\n  const performExcelLikeTable = {\n    type: \"excel-like-table\",\n    compact: { removeEmptyRows: true },\n    sectionLabels: {\n      tables: \"Bảng\",\n      using: \"Tham số vào\",\n      changing: \"Tham số thay đổi\",\n      raising: \"Ngoại lệ\",\n    },\n    grid: {\n      rows: 9,\n      cols: 3,\n      colWidths: {\n        A: 160,\n        B: 190,\n        C: 860,\n      },\n      rowHeights: {\n        1: 34,\n        2: 30,\n        3: 30,\n        4: 30,\n        5: 30,\n        6: 30,\n        7: 30,\n        8: 30,\n        9: 30,\n      },\n    },\n    css: {\n      label: \"background:#f4b183;font-weight:600;color:#111;\",\n      cell: \"border:1px solid #222;padding:6px 8px;vertical-align:middle;background:#fff;color:#111;\",\n      mono: \"font-family:Consolas,monospace;\",\n      wrap: \"white-space:normal;line-height:1.25;\",\n    },\n    defaultCellClass: [\"gap\"],\n    cells: [\n      { addr: \"A1\", text: \"Thực hiện\", class: [\"cell\", \"label\"] },\n      { addr: \"B1\", text: \"{perform.name}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C1\", text: \"{perform.description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A2\", text: \"{labels.tables}\", class: [\"cell\", \"label\"] },\n      { addr: \"B2\", text: \"{tables[0].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C2\", text: \"{tables[0].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A3\", text: \"\", class: [\"cell\", \"label\"] },\n      { addr: \"B3\", text: \"{tables[1].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C3\", text: \"{tables[1].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A4\", text: \"{labels.using}\", class: [\"cell\", \"label\"] },\n      { addr: \"B4\", text: \"{using[0].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C4\", text: \"{using[0].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A5\", text: \"\", class: [\"cell\", \"label\"] },\n      { addr: \"B5\", text: \"{using[1].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C5\", text: \"{using[1].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A6\", text: \"{labels.changing}\", class: [\"cell\", \"label\"] },\n      { addr: \"B6\", text: \"{changing[0].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C6\", text: \"{changing[0].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A7\", text: \"\", class: [\"cell\", \"label\"] },\n      { addr: \"B7\", text: \"{changing[1].actual}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C7\", text: \"{changing[1].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A8\", text: \"{labels.raising}\", class: [\"cell\", \"label\"] },\n      { addr: \"B8\", text: \"{raising[0].name}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C8\", text: \"{raising[0].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n\n      { addr: \"A9\", text: \"\", class: [\"cell\", \"label\"] },\n      { addr: \"B9\", text: \"{raising[1].name}\", class: [\"cell\", \"mono\", \"gap-right\"] },\n      { addr: \"C9\", text: \"{raising[1].description}\", class: [\"cell\", \"wrap\", \"gap-left\"] },\n    ],\n  };\n\n  ns.abapObjects?.defineTemplate?.(\"perform.excel-like-table\", performExcelLikeTable);\n})(window.AbapFlow);\n"});
 
   var head = document && document.head;
   if (!head || head.__abapflowInlinePatched) return;
