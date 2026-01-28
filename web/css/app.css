@@ -322,6 +322,17 @@ body {
   flex-direction: column;
 }
 
+.split__right {
+  display: flex;
+  flex-direction: column;
+}
+
+.split__right > .details {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
 .toolbar {
   padding: 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
@@ -414,6 +425,14 @@ body {
 .objects-row--source td {
   padding-top: 6px;
   padding-bottom: 6px;
+}
+
+.objects-desc-editable {
+  cursor: text;
+}
+
+.objects-desc-editable:hover {
+  box-shadow: inset 0 0 0 2px rgba(96, 165, 250, 0.55);
 }
 
 .objcfg-toolbar {

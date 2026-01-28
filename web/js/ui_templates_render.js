@@ -407,92 +407,21 @@
   }
 
   function openDescriptionEditorDialog(options) {
-    const titleText = String(options?.title || "Sửa mô tả");
-    const initialValue = String(options?.value ?? "");
+    if (typeof ui.openTextEditorModal !== "function") {
+      return Promise.resolve({ action: "cancel", value: String(options?.value ?? "") });
+    }
 
-    return new Promise((resolve) => {
-      const overlay = document.createElement("div");
-      overlay.className = "demo-modal";
-
-      const dialog = document.createElement("div");
-      dialog.className = "demo-modal__dialog";
-      overlay.appendChild(dialog);
-
-      const title = document.createElement("div");
-      title.className = "demo-modal__title";
-      title.textContent = titleText;
-      dialog.appendChild(title);
-
-      const textarea = document.createElement("textarea");
-      textarea.className = "input demo-modal__textarea";
-      textarea.value = initialValue;
-      textarea.placeholder = "Nhập mô tả...";
-      dialog.appendChild(textarea);
-
-      const hint = document.createElement("div");
-      hint.className = "demo-modal__hint";
-      hint.textContent = "Chọn phạm vi cập nhật:";
-      dialog.appendChild(hint);
-
-      const actions = document.createElement("div");
-      actions.className = "demo-modal__actions";
-      dialog.appendChild(actions);
-
-      const btnCancel = document.createElement("button");
-      btnCancel.type = "button";
-      btnCancel.className = "btn";
-      btnCancel.textContent = "Hủy";
-
-      const btnClear = document.createElement("button");
-      btnClear.type = "button";
-      btnClear.className = "btn";
-      btnClear.textContent = "Xóa mô tả";
-
-      const btnLocal = document.createElement("button");
-      btnLocal.type = "button";
-      btnLocal.className = "btn";
-      btnLocal.textContent = "Chỉ template hiện tại";
-
-      const btnGlobal = document.createElement("button");
-      btnGlobal.type = "button";
-      btnGlobal.className = "btn btn-primary";
-      btnGlobal.textContent = "Toàn bộ template";
-
-      actions.appendChild(btnCancel);
-      actions.appendChild(btnClear);
-      actions.appendChild(btnLocal);
-      actions.appendChild(btnGlobal);
-
-      function cleanup() {
-        window.removeEventListener("keydown", onKeyDown);
-        overlay.remove();
-      }
-
-      function close(action) {
-        const value = textarea.value;
-        cleanup();
-        resolve({ action, value });
-      }
-
-      function onKeyDown(e) {
-        if (e.key === "Escape") {
-          e.preventDefault();
-          close("cancel");
-        }
-      }
-
-      overlay.addEventListener("click", (e) => {
-        if (e.target === overlay) close("cancel");
-      });
-      btnCancel.addEventListener("click", () => close("cancel"));
-      btnClear.addEventListener("click", () => close("clear"));
-      btnLocal.addEventListener("click", () => close("local"));
-      btnGlobal.addEventListener("click", () => close("global"));
-      window.addEventListener("keydown", onKeyDown);
-
-      document.body.appendChild(overlay);
-      textarea.focus();
-      textarea.select();
+    return ui.openTextEditorModal({
+      title: String(options?.title || "Sửa mô tả"),
+      value: String(options?.value ?? ""),
+      placeholder: "Nhập mô tả...",
+      hint: "Chọn phạm vi cập nhật:",
+      actions: [
+        { key: "cancel", label: "Hủy" },
+        { key: "clear", label: "Xóa mô tả" },
+        { key: "local", label: "Chỉ template hiện tại" },
+        { key: "global", label: "Toàn bộ template", className: "btn btn-primary" },
+      ],
     });
   }
 
@@ -522,149 +451,24 @@
   }
 
   function openDescriptionEditorDialogForTargets(options) {
-    const titleText = String(options?.title || "Sửa mô tả");
-    const targets = Array.isArray(options?.targets) ? options.targets : [];
-    const initialByKey = options?.initialByKey && typeof options.initialByKey === "object" ? options.initialByKey : {};
-    const initialKey = String(options?.initialKey || (targets[0] ? targets[0].key : "") || "").trim();
+    if (typeof ui.openTextEditorModal !== "function") {
+      return Promise.resolve({ action: "cancel", value: "", targetKey: "" });
+    }
 
-    return new Promise((resolve) => {
-      const overlay = document.createElement("div");
-      overlay.className = "demo-modal";
-
-      const dialog = document.createElement("div");
-      dialog.className = "demo-modal__dialog";
-      overlay.appendChild(dialog);
-
-      const title = document.createElement("div");
-      title.className = "demo-modal__title";
-      title.textContent = titleText;
-      dialog.appendChild(title);
-
-      let selectedKey = initialKey;
-      const draftByKey = new Map();
-
-      function getInitialForKey(key) {
-        return String(initialByKey[String(key || "")] ?? "");
-      }
-
-      for (const t of targets) {
-        const k = String(t?.key || "").trim();
-        if (!k) continue;
-        draftByKey.set(k, getInitialForKey(k));
-      }
-
-      let select = null;
-      if (targets.length > 1) {
-        const row = document.createElement("div");
-        row.style.display = "flex";
-        row.style.gap = "8px";
-        row.style.alignItems = "center";
-        row.style.marginBottom = "8px";
-
-        const label = document.createElement("div");
-        label.textContent = "Đối tượng:";
-        label.style.minWidth = "64px";
-        row.appendChild(label);
-
-        select = document.createElement("select");
-        select.className = "input";
-        select.style.flex = "1";
-        for (const t of targets) {
-          const key = String(t?.key || "").trim();
-          const labelText = String(t?.label || "").trim() || key;
-          if (!key) continue;
-          const opt = document.createElement("option");
-          opt.value = key;
-          opt.textContent = labelText;
-          select.appendChild(opt);
-        }
-        if (selectedKey) select.value = selectedKey;
-        row.appendChild(select);
-
-        dialog.appendChild(row);
-      }
-
-      const textarea = document.createElement("textarea");
-      textarea.className = "input demo-modal__textarea";
-      textarea.value = selectedKey ? draftByKey.get(selectedKey) || "" : "";
-      textarea.placeholder = "Nhập mô tả...";
-      dialog.appendChild(textarea);
-
-      const hint = document.createElement("div");
-      hint.className = "demo-modal__hint";
-      hint.textContent = "Chọn phạm vi cập nhật:";
-      dialog.appendChild(hint);
-
-      const actions = document.createElement("div");
-      actions.className = "demo-modal__actions";
-      dialog.appendChild(actions);
-
-      const btnCancel = document.createElement("button");
-      btnCancel.type = "button";
-      btnCancel.className = "btn";
-      btnCancel.textContent = "Hủy";
-
-      const btnClear = document.createElement("button");
-      btnClear.type = "button";
-      btnClear.className = "btn";
-      btnClear.textContent = "Xóa mô tả";
-
-      const btnLocal = document.createElement("button");
-      btnLocal.type = "button";
-      btnLocal.className = "btn";
-      btnLocal.textContent = "Chỉ template hiện tại";
-
-      const btnGlobal = document.createElement("button");
-      btnGlobal.type = "button";
-      btnGlobal.className = "btn btn-primary";
-      btnGlobal.textContent = "Toàn bộ template";
-
-      actions.appendChild(btnCancel);
-      actions.appendChild(btnClear);
-      actions.appendChild(btnLocal);
-      actions.appendChild(btnGlobal);
-
-      function cleanup() {
-        window.removeEventListener("keydown", onKeyDown);
-        overlay.remove();
-      }
-
-      function close(action) {
-        if (selectedKey) draftByKey.set(selectedKey, textarea.value);
-        const value = selectedKey ? draftByKey.get(selectedKey) || "" : textarea.value;
-        cleanup();
-        resolve({ action, value, targetKey: selectedKey });
-      }
-
-      function onKeyDown(e) {
-        if (e.key === "Escape") {
-          e.preventDefault();
-          close("cancel");
-        }
-      }
-
-      if (select) {
-        select.addEventListener("change", () => {
-          if (selectedKey) draftByKey.set(selectedKey, textarea.value);
-          selectedKey = String(select.value || "").trim();
-          textarea.value = selectedKey ? draftByKey.get(selectedKey) || "" : "";
-          textarea.focus();
-          textarea.select();
-        });
-      }
-
-      overlay.addEventListener("click", (e) => {
-        if (e.target === overlay) close("cancel");
-      });
-      btnCancel.addEventListener("click", () => close("cancel"));
-      btnClear.addEventListener("click", () => close("clear"));
-      btnLocal.addEventListener("click", () => close("local"));
-      btnGlobal.addEventListener("click", () => close("global"));
-      window.addEventListener("keydown", onKeyDown);
-
-      document.body.appendChild(overlay);
-      textarea.focus();
-      textarea.select();
+    return ui.openTextEditorModal({
+      title: String(options?.title || "Sửa mô tả"),
+      targets: Array.isArray(options?.targets) ? options.targets : [],
+      initialByKey: options?.initialByKey && typeof options.initialByKey === "object" ? options.initialByKey : {},
+      initialKey: String(options?.initialKey || ""),
+      selectLabel: "Đối tượng:",
+      placeholder: "Nhập mô tả...",
+      hint: "Chọn phạm vi cập nhật:",
+      actions: [
+        { key: "cancel", label: "Hủy" },
+        { key: "clear", label: "Xóa mô tả" },
+        { key: "local", label: "Chỉ template hiện tại" },
+        { key: "global", label: "Toàn bộ template", className: "btn btn-primary" },
+      ],
     });
   }
 

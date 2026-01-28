@@ -330,6 +330,17 @@
       flex-direction: column;
     }
 
+    .split__right {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .split__right > .details {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+    }
+
     .toolbar {
       padding: 10px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.06);
@@ -422,6 +433,14 @@
     .objects-row--source td {
       padding-top: 6px;
       padding-bottom: 6px;
+    }
+
+    .objects-desc-editable {
+      cursor: text;
+    }
+
+    .objects-desc-editable:hover {
+      box-shadow: inset 0 0 0 2px rgba(96, 165, 250, 0.55);
     }
 
     .objcfg-toolbar {
@@ -8740,8 +8759,142 @@
           a.remove();
           window.setTimeout(() => URL.revokeObjectURL(url), 1000);
         };
-    })(window.AbapFlow);
 
+      ui.openTextEditorModal =
+        ui.openTextEditorModal ||
+        function openTextEditorModal(options) {
+          const titleText = String(options?.title || "Sửa mô tả");
+          const placeholder = String(options?.placeholder || "Nhập mô tả...");
+          const hintText = String(options?.hint || "");
+          const actions = Array.isArray(options?.actions) && options.actions.length ? options.actions : [{ key: "cancel", label: "Đóng" }];
+
+          const targets = Array.isArray(options?.targets) ? options.targets : [];
+          const initialByKey = options?.initialByKey && typeof options.initialByKey === "object" ? options.initialByKey : {};
+          const initialValue = String(options?.value ?? "");
+          const initialKey = String(options?.initialKey || (targets[0] ? targets[0].key : "") || "").trim();
+
+          return new Promise((resolve) => {
+            const overlay = document.createElement("div");
+            overlay.className = "demo-modal";
+
+            const dialog = document.createElement("div");
+            dialog.className = "demo-modal__dialog";
+            overlay.appendChild(dialog);
+
+            const title = document.createElement("div");
+            title.className = "demo-modal__title";
+            title.textContent = titleText;
+            dialog.appendChild(title);
+
+            let selectedKey = initialKey;
+            const draftByKey = new Map();
+            if (targets.length) {
+              for (const t of targets) {
+                const k = String(t?.key || "").trim();
+                if (!k) continue;
+                draftByKey.set(k, String(initialByKey[k] ?? ""));
+              }
+            }
+
+            let select = null;
+            if (targets.length > 1) {
+              const row = document.createElement("div");
+              row.style.display = "flex";
+              row.style.gap = "8px";
+              row.style.alignItems = "center";
+              row.style.marginBottom = "8px";
+
+              const label = document.createElement("div");
+              label.textContent = String(options?.selectLabel || "Đối tượng:");
+              label.style.minWidth = "64px";
+              row.appendChild(label);
+
+              select = document.createElement("select");
+              select.className = "input";
+              select.style.flex = "1";
+              for (const t of targets) {
+                const key = String(t?.key || "").trim();
+                const labelText = String(t?.label || "").trim() || key;
+                if (!key) continue;
+                const opt = document.createElement("option");
+                opt.value = key;
+                opt.textContent = labelText;
+                select.appendChild(opt);
+              }
+              if (selectedKey) select.value = selectedKey;
+              row.appendChild(select);
+
+              dialog.appendChild(row);
+            }
+
+            const textarea = document.createElement("textarea");
+            textarea.className = "input demo-modal__textarea";
+            textarea.value = targets.length ? (selectedKey ? draftByKey.get(selectedKey) || "" : "") : initialValue;
+            textarea.placeholder = placeholder;
+            dialog.appendChild(textarea);
+
+            if (hintText) {
+              const hint = document.createElement("div");
+              hint.className = "demo-modal__hint";
+              hint.textContent = hintText;
+              dialog.appendChild(hint);
+            }
+
+            const actionsRow = document.createElement("div");
+            actionsRow.className = "demo-modal__actions";
+            dialog.appendChild(actionsRow);
+
+            function cleanup() {
+              window.removeEventListener("keydown", onKeyDown);
+              overlay.remove();
+            }
+
+            function close(action) {
+              if (targets.length && selectedKey) draftByKey.set(selectedKey, textarea.value);
+              const value = targets.length ? (selectedKey ? draftByKey.get(selectedKey) || "" : textarea.value) : textarea.value;
+              cleanup();
+              resolve({ action, value, targetKey: selectedKey });
+            }
+
+            function onKeyDown(e) {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                close("cancel");
+              }
+            }
+
+            for (const act of actions) {
+              const key = String(act?.key || "").trim() || "action";
+              const label = String(act?.label || key);
+              const btn = document.createElement("button");
+              btn.type = "button";
+              btn.className = act?.className || "btn";
+              btn.textContent = label;
+              btn.addEventListener("click", () => close(key));
+              actionsRow.appendChild(btn);
+            }
+
+            if (select) {
+              select.addEventListener("change", () => {
+                if (selectedKey) draftByKey.set(selectedKey, textarea.value);
+                selectedKey = String(select.value || "").trim();
+                textarea.value = selectedKey ? draftByKey.get(selectedKey) || "" : "";
+                textarea.focus();
+                textarea.select();
+              });
+            }
+
+            overlay.addEventListener("click", (e) => {
+              if (e.target === overlay) close("cancel");
+            });
+            window.addEventListener("keydown", onKeyDown);
+
+            document.body.appendChild(overlay);
+            textarea.focus();
+            textarea.select();
+          });
+        };
+    })(window.AbapFlow);
 
     </script>
         <script>
@@ -9267,6 +9420,134 @@
       const ui = ns.ui;
       const state = ui.state;
 
+      function originLabel(origin) {
+        const kind = String(origin?.kind || "").trim().toUpperCase();
+        const key = String(origin?.key || "").trim();
+
+        if (kind === "DECL") {
+          const vn = String(origin?.entity?.variableName || "").trim();
+          if (vn) return vn;
+          return String(origin?.name || "").trim();
+        }
+
+        if (kind === "PARAM") {
+          const pn = String(origin?.entity?.name || "").trim();
+          if (pn) return pn;
+          return String(origin?.name || "").trim();
+        }
+
+        if (kind === "TYPEFIELD") {
+          const m = /^TYPEFIELD:[^:]*:([^:]+):(.+)$/.exec(key);
+          if (m) return `${m[1]}-${m[2]}`;
+          return String(origin?.name || "").trim();
+        }
+
+        return String(origin?.name || "").trim() || key;
+      }
+
+      function editSourceDescription(source) {
+        if (typeof ui.openTextEditorModal !== "function") return;
+        if (!desc?.describeExpressionWithOrigin || !ns.notes?.setEntry) {
+          ui.setStatus("Thiếu module mô tả để sửa.", true);
+          return;
+        }
+
+        const callerKey = String(source?.callerKey || "").trim();
+        const actualExpr = String(source?.actualExpr || "").trim();
+        if (!callerKey || !actualExpr) {
+          ui.setStatus("Không có biểu thức nguồn để sửa.", true);
+          return;
+        }
+
+        const model = state.model;
+        if (!model) return;
+
+        const described = desc.describeExpressionWithOrigin(model, callerKey, actualExpr) || {};
+        const origins = Array.isArray(described.origins) ? described.origins : [];
+        if (!origins.length) {
+          ui.setStatus("Không xác định được đối tượng nguồn.", true);
+          return;
+        }
+
+        const targets = [];
+        const initialByKey = {};
+        const seen = new Set();
+        for (const o of origins) {
+          const key = String(o?.key || "").trim();
+          if (!key || seen.has(key)) continue;
+          seen.add(key);
+          targets.push({ key, label: originLabel(o), origin: o });
+          const fallback = String(o?.name || "").trim();
+          initialByKey[key] = typeof desc?.pickDescription === "function" ? desc.pickDescription(o?.entity || null, fallback) : fallback;
+        }
+
+        const initialKey = targets[0]?.key || "";
+        ui
+          .openTextEditorModal({
+            title: "Mô tả nguồn",
+            targets,
+            initialByKey,
+            initialKey,
+            selectLabel: "Đối tượng:",
+            placeholder: "Nhập mô tả...",
+            actions: [
+              { key: "cancel", label: "Hủy" },
+              { key: "clear", label: "Xóa mô tả" },
+              { key: "save", label: "Lưu", className: "btn btn-primary" },
+            ],
+          })
+          .then(({ action, value, targetKey }) => {
+            if (action === "cancel") return;
+            const tk = String(targetKey || initialKey || "").trim();
+            if (!tk) {
+              ui.setStatus("Không xác định được đối tượng để lưu.", true);
+              return;
+            }
+            const nextValue = action === "clear" ? "" : String(value || "").trim();
+            ns.notes.setEntry(tk, { description: nextValue });
+            if (model && ns.notes?.applyToModel) ns.notes.applyToModel(model);
+            ui.renderObjectsTable();
+            ui.renderDetails();
+            ui.setStatus(action === "clear" ? "Đã xóa mô tả." : "Đã lưu mô tả.", false);
+          });
+      }
+
+      function applyRoutineDescription(key, descText) {
+        const notes = ns.notes;
+        if (notes?.setEntry) notes.setEntry(key, { description: descText });
+
+        const model = state.model;
+        if (!model) return;
+        if (String(key) === "PROGRAM") {
+          if (descText) model.userDescription = descText;
+          else delete model.userDescription;
+          return;
+        }
+
+        const node = model.nodes?.get ? model.nodes.get(key) : null;
+        if (!node) return;
+        if (descText) node.userDescription = descText;
+        else delete node.userDescription;
+      }
+
+      function applyParamDescription(routineKey, paramName, descText) {
+        const notes = ns.notes;
+        if (notes?.makeParamKey && notes?.setEntry) {
+          const key = notes.makeParamKey(routineKey, paramName);
+          if (key) notes.setEntry(key, { description: descText });
+        }
+
+        const model = state.model;
+        const node = model?.nodes?.get ? model.nodes.get(routineKey) : null;
+        if (!node || !Array.isArray(node.params)) return;
+
+        const target =
+          node.params.find((p) => String(p?.name || "").trim().toLowerCase() === String(paramName || "").trim().toLowerCase()) || null;
+        if (!target) return;
+        if (descText) target.userDescription = descText;
+        else delete target.userDescription;
+      }
+
       function getRoutineDescription(obj, model) {
         if (!obj) return "";
         if (obj.key === "PROGRAM") {
@@ -9516,6 +9797,36 @@
 
             const sourceRef = p?.sourceRef || obj?.sourceRef || null;
             tr.addEventListener("click", () => selectObject(obj.key, { paramKey, sourceRef }));
+
+            const descCell = tr.querySelector("td:last-child");
+            if (descCell) {
+              descCell.classList.add("objects-desc-editable");
+              descCell.title = "Double-click để sửa mô tả";
+              descCell.addEventListener("dblclick", (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                if (typeof ui.openTextEditorModal !== "function") return;
+                ui
+                  .openTextEditorModal({
+                    title: `Mô tả tham số ${kind} ${name}`,
+                    value: desc,
+                    placeholder: "Nhập mô tả...",
+                    actions: [
+                      { key: "cancel", label: "Hủy" },
+                      { key: "clear", label: "Xóa mô tả" },
+                      { key: "save", label: "Lưu", className: "btn btn-primary" },
+                    ],
+                  })
+                  .then(({ action, value }) => {
+                    if (action === "cancel") return;
+                    const nextValue = action === "clear" ? "" : String(value || "").trim();
+                    applyParamDescription(obj.key, name, nextValue);
+                    ui.renderObjectsTable();
+                    ui.renderDetails();
+                    ui.setStatus("Đã lưu mô tả.", false);
+                  });
+              });
+            }
           } else if (row.rowKind === "source") {
             const p = row.param;
             const kind = String(p?.kind || "").trim();
@@ -9554,6 +9865,17 @@
 
             const sourceRef = s?.originSourceRef || s?.callSourceRef || obj?.sourceRef || null;
             tr.addEventListener("click", () => selectObject(obj.key, { paramKey, sourceRef }));
+
+            const descCellEl = tr.querySelector("td:last-child");
+            if (descCellEl) {
+              descCellEl.classList.add("objects-desc-editable");
+              descCellEl.title = "Double-click để sửa mô tả";
+              descCellEl.addEventListener("dblclick", (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                editSourceDescription(s || {});
+              });
+            }
           } else {
             tr.dataset.key = obj.key;
             if (obj.key === state.selectedKey && !state.selectedParamKey) tr.classList.add("is-selected");
@@ -9581,6 +9903,38 @@
 
             const sourceRef = obj?.sourceRef || null;
             tr.addEventListener("click", () => selectObject(obj.key, { paramKey: "", sourceRef }));
+
+            const descCell = tr.querySelector("td:last-child");
+            if (descCell) {
+              descCell.classList.add("objects-desc-editable");
+              descCell.title = "Double-click để sửa mô tả";
+              descCell.addEventListener("dblclick", (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                if (typeof ui.openTextEditorModal !== "function") return;
+                const key = String(obj.key || "");
+                const title = key === "PROGRAM" ? "Mô tả PROGRAM" : `Mô tả ${obj.kind} ${obj.name}`;
+                ui
+                  .openTextEditorModal({
+                    title,
+                    value: desc,
+                    placeholder: "Nhập mô tả...",
+                    actions: [
+                      { key: "cancel", label: "Hủy" },
+                      { key: "clear", label: "Xóa mô tả" },
+                      { key: "save", label: "Lưu", className: "btn btn-primary" },
+                    ],
+                  })
+                  .then(({ action, value }) => {
+                    if (action === "cancel") return;
+                    const nextValue = action === "clear" ? "" : String(value || "").trim();
+                    applyRoutineDescription(key, nextValue);
+                    ui.renderObjectsTable();
+                    ui.renderDetails();
+                    ui.setStatus("Đã lưu mô tả.", false);
+                  });
+              });
+            }
 
             const toggleBtn = tr.querySelector("button.objects-tree-toggle");
             if (toggleBtn) {
@@ -13124,92 +13478,21 @@
       }
 
       function openDescriptionEditorDialog(options) {
-        const titleText = String(options?.title || "Sửa mô tả");
-        const initialValue = String(options?.value ?? "");
+        if (typeof ui.openTextEditorModal !== "function") {
+          return Promise.resolve({ action: "cancel", value: String(options?.value ?? "") });
+        }
 
-        return new Promise((resolve) => {
-          const overlay = document.createElement("div");
-          overlay.className = "demo-modal";
-
-          const dialog = document.createElement("div");
-          dialog.className = "demo-modal__dialog";
-          overlay.appendChild(dialog);
-
-          const title = document.createElement("div");
-          title.className = "demo-modal__title";
-          title.textContent = titleText;
-          dialog.appendChild(title);
-
-          const textarea = document.createElement("textarea");
-          textarea.className = "input demo-modal__textarea";
-          textarea.value = initialValue;
-          textarea.placeholder = "Nhập mô tả...";
-          dialog.appendChild(textarea);
-
-          const hint = document.createElement("div");
-          hint.className = "demo-modal__hint";
-          hint.textContent = "Chọn phạm vi cập nhật:";
-          dialog.appendChild(hint);
-
-          const actions = document.createElement("div");
-          actions.className = "demo-modal__actions";
-          dialog.appendChild(actions);
-
-          const btnCancel = document.createElement("button");
-          btnCancel.type = "button";
-          btnCancel.className = "btn";
-          btnCancel.textContent = "Hủy";
-
-          const btnClear = document.createElement("button");
-          btnClear.type = "button";
-          btnClear.className = "btn";
-          btnClear.textContent = "Xóa mô tả";
-
-          const btnLocal = document.createElement("button");
-          btnLocal.type = "button";
-          btnLocal.className = "btn";
-          btnLocal.textContent = "Chỉ template hiện tại";
-
-          const btnGlobal = document.createElement("button");
-          btnGlobal.type = "button";
-          btnGlobal.className = "btn btn-primary";
-          btnGlobal.textContent = "Toàn bộ template";
-
-          actions.appendChild(btnCancel);
-          actions.appendChild(btnClear);
-          actions.appendChild(btnLocal);
-          actions.appendChild(btnGlobal);
-
-          function cleanup() {
-            window.removeEventListener("keydown", onKeyDown);
-            overlay.remove();
-          }
-
-          function close(action) {
-            const value = textarea.value;
-            cleanup();
-            resolve({ action, value });
-          }
-
-          function onKeyDown(e) {
-            if (e.key === "Escape") {
-              e.preventDefault();
-              close("cancel");
-            }
-          }
-
-          overlay.addEventListener("click", (e) => {
-            if (e.target === overlay) close("cancel");
-          });
-          btnCancel.addEventListener("click", () => close("cancel"));
-          btnClear.addEventListener("click", () => close("clear"));
-          btnLocal.addEventListener("click", () => close("local"));
-          btnGlobal.addEventListener("click", () => close("global"));
-          window.addEventListener("keydown", onKeyDown);
-
-          document.body.appendChild(overlay);
-          textarea.focus();
-          textarea.select();
+        return ui.openTextEditorModal({
+          title: String(options?.title || "Sửa mô tả"),
+          value: String(options?.value ?? ""),
+          placeholder: "Nhập mô tả...",
+          hint: "Chọn phạm vi cập nhật:",
+          actions: [
+            { key: "cancel", label: "Hủy" },
+            { key: "clear", label: "Xóa mô tả" },
+            { key: "local", label: "Chỉ template hiện tại" },
+            { key: "global", label: "Toàn bộ template", className: "btn btn-primary" },
+          ],
         });
       }
 
@@ -13239,149 +13522,24 @@
       }
 
       function openDescriptionEditorDialogForTargets(options) {
-        const titleText = String(options?.title || "Sửa mô tả");
-        const targets = Array.isArray(options?.targets) ? options.targets : [];
-        const initialByKey = options?.initialByKey && typeof options.initialByKey === "object" ? options.initialByKey : {};
-        const initialKey = String(options?.initialKey || (targets[0] ? targets[0].key : "") || "").trim();
+        if (typeof ui.openTextEditorModal !== "function") {
+          return Promise.resolve({ action: "cancel", value: "", targetKey: "" });
+        }
 
-        return new Promise((resolve) => {
-          const overlay = document.createElement("div");
-          overlay.className = "demo-modal";
-
-          const dialog = document.createElement("div");
-          dialog.className = "demo-modal__dialog";
-          overlay.appendChild(dialog);
-
-          const title = document.createElement("div");
-          title.className = "demo-modal__title";
-          title.textContent = titleText;
-          dialog.appendChild(title);
-
-          let selectedKey = initialKey;
-          const draftByKey = new Map();
-
-          function getInitialForKey(key) {
-            return String(initialByKey[String(key || "")] ?? "");
-          }
-
-          for (const t of targets) {
-            const k = String(t?.key || "").trim();
-            if (!k) continue;
-            draftByKey.set(k, getInitialForKey(k));
-          }
-
-          let select = null;
-          if (targets.length > 1) {
-            const row = document.createElement("div");
-            row.style.display = "flex";
-            row.style.gap = "8px";
-            row.style.alignItems = "center";
-            row.style.marginBottom = "8px";
-
-            const label = document.createElement("div");
-            label.textContent = "Đối tượng:";
-            label.style.minWidth = "64px";
-            row.appendChild(label);
-
-            select = document.createElement("select");
-            select.className = "input";
-            select.style.flex = "1";
-            for (const t of targets) {
-              const key = String(t?.key || "").trim();
-              const labelText = String(t?.label || "").trim() || key;
-              if (!key) continue;
-              const opt = document.createElement("option");
-              opt.value = key;
-              opt.textContent = labelText;
-              select.appendChild(opt);
-            }
-            if (selectedKey) select.value = selectedKey;
-            row.appendChild(select);
-
-            dialog.appendChild(row);
-          }
-
-          const textarea = document.createElement("textarea");
-          textarea.className = "input demo-modal__textarea";
-          textarea.value = selectedKey ? draftByKey.get(selectedKey) || "" : "";
-          textarea.placeholder = "Nhập mô tả...";
-          dialog.appendChild(textarea);
-
-          const hint = document.createElement("div");
-          hint.className = "demo-modal__hint";
-          hint.textContent = "Chọn phạm vi cập nhật:";
-          dialog.appendChild(hint);
-
-          const actions = document.createElement("div");
-          actions.className = "demo-modal__actions";
-          dialog.appendChild(actions);
-
-          const btnCancel = document.createElement("button");
-          btnCancel.type = "button";
-          btnCancel.className = "btn";
-          btnCancel.textContent = "Hủy";
-
-          const btnClear = document.createElement("button");
-          btnClear.type = "button";
-          btnClear.className = "btn";
-          btnClear.textContent = "Xóa mô tả";
-
-          const btnLocal = document.createElement("button");
-          btnLocal.type = "button";
-          btnLocal.className = "btn";
-          btnLocal.textContent = "Chỉ template hiện tại";
-
-          const btnGlobal = document.createElement("button");
-          btnGlobal.type = "button";
-          btnGlobal.className = "btn btn-primary";
-          btnGlobal.textContent = "Toàn bộ template";
-
-          actions.appendChild(btnCancel);
-          actions.appendChild(btnClear);
-          actions.appendChild(btnLocal);
-          actions.appendChild(btnGlobal);
-
-          function cleanup() {
-            window.removeEventListener("keydown", onKeyDown);
-            overlay.remove();
-          }
-
-          function close(action) {
-            if (selectedKey) draftByKey.set(selectedKey, textarea.value);
-            const value = selectedKey ? draftByKey.get(selectedKey) || "" : textarea.value;
-            cleanup();
-            resolve({ action, value, targetKey: selectedKey });
-          }
-
-          function onKeyDown(e) {
-            if (e.key === "Escape") {
-              e.preventDefault();
-              close("cancel");
-            }
-          }
-
-          if (select) {
-            select.addEventListener("change", () => {
-              if (selectedKey) draftByKey.set(selectedKey, textarea.value);
-              selectedKey = String(select.value || "").trim();
-              textarea.value = selectedKey ? draftByKey.get(selectedKey) || "" : "";
-              textarea.focus();
-              textarea.select();
-            });
-          }
-
-          overlay.addEventListener("click", (e) => {
-            if (e.target === overlay) close("cancel");
-          });
-          btnCancel.addEventListener("click", () => close("cancel"));
-          btnClear.addEventListener("click", () => close("clear"));
-          btnLocal.addEventListener("click", () => close("local"));
-          btnGlobal.addEventListener("click", () => close("global"));
-          window.addEventListener("keydown", onKeyDown);
-
-          document.body.appendChild(overlay);
-          textarea.focus();
-          textarea.select();
+        return ui.openTextEditorModal({
+          title: String(options?.title || "Sửa mô tả"),
+          targets: Array.isArray(options?.targets) ? options.targets : [],
+          initialByKey: options?.initialByKey && typeof options.initialByKey === "object" ? options.initialByKey : {},
+          initialKey: String(options?.initialKey || ""),
+          selectLabel: "Đối tượng:",
+          placeholder: "Nhập mô tả...",
+          hint: "Chọn phạm vi cập nhật:",
+          actions: [
+            { key: "cancel", label: "Hủy" },
+            { key: "clear", label: "Xóa mô tả" },
+            { key: "local", label: "Chỉ template hiện tại" },
+            { key: "global", label: "Toàn bộ template", className: "btn btn-primary" },
+          ],
         });
       }
 

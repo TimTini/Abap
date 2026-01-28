@@ -67,9 +67,7 @@ Private Sub SetupInputSheet(ByVal wsIn As Worksheet)
 
     wsIn.Columns("A").WrapText = False
 
-    wsIn.Range("B1").Value2 = U("S\u1ED1 th\u1EE9 t\u1EF1")
-    wsIn.Range("B1").Font.Bold = True
-    If Len(CStr(wsIn.Range("B2").Value2)) = 0 Then wsIn.Range("B2").Value2 = 1
+    wsIn.Range("B1:B2").ClearContents
 
     wsIn.Range("C1").Value2 = U("Tr\u1EA1ng th\u00E1i")
     wsIn.Range("C1").Font.Bold = True
@@ -79,12 +77,12 @@ Private Sub SetupInputSheet(ByVal wsIn As Worksheet)
 
     EnsureButton wsIn, "btnLoadXml", U("N\u1EA1p XML"), "LoadXmlFromFile", 320, 32
     EnsureButton wsIn, "btnListObjects", U("Danh s\u00E1ch \u0111\u1ED1i t\u01B0\u1EE3ng"), "LoadObjectListFromXml", 320, 72
-    EnsureButton wsIn, "btnGenerateOne", U("T\u1EA1o theo s\u1ED1 th\u1EE9 t\u1EF1"), "GenerateTemplateFromXml", 320, 112
     EnsureButton wsIn, "btnGenerateAll", U("T\u1EA1o to\u00E0n b\u1ED9/\u0111\u00E3 ch\u1ECDn"), "GenerateAllTemplatesFromXml", 320, 152
     EnsureButton wsIn, "btnResetTplCfg", U("Kh\u00F4i ph\u1EE5c template"), "ResetTemplateConfig", 320, 192
     EnsureButton wsIn, "btnSelectAll", U("Ch\u1ECDn t\u1EA5t c\u1EA3"), "SelectAllObjects", 320, 232
     EnsureButton wsIn, "btnClearSelected", U("B\u1ECF ch\u1ECDn"), "ClearSelectedObjects", 320, 272
     RemoveButton wsIn, "btnGenerate"
+    RemoveButton wsIn, "btnGenerateOne"
 End Sub
 
 Private Sub SetupTemplateConfigSheet(ByVal wsCfg As Worksheet)
@@ -121,97 +119,6 @@ Public Sub ResetTemplateConfig()
     SeedDefaultTemplateConfig wsCfg
 
     MsgBox U("\u0110\u00E3 kh\u00F4i ph\u1EE5c c\u1EA5u h\u00ECnh template."), vbInformation
-End Sub
-
-Public Sub GenerateTemplateFromXml()
-    Dim wsIn As Worksheet
-    Set wsIn = GetOrCreateWorksheet(ThisWorkbook, SHEET_INPUT)
-
-    Dim wsCfg As Worksheet
-    Set wsCfg = GetOrCreateWorksheet(ThisWorkbook, SHEET_TEMPLATE_CONFIG)
-
-    Dim wsTpl As Worksheet
-    Set wsTpl = GetOrCreateWorksheet(ThisWorkbook, SHEET_TEMPLATE)
-
-    Dim inputText As String
-    inputText = ReadXmlInputFromSheet(wsIn)
-    If Len(Trim$(inputText)) = 0 Then
-        MsgBox U("XML tr\u1ED1ng. D\u00E1n XML export v\u00E0o c\u1ED9t A t\u1EEB A2 ho\u1EB7c b\u1EA5m 'N\u1EA1p XML'."), vbExclamation
-        Exit Sub
-    End If
-
-    Dim index1 As Long
-    index1 = CLng(Val(CStr(wsIn.Range("B2").Value2)))
-    If index1 <= 0 Then index1 = 1
-
-    Dim doc As Object
-    Dim objectNodes As Object
-    If Not TryLoadObjectsExportXml(inputText, doc, objectNodes) Then Exit Sub
-
-    Dim objNode As Object
-    Set objNode = PickObjectNode(objectNodes, index1)
-    If objNode Is Nothing Then
-        MsgBox U("Kh\u00F4ng t\u00ECm th\u1EA5y \u0111\u1ED1i t\u01B0\u1EE3ng \u1EDF s\u1ED1 th\u1EE9 t\u1EF1 #") & CStr(index1) & ".", vbExclamation
-        Exit Sub
-    End If
-
-    Dim templateId As String
-    templateId = SafeAttr(objNode, "templateId")
-
-    Dim objectId As String
-    objectId = SafeAttr(objNode, "objectId")
-
-    Dim templateKey As String
-    templateKey = Trim$(templateId)
-    If Len(templateKey) = 0 Then templateKey = Trim$(objectId)
-
-    If Len(templateKey) = 0 Then
-        MsgBox U("\u0110\u1ED1i t\u01B0\u1EE3ng \u0111\u01B0\u1EE3c ch\u1ECDn kh\u00F4ng c\u00F3 templateId/objectId."), vbExclamation
-        Exit Sub
-    End If
-
-    Dim sample As Range
-    Set sample = GetTemplateSampleRange(wsCfg, templateKey)
-    If sample Is Nothing Then
-        Dim available As String
-        available = JoinTemplateKeys(wsCfg)
-        MsgBox U("Kh\u00F4ng t\u00ECm th\u1EA5y c\u1EA5u h\u00ECnh template cho: ") & templateKey & IIf(Len(available) > 0, vbCrLf & vbCrLf & U("C\u00F3 s\u1EB5n: ") & available, ""), vbExclamation
-        Exit Sub
-    End If
-
-    Dim ctxNode As Object
-    Set ctxNode = objNode.selectSingleNode("context")
-    If ctxNode Is Nothing Then
-        MsgBox U("\u0110\u1ED1i t\u01B0\u1EE3ng kh\u00F4ng c\u00F3 n\u00FAt <context>."), vbExclamation
-        Exit Sub
-    End If
-
-    wsTpl.Cells.Clear
-
-    Dim dest As Range
-    Set dest = wsTpl.Range("A1")
-    CopyRangeWithDimensions sample, dest
-
-    Dim outRange As Range
-    Set outRange = wsTpl.Range(dest, dest.Offset(sample.Rows.Count - 1, sample.Columns.Count - 1))
-    Dim removeEmpty As Boolean
-    removeEmpty = ShouldRemoveEmptyRows(wsCfg, templateKey)
-    Dim removeAdv As Boolean
-    removeAdv = ShouldRemoveEmptyRowsAdvanced(wsCfg, templateKey)
-
-    Dim rowInfo As Object
-    If removeAdv Then Set rowInfo = CreateObject("Scripting.Dictionary")
-
-    FillRangePlaceholders outRange, ctxNode, rowInfo
-    If removeAdv Then
-        RemoveEmptyRowsInRangeAdvanced outRange, rowInfo
-    ElseIf removeEmpty Then
-        RemoveEmptyRowsInRange outRange
-    End If
-
-    UpdateStatus wsIn, U("\u0110\u00E3 t\u1EA1o: templateId=") & templateId & " objectId=" & objectId & " resultId=" & SafeAttr(objNode, "resultId")
-
-    MsgBox U("Ho\u00E0n t\u1EA5t. Template \u0111\u00E3 ghi v\u00E0o sheet '") & SHEET_TEMPLATE & "'.", vbInformation
 End Sub
 
 Private Function ReadXmlInputFromSheet(ByVal wsIn As Worksheet) As String
@@ -942,18 +849,30 @@ End Function
 Private Function RemoveEmptyRowsInRange(ByVal targetRange As Range) As Long
     Dim removed As Long
     Dim r As Long
+    Dim deleteRange As Range
+
     For r = targetRange.Rows.Count To 1 Step -1
-        If IsRowBlank(targetRange.Rows(r)) Then
-            targetRange.Rows(r).EntireRow.Delete
+        Dim rowRange As Range
+        Set rowRange = targetRange.Rows(r)
+        If IsRowBlank(rowRange) Then
+            If deleteRange Is Nothing Then
+                Set deleteRange = rowRange.EntireRow
+            Else
+                Set deleteRange = Union(deleteRange, rowRange.EntireRow)
+            End If
             removed = removed + 1
         End If
     Next r
+
+    If Not deleteRange Is Nothing Then deleteRange.Delete
     RemoveEmptyRowsInRange = removed
 End Function
 
 Private Function RemoveEmptyRowsInRangeAdvanced(ByVal targetRange As Range, ByVal rowInfo As Object) As Long
     Dim removed As Long
     Dim r As Long
+    Dim deleteRange As Range
+
     For r = targetRange.Rows.Count To 1 Step -1
         Dim rowRange As Range
         Set rowRange = targetRange.Rows(r)
@@ -978,10 +897,16 @@ Private Function RemoveEmptyRowsInRangeAdvanced(ByVal targetRange As Range, ByVa
         End If
 
         If removable Then
-            rowRange.EntireRow.Delete
+            If deleteRange Is Nothing Then
+                Set deleteRange = rowRange.EntireRow
+            Else
+                Set deleteRange = Union(deleteRange, rowRange.EntireRow)
+            End If
             removed = removed + 1
         End If
     Next r
+
+    If Not deleteRange Is Nothing Then deleteRange.Delete
     RemoveEmptyRowsInRangeAdvanced = removed
 End Function
 

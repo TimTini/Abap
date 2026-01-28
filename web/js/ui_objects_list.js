@@ -6,6 +6,134 @@
   const ui = ns.ui;
   const state = ui.state;
 
+  function originLabel(origin) {
+    const kind = String(origin?.kind || "").trim().toUpperCase();
+    const key = String(origin?.key || "").trim();
+
+    if (kind === "DECL") {
+      const vn = String(origin?.entity?.variableName || "").trim();
+      if (vn) return vn;
+      return String(origin?.name || "").trim();
+    }
+
+    if (kind === "PARAM") {
+      const pn = String(origin?.entity?.name || "").trim();
+      if (pn) return pn;
+      return String(origin?.name || "").trim();
+    }
+
+    if (kind === "TYPEFIELD") {
+      const m = /^TYPEFIELD:[^:]*:([^:]+):(.+)$/.exec(key);
+      if (m) return `${m[1]}-${m[2]}`;
+      return String(origin?.name || "").trim();
+    }
+
+    return String(origin?.name || "").trim() || key;
+  }
+
+  function editSourceDescription(source) {
+    if (typeof ui.openTextEditorModal !== "function") return;
+    if (!desc?.describeExpressionWithOrigin || !ns.notes?.setEntry) {
+      ui.setStatus("Thiếu module mô tả để sửa.", true);
+      return;
+    }
+
+    const callerKey = String(source?.callerKey || "").trim();
+    const actualExpr = String(source?.actualExpr || "").trim();
+    if (!callerKey || !actualExpr) {
+      ui.setStatus("Không có biểu thức nguồn để sửa.", true);
+      return;
+    }
+
+    const model = state.model;
+    if (!model) return;
+
+    const described = desc.describeExpressionWithOrigin(model, callerKey, actualExpr) || {};
+    const origins = Array.isArray(described.origins) ? described.origins : [];
+    if (!origins.length) {
+      ui.setStatus("Không xác định được đối tượng nguồn.", true);
+      return;
+    }
+
+    const targets = [];
+    const initialByKey = {};
+    const seen = new Set();
+    for (const o of origins) {
+      const key = String(o?.key || "").trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      targets.push({ key, label: originLabel(o), origin: o });
+      const fallback = String(o?.name || "").trim();
+      initialByKey[key] = typeof desc?.pickDescription === "function" ? desc.pickDescription(o?.entity || null, fallback) : fallback;
+    }
+
+    const initialKey = targets[0]?.key || "";
+    ui
+      .openTextEditorModal({
+        title: "Mô tả nguồn",
+        targets,
+        initialByKey,
+        initialKey,
+        selectLabel: "Đối tượng:",
+        placeholder: "Nhập mô tả...",
+        actions: [
+          { key: "cancel", label: "Hủy" },
+          { key: "clear", label: "Xóa mô tả" },
+          { key: "save", label: "Lưu", className: "btn btn-primary" },
+        ],
+      })
+      .then(({ action, value, targetKey }) => {
+        if (action === "cancel") return;
+        const tk = String(targetKey || initialKey || "").trim();
+        if (!tk) {
+          ui.setStatus("Không xác định được đối tượng để lưu.", true);
+          return;
+        }
+        const nextValue = action === "clear" ? "" : String(value || "").trim();
+        ns.notes.setEntry(tk, { description: nextValue });
+        if (model && ns.notes?.applyToModel) ns.notes.applyToModel(model);
+        ui.renderObjectsTable();
+        ui.renderDetails();
+        ui.setStatus(action === "clear" ? "Đã xóa mô tả." : "Đã lưu mô tả.", false);
+      });
+  }
+
+  function applyRoutineDescription(key, descText) {
+    const notes = ns.notes;
+    if (notes?.setEntry) notes.setEntry(key, { description: descText });
+
+    const model = state.model;
+    if (!model) return;
+    if (String(key) === "PROGRAM") {
+      if (descText) model.userDescription = descText;
+      else delete model.userDescription;
+      return;
+    }
+
+    const node = model.nodes?.get ? model.nodes.get(key) : null;
+    if (!node) return;
+    if (descText) node.userDescription = descText;
+    else delete node.userDescription;
+  }
+
+  function applyParamDescription(routineKey, paramName, descText) {
+    const notes = ns.notes;
+    if (notes?.makeParamKey && notes?.setEntry) {
+      const key = notes.makeParamKey(routineKey, paramName);
+      if (key) notes.setEntry(key, { description: descText });
+    }
+
+    const model = state.model;
+    const node = model?.nodes?.get ? model.nodes.get(routineKey) : null;
+    if (!node || !Array.isArray(node.params)) return;
+
+    const target =
+      node.params.find((p) => String(p?.name || "").trim().toLowerCase() === String(paramName || "").trim().toLowerCase()) || null;
+    if (!target) return;
+    if (descText) target.userDescription = descText;
+    else delete target.userDescription;
+  }
+
   function getRoutineDescription(obj, model) {
     if (!obj) return "";
     if (obj.key === "PROGRAM") {
@@ -255,6 +383,36 @@
 
         const sourceRef = p?.sourceRef || obj?.sourceRef || null;
         tr.addEventListener("click", () => selectObject(obj.key, { paramKey, sourceRef }));
+
+        const descCell = tr.querySelector("td:last-child");
+        if (descCell) {
+          descCell.classList.add("objects-desc-editable");
+          descCell.title = "Double-click để sửa mô tả";
+          descCell.addEventListener("dblclick", (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            if (typeof ui.openTextEditorModal !== "function") return;
+            ui
+              .openTextEditorModal({
+                title: `Mô tả tham số ${kind} ${name}`,
+                value: desc,
+                placeholder: "Nhập mô tả...",
+                actions: [
+                  { key: "cancel", label: "Hủy" },
+                  { key: "clear", label: "Xóa mô tả" },
+                  { key: "save", label: "Lưu", className: "btn btn-primary" },
+                ],
+              })
+              .then(({ action, value }) => {
+                if (action === "cancel") return;
+                const nextValue = action === "clear" ? "" : String(value || "").trim();
+                applyParamDescription(obj.key, name, nextValue);
+                ui.renderObjectsTable();
+                ui.renderDetails();
+                ui.setStatus("Đã lưu mô tả.", false);
+              });
+          });
+        }
       } else if (row.rowKind === "source") {
         const p = row.param;
         const kind = String(p?.kind || "").trim();
@@ -293,6 +451,17 @@
 
         const sourceRef = s?.originSourceRef || s?.callSourceRef || obj?.sourceRef || null;
         tr.addEventListener("click", () => selectObject(obj.key, { paramKey, sourceRef }));
+
+        const descCellEl = tr.querySelector("td:last-child");
+        if (descCellEl) {
+          descCellEl.classList.add("objects-desc-editable");
+          descCellEl.title = "Double-click để sửa mô tả";
+          descCellEl.addEventListener("dblclick", (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            editSourceDescription(s || {});
+          });
+        }
       } else {
         tr.dataset.key = obj.key;
         if (obj.key === state.selectedKey && !state.selectedParamKey) tr.classList.add("is-selected");
@@ -320,6 +489,38 @@
 
         const sourceRef = obj?.sourceRef || null;
         tr.addEventListener("click", () => selectObject(obj.key, { paramKey: "", sourceRef }));
+
+        const descCell = tr.querySelector("td:last-child");
+        if (descCell) {
+          descCell.classList.add("objects-desc-editable");
+          descCell.title = "Double-click để sửa mô tả";
+          descCell.addEventListener("dblclick", (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            if (typeof ui.openTextEditorModal !== "function") return;
+            const key = String(obj.key || "");
+            const title = key === "PROGRAM" ? "Mô tả PROGRAM" : `Mô tả ${obj.kind} ${obj.name}`;
+            ui
+              .openTextEditorModal({
+                title,
+                value: desc,
+                placeholder: "Nhập mô tả...",
+                actions: [
+                  { key: "cancel", label: "Hủy" },
+                  { key: "clear", label: "Xóa mô tả" },
+                  { key: "save", label: "Lưu", className: "btn btn-primary" },
+                ],
+              })
+              .then(({ action, value }) => {
+                if (action === "cancel") return;
+                const nextValue = action === "clear" ? "" : String(value || "").trim();
+                applyRoutineDescription(key, nextValue);
+                ui.renderObjectsTable();
+                ui.renderDetails();
+                ui.setStatus("Đã lưu mô tả.", false);
+              });
+          });
+        }
 
         const toggleBtn = tr.querySelector("button.objects-tree-toggle");
         if (toggleBtn) {
