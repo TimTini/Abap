@@ -194,7 +194,20 @@ Public Sub GenerateTemplateFromXml()
 
     Dim outRange As Range
     Set outRange = wsTpl.Range(dest, dest.Offset(sample.Rows.Count - 1, sample.Columns.Count - 1))
-    FillRangePlaceholders outRange, ctxNode
+    Dim removeEmpty As Boolean
+    removeEmpty = ShouldRemoveEmptyRows(wsCfg, templateKey)
+    Dim removeAdv As Boolean
+    removeAdv = ShouldRemoveEmptyRowsAdvanced(wsCfg, templateKey)
+
+    Dim rowInfo As Object
+    If removeAdv Then Set rowInfo = CreateObject("Scripting.Dictionary")
+
+    FillRangePlaceholders outRange, ctxNode, rowInfo
+    If removeAdv Then
+        RemoveEmptyRowsInRangeAdvanced outRange, rowInfo
+    ElseIf removeEmpty Then
+        RemoveEmptyRowsInRange outRange
+    End If
 
     UpdateStatus wsIn, U("\u0110\u00E3 t\u1EA1o: templateId=") & templateId & " objectId=" & objectId & " resultId=" & SafeAttr(objNode, "resultId")
 
@@ -610,9 +623,26 @@ Public Sub GenerateAllTemplatesFromXml()
 
         Dim outRange As Range
         Set outRange = wsTpl.Range(dest, dest.Offset(sample.Rows.Count - 1, sample.Columns.Count - 1))
-        FillRangePlaceholders outRange, ctxNode
+        Dim removeEmpty As Boolean
+        removeEmpty = ShouldRemoveEmptyRows(wsCfg, templateKey)
+        Dim removeAdv As Boolean
+        removeAdv = ShouldRemoveEmptyRowsAdvanced(wsCfg, templateKey)
 
-        rowPtr = rowPtr + sample.Rows.Count + BLOCK_GAP_ROWS
+        Dim rowInfo As Object
+        If removeAdv Then Set rowInfo = CreateObject("Scripting.Dictionary")
+
+        FillRangePlaceholders outRange, ctxNode, rowInfo
+
+        Dim removed As Long
+        If removeAdv Then
+            removed = RemoveEmptyRowsInRangeAdvanced(outRange, rowInfo)
+        ElseIf removeEmpty Then
+            removed = RemoveEmptyRowsInRange(outRange)
+        Else
+            removed = 0
+        End If
+
+        rowPtr = rowPtr + (sample.Rows.Count - removed) + BLOCK_GAP_ROWS
 
 NextObj:
         If stepIndex Mod 20 = 0 Or stepIndex = totalCount Then
@@ -758,7 +788,7 @@ Private Sub CopyRangeWithRowHeights(ByVal src As Range, ByVal dstTopLeft As Rang
     Next r
 End Sub
 
-Private Sub FillRangePlaceholders(ByVal targetRange As Range, ByVal contextNode As Object)
+Private Sub FillRangePlaceholders(ByVal targetRange As Range, ByVal contextNode As Object, Optional ByVal rowInfo As Object = Nothing)
     Dim cell As Range
     For Each cell In targetRange.Cells
         If VarType(cell.Value2) <> vbString Then GoTo NextCell
@@ -766,18 +796,220 @@ Private Sub FillRangePlaceholders(ByVal targetRange As Range, ByVal contextNode 
         Dim raw As String
         raw = CStr(cell.Value2)
 
-        If InStr(1, raw, "{", vbBinaryCompare) = 0 Or InStr(1, raw, "}", vbBinaryCompare) = 0 Then GoTo NextCell
+        Dim hasPlaceholder As Boolean
+        hasPlaceholder = (InStr(1, raw, "{", vbBinaryCompare) > 0 And InStr(1, raw, "}", vbBinaryCompare) > 0)
 
-        Dim replaced As String
-        replaced = ReplacePlaceholders(raw, contextNode)
+        Dim tokenHasValue As Boolean
+        tokenHasValue = False
 
-        If replaced <> raw Then cell.Value2 = replaced
+        If hasPlaceholder Then
+            Dim replaced As String
+            replaced = ReplacePlaceholders(raw, contextNode, tokenHasValue)
+            If replaced <> raw Then cell.Value2 = replaced
+        End If
+
+        If Not rowInfo Is Nothing Then
+            UpdateRowInfo rowInfo, cell.Row, hasPlaceholder, tokenHasValue
+        End If
 
 NextCell:
     Next cell
 End Sub
 
-Private Function ReplacePlaceholders(ByVal text As String, ByVal contextNode As Object) As String
+Private Function ShouldRemoveEmptyRows(ByVal wsCfg As Worksheet, ByVal templateKey As String) As Boolean
+    ShouldRemoveEmptyRows = True
+
+    Dim tlMarker As String, trMarker As String
+    tlMarker = MakeMarker(templateKey, "TL")
+    trMarker = MakeMarker(templateKey, "TR")
+
+    Dim tl As Range, tr As Range
+    Set tl = FindMarkerCell(wsCfg, tlMarker)
+    Set tr = FindMarkerCell(wsCfg, trMarker)
+    If tl Is Nothing Or tr Is Nothing Then Exit Function
+    If tl.Row <> tr.Row Then Exit Function
+
+    Dim c As Long
+    For c = tl.Column + 1 To tr.Column - 1
+        Dim v As Variant
+        v = wsCfg.Cells(tl.Row, c).Value2
+        If VarType(v) = vbString Then
+            Dim flag As Boolean
+            If ParseBoolOption(CStr(v), "removeEmptyRows", flag) Then
+                ShouldRemoveEmptyRows = flag
+                Exit Function
+            End If
+            If ParseBoolOption(CStr(v), "compact.removeEmptyRows", flag) Then
+                ShouldRemoveEmptyRows = flag
+                Exit Function
+            End If
+        End If
+    Next c
+End Function
+
+Private Function ShouldRemoveEmptyRowsAdvanced(ByVal wsCfg As Worksheet, ByVal templateKey As String) As Boolean
+    ShouldRemoveEmptyRowsAdvanced = True
+
+    Dim tlMarker As String, trMarker As String
+    tlMarker = MakeMarker(templateKey, "TL")
+    trMarker = MakeMarker(templateKey, "TR")
+
+    Dim tl As Range, tr As Range
+    Set tl = FindMarkerCell(wsCfg, tlMarker)
+    Set tr = FindMarkerCell(wsCfg, trMarker)
+    If tl Is Nothing Or tr Is Nothing Then Exit Function
+    If tl.Row <> tr.Row Then Exit Function
+
+    Dim c As Long
+    For c = tl.Column + 1 To tr.Column - 1
+        Dim v As Variant
+        v = wsCfg.Cells(tl.Row, c).Value2
+        If VarType(v) = vbString Then
+            Dim flag As Boolean
+            If ParseBoolOption(CStr(v), "removeEmptyRowsAdvanced", flag) Then
+                ShouldRemoveEmptyRowsAdvanced = flag
+                Exit Function
+            End If
+            If ParseBoolOption(CStr(v), "removeEmptyRowsAdv", flag) Then
+                ShouldRemoveEmptyRowsAdvanced = flag
+                Exit Function
+            End If
+            If ParseBoolOption(CStr(v), "compact.removeEmptyRowsAdvanced", flag) Then
+                ShouldRemoveEmptyRowsAdvanced = flag
+                Exit Function
+            End If
+            If ParseBoolOption(CStr(v), "compact.removeEmptyRowsAdv", flag) Then
+                ShouldRemoveEmptyRowsAdvanced = flag
+                Exit Function
+            End If
+        End If
+    Next c
+End Function
+
+Private Function ParseBoolOption(ByVal text As String, ByVal key As String, ByRef outValue As Boolean) As Boolean
+    Dim s As String
+    s = LCase$(Trim$(CStr(text)))
+    If Len(s) = 0 Then Exit Function
+
+    Dim k As String
+    k = LCase$(Trim$(CStr(key)))
+    If Len(k) = 0 Then Exit Function
+
+    If s = k Then
+        outValue = True
+        ParseBoolOption = True
+        Exit Function
+    End If
+
+    If Left$(s, Len(k)) <> k Then Exit Function
+
+    Dim rest As String
+    rest = Trim$(Mid$(s, Len(k) + 1))
+    If Len(rest) = 0 Then
+        outValue = True
+        ParseBoolOption = True
+        Exit Function
+    End If
+
+    Dim firstCh As String
+    firstCh = Left$(rest, 1)
+    If firstCh = "=" Or firstCh = ":" Then rest = Trim$(Mid$(rest, 2))
+
+    If IsTruthy(rest) Then
+        outValue = True
+        ParseBoolOption = True
+        Exit Function
+    End If
+    If IsFalsy(rest) Then
+        outValue = False
+        ParseBoolOption = True
+        Exit Function
+    End If
+End Function
+
+Private Function IsTruthy(ByVal text As String) As Boolean
+    Dim s As String
+    s = LCase$(Trim$(CStr(text)))
+    If s = "1" Or s = "true" Or s = "yes" Or s = "y" Or s = "on" Then IsTruthy = True
+End Function
+
+Private Function IsFalsy(ByVal text As String) As Boolean
+    Dim s As String
+    s = LCase$(Trim$(CStr(text)))
+    If s = "0" Or s = "false" Or s = "no" Or s = "n" Or s = "off" Then IsFalsy = True
+End Function
+
+Private Function RemoveEmptyRowsInRange(ByVal targetRange As Range) As Long
+    Dim removed As Long
+    Dim r As Long
+    For r = targetRange.Rows.Count To 1 Step -1
+        If IsRowBlank(targetRange.Rows(r)) Then
+            targetRange.Rows(r).EntireRow.Delete
+            removed = removed + 1
+        End If
+    Next r
+    RemoveEmptyRowsInRange = removed
+End Function
+
+Private Function RemoveEmptyRowsInRangeAdvanced(ByVal targetRange As Range, ByVal rowInfo As Object) As Long
+    Dim removed As Long
+    Dim r As Long
+    For r = targetRange.Rows.Count To 1 Step -1
+        Dim rowRange As Range
+        Set rowRange = targetRange.Rows(r)
+
+        Dim removable As Boolean
+        removable = IsRowBlank(rowRange)
+
+        If Not removable And Not rowInfo Is Nothing Then
+            Dim key As String
+            key = CStr(rowRange.Row)
+            If rowInfo.Exists(key) Then
+                Dim info As Object
+                Set info = rowInfo(key)
+                If info.Exists("hasPlaceholder") Then
+                    If info("hasPlaceholder") = True Then
+                        If Not info.Exists("hasValue") Or info("hasValue") <> True Then
+                            removable = True
+                        End If
+                    End If
+                End If
+            End If
+        End If
+
+        If removable Then
+            rowRange.EntireRow.Delete
+            removed = removed + 1
+        End If
+    Next r
+    RemoveEmptyRowsInRangeAdvanced = removed
+End Function
+
+Private Function IsRowBlank(ByVal rowRange As Range) As Boolean
+    Dim cell As Range
+    For Each cell In rowRange.Cells
+        Dim v As Variant
+        v = cell.Value2
+        If IsError(v) Then
+            IsRowBlank = False
+            Exit Function
+        End If
+        If IsEmpty(v) Then GoTo NextCell
+        If VarType(v) = vbString Then
+            If Len(Trim$(CStr(v))) > 0 Then
+                IsRowBlank = False
+                Exit Function
+            End If
+        Else
+            IsRowBlank = False
+            Exit Function
+        End If
+NextCell:
+    Next cell
+    IsRowBlank = True
+End Function
+
+Private Function ReplacePlaceholders(ByVal text As String, ByVal contextNode As Object, Optional ByRef anyTokenValue As Boolean = False) As String
     Dim s As String
     s = CStr(text)
 
@@ -809,9 +1041,10 @@ Private Function ReplacePlaceholders(ByVal text As String, ByVal contextNode As 
 
         Dim tokenValue As String
         If Len(token) > 0 And TryResolveXmlPath(contextNode, token, tokenValue) Then
+            If Len(Trim$(CStr(tokenValue))) > 0 Then anyTokenValue = True
             out = out & tokenValue
         Else
-            out = out & "{" & token & "}"
+            out = out & vbNullString
         End If
 
         pos = closePos + 1
@@ -819,6 +1052,24 @@ Private Function ReplacePlaceholders(ByVal text As String, ByVal contextNode As 
 
     ReplacePlaceholders = out
 End Function
+
+Private Sub UpdateRowInfo(ByVal rowInfo As Object, ByVal rowIndex As Long, ByVal hasPlaceholder As Boolean, ByVal tokenHasValue As Boolean)
+    If rowInfo Is Nothing Then Exit Sub
+
+    Dim key As String
+    key = CStr(rowIndex)
+
+    Dim info As Object
+    If rowInfo.Exists(key) Then
+        Set info = rowInfo(key)
+    Else
+        Set info = CreateObject("Scripting.Dictionary")
+        rowInfo.Add key, info
+    End If
+
+    If hasPlaceholder Then info("hasPlaceholder") = True
+    If tokenHasValue Then info("hasValue") = True
+End Sub
 
 Private Function TryResolveXmlPath(ByVal baseNode As Object, ByVal path As String, ByRef outValue As String) As Boolean
     On Error GoTo Fail
