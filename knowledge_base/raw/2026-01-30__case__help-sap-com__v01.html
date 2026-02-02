@@ -1,0 +1,538 @@
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-16" /><meta http-equiv="X-UA-Compatible" content="IE=edge" /><meta charset="utf-8" /><link rel="shortcut icon" href="ABAPIcon.ico" type="image/ico" /><title>CASE | ABAP Keyword Documentation</title><script id="sap-ui-bootstrap" src="https://ui5.sap.com/1.136.4/resources/sap-ui-core.js" data-sap-ui-async="true" data-sap-ui-theme="sap_horizon" data-sap-ui-libs="sap.m" data-sap-ui-xx-bindingsyntax="complex"> </script><script id="main_page_xml" type="text/xmldata"><mvc:View xmlns="sap.m" xmlns:blocks="sap.uxap.blocks" xmlns:code="sap.ui.codeeditor" xmlns:core="sap.ui.core" xmlns:f="sap.f" xmlns:form="sap.ui.layout.form" xmlns:layout="sap.ui.layout" xmlns:mvc="sap.ui.core.mvc" xmlns:table="sap.ui.table" xmlns:tnt="sap.tnt" xmlns:uxap="sap.uxap" xmlns:xhtml="http://www.w3.org/1999/xhtml" controllerName="myController" height="100%" class="side-navigation-demo"><tnt:ToolPage id="toolPage"><tnt:header><f:ShellBar title="ABAP Keyword Documentation" secondTitle="Reference" showMenuButton="true" homeIcon="https://www.sap.com/dam/application/shared/logos/sap-logo-svg.svg.adapt.svg/1493030643828.svg" homeIconTooltip="Home" showNavButton="false" menuButtonPressed="onMenuButtonPress" homeIconPressed="onIconPress"></f:ShellBar></tnt:header><tnt:mainContents><Page id="page" showHeader="false" showNavButton="false" enableScrolling="true"><layout:DynamicSideContent id="DynamicSideContent" class="sapUiDSCExplored sapUiContentPadding" sideContentFallDown="BelowM" sideContentPosition="Begin" containerQuery="true" breakpointChanged="handleBreakpointChanged"><xhtml:div class="pageDiv"><uxap:ObjectPageLayout id="ObjectPageLayout" showTitleInHeaderContent="true" showEditHeaderButton="true" enableLazyLoading="true" editHeaderButtonPress="handleEditBtnPress" upperCaseAnchorBar="false" useIconTabBar="false"><uxap:headerTitle><uxap:ObjectPageDynamicHeaderTitle><uxap:breadcrumbs><Breadcrumbs currentLocationText="CASE"><Link text="ABAP - Keyword Documentation" href="{/breadcrumb1}" /><Link text="ABAP Programming Language" href="{/breadcrumb2}" /><Link text="ABAP - Program Flow Logic" href="{/breadcrumb3}" /><Link text="Control Structures" href="{/breadcrumb4}" /><Link text="Branches" href="{/breadcrumb5}" /></Breadcrumbs></uxap:breadcrumbs><uxap:expandedHeading><Title text="CASE" wrapping="true"></Title></uxap:expandedHeading><uxap:expandedContent><layout:VerticalLayout><HBox><core:Icon src="sap-icon://source-code"></core:Icon><Text renderWhitespace="true" text="  Keyword"></Text></HBox><HBox></HBox></layout:VerticalLayout></uxap:expandedContent><uxap:actions><ComboBox class="sapMLIBActionable" placeholder="ABAP Release 9.17" items="{path:'displayList>/Elements', sorter:{path:'text', descending: true}}" change="onChange"><core:Item key="{displayList>key}" text="{displayList>text}"></core:Item></ComboBox><Button text="News" press="handleNews" type="Ghost"></Button><Button icon="sap-icon://email" tooltip="Email us" press="onPress"></Button><OverflowToolbarButton icon="sap-icon://chain-link" tooltip="Get link" press="onPressAddress"></OverflowToolbarButton></uxap:actions></uxap:ObjectPageDynamicHeaderTitle></uxap:headerTitle><uxap:headerContent><layout:HorizontalLayout class="sapUiSmallMarginBeginEnd"><VBox><FormattedText htmlText="{/par1}"></FormattedText></VBox></layout:HorizontalLayout><layout:HorizontalLayout class="sapUiSmallMarginBeginEnd"><Text renderWhitespace="true" text="&#x9;&#x9;"></Text></layout:HorizontalLayout><layout:HorizontalLayout class="sapUiSmallMarginBeginEnd"></layout:HorizontalLayout></uxap:headerContent><uxap:sections><uxap:ObjectPageSection titleUppercase="false" title=""><uxap:subSections><uxap:ObjectPageSubSection titleUppercase="false"><uxap:blocks><VBox><form:SimpleForm title="Description" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanM="12" adjustLabelSpan="false" emptySpanXL="0" columnsXL="2"><form:content><VBox><FormattedText htmlText="{/par2}"></FormattedText><FormattedText htmlText="{/par3}"></FormattedText><FormattedText htmlText="{/ul1}"></FormattedText><FormattedText htmlText="{/par4}"></FormattedText><FormattedText htmlText="{/par5}"></FormattedText><FormattedText htmlText="{/par6}"></FormattedText><FormattedText htmlText="{/par7}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Hints" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanL="4" labelSpanM="12" labelSpanS="12" adjustLabelSpan="false" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="2" columnsL="2" columnsM="1"><form:content><VBox><FormattedText htmlText="{/ul2}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Example" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="-1" labelSpanL="4" labelSpanM="2" labelSpanS="12" adjustLabelSpan="true" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="1" columnsL="1" columnsM="1" singleContainerFullSize="false"><form:content><VBox><MessageStrip text="The programs and program extracts presented in the ABAP Keyword Documentation are only syntax examples and are not intended for direct use in a production system environment. The source texts of the examples are primarily intended to provide a better explanation and visualization of the syntax and semantics of ABAP statements and not to solve concrete programming tasks. For production application programs, a dedicated solution should therefore always be worked out for each individual case. The example can use demo artifacts that are not released as APIs for use in ABAP for Cloud Development." type="Warning" showIcon="true" class="sapUiMediumMarginBottom" enableFormattedText="true"></MessageStrip><FormattedText htmlText="{/par8}"></FormattedText><Button class="sapUiTinyMarginBeginEnd" icon="sap-icon://copy" tooltip="Copy example" press="onPressCopy1"></Button><code:CodeEditor type="abap" editable="false" value="{/code1}" maxLines="15" width="auto" id="copy1"></code:CodeEditor><FormattedText htmlText="{/par9}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Example" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="-1" labelSpanL="4" labelSpanM="2" labelSpanS="12" adjustLabelSpan="true" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="1" columnsL="1" columnsM="1" singleContainerFullSize="false"><form:content><VBox><MessageStrip text="The programs and program extracts presented in the ABAP Keyword Documentation are only syntax examples and are not intended for direct use in a production system environment. The source texts of the examples are primarily intended to provide a better explanation and visualization of the syntax and semantics of ABAP statements and not to solve concrete programming tasks. For production application programs, a dedicated solution should therefore always be worked out for each individual case. The example can use demo artifacts that are not released as APIs for use in ABAP for Cloud Development." type="Warning" showIcon="true" class="sapUiMediumMarginBottom" enableFormattedText="true"></MessageStrip><FormattedText htmlText="{/par10}"></FormattedText><Button class="sapUiTinyMarginBeginEnd" icon="sap-icon://copy" tooltip="Copy example" press="onPressCopy2"></Button><code:CodeEditor type="abap" editable="false" value="{/code2}" maxLines="15" width="auto" id="copy2"></code:CodeEditor><FormattedText htmlText="{/par11}"></FormattedText></VBox></form:content></form:SimpleForm><FormattedText htmlText="{/par12}"></FormattedText></VBox></uxap:blocks></uxap:ObjectPageSubSection></uxap:subSections></uxap:ObjectPageSection></uxap:sections></uxap:ObjectPageLayout></xhtml:div><layout:sideContent><HBox height="100%"><table:TreeTable id="treeTable" rows="{path:'displayModel>/TreeElements', parameters:{arrayNames:['children']}}" visibleRowCountMode="Auto" selectionMode="None"><table:toolbar><Toolbar><Button icon="sap-icon://expand-group" press="onExpandAll"></Button><Button icon="sap-icon://collapse-group" press="onCollapseAll"></Button><SearchField liveChange="onLiveSearch" search="onSearchSubmit"></SearchField></Toolbar></table:toolbar><table:rowSettingsTemplate></table:rowSettingsTemplate><table:Column autoResizable="true" width="auto"><Label text="Topics"></Label><table:template><Link href="{displayModel>object}.html" text="{displayModel>name}" emphasized="{= ${displayModel>object} === 'ABAPCASE' ? true : false}" /></table:template></table:Column></table:TreeTable></HBox></layout:sideContent></layout:DynamicSideContent><footer><Toolbar><ToolbarSpacer></ToolbarSpacer><Label text="ABAP for Cloud Development, &#x00A9;Copyright 2025 SAP SE. All rights reserved."></Label><ToolbarSpacer></ToolbarSpacer><Button icon="sap-icon://arrow-top" press="onScrollUp" tooltip="Scroll up" enabled="true"></Button></Toolbar></footer></Page></tnt:mainContents></tnt:ToolPage></mvc:View></script><link rel="stylesheet" href="layout.css" /><script type="text/javascript" src="global.js"></script><script type="text/javascript" src="defaultJsonTree.js"></script><script>
+          sap.ui.require([
+            'sap/ui/core/mvc/Controller',
+            'sap/ui/core/mvc/XMLView',
+            'sap/base/security/URLListValidator'
+          ],
+
+          function (Controller, XMLView, URLListValidator) {
+
+            URLListValidator.add('adt');
+            URLListValidator.add('http');
+            URLListValidator.add('https');
+
+              //'use strict';
+              //var clicked = 0;
+
+              sap.ui.controller("myController", {
+                  onInit: function() {
+
+                    /*Theme Setting*/
+                    if (window.matchMedia) {
+                      if(window.matchMedia('(prefers-color-scheme: dark)').matches){
+                        sap.ui.core.Configuration.setTheme("sap_horizon_dark");
+                      } else {
+                        sap.ui.core.Configuration.setTheme("sap_horizon");
+                      }
+                    } else {
+                      sap.ui.core.Configuration.setTheme("sap_horizon");
+                    }
+
+                     /*TreeTable*/
+                     
+                           var treeJson = A.getDefaultJsonTree();
+                       
+                     var DisplayModel = new sap.ui.model.json.JSONModel(treeJson);
+                     this.getView().setModel(DisplayModel, 'displayModel');
+                     var tree = this.getView().byId('treeTable');
+
+                     tree.expand(0);tree.expand(4);tree.expand(15);tree.expand(17);tree.expand(18);
+
+                     var oModel = new sap.ui.model.json.JSONModel({
+
+                        par1: "<pre><p><code class='code'>CASE operand.</code>\ <br><code class='code'>  <span class='meta_style'>[</span>WHEN operand1 <span class='meta_style'>[</span>OR operand2 <span class='meta_style'>[</span>OR operand3 <span class='meta_style'>[</span>...<span class='meta_style'>]</span><span class='meta_style'>]</span><span class='meta_style'>]</span>.</code>\ <br><code class='code'>    <span class='meta_style'>[</span>statement_block1<span class='meta_style'>]</span><span class='meta_style'>]</span></code>\ <br><code class='code'>  ...</code>\ <br><code class='code'>  <span class='meta_style'>[</span>WHEN OTHERS.</code>\ <br><code class='code'>    <span class='meta_style'>[</span>statement_blockn<span class='meta_style'>]</span><span class='meta_style'>]</span></code>\ <br><code class='code'>ENDCASE.</code></p></pre>",par2: "<p>Simple case distinction. These statements define a control structure that can contain multiple statement blocks <code class='code'>statement_block1</code>, ..., <code class='code'>statement_blockn</code>, of which a maximum of one is executed depending on the value of the operand <code class='code'>operand</code>.</p>",par3: "<p>Starting with the first <code class='code'>WHEN</code> statement, the system checks from top to bottom whether the content of the operand in <code class='code'>operand</code> matches the content of one of the operands <code class='code'>operand1</code>, <code class='code'>operand2</code>, .... The statement block is executed after the first match. If no matches are found, the statement block is executed after the statement <code class='code'>WHEN OTHERS</code>.</p>",par4: "<p>If the end of the executed statement block is reached or no statement block is executed, processing continues after <code class='code'>ENDCASE</code>.</p>",par5: "<p>The content is compared as illustrated in the following logical expression:</p>",par6: "<p><code class='code'>operand = operand1 <span class='meta_style'>[</span>OR operand = operand2 <br>                   <span class='meta_style'>[</span>OR operand = operand3 <span class='meta_style'>[</span>...<span class='meta_style'>]</span><span class='meta_style'>]</span><span class='meta_style'>]</span></code></p>",par7: "<p>The <a target='_parent' href='ABENLOGEXP_RULES_OPERANDS.html' class='blue'>comparison rules</a> for comparisons between any operands apply to this comparison, depending on the data types of the operands involved.</p>",par8: "<p>Branching of the program flow depending on the time of the day.</p>",par9: "<p></p>",par10: "<p>This example demonstrates that the calculation type of an arithmetic expression after <code class='code'>CASE</code> is determined only by its operands. The calculation type after the first <code class='code'>CASE</code> statement is <code class='code'>i</code> and the result of the calculation is 0. The comparison with the value 0 after <code class='code'>WHEN</code> is true regardless of its data type. The calculation type of the comparison after <code class='code'>IF</code> is <code class='code'>decfloat34</code>, however, and the result is false. To force a specific calculation type after <code class='code'>CASE</code>, an additional operand can be added as shown in the second <code class='code'>CASE</code> statement. This operand does not contribute to the calculation.</p>",par11: "<p></p>",par12: "<p></p>",ul1: "<ul><li class='list_style'>The operand <code class='code'>operand</code> after <code class='code'>CASE</code> is a <a target='_parent' href='ABENGENERAL_EXPR_POSITION_GLOSRY.html' class='green'>general expression position</a>.</li><li class='list_style'>The operands <code class='code'>operand1</code>, <code class='code'>operand2</code>, ... after <code class='code'>WHEN</code> are extended functional operand positions in which, however, <a target='_parent' href='ABENTABLE_EXPRESSION_GLOSRY.html' class='green'>table expressions</a> cannot be specified. This property of operand positions is obsolete and should no longer be used.</li></ul>",ul2: "<ul><li class='list_style'>For <code class='code'>operand</code>, the current value is used in every comparison. This may differ from the starting value if <code class='code'>operand</code> is a variable that is changed in a <a target='_parent' href='ABENFUNCTIONAL_METHOD_GLOSRY.html' class='green'>functional method</a> specified after a <code class='code'>WHEN</code> statement.</li><li class='list_style'>A <code class='code'>CASE</code> control structure is somewhat faster than a semantically equivalent <code class='code'>IF</code> control structure.</li><li class='list_style'>Functional methods and certain built-in functions can be specified after <code class='code'>WHEN</code>, however this should be avoided. Constant values, for example, should be specified in the operand positions after <code class='code'>WHEN</code>.</li><li class='list_style'>A special control structure introduced using <a target='_parent' href='ABAPCASE_TYPE.html' class='blue'><code class='code'>CASE TYPE OF</code></a> makes it possible for the type of object reference variables to be checked.</li><li class='list_style'>The <a target='_parent' href='ABENCONDITIONAL_OPERATOR_GLOSRY.html' class='green'>conditional operator</a>\ <a target='_parent' href='ABENCONDITIONAL_EXPRESSION_SWITCH.html' class='blue'><code class='code'>SWITCH</code></a> can also be used to make case distinctions in operand positions.</li></ul>",code1: "FINAL(out) = cl_demo_output=>new( ). \n\ \nDATA time_of_day TYPE string. \n\ \ncl_demo_input=>add_field( CHANGING field = time_of_day ). \ncl_demo_input=>request( ). \n\ \nCASE time_of_day. \n  WHEN `morning`. \n    out->write( `Good morning!` ). \n  WHEN `night`. \n    out->write( `Good night!` ). \n  WHEN OTHERS. \n    out->write( `Hello.` ). \nENDCASE. \n\ \nout->display( ).",code2: "FINAL(out) = cl_demo_output=>new( ). \n\ \nDATA: \n  inum1 TYPE i VALUE 1, \n  inum2 TYPE i VALUE 3, \n  decf  TYPE decfloat34 VALUE 0. \n\ \nCASE  inum1 / inum2. \n  WHEN decf. \n    out->write_text( 'In CASE equal' ). \nENDCASE. \n\ \nIF decf <> inum1 / inum2. \n  out->write_text( 'In IF not equal' ). \nENDIF. \n\ \nCASE CONV decfloat34( inum1 / inum2 ). \n  WHEN decf. \n    out->write_text( 'In CASE equal' ). \n  WHEN OTHERS. \n    out->write_text( 'In CASE not equal' ). \nENDCASE. \n\ \nout->display( ).",breadcrumb1: "abenabap.html",breadcrumb2: "abenabap_reference.html",breadcrumb3: "abenabap_flow_logic.html",breadcrumb4: "abencontrol_structures.html",breadcrumb5: "abenabap_branches.html",
+
+                      });
+                      this.getView().setModel(oModel);
+
+                      var DisplayList = new sap.ui.model.json.JSONModel({
+                        "Elements": [
+
+                        
+                                {
+                                    
+                                        "key": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm?file=ABAPCASE.htm",
+                                        "text": "ABAP Release 8.16 (latest)",
+                                            
+                                },
+                            
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_758_index_htm/7.58/en-US/index.htm",
+                            "text": "ABAP Release 7.58",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_757_index_htm/7.57/en-US/index.htm",
+                            "text": "ABAP Release 7.57",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_756_index_htm/7.56/en-US/index.htm",
+                            "text": "ABAP Release 7.56",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_755_index_htm/7.55/en-US/index.htm",
+                            "text": "ABAP Release 7.55",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_754_index_htm/7.54/en-US/index.htm",
+                            "text": "ABAP Release 7.54",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_753_index_htm/7.53/en-US/index.htm",
+                            "text": "ABAP Release 7.53",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_752_index_htm/7.52/en-US/index.htm",
+                            "text": "ABAP Release 7.52",
+                        }
+                        
+                        ]
+                      });
+                      this.getView().setModel(DisplayList, 'displayList');
+
+                  
+
+                      this._oDSC = this.byId("DynamicSideContent");
+                      this._oToggleButton = this.byId("toggleButton");
+                    },
+
+                  /* -------
+                  [ events ]
+                  ------- */
+
+                  onChange: function(oEvent) {
+                    var oControl = oEvent.getSource();
+                    window.location.href = oControl.getSelectedKey();
+                    /*sap.m.MessageToast.show("Switch to " + oControl.getSelectedKey() + "?");*/
+                  },
+
+                  
+
+                  onIconPress: function(oEvent) {
+                    window.location.href="https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/index.htm?file=ABENABAP.htm";
+                  },
+
+                  handleNews: function(oEvent) {
+                    var docu_url = window.location.href;
+                    if(docu_url.includes('version=5')) {
+                      
+                      window.open('https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/index.htm&object=ABENNEWS-917', '_self');
+                    }
+                    else if(docu_url.includes('abapdocu_latest')) {
+                      window.open('https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm?file=abennews-816.htm', '_self');
+                    }
+                    else if(docu_url.includes('abapdocu_cp')) {
+                      window.open('https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABENNEWS-917.html', '_self');
+                    }
+                    else {
+                      
+                      window.open('https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/index.htm&object=ABENNEWS-816', '_self');
+                    }
+                  },
+
+                  handleException: function(oEvent) {
+                    
+                    window.open('', '_self');
+                  },
+
+                  
+                  onScrollUp: function() {
+                    this.byId("ObjectPageLayout").setSelectedSection(null);
+                  },
+
+
+                  onPressTheme: function(oEvent) {
+                    clicked++;
+                    if (clicked === 1 ) {
+                        //sap.ui.getCore().applyTheme("sap_horizon_dark");
+                        sap.ui.core.Configuration.setTheme("sap_horizon_dark");
+                        var subtleId = this.getView().getId('subtle');
+                        var subtle = document.getElementById(subtleId);
+                        a.style.color = '#1d2d3e';
+                    }
+                    if (clicked === 2)
+                    {
+                        //sap.ui.getCore().applyTheme("sap_horizon");
+                        sap.ui.core.Configuration.setTheme("sap_horizon");
+                        clicked = 0;
+                    }
+
+                    /*const element = document.getElementById("sap-ui-bootstrap");
+                    if (element.hasAttribute("data-sap-ui-theme", "sap_horizon")) {
+                        element.setAttribute("data-sap-ui-theme", "sap_horizon_dark");
+                        //window.location.reload();
+                    }
+                    else {
+                        element.setAttribute("data-sap-ui-theme", "sap_horizon");
+                        //window.location.reload();
+                    };*/
+                  },
+
+                  onPressBack: function(oEvent) {
+                    window.history.go(-1);
+                  },
+
+                  onPress: function(oEvent) {
+                    var mail = document.createElement("a");
+                    mail.href = "mailto:f1_help@sap.com?subject=Feedback on ABAP Documentation from Help Portal version&body=Document: CASE, ABAPCASE, 824%0D%0A%0D%0AError:%0D%0A%0D%0A%0D%0A%0D%0ASuggestion for improvement:";
+                    mail.click();
+                  },
+
+                  /*handlePopoverPress: function(oEvent) {
+                    var oButton = oEvent.getSource(),
+                    oView = this.getView();
+
+                    if (!this._oPopover) {
+                       this._oPopover = new sap.ui.xmlfragment({
+                           fragmentContent: jQuery("#fragment_xml").html()
+                           }, this);
+                       oView.addDependent(this._oPopover);
+                    }
+                    this._oPopover.openBy(oButton);
+                   },*/
+
+                   handleClosePress: function(oEvent) {
+                       //this.byId("myPopover").close();
+                       //sap.m.MessageToast.show("You cannot close me.");
+                       this._oPopover.getParent().destroyContent();
+                   },
+
+                   popoverAfterClose: function(oEvent) {
+                        this._oPopover.destroy();
+                        this._oPopover.getParent().destroyContent();
+                    },
+
+                   onPressAddress: function(oEvent) {
+                     var address = "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/index.htm?file=abapcase.htm";
+                     navigator.clipboard.writeText(address).then(function() {
+                         sap.m.MessageToast.show("'" + address + "' copied.");
+                     }, function(err) {
+                         sap.m.MessageToast.show("No address copied.");
+                     });
+                   },
+                  
+                    handlePopoverPress1: function(oEvent) {
+                      var oButton = oEvent.getSource(),
+                      oView = this.getView();
+
+                      this._oPopover = new sap.ui.xmlfragment({
+                        fragmentContent: jQuery("#fragment_xml1").html()
+                        }, this);
+
+                      this._oPopover.openBy(oButton);
+                     },
+                  
+                    handlePopoverPress2: function(oEvent) {
+                      var oButton = oEvent.getSource(),
+                      oView = this.getView();
+
+                      this._oPopover = new sap.ui.xmlfragment({
+                        fragmentContent: jQuery("#fragment_xml2").html()
+                        }, this);
+
+                      this._oPopover.openBy(oButton);
+                     },
+                  
+
+                  handlePopoverPressExa: function(oEvent) {
+                    window.open('');
+                  },
+
+                  
+                    onPressCopy1: function(oEvent) {
+                    var copy = this.byId("copy1").getCurrentValue();
+                    navigator.clipboard.writeText(copy).then(function() {
+                        sap.m.MessageToast.show("Copied to Clipboard.");
+                    }, function(err) {
+                        sap.m.MessageToast.show("Not copied to Clipboard.");
+                    });
+                  },
+                  
+                    onPressCopy2: function(oEvent) {
+                    var copy = this.byId("copy2").getCurrentValue();
+                    navigator.clipboard.writeText(copy).then(function() {
+                        sap.m.MessageToast.show("Copied to Clipboard.");
+                    }, function(err) {
+                        sap.m.MessageToast.show("Not copied to Clipboard.");
+                    });
+                  },
+                  
+
+                  onPressVersion: function(oEvent) {
+                    
+                    window.open('https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/index.htm&object=ABAPCASE&style=adt', '_self');
+                  },
+
+                  
+                  onItemSelect: function(oEvent) {
+                  if (! this.sSelectedNavigationListItemId) {
+                      this.updateSelectedNavigationListItemId();
+                  }
+                  else {
+                      if (this.oSideNavigation.getSelectedItem() != this.sSelectedNavigationListItemId) {
+                          this.restoreSideNavigationSelection();
+                      }
+                  }
+                  },
+
+                  onCollapseExpandPress: function () {
+                  this.toggleControlExpand(this.oSideNavigation);
+                  },
+
+                  onMenuButtonPress : function() {
+                  var toolPage = this.byId("toolPage");
+
+                  toolPage.setSideExpanded(!toolPage.getSideExpanded());
+                  },
+
+                  /* ----------------
+                  [ event listeners ]
+                  ---------------- */
+
+                  /* ------------------------------------
+                  [ restoring side navigation selection ]
+                  ------------------------------------ */
+
+                  updateSelectedNavigationListItemId: function(sId) {
+                  this.sSelectedNavigationListItemId = sId;
+                  },
+
+                  restoreSideNavigationSelection: function() {
+                  this.oSideNavigation.setSelectedItem(this.sSelectedNavigationListItemId);
+                  this.oSideNavigation.invalidate();
+                  },
+
+                  /* ----------------
+                  [ collapse/expand ]
+                  ---------------- */
+
+                  toggleControlExpand: function(oControl) {
+                  oControl.setExpanded(! oControl.getExpanded());
+                  },
+
+                  /*TreeTable*/
+                  
+
+                  onLiveSearch: function (evt) {
+                    var filterString = evt.getParameter('newValue');
+                    var filter = filterString.toUpperCase();
+
+                    
+                           var treeJson = A.getDefaultJsonTree();
+                       
+                    var treeJsonModel = new sap.ui.model.json.JSONModel(treeJson);
+
+                    if (filterString == '') {
+                        this.getView().setModel(treeJsonModel, 'displayModel');
+                        var tree = this.getView().byId('treeTable');
+                        tree.expandToLevel(1);
+                    } else {
+                    //-----------------------------------------------------------
+                    // Function that flattens tree along a keyword "key", here the collection formally starts as empty
+                    // FIXED
+
+                    var bfs = function (treeJson, collection) {
+                        collection.push({ name: treeJson.name, object: treeJson.object, indices: treeJson.indices });
+                        if (!treeJson.children || treeJson.children.length === 0) return;
+                        for (var i = 0; i < treeJson.children.length; i++) {
+                            //flatten children recursively
+                            bfs(treeJson.children[i], collection);
+                        }
+                        return;
+                    }
+                    //flatten all the subtree categories seperately
+                    // FIXED
+                    var treeModelFlat = treeJson.TreeElements[0];
+                    //Loop over sub trees
+                    for (var i = 0; i < treeJson.TreeElements[0].children.length; i++) {
+                        subTree = treeJson.TreeElements[0].children[i];
+                        if (subTree.children) {
+                            for (var j = 0; j < subTree.children.length; j++) {
+                                var subSubTree = subTree.children[j];
+                                var flattenedCollection = [];
+                                bfs(subSubTree, flattenedCollection);
+                                treeModelFlat.children[i].children[j].children = flattenedCollection.slice(1); //omit first element (root node), would be doubled
+                            }
+                        }
+                        else {
+                            var flattenedCollection = [];
+                            bfs(subTree, flattenedCollection);
+                            treeModelFlat.children[i].children = flattenedCollection.slice(1);
+                        }
+                    }
+                    //filter Model
+                    // FIXED
+                    var filterMode = 0; var similaritySearch = false;
+                    //var filteredModel = structuredClone(treeModelFlat);
+                    var filteredModel = {};
+                    var buildingFilteredModel = {};
+                    var filteredSubtree = [];
+                    var filteredCollection = [];
+                    var treeModelClone = cloneJSON(treeModelFlat);
+
+
+                    for (var i = 0; i < treeModelFlat.children.length; i++) {
+                        var subTree = treeModelFlat.children[i];
+                        if (subTree.children) {
+                            var deleteSubTree = true;
+                            for (var j = 0; j < subTree.children.length; j++) {
+                                var subSubTree = subTree.children[j];
+                                var deleteSubSubTree = true;
+                                if (subSubTree.children.length > 0) {
+                                    for (var k in subSubTree.children) {
+                                        //if (subSubTree.children[k].name.toUpperCase().indexOf(filter) == -1) {
+                                        var indices = subSubTree.children[k].indices;
+
+                                        if (!matchesSearchCriteria(indices, filter)) {
+                                            delete treeModelClone.children[i].children[j].children[k];
+                                        } else {
+                                            deleteSubSubTree = false;
+                                            deleteSubTree = false;
+                                        }
+                                    }
+                                }
+                                if (deleteSubSubTree) {
+                                    delete treeModelClone.children[i].children[j];
+                                }
+                            }
+                            if (deleteSubTree) {
+                                delete treeModelClone.children[i];
+                            }
+                        }
+                    }
+                    var treeModelString = JSON.stringify(treeModelClone);
+                    treeModelString = '{"TreeElements": [' + treeModelString + ']}';
+                    var treeModelObj = JSON.parse(treeModelString);
+                    var DisplayModel = new sap.ui.model.json.JSONModel(treeModelObj);
+                    this.getView().setModel(DisplayModel, 'displayModel');
+                    this.onExpandAll();
+                }
+            },
+
+                  onExpandAll: function (evt) {
+                      var tree = this.getView().byId('treeTable');
+                      tree.expandToLevel(14);
+                  },
+
+                  onCollapseAll: function (evt) {
+                      var tree = this.getView().byId('treeTable');
+                      tree.collapseAll();
+                  },
+
+                  onMenuButtonPress: function () {
+                      if(this._oDSC.getShowSideContent()){
+                      this._oDSC.setShowSideContent(false);
+                      }else{
+                      this._oDSC.setShowSideContent(true);
+                      }
+                  },
+
+                  handleToggleClick: function () {
+                      this._oDSC.toggle();
+                  },
+
+              });
+
+              
+              
+
+              function setAddress(query) {
+                var address = ""
+                var textinput = query;
+                while (textinput.indexOf("&") > -1) {
+                    textinput = textinput.replace("&", "%26")
+                }
+                while (textinput.indexOf("+") > -1) {
+                    textinput = textinput.replace("+", "%2B")
+                }
+                while (textinput.indexOf("=") > -1) {
+                    textinput = textinput.replace("=", "%3D")
+                } while (textinput.indexOf("?") > -1) {
+                    textinput = textinput.replace("?", "%3F")
+                }
+              address = "" + "?query=" + textinput + "&";
+                return address;
+               }
+
+              
+              function cloneJSON(obj) {
+                    // basic type deep copy
+                    if (obj === null || obj === undefined || typeof obj !== 'object') {
+                        return obj
+                    }
+                    // array deep copy
+                    if (obj instanceof Array) {
+                        var cloneA = [];
+                        for (var i = 0; i < obj.length; ++i) {
+                            cloneA[i] = cloneJSON(obj[i]);
+                        }
+                        return cloneA;
+                    }
+                    // object deep copy
+                    var cloneO = {};
+                    for (var i in obj) {
+                      cloneO[i] = cloneJSON(obj[i]);
+                    }
+                  return cloneO;
+                }
+
+            function matchesSearchCriteria(indices, searchWord) {
+                var returnValue = false;
+                for (var index of indices) {
+                    if (index.key1.toUpperCase().indexOf(searchWord) !== -1) {
+                        returnValue = true;
+                        break;
+                    }
+                    var key2Key1Search = index.key2 && index.key1;
+                    if (key2Key1Search.toUpperCase().indexOf(searchWord) !== -1) {
+                        returnValue = true;
+                        break;
+                    }
+                }
+                return returnValue;
+             }
+
+              
+
+              sap.ui.xmlview({ viewContent: jQuery('#main_page_xml').html() }).placeAt("main_page");
+
+              });
+
+        </script>
+<script>
+window.adobeDataLayer = window.adobeDataLayer || [];
+window.adobeDataLayer.push({
+'event': 'globalDL',
+'site': { 
+'name': 'help',
+'country': 'glo'
+},
+'user': {
+'loginStatus': 'no'
+}
+});
+window.adobeDataLayer.push({ 
+'event': 'pageView', 
+'page': { 
+'name':  "", 
+'section': location.pathname.slice(1, location.pathname.indexOf("/", 1)), 
+'language': "en", 
+'country': "US", 
+'referrer': "https://www.bing.com/", 
+'url': location.href, 
+'details': { 
+'productID':  "ABAP", 
+'deliverableID': "abapdocu_cp_index_htm", 
+'topicID': "n/a", 
+'version': "CLOUD", 
+'machineTranslated': "no", 
+}, 
+}, 
+'user': { 
+'loginStatus': "no", 
+},
+}); 
+window.adobeDataLayer.push({
+'event': "stBeaconReady"
+}); 
+</script>
+</head><body class="sapUiBody sapUiSizeCompact"><div id="tree"></div><div id="main_page"></div></body></html>

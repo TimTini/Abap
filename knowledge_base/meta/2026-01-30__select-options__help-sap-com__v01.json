@@ -1,0 +1,36 @@
+{
+  "id": "2026-01-30__select-options__help-sap-com",
+  "title": "SELECT-OPTIONS | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPSELECT-OPTIONS.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T22:34:29",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "selection screen"
+  ],
+  "summary": "Tài liệu SAP Help cho SELECT-OPTIONS.\nTạo vùng chọn (ranges) trên selection screen.\nCung cấp bảng ranges với SIGN/OPTION/LOW/HIGH.\nHỗ trợ NO INTERVALS và NO-EXTENSION.\nDùng để lọc dữ liệu trong SELECT.",
+  "key_points": [
+    "SELECT-OPTIONS tạo range table.",
+    "SIGN/OPTION/LOW/HIGH cấu thành điều kiện.",
+    "NO INTERVALS giới hạn 1 giá trị.",
+    "NO-EXTENSION cấm pattern.",
+    "Áp dụng WHERE field IN s_range."
+  ],
+  "abap_keywords": [
+    "SELECT-OPTIONS",
+    "SIGN",
+    "OPTION",
+    "LOW",
+    "HIGH",
+    "NO INTERVALS",
+    "NO-EXTENSION"
+  ],
+  "notes_user": "",
+  "chunks": [
+    "knowledge_base\\clean\\2026-01-30__select-options__help-sap-com__v01__chunk-01.md",
+    "knowledge_base\\clean\\2026-01-30__select-options__help-sap-com__v01__chunk-02.md",
+    "knowledge_base\\clean\\2026-01-30__select-options__help-sap-com__v01__chunk-03.md"
+  ]
+}

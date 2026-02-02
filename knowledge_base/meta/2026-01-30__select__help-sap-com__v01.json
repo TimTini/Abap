@@ -1,0 +1,39 @@
+{
+  "id": "2026-01-30__select__help-sap-com",
+  "title": "SELECT | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPSELECT.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T22:34:29",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "sql",
+    "data access"
+  ],
+  "summary": "Tài liệu SAP Help cho câu lệnh ABAP SQL SELECT.\nMô tả truy vấn dữ liệu từ database trong ABAP.\nBao gồm INTO/APPENDING, WHERE, ORDER BY, GROUP BY.\nHỗ trợ UNION và các biến thể truy vấn.\nCốt lõi cho thao tác đọc dữ liệu.",
+  "key_points": [
+    "SELECT ... FROM ... là cú pháp nền.",
+    "INTO/APPENDING đưa dữ liệu vào itab.",
+    "WHERE lọc dữ liệu, ORDER BY sắp xếp.",
+    "GROUP BY/HAVING cho tổng hợp.",
+    "ENDSELECT dùng cho loop truyền thống."
+  ],
+  "abap_keywords": [
+    "SELECT",
+    "FROM",
+    "INTO",
+    "APPENDING",
+    "WHERE",
+    "ORDER BY",
+    "GROUP BY",
+    "HAVING",
+    "UNION",
+    "ENDSELECT"
+  ],
+  "notes_user": "",
+  "chunks": [
+    "knowledge_base\\clean\\2026-01-30__select__help-sap-com__v01__chunk-01.md",
+    "knowledge_base\\clean\\2026-01-30__select__help-sap-com__v01__chunk-02.md"
+  ]
+}

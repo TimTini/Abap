@@ -1,0 +1,29 @@
+{
+  "id": "2026-01-30__catch__help-sap-com",
+  "title": "CATCH | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPCATCH_TRY.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T22:34:29",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "exception handling"
+  ],
+  "summary": "Tài liệu SAP Help cho CATCH trong khối TRY.\nXác định class exception cần bắt.\nHỗ trợ INTO để lấy object exception.\nCho phép nhiều CATCH theo thứ tự.\nDùng trong xử lý lỗi chuẩn ABAP OO.",
+  "key_points": [
+    "CATCH cx_class INTO lx để bắt lỗi.",
+    "Có thể nhiều CATCH liên tiếp.",
+    "Đọc message từ object exception.",
+    "Thứ tự CATCH quan trọng.",
+    "Kết thúc trong TRY...ENDTRY."
+  ],
+  "abap_keywords": [
+    "CATCH",
+    "INTO",
+    "cx_root",
+    "ENDTRY"
+  ],
+  "notes_user": "",
+  "chunks": []
+}

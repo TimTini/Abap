@@ -1,0 +1,32 @@
+{
+  "id": "2026-01-30__perform__help-sap-com",
+  "title": "PERFORM | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPPERFORM.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T23:45:00",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "subroutines",
+    "legacy"
+  ],
+  "summary": "Tài liệu tham khảo cho PERFORM.\nGọi subroutine được định nghĩa bằng FORM ... ENDFORM.\nHỗ trợ IN PROGRAM, USING/CHANGING/TABLES.\nHay gặp trong code legacy.\nTrong OO code thường thay bằng method call.",
+  "key_points": [
+    "PERFORM gọi FORM.",
+    "Có thể gọi subroutine ở chương trình khác (IN PROGRAM).",
+    "Truyền tham số bằng USING/CHANGING/TABLES.",
+    "Hay gặp trong report/module pool cũ.",
+    "OO thay bằng method call."
+  ],
+  "abap_keywords": [
+    "PERFORM",
+    "IN PROGRAM",
+    "USING",
+    "CHANGING",
+    "TABLES"
+  ],
+  "notes_user": "",
+  "chunks": []
+}
+

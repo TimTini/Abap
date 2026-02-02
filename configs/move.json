@@ -1,0 +1,14 @@
+{
+  "object": "MOVE",
+  "match": { "startKeyword": "MOVE" },
+  "keywordLabels": {
+    "MOVE": "stmt",
+    "TO": "to"
+  },
+  "keywordPhrases": {},
+  "captureRules": [
+    { "after": "MOVE", "name": "source", "label": "source", "capture": "rest", "stopTokens": ["TO"] },
+    { "after": "TO", "name": "target", "label": "target", "capture": "rest" }
+  ]
+}
+

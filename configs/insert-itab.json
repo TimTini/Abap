@@ -1,0 +1,28 @@
+{
+  "object": "INSERT_ITAB",
+  "match": { "startKeyword": "INSERT" },
+  "keywordLabels": {
+    "INSERT": "stmt",
+    "INTO": "into",
+    "TABLE": "table",
+    "LINES": "lines",
+    "OF": "of",
+    "INDEX": "index",
+    "ASSIGNING": "assigning",
+    "REFERENCE": "reference"
+  },
+  "keywordPhrases": {
+    "INTO TABLE": "into-table",
+    "LINES OF": "lines-of",
+    "REFERENCE INTO": "reference-into"
+  },
+  "captureRules": [
+    { "after": "INSERT", "name": "what", "label": "what" },
+    { "after": "INSERT LINES OF", "name": "source", "label": "source-itab" },
+    { "after": "INTO TABLE", "name": "intoTable", "label": "into-table" },
+    { "after": "INTO", "name": "into", "label": "into" },
+    { "after": "INDEX", "name": "index", "label": "index" },
+    { "after": "ASSIGNING", "name": "assigning", "label": "assigning" },
+    { "after": "REFERENCE INTO", "name": "refInto", "label": "reference-into" }
+  ]
+}

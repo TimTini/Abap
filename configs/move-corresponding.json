@@ -1,0 +1,23 @@
+{
+  "object": "MOVE-CORRESPONDING",
+  "match": { "startKeyword": "MOVE-CORRESPONDING" },
+  "keywordLabels": {
+    "MOVE-CORRESPONDING": "stmt",
+    "TO": "to",
+    "EXPANDING": "expanding",
+    "NESTED": "nested",
+    "TABLES": "tables",
+    "KEEPING": "keeping",
+    "TARGET": "target",
+    "LINES": "lines"
+  },
+  "keywordPhrases": {
+    "EXPANDING NESTED TABLES": "expanding-nested-tables",
+    "KEEPING TARGET LINES": "keeping-target-lines"
+  },
+  "captureRules": [
+    { "after": "MOVE-CORRESPONDING", "name": "source", "label": "source" },
+    { "after": "TO", "name": "target", "label": "target" }
+  ]
+}
+

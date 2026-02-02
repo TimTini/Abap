@@ -1,0 +1,31 @@
+{
+  "object": "CALL_FUNCTION",
+  "match": { "startPhrase": "CALL FUNCTION" },
+  "extras": { "type": "callFunction" },
+  "keywordLabels": {
+    "CALL": "stmt",
+    "FUNCTION": "function",
+    "DESTINATION": "destination",
+    "IN": "in",
+    "BACKGROUND": "background",
+    "TASK": "task",
+    "EXPORTING": "exporting",
+    "IMPORTING": "importing",
+    "CHANGING": "changing",
+    "TABLES": "tables",
+    "EXCEPTIONS": "exceptions"
+  },
+  "keywordPhrases": {
+    "CALL FUNCTION": "call-function",
+    "IN BACKGROUND TASK": "in-background-task"
+  },
+  "captureRules": [
+    { "after": "CALL FUNCTION", "name": "name", "label": "function-name", "descKey": "name" },
+    { "after": "DESTINATION", "name": "destination", "label": "destination" },
+    { "after": "EXPORTING", "name": "exportingRaw", "label": "exporting", "capture": "rest", "stopTokens": ["IMPORTING", "CHANGING", "TABLES", "EXCEPTIONS"] },
+    { "after": "IMPORTING", "name": "importingRaw", "label": "importing", "capture": "rest", "stopTokens": ["EXPORTING", "CHANGING", "TABLES", "EXCEPTIONS"] },
+    { "after": "CHANGING", "name": "changingRaw", "label": "changing", "capture": "rest", "stopTokens": ["EXPORTING", "IMPORTING", "TABLES", "EXCEPTIONS"] },
+    { "after": "TABLES", "name": "tablesRaw", "label": "tables", "capture": "rest", "stopTokens": ["EXPORTING", "IMPORTING", "CHANGING", "EXCEPTIONS"] },
+    { "after": "EXCEPTIONS", "name": "exceptionsRaw", "label": "exceptions", "capture": "rest" }
+  ]
+}

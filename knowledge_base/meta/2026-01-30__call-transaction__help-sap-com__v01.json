@@ -1,0 +1,31 @@
+{
+  "id": "2026-01-30__call-transaction__help-sap-com",
+  "title": "CALL TRANSACTION | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCALL_TRANSACTION.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T22:34:29",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "transactions"
+  ],
+  "summary": "Tài liệu SAP Help cho CALL TRANSACTION.\nChạy transaction programmatically trong ABAP.\nHỗ trợ USING BDC, MODE và UPDATE.\nCó thể SKIP FIRST SCREEN.\nThu thập messages bằng MESSAGES INTO.",
+  "key_points": [
+    "CALL TRANSACTION tcode cơ bản.",
+    "USING itab cho batch input.",
+    "MODE điều khiển hiển thị.",
+    "UPDATE điều khiển update task.",
+    "MESSAGES INTO để lấy log."
+  ],
+  "abap_keywords": [
+    "CALL TRANSACTION",
+    "USING",
+    "MODE",
+    "UPDATE",
+    "MESSAGES INTO",
+    "SKIP FIRST SCREEN"
+  ],
+  "notes_user": "",
+  "chunks": []
+}

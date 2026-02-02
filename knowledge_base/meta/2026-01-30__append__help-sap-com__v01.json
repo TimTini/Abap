@@ -1,0 +1,31 @@
+{
+  "id": "2026-01-30__append__help-sap-com",
+  "title": "APPEND | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPAPPEND.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T22:34:29",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "internal tables"
+  ],
+  "summary": "Tài liệu SAP Help cho câu lệnh APPEND.\nThêm dòng mới vào cuối internal table.\nHỗ trợ APPEND INITIAL LINE và ASSIGNING.\nCó thể dùng work area hoặc VALUE.\nCập nhật sy-tabix sau khi thêm.",
+  "key_points": [
+    "APPEND thêm dòng vào cuối bảng.",
+    "INITIAL LINE tạo dòng rỗng.",
+    "ASSIGNING để thao tác trực tiếp.",
+    "VALUE để thêm bằng expression.",
+    "Không dùng cho hashed table."
+  ],
+  "abap_keywords": [
+    "APPEND",
+    "INITIAL LINE",
+    "ASSIGNING",
+    "VALUE",
+    "sy-tabix",
+    "INSERT"
+  ],
+  "notes_user": "",
+  "chunks": []
+}

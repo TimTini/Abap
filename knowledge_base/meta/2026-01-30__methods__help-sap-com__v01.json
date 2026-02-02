@@ -1,0 +1,32 @@
+{
+  "id": "2026-01-30__methods__help-sap-com",
+  "title": "METHODS | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPMETHODS.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T23:45:00",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "oop"
+  ],
+  "summary": "Tài liệu tham khảo cho METHODS.\nKhai báo instance method trong class definition.\nXác định signature: importing/exporting/changing/returning.\nCó thể khai báo exception bằng RAISING.\nChained METHODS: ... cũng hay gặp.",
+  "key_points": [
+    "Dùng trong CLASS ... DEFINITION.",
+    "Khai báo signature của instance method.",
+    "IMPORTING/EXPORTING/CHANGING/RETURNING.",
+    "RAISING để khai báo exception.",
+    "Hỗ trợ chained statement."
+  ],
+  "abap_keywords": [
+    "METHODS",
+    "IMPORTING",
+    "EXPORTING",
+    "CHANGING",
+    "RETURNING",
+    "RAISING"
+  ],
+  "notes_user": "",
+  "chunks": []
+}
+

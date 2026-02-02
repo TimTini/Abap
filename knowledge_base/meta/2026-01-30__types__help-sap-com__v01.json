@@ -1,0 +1,30 @@
+{
+  "id": "2026-01-30__types__help-sap-com",
+  "title": "TYPES | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPTYPES.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T22:34:29",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "type definitions"
+  ],
+  "summary": "Tài liệu SAP Help cho từ khóa ABAP TYPES.\nMô tả cách định nghĩa kiểu dữ liệu và cấu trúc.\nBao gồm kiểu đơn, cấu trúc và table type.\nHỗ trợ định nghĩa cục bộ để tái sử dụng.\nLàm nền tảng cho khai báo DATA.",
+  "key_points": [
+    "Định nghĩa kiểu dữ liệu với TYPES.",
+    "Tạo cấu trúc bằng BEGIN OF/END OF.",
+    "Hỗ trợ table type và kiểu tham chiếu.",
+    "Dùng TYPE/LIKE để liên kết kiểu.",
+    "Cơ sở cho khai báo biến và cấu trúc."
+  ],
+  "abap_keywords": [
+    "TYPES",
+    "TYPE",
+    "LIKE",
+    "BEGIN OF",
+    "END OF"
+  ],
+  "notes_user": "",
+  "chunks": []
+}

@@ -1,0 +1,33 @@
+{
+  "id": "2026-01-30__data__help-sap-com",
+  "title": "DATA | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPDATA.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T22:34:29",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "data declaration"
+  ],
+  "summary": "Tài liệu SAP Help cho từ khóa ABAP DATA.\nTrình bày cách khai báo data object và biến thể cú pháp.\nBao gồm chỉ định kiểu với TYPE/LIKE và độ dài/decimals.\nĐề cập khởi tạo giá trị và phạm vi khai báo.\nLiên kết tới các phần tham chiếu liên quan.",
+  "key_points": [
+    "Khai báo data object cục bộ trong chương trình.",
+    "Chỉ định kiểu qua TYPE/LIKE.",
+    "Tùy chọn LENGTH/DECIMALS cho kiểu số.",
+    "Hỗ trợ VALUE cho giá trị khởi tạo.",
+    "Liên quan chặt với TYPES và cấu trúc."
+  ],
+  "abap_keywords": [
+    "DATA",
+    "TYPE",
+    "LIKE",
+    "VALUE",
+    "LENGTH",
+    "DECIMALS",
+    "BEGIN OF",
+    "END OF"
+  ],
+  "notes_user": "",
+  "chunks": []
+}

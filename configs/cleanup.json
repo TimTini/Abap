@@ -1,0 +1,10 @@
+{
+  "object": "CLEANUP",
+  "match": { "startKeyword": "CLEANUP" },
+  "keywordLabels": {
+    "CLEANUP": "stmt"
+  },
+  "keywordPhrases": {},
+  "captureRules": []
+}
+

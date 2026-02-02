@@ -1,0 +1,10 @@
+{
+  "object": "ELSE",
+  "match": { "startKeyword": "ELSE" },
+  "keywordLabels": {
+    "ELSE": "stmt"
+  },
+  "keywordPhrases": {},
+  "captureRules": []
+}
+

@@ -1,0 +1,47 @@
+{
+  "object": "PARAMETERS",
+  "match": {
+    "startKeyword": "PARAMETERS"
+  },
+  "keywordLabels": {
+    "PARAMETERS": "stmt",
+    "TYPE": "type",
+    "DEFAULT": "default",
+    "OBLIGATORY": "obligatory",
+    "AS": "as",
+    "CHECKBOX": "checkbox",
+    "RADIOBUTTON": "radiobutton",
+    "LISTBOX": "listbox",
+    "VISIBLE": "visible",
+    "LENGTH": "length",
+    "NO-DISPLAY": "no-display",
+    "LOWER": "lower",
+    "CASE": "case",
+    "MEMORY": "memory",
+    "ID": "id",
+    "MODIF": "modif",
+    "GROUP": "group",
+    "DECIMALS": "decimals",
+    "NO-EXTENSION": "no-extension"
+  },
+  "keywordPhrases": {
+    "LOWER CASE": "lower-case",
+    "NO-DISPLAY": "no-display",
+    "AS CHECKBOX": "as-checkbox",
+    "AS RADIOBUTTON": "as-radiobutton",
+    "AS LISTBOX": "as-listbox",
+    "MEMORY ID": "memory-id",
+    "MODIF ID": "modif-id",
+    "NO-EXTENSION": "no-extension"
+  },
+  "captureRules": [
+    { "after": "PARAMETERS", "name": "name", "label": "param-name", "descKey": "name" },
+    { "after": "TYPE", "name": "type", "label": "type-name", "descKey": "type" },
+    { "after": "DEFAULT", "name": "default", "label": "default-value", "descKey": "default" },
+    { "after": "LENGTH", "name": "length", "label": "length" },
+    { "after": "DECIMALS", "name": "decimals", "label": "decimals" },
+    { "after": "GROUP", "name": "group", "label": "group-name" },
+    { "after": "MEMORY ID", "name": "memoryId", "label": "memory-id" },
+    { "after": "MODIF ID", "name": "modifId", "label": "modif-id" }
+  ]
+}

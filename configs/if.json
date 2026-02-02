@@ -1,0 +1,18 @@
+{
+  "object": "IF",
+  "match": { "startKeyword": "IF" },
+  "block": { "endKeyword": "ENDIF" },
+  "keywordLabels": {
+    "IF": "stmt",
+    "AND": "and",
+    "OR": "or",
+    "NOT": "not",
+    "IS": "is",
+    "INITIAL": "initial"
+  },
+  "keywordPhrases": {},
+  "captureRules": [
+    { "after": "IF", "name": "condition", "label": "condition", "capture": "rest" }
+  ]
+}
+

@@ -1,0 +1,30 @@
+{
+  "id": "2026-01-30__class__help-sap-com",
+  "title": "CLASS | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPCLASS.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T23:45:00",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "oop"
+  ],
+  "summary": "Tài liệu tham khảo cho CLASS.\nDùng để viết class definition/implementation.\nKết thúc bằng ENDCLASS.\nBên trong definition hay có METHODS/CLASS-METHODS/DATA.\nBên trong implementation có METHOD ... ENDMETHOD.",
+  "key_points": [
+    "CLASS ... DEFINITION/IMPLEMENTATION mở block.",
+    "ENDCLASS kết thúc block.",
+    "PUBLIC/PROTECTED/PRIVATE SECTION trong definition.",
+    "METHODS/CLASS-METHODS khai báo signature.",
+    "METHOD/ENDMETHOD triển khai method."
+  ],
+  "abap_keywords": [
+    "CLASS",
+    "DEFINITION",
+    "IMPLEMENTATION",
+    "ENDCLASS"
+  ],
+  "notes_user": "",
+  "chunks": []
+}
+

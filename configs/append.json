@@ -1,0 +1,28 @@
+{
+  "object": "APPEND",
+  "match": { "startKeyword": "APPEND" },
+  "keywordLabels": {
+    "APPEND": "stmt",
+    "TO": "to",
+    "LINES": "lines",
+    "OF": "of",
+    "INITIAL": "initial",
+    "LINE": "line",
+    "ASSIGNING": "assigning",
+    "REFERENCE": "reference",
+    "INTO": "into"
+  },
+  "keywordPhrases": {
+    "LINES OF": "lines-of",
+    "INITIAL LINE": "initial-line",
+    "REFERENCE INTO": "reference-into"
+  },
+  "captureRules": [
+    { "after": "APPEND", "name": "what", "label": "what" },
+    { "after": "APPEND LINES OF", "name": "source", "label": "source-itab" },
+    { "after": "TO", "name": "to", "label": "to-itab" },
+    { "after": "ASSIGNING", "name": "assigning", "label": "assigning" },
+    { "after": "REFERENCE INTO", "name": "refInto", "label": "reference-into" }
+  ]
+}
+

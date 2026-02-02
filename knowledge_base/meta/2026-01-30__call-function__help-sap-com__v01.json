@@ -1,0 +1,32 @@
+{
+  "id": "2026-01-30__call-function__help-sap-com",
+  "title": "CALL FUNCTION | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/abapcall_function.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T22:34:29",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "function module"
+  ],
+  "summary": "Tài liệu SAP Help cho CALL FUNCTION.\nGọi function module và truyền tham số.\nHỗ trợ EXPORTING/IMPORTING/CHANGING/TABLES.\nXử lý EXCEPTIONS và RFC DESTINATION.\nDùng cho API dạng function module.",
+  "key_points": [
+    "CALL FUNCTION với các section tham số.",
+    "EXCEPTIONS trả về sy-subrc.",
+    "DESTINATION cho gọi RFC.",
+    "TABLES cho bảng truyền thống.",
+    "Thường thay bằng class method khi có."
+  ],
+  "abap_keywords": [
+    "CALL FUNCTION",
+    "EXPORTING",
+    "IMPORTING",
+    "CHANGING",
+    "TABLES",
+    "EXCEPTIONS",
+    "DESTINATION"
+  ],
+  "notes_user": "",
+  "chunks": []
+}

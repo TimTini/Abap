@@ -1,0 +1,30 @@
+{
+  "id": "2026-01-30__modify-itab__help-sap-com",
+  "title": "MODIFY itab | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPMODIFY_ITAB.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T22:34:29",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "internal tables"
+  ],
+  "summary": "Tài liệu SAP Help cho câu lệnh MODIFY itab.\nCập nhật dòng nội bảng theo key hoặc index.\nHỗ trợ TRANSPORTING để cập nhật trường chọn lọc.\nÁp dụng cho standard/sorted/hashed tables.\nThiết lập sy-subrc theo kết quả cập nhật.",
+  "key_points": [
+    "MODIFY cập nhật dòng trong itab.",
+    "FROM work area hoặc ASSIGNING.",
+    "INDEX để cập nhật theo vị trí.",
+    "TRANSPORTING giới hạn field cập nhật.",
+    "Kiểm tra sy-subrc."
+  ],
+  "abap_keywords": [
+    "MODIFY",
+    "FROM",
+    "INDEX",
+    "TRANSPORTING",
+    "sy-subrc"
+  ],
+  "notes_user": "",
+  "chunks": []
+}

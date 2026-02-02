@@ -1,0 +1,21 @@
+{
+  "object": "FORM",
+  "match": { "startKeyword": "FORM" },
+  "block": { "endKeyword": "ENDFORM" },
+  "extras": { "type": "form" },
+  "keywordLabels": {
+    "FORM": "stmt",
+    "USING": "using",
+    "CHANGING": "changing",
+    "TABLES": "tables",
+    "RAISING": "raising"
+  },
+  "keywordPhrases": {},
+  "captureRules": [
+    { "after": "FORM", "name": "name", "label": "form-name", "descKey": "name" },
+    { "after": "USING", "name": "usingRaw", "label": "using", "capture": "rest", "stopTokens": ["CHANGING", "TABLES", "RAISING"] },
+    { "after": "CHANGING", "name": "changingRaw", "label": "changing", "capture": "rest", "stopTokens": ["USING", "TABLES", "RAISING"] },
+    { "after": "TABLES", "name": "tablesRaw", "label": "tables", "capture": "rest", "stopTokens": ["USING", "CHANGING", "RAISING"] },
+    { "after": "RAISING", "name": "raisingRaw", "label": "raising", "capture": "rest" }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "id": "2026-01-30__parameters__help-sap-com",
+  "title": "PARAMETERS | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPPARAMETERS.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T22:34:29",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "selection screen"
+  ],
+  "summary": "Tài liệu SAP Help cho PARAMETERS trên selection screen.\nTạo field nhập đơn trên màn hình chọn.\nHỗ trợ DEFAULT, OBLIGATORY và MEMORY ID.\nCó thể cấu hình listbox/radiobutton group.\nDùng phổ biến trong report.",
+  "key_points": [
+    "PARAMETERS tạo trường nhập đơn.",
+    "DEFAULT và OBLIGATORY để kiểm soát input.",
+    "MEMORY ID lưu giá trị mặc định.",
+    "AS LISTBOX/RADIOBUTTON GROUP cho UI.",
+    "Kết hợp với SELECT-OPTIONS."
+  ],
+  "abap_keywords": [
+    "PARAMETERS",
+    "DEFAULT",
+    "OBLIGATORY",
+    "MEMORY ID",
+    "AS LISTBOX",
+    "RADIOBUTTON GROUP"
+  ],
+  "notes_user": "",
+  "chunks": []
+}

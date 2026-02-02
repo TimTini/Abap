@@ -1,0 +1,33 @@
+{
+  "id": "2026-01-30__if__help-sap-com",
+  "title": "IF | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPIF.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T22:34:29",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "control flow",
+    "conditional"
+  ],
+  "summary": "Tài liệu SAP Help cho câu lệnh IF trong ABAP.\nTrình bày cấu trúc điều kiện và nhánh xử lý.\nBao gồm ELSEIF, ELSE và đóng ENDIF.\nDùng cho rẽ nhánh theo biểu thức logic.\nTham chiếu tới các phần mô tả chi tiết.",
+  "key_points": [
+    "Cấu trúc IF ... ENDIF.",
+    "Hỗ trợ ELSEIF/ELSE.",
+    "Điều kiện dùng toán tử logic.",
+    "Có thể lồng nhiều IF.",
+    "Phục vụ điều khiển luồng."
+  ],
+  "abap_keywords": [
+    "IF",
+    "ELSEIF",
+    "ELSE",
+    "ENDIF",
+    "AND",
+    "OR",
+    "NOT"
+  ],
+  "notes_user": "",
+  "chunks": []
+}

@@ -1,0 +1,28 @@
+{
+  "object": "CONSTANTS",
+  "match": {
+    "startKeyword": "CONSTANTS"
+  },
+  "keywordLabels": {
+    "CONSTANTS": "stmt",
+    "TYPE": "type",
+    "LIKE": "like",
+    "REF": "ref",
+    "TO": "to",
+    "VALUE": "value",
+    "LENGTH": "length",
+    "DECIMALS": "decimals"
+  },
+  "keywordPhrases": {
+    "REF TO": "ref-to"
+  },
+  "captureRules": [
+    { "after": "CONSTANTS", "name": "name", "label": "const-name", "descKey": "name" },
+    { "after": "TYPE REF TO", "name": "refTo", "label": "ref-to", "descKey": "refTo" },
+    { "after": "TYPE", "name": "type", "label": "type-name", "descKey": "type" },
+    { "after": "LIKE", "name": "like", "label": "like-name", "descKey": "like" },
+    { "after": "VALUE", "name": "value", "label": "value", "descKey": "value" },
+    { "after": "LENGTH", "name": "length", "label": "length" },
+    { "after": "DECIMALS", "name": "decimals", "label": "decimals" }
+  ]
+}

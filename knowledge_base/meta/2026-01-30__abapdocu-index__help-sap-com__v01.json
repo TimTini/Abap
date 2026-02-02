@@ -1,0 +1,26 @@
+{
+  "id": "2026-01-30__abapdocu-index__help-sap-com",
+  "title": "ABAP Keyword Documentation (Index)",
+  "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T22:34:29",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "documentation",
+    "index"
+  ],
+  "summary": "Trang chỉ mục ABAP Keyword Documentation trên SAP Help.\nCung cấp điểm vào để tra cứu tài liệu từ khóa và cú pháp ABAP.\nĐóng vai trò trung tâm điều hướng tới các mục keyword/statement.\nPhù hợp làm điểm neo để bắt đầu đọc tài liệu ABAP.\nDùng tốt cho việc index hóa và trích dẫn lại về sau.",
+  "key_points": [
+    "Trang entry/redirect cho bộ ABAP Keyword Documentation.",
+    "Tập trung vào điều hướng và truy cập nhanh.",
+    "Liên kết tới các phần chính của tài liệu.",
+    "Hữu ích như nút gốc trong knowledge base."
+  ],
+  "abap_keywords": [
+    "ABAP"
+  ],
+  "notes_user": "",
+  "chunks": []
+}

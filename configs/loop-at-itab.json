@@ -1,0 +1,29 @@
+{
+  "object": "LOOP_AT_ITAB",
+  "match": { "startPhrase": "LOOP AT" },
+  "block": { "endKeyword": "ENDLOOP" },
+  "keywordLabels": {
+    "LOOP": "stmt",
+    "AT": "at",
+    "INTO": "into",
+    "ASSIGNING": "assigning",
+    "REFERENCE": "reference",
+    "WHERE": "where",
+    "FROM": "from",
+    "TO": "to"
+  },
+  "keywordPhrases": {
+    "LOOP AT": "loop-at",
+    "REFERENCE INTO": "reference-into"
+  },
+  "captureRules": [
+    { "after": "LOOP AT", "name": "itab", "label": "itab", "descKey": "itab" },
+    { "after": "INTO", "name": "into", "label": "into" },
+    { "after": "ASSIGNING", "name": "assigning", "label": "assigning" },
+    { "after": "REFERENCE INTO", "name": "refInto", "label": "reference-into" },
+    { "after": "FROM", "name": "from", "label": "from" },
+    { "after": "TO", "name": "to", "label": "to" },
+    { "after": "WHERE", "name": "where", "label": "where", "capture": "rest" }
+  ]
+}
+

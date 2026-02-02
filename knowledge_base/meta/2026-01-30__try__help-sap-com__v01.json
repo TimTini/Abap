@@ -1,0 +1,30 @@
+{
+  "id": "2026-01-30__try__help-sap-com",
+  "title": "TRY | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPTRY.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T22:34:29",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "exception handling"
+  ],
+  "summary": "Tài liệu SAP Help cho TRY trong ABAP.\nBắt đầu khối xử lý exception kiểu class-based.\nKết hợp với CATCH và tùy chọn CLEANUP.\nKết thúc bằng ENDTRY.\nHỗ trợ xử lý lỗi có cấu trúc.",
+  "key_points": [
+    "TRY mở khối xử lý lỗi.",
+    "CATCH bắt exception cụ thể.",
+    "CLEANUP cho dọn dẹp bắt buộc.",
+    "ENDTRY kết thúc khối.",
+    "RAISE EXCEPTION để ném lỗi."
+  ],
+  "abap_keywords": [
+    "TRY",
+    "CATCH",
+    "CLEANUP",
+    "ENDTRY",
+    "RAISE EXCEPTION"
+  ],
+  "notes_user": "",
+  "chunks": []
+}

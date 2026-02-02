@@ -1,0 +1,538 @@
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-16" /><meta http-equiv="X-UA-Compatible" content="IE=edge" /><meta charset="utf-8" /><link rel="shortcut icon" href="ABAPIcon.ico" type="image/ico" /><title>LOOP AT itab, Basic Form | ABAP Keyword Documentation</title><script id="sap-ui-bootstrap" src="https://ui5.sap.com/1.136.4/resources/sap-ui-core.js" data-sap-ui-async="true" data-sap-ui-theme="sap_horizon" data-sap-ui-libs="sap.m" data-sap-ui-xx-bindingsyntax="complex"> </script><script id="main_page_xml" type="text/xmldata"><mvc:View xmlns="sap.m" xmlns:blocks="sap.uxap.blocks" xmlns:code="sap.ui.codeeditor" xmlns:core="sap.ui.core" xmlns:f="sap.f" xmlns:form="sap.ui.layout.form" xmlns:layout="sap.ui.layout" xmlns:mvc="sap.ui.core.mvc" xmlns:table="sap.ui.table" xmlns:tnt="sap.tnt" xmlns:uxap="sap.uxap" xmlns:xhtml="http://www.w3.org/1999/xhtml" controllerName="myController" height="100%" class="side-navigation-demo"><tnt:ToolPage id="toolPage"><tnt:header><f:ShellBar title="ABAP Keyword Documentation" secondTitle="Reference" showMenuButton="true" homeIcon="https://www.sap.com/dam/application/shared/logos/sap-logo-svg.svg.adapt.svg/1493030643828.svg" homeIconTooltip="Home" showNavButton="false" menuButtonPressed="onMenuButtonPress" homeIconPressed="onIconPress"></f:ShellBar></tnt:header><tnt:mainContents><Page id="page" showHeader="false" showNavButton="false" enableScrolling="true"><layout:DynamicSideContent id="DynamicSideContent" class="sapUiDSCExplored sapUiContentPadding" sideContentFallDown="BelowM" sideContentPosition="Begin" containerQuery="true" breakpointChanged="handleBreakpointChanged"><xhtml:div class="pageDiv"><uxap:ObjectPageLayout id="ObjectPageLayout" showTitleInHeaderContent="true" showEditHeaderButton="true" enableLazyLoading="true" editHeaderButtonPress="handleEditBtnPress" upperCaseAnchorBar="false" useIconTabBar="false"><uxap:headerTitle><uxap:ObjectPageDynamicHeaderTitle><uxap:breadcrumbs><Breadcrumbs currentLocationText="LOOP AT itab, Basic Form"><Link text="ABAP - Keyword Documentation" href="{/breadcrumb1}" /><Link text="ABAP Programming Language" href="{/breadcrumb2}" /><Link text="ABAP - Processing Internal Data" href="{/breadcrumb3}" /><Link text="Internal Tables (itab)" href="{/breadcrumb4}" /><Link text="itab - Processing Statements" href="{/breadcrumb5}" /><Link text="LOOP AT itab" href="{/breadcrumb6}" /></Breadcrumbs></uxap:breadcrumbs><uxap:expandedHeading><Title text="LOOP AT itab, Basic Form" wrapping="true"></Title></uxap:expandedHeading><uxap:expandedContent><layout:VerticalLayout><HBox><core:Icon src="sap-icon://source-code"></core:Icon><Text renderWhitespace="true" text="  Keyword"></Text></HBox><HBox></HBox></layout:VerticalLayout></uxap:expandedContent><uxap:actions><ComboBox class="sapMLIBActionable" placeholder="ABAP Release 9.17" items="{path:'displayList>/Elements', sorter:{path:'text', descending: true}}" change="onChange"><core:Item key="{displayList>key}" text="{displayList>text}"></core:Item></ComboBox><Button text="News" press="handleNews" type="Ghost"></Button><Button icon="sap-icon://email" tooltip="Email us" press="onPress"></Button><OverflowToolbarButton icon="sap-icon://chain-link" tooltip="Get link" press="onPressAddress"></OverflowToolbarButton></uxap:actions></uxap:ObjectPageDynamicHeaderTitle></uxap:headerTitle><uxap:headerContent><layout:HorizontalLayout class="sapUiSmallMarginBeginEnd"><VBox><FormattedText htmlText="{/par1}"></FormattedText></VBox></layout:HorizontalLayout><layout:HorizontalLayout class="sapUiSmallMarginBeginEnd"><Text renderWhitespace="true" text="&#x9;&#x9;"></Text></layout:HorizontalLayout><layout:HorizontalLayout class="sapUiSmallMarginBeginEnd"></layout:HorizontalLayout></uxap:headerContent><uxap:sections><uxap:ObjectPageSection titleUppercase="false" title="Overview"><uxap:subSections><uxap:ObjectPageSubSection titleUppercase="false"><uxap:blocks><VBox><form:SimpleForm title="Description" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanM="12" adjustLabelSpan="false" emptySpanXL="0" columnsXL="2"><form:content><VBox><FormattedText htmlText="{/par2}"></FormattedText><FormattedText htmlText="{/ul1}"></FormattedText><FormattedText htmlText="{/par3}"></FormattedText><FormattedText htmlText="{/ul2}"></FormattedText><FormattedText htmlText="{/par4}"></FormattedText><FormattedText htmlText="{/ul3}"></FormattedText><FormattedText htmlText="{/par5}"></FormattedText><FormattedText htmlText="{/par6}"></FormattedText><MessageStrip text="{/par7}" type="Warning" showIcon="true" class="sapUiMediumMarginBottom" enableFormattedText="true"></MessageStrip></VBox></form:content></form:SimpleForm><form:SimpleForm title="System Fields" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanL="4" labelSpanM="12" labelSpanS="12" adjustLabelSpan="false" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="2" columnsL="2" columnsM="1"><form:content><VBox><FormattedText htmlText="{/par8}"></FormattedText><FormattedText htmlText="{/ul4}"></FormattedText><FormattedText htmlText="{/par9}"></FormattedText><ScrollContainer><Table fixedLayout="false"><columns><Column demandPopin="false"><FormattedText htmlText="{/th1}"></FormattedText></Column><Column demandPopin="false"><FormattedText htmlText="{/th2}"></FormattedText></Column></columns><items><ColumnListItem vAlign="Middle" type="Active"><cells><FormattedText htmlText="{/td1}"></FormattedText><FormattedText htmlText="{/td2}"></FormattedText></cells></ColumnListItem><ColumnListItem vAlign="Middle" type="Active"><cells><FormattedText htmlText="{/td3}"></FormattedText><FormattedText htmlText="{/td4}"></FormattedText></cells></ColumnListItem></items></Table></ScrollContainer></VBox></form:content></form:SimpleForm><form:SimpleForm title="Hints" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanL="4" labelSpanM="12" labelSpanS="12" adjustLabelSpan="false" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="2" columnsL="2" columnsM="1"><form:content><VBox><FormattedText htmlText="{/ul5}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Example" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="-1" labelSpanL="4" labelSpanM="2" labelSpanS="12" adjustLabelSpan="true" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="1" columnsL="1" columnsM="1" singleContainerFullSize="false"><form:content><VBox><MessageStrip text="The programs and program extracts presented in the ABAP Keyword Documentation are only syntax examples and are not intended for direct use in a production system environment. The source texts of the examples are primarily intended to provide a better explanation and visualization of the syntax and semantics of ABAP statements and not to solve concrete programming tasks. For production application programs, a dedicated solution should therefore always be worked out for each individual case. The example can use demo artifacts that are not released as APIs for use in ABAP for Cloud Development." type="Warning" showIcon="true" class="sapUiMediumMarginBottom" enableFormattedText="true"></MessageStrip><FormattedText htmlText="{/par10}"></FormattedText><Button class="sapUiTinyMarginBeginEnd" icon="sap-icon://copy" tooltip="Copy example" press="onPressCopy1"></Button><code:CodeEditor type="abap" editable="false" value="{/code1}" maxLines="15" width="auto" id="copy1"></code:CodeEditor><FormattedText htmlText="{/par11}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Example" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="-1" labelSpanL="4" labelSpanM="2" labelSpanS="12" adjustLabelSpan="true" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="1" columnsL="1" columnsM="1" singleContainerFullSize="false"><form:content><VBox><MessageStrip text="The programs and program extracts presented in the ABAP Keyword Documentation are only syntax examples and are not intended for direct use in a production system environment. The source texts of the examples are primarily intended to provide a better explanation and visualization of the syntax and semantics of ABAP statements and not to solve concrete programming tasks. For production application programs, a dedicated solution should therefore always be worked out for each individual case. The example can use demo artifacts that are not released as APIs for use in ABAP for Cloud Development." type="Warning" showIcon="true" class="sapUiMediumMarginBottom" enableFormattedText="true"></MessageStrip><FormattedText htmlText="{/par12}"></FormattedText><Button class="sapUiTinyMarginBeginEnd" icon="sap-icon://copy" tooltip="Copy example" press="onPressCopy2"></Button><code:CodeEditor type="abap" editable="false" value="{/code2}" maxLines="15" width="auto" id="copy2"></code:CodeEditor><FormattedText htmlText="{/par13}"></FormattedText></VBox></form:content></form:SimpleForm></VBox></uxap:blocks></uxap:ObjectPageSubSection></uxap:subSections></uxap:ObjectPageSection><uxap:ObjectPageSection title="Exceptions" titleUppercase="false"><uxap:subSections><uxap:ObjectPageSubSection titleUppercase="false"><uxap:blocks><VBox><HBox><core:Icon src="sap-icon://dimension"></core:Icon><Text renderWhitespace="true" text="  "></Text><Link text="Exception" press="handleException" /></HBox><Text renderWhitespace="true" text="&#x9;&#x9;"></Text><form:SimpleForm title="Catchable Exceptions" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanL="4" labelSpanM="12" labelSpanS="12" adjustLabelSpan="false" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="2" columnsL="2" columnsM="1"><form:content><VBox><FormattedText htmlText="{/par14}"></FormattedText><FormattedText htmlText="{/ul6}"></FormattedText><FormattedText htmlText="{/par15}"></FormattedText></VBox></form:content></form:SimpleForm></VBox></uxap:blocks></uxap:ObjectPageSubSection></uxap:subSections></uxap:ObjectPageSection></uxap:sections></uxap:ObjectPageLayout></xhtml:div><layout:sideContent><HBox height="100%"><table:TreeTable id="treeTable" rows="{path:'displayModel>/TreeElements', parameters:{arrayNames:['children']}}" visibleRowCountMode="Auto" selectionMode="None"><table:toolbar><Toolbar><Button icon="sap-icon://expand-group" press="onExpandAll"></Button><Button icon="sap-icon://collapse-group" press="onCollapseAll"></Button><SearchField liveChange="onLiveSearch" search="onSearchSubmit"></SearchField></Toolbar></table:toolbar><table:rowSettingsTemplate></table:rowSettingsTemplate><table:Column autoResizable="true" width="auto"><Label text="Topics"></Label><table:template><Link href="{displayModel>object}.html" text="{displayModel>name}" emphasized="{= ${displayModel>object} === 'ABAPLOOP_AT_ITAB' ? true : false}" /></table:template></table:Column></table:TreeTable></HBox></layout:sideContent></layout:DynamicSideContent><footer><Toolbar><ToolbarSpacer></ToolbarSpacer><Label text="ABAP for Cloud Development, &#x00A9;Copyright 2025 SAP SE. All rights reserved."></Label><ToolbarSpacer></ToolbarSpacer><Button icon="sap-icon://arrow-top" press="onScrollUp" tooltip="Scroll up" enabled="true"></Button></Toolbar></footer></Page></tnt:mainContents></tnt:ToolPage></mvc:View></script><link rel="stylesheet" href="layout.css" /><script type="text/javascript" src="global.js"></script><script type="text/javascript" src="defaultJsonTree.js"></script><script>
+          sap.ui.require([
+            'sap/ui/core/mvc/Controller',
+            'sap/ui/core/mvc/XMLView',
+            'sap/base/security/URLListValidator'
+          ],
+
+          function (Controller, XMLView, URLListValidator) {
+
+            URLListValidator.add('adt');
+            URLListValidator.add('http');
+            URLListValidator.add('https');
+
+              //'use strict';
+              //var clicked = 0;
+
+              sap.ui.controller("myController", {
+                  onInit: function() {
+
+                    /*Theme Setting*/
+                    if (window.matchMedia) {
+                      if(window.matchMedia('(prefers-color-scheme: dark)').matches){
+                        sap.ui.core.Configuration.setTheme("sap_horizon_dark");
+                      } else {
+                        sap.ui.core.Configuration.setTheme("sap_horizon");
+                      }
+                    } else {
+                      sap.ui.core.Configuration.setTheme("sap_horizon");
+                    }
+
+                     /*TreeTable*/
+                     
+                           var treeJson = A.getDefaultJsonTree();
+                       
+                     var DisplayModel = new sap.ui.model.json.JSONModel(treeJson);
+                     this.getView().setModel(DisplayModel, 'displayModel');
+                     var tree = this.getView().byId('treeTable');
+
+                     tree.expand(0);tree.expand(4);tree.expand(16);tree.expand(22);tree.expand(23);tree.expand(25);
+
+                     var oModel = new sap.ui.model.json.JSONModel({
+
+                        par1: "<pre><p><code class='code'>LOOP AT itab <a target='_parent' href='ABAPLOOP_AT_ITAB_RESULT.html' class='@class'><code class='code'>result</code></a>\ <span class='meta_style'>[</span><a target='_parent' href='ABAPLOOP_AT_ITAB_COND.html' class='@class'><code class='code'>cond</code></a><span class='meta_style'>]</span>.</code>\ <br><code class='code'>  ...</code>\ <br><a target='_parent' href='ABAPENDLOOP.html' class='blue'><code class='code'>ENDLOOP.</code></a></p></pre>",par2: "<p>This variant of the statement <a target='_parent' href='ABAPLOOP_AT_ITAB_VARIANTS.html' class='blue'><code class='code'>LOOP AT itab</code></a> sequentially reads lines of the internal table <code class='code'>itab</code> and executes the statement block between <code class='code'>LOOP</code> and <code class='code'>ENDLOOP</code> once for each line. Either all lines are read or a subset specified by one or more conditions <a target='_parent' href='ABAPLOOP_AT_ITAB_COND.html' class='blue'><code class='code'>cond</code></a>.</p>",par3: "<p>The order in which the lines are read can depend on:</p>",par4: "<p>If none of the additions is specified, the standard order depends on the table category as follows:</p>",par5: "<p>The loop is executed until all the table lines of the table or the subset as specified in the  <a target='_parent' href='ABAPLOOP_AT_ITAB_COND.html' class='blue'><code class='code'>cond</code></a> condition have been read or until it is exited with a <a target='_parent' href='ABENLEAVE_PROGRAM_UNITS.html' class='blue'>statement</a>. If no corresponding lines are found or if the internal table is empty, the loop is not executed at all.</p>",par6: "<p>If the internal table is specified as the return value or result of a <a target='_parent' href='ABENFUNCTIONAL_METHOD_GLOSRY.html' class='green'>functional method</a>, a <a target='_parent' href='ABENCONSTRUCTOR_EXPRESSION_GLOSRY.html' class='green'>constructor expression</a>, or a <a target='_parent' href='ABENTABLE_EXPRESSION_GLOSRY.html' class='green'>table expression</a>, the value is persisted for the duration of the loop. Afterwards, the internal table can no longer be accessed.</p>",par7: "<strong>Caution</strong>\ <a target='_parent' href='ABENITAB_LOOP_CHANGE.html' class='blue'>Special rules apply</a> when changing the internal table within a loop. In particular you should never perform write accesses on a complete table body.",par8: "<p>This variant of the statement <code class='code'>LOOP AT</code> sets the value of the system field <code class='code'>sy-tabix</code>:</p>",par9: "<p>The loop entry <code class='code'>LOOP AT</code> does not modify <code class='code'>sy-subrc</code>. After exiting the loop, behind <code class='code'>ENDLOOP</code>, <code class='code'>sy-tabix</code> is set to the value that it had before entering the loop and  <code class='code'>sy-subrc</code> is set as follows:</p>",par10: "<p>Loop across an internal table constructed using the <a target='_parent' href='ABENVALUE_OPERATOR_GLOSRY.html' class='green'>value operator</a>\ <a target='_parent' href='ABENCONSTRUCTOR_EXPRESSION_VALUE.html' class='blue'><code class='code'>VALUE</code></a>, where each line is assigned to a field symbol declared inline using <a target='_parent' href='ABENFIELD-SYMBOL_INLINE.html' class='blue'><code class='code'>FIELD-SYMBOL</code></a>.</p>",par11: "<p></p>",par12: "<p>Nested <code class='code'>LOOP</code> loops without explicit key declaration. The content of the current line for the outer loop is evaluated in the <code class='code'>WHERE</code> condition for the inner loop.</p>",par13: "<p></p>",par14: "<p><code class='code'>CX_SY_ITAB_DYN_LOOP</code></p>",par15: "<p></p>",ul1: "<ul><li class='list_style'>The output behavior <a target='_parent' href='ABAPLOOP_AT_ITAB_RESULT.html' class='blue'><code class='code'>result</code></a> determines how and to where the line content is read.</li><li class='list_style'>The conditions <a target='_parent' href='ABAPLOOP_AT_ITAB_COND.html' class='blue'><code class='code'>cond</code></a> can consist of the following optional additions:</li><ul><li class='list_style'>The table key with which the loop is executed can be determined with an addition <a target='_parent' href='ABAPLOOP_AT_ITAB_COND.html' class='blue'><code class='code'>USING KEY</code></a>. The table key affects the order in which the lines are processed.</li><li class='list_style'>Using the additions <a target='_parent' href='ABAPLOOP_AT_ITAB_COND.html' class='blue'><code class='code'>FROM</code></a> and <a target='_parent' href='ABAPLOOP_AT_ITAB_COND.html' class='blue'><code class='code'>TO</code></a> for index tables and <a target='_parent' href='ABAPLOOP_AT_ITAB_COND.html' class='blue'><code class='code'>WHERE</code></a> for all table categories, the loop processing can be restricted to a subset of lines.</li><li class='list_style'>An addition <a target='_parent' href='ABAPLOOP_AT_ITAB_COND.html' class='blue'><code class='code'>STEP</code></a> allows a step size and the direction of the loop processing to be defined.</li></ul></ul>",ul2: "<ul><li class='list_style'>The <a target='_parent' href='ABENTABLE_CATEGORY_GLOSRY.html' class='green'>table category</a></li><li class='list_style'>The addition <a target='_parent' href='ABAPLOOP_AT_ITAB_COND.html' class='blue'><code class='code'>USING KEY</code></a></li><li class='list_style'>The addition <a target='_parent' href='ABAPLOOP_AT_ITAB_COND.html' class='blue'><code class='code'>STEP</code></a></li></ul>",ul3: "<ul><li class='list_style'><strong>Standard tables and sorted tables</strong></li><li class='no_list_style'>The lines are read by ascending line numbers in the <a target='_parent' href='ABENPRIMARY_TABLE_INDEX_GLOSRY.html' class='green'>primary table index</a>. In each loop pass, the system field <code class='code'>sy-tabix</code> contains the line number of the current line in the primary table index.</li><li class='list_style'><strong>Hashed tables</strong></li><li class='no_list_style'>The lines are processed in the order in which they were inserted into the table, and after a sort using the statement <code class='code'>SORT</code> in the sort order. In each loop pass, the system field <code class='code'>sy-tabix</code> contains the value 0.</li></ul>",ul4: "<ul><li class='list_style'>In each loop pass for <a target='_parent' href='ABENINDEX_TABLE_GLOSRY.html' class='green'>index tables</a> and when using a <a target='_parent' href='ABENSORTED_KEY_GLOSRY.html' class='green'>sorted key</a> on the line number of the current table line in the associated table index.</li><li class='list_style'>In <a target='_parent' href='ABENHASHED_TABLE_GLOSRY.html' class='green'>hashed tables</a> and when using a <a target='_parent' href='ABENHASH_KEY_GLOSRY.html' class='green'>hash key</a> on the value 0.</li></ul>",ul5: "<ul><li class='list_style'>If the internal table <code class='code'>itab</code> is specified using a <a target='_parent' href='ABENREFERENCE_VARIABLE_GLOSRY.html' class='green'>reference variable</a>, the loop is executed completely using the table referenced at entry. Any changes to the reference variable do not have an effect on the loop. The associated object cannot be deleted by the <a target='_parent' href='ABENGARBAGE_COLLECTOR_GLOSRY.html' class='green'>Garbage Collector</a> until the loop has been completed. The same thing applies if the table is represented by a field symbol. After the implementation of the field symbol in the loop, iteration still takes place using the table linked to the field symbol when <code class='code'>LOOP</code> is entered.</li><li class='list_style'>There is no implicit selection of a suitable key or index. The used table key or table index is always specified uniquely. A syntax check warning occurs if there is a suitable <a target='_parent' href='ABENSECONDARY_TABLE_KEY_GLOSRY.html' class='green'>secondary table key</a> available but not used. This warning should be removed by using the key. However, in exceptional cases, it can also be bypassed using a <a target='_parent' href='ABENPRAGMA_GLOSRY.html' class='green'>pragma</a>.</li><li class='list_style'>It is generally better to read multiple lines in a <code class='code'>LOOP</code> than making multiple individual line reads using the statement <a target='_parent' href='ABAPREAD_TABLE.html' class='blue'><code class='code'>READ TABLE</code></a> or <a target='_parent' href='ABENTABLE_EXPRESSIONS.html' class='blue'>table expressions</a>.</li><li class='list_style'>For compatibility reasons, when a table body is replaced in the loop, a runtime error only occurs when a directly specified table is read without a specified secondary key and when a work area <code class='code'>wa</code> is specified for the output behavior <a target='_parent' href='ABAPLOOP_AT_ITAB_RESULT.html' class='blue'><code class='code'>result</code></a>.</li><li class='list_style'>Using a special variant <a target='_parent' href='ABENMESH_LOOP.html' class='blue'><code class='code'>LOOP AT mesh_path</code></a>, a loop can be executed across the last node of a <a target='_parent' href='ABENMESH_PATH_GLOSRY.html' class='green'>mesh path</a>.</li><li class='list_style'>Another form of <a target='_parent' href='ABENTABLE_ITERATION_GLOSRY.html' class='green'>table iterations</a> is possible using <a target='_parent' href='ABENITERATION_EXPRESSION_GLOSRY.html' class='green'>iteration expressions</a> and <a target='_parent' href='ABENFOR_ITAB.html' class='blue'><code class='code'>FOR</code></a> in certain constructor expressions.</li></ul>",ul6: "<ul><li class='list_style'><em>Cause:</em> Error in a dynamic <code class='code'>WHERE</code> condition <br><em>Runtime error:</em>\ <code class='code'>DYN_WHERE_PARSE_ERROR</code></li></ul>",code1: "FINAL(out) = cl_demo_output=>new( ). \n\ \nTYPES t_itab TYPE TABLE OF i WITH EMPTY KEY. \n\ \nLOOP AT VALUE t_itab( ( 1 ) ( 2 ) ( 3 ) ) ASSIGNING FIELD-SYMBOL(<fs>). \n  out->write( |\{ <fs> \}| ). \nENDLOOP. \n\ \nout->display( ).",code2: "FINAL(out) = cl_demo_output=>new( ). \n\ \nDATA name TYPE scarr-carrname VALUE '*'. \ncl_demo_input=>request( CHANGING field = name ). \n\ \nDATA: scarr_tab TYPE SORTED TABLE OF scarr \n                WITH UNIQUE KEY carrname, \n      spfli_tab TYPE SORTED TABLE OF spfli \n                WITH NON-UNIQUE KEY carrid. \n\ \nSELECT * \n       FROM scarr \n       INTO TABLE @scarr_tab. \n\ \nSELECT * \n       FROM spfli \n       INTO TABLE @spfli_tab. \n\ \nLOOP AT scarr_tab ASSIGNING FIELD-SYMBOL(<scarr_line>) \n                  WHERE carrname CP name. \n  LOOP AT spfli_tab INTO FINAL(spfli_line) \n                    WHERE carrid = <scarr_line>-carrid. \n    out->write_data( spfli_line ). \n  ENDLOOP. \nENDLOOP. \n\ \nout->display( ).",th1: "<code class='code'><strong>sy-subrc</strong></code>",th2: "<strong>Meaning</strong>",td1: "0",td2: "At least one loop pass was executed.",td3: "4",td4: "No loop pass was executed.",breadcrumb1: "abenabap.html",breadcrumb2: "abenabap_reference.html",breadcrumb3: "abenabap_data_working.html",breadcrumb4: "abenitab.html",breadcrumb5: "abentable_processing_statements.html",breadcrumb6: "abaploop_at_itab_variants.html",
+
+                      });
+                      this.getView().setModel(oModel);
+
+                      var DisplayList = new sap.ui.model.json.JSONModel({
+                        "Elements": [
+
+                        
+                                {
+                                    
+                                        "key": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm?file=ABAPLOOP_AT_ITAB.htm",
+                                        "text": "ABAP Release 8.16 (latest)",
+                                            
+                                },
+                            
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_758_index_htm/7.58/en-US/index.htm",
+                            "text": "ABAP Release 7.58",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_757_index_htm/7.57/en-US/index.htm",
+                            "text": "ABAP Release 7.57",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_756_index_htm/7.56/en-US/index.htm",
+                            "text": "ABAP Release 7.56",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_755_index_htm/7.55/en-US/index.htm",
+                            "text": "ABAP Release 7.55",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_754_index_htm/7.54/en-US/index.htm",
+                            "text": "ABAP Release 7.54",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_753_index_htm/7.53/en-US/index.htm",
+                            "text": "ABAP Release 7.53",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_752_index_htm/7.52/en-US/index.htm",
+                            "text": "ABAP Release 7.52",
+                        }
+                        
+                        ]
+                      });
+                      this.getView().setModel(DisplayList, 'displayList');
+
+                  
+
+                      this._oDSC = this.byId("DynamicSideContent");
+                      this._oToggleButton = this.byId("toggleButton");
+                    },
+
+                  /* -------
+                  [ events ]
+                  ------- */
+
+                  onChange: function(oEvent) {
+                    var oControl = oEvent.getSource();
+                    window.location.href = oControl.getSelectedKey();
+                    /*sap.m.MessageToast.show("Switch to " + oControl.getSelectedKey() + "?");*/
+                  },
+
+                  
+
+                  onIconPress: function(oEvent) {
+                    window.location.href="https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/index.htm?file=ABENABAP.htm";
+                  },
+
+                  handleNews: function(oEvent) {
+                    var docu_url = window.location.href;
+                    if(docu_url.includes('version=5')) {
+                      
+                      window.open('https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/index.htm&object=ABENNEWS-917', '_self');
+                    }
+                    else if(docu_url.includes('abapdocu_latest')) {
+                      window.open('https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm?file=abennews-816.htm', '_self');
+                    }
+                    else if(docu_url.includes('abapdocu_cp')) {
+                      window.open('https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABENNEWS-917.html', '_self');
+                    }
+                    else {
+                      
+                      window.open('https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/index.htm&object=ABENNEWS-816', '_self');
+                    }
+                  },
+
+                  handleException: function(oEvent) {
+                    
+                    window.open('ABENABAP_LANGUAGE_EXCEPTIONS.html', '_self');
+                  },
+
+                  
+                  onScrollUp: function() {
+                    this.byId("ObjectPageLayout").setSelectedSection(null);
+                  },
+
+
+                  onPressTheme: function(oEvent) {
+                    clicked++;
+                    if (clicked === 1 ) {
+                        //sap.ui.getCore().applyTheme("sap_horizon_dark");
+                        sap.ui.core.Configuration.setTheme("sap_horizon_dark");
+                        var subtleId = this.getView().getId('subtle');
+                        var subtle = document.getElementById(subtleId);
+                        a.style.color = '#1d2d3e';
+                    }
+                    if (clicked === 2)
+                    {
+                        //sap.ui.getCore().applyTheme("sap_horizon");
+                        sap.ui.core.Configuration.setTheme("sap_horizon");
+                        clicked = 0;
+                    }
+
+                    /*const element = document.getElementById("sap-ui-bootstrap");
+                    if (element.hasAttribute("data-sap-ui-theme", "sap_horizon")) {
+                        element.setAttribute("data-sap-ui-theme", "sap_horizon_dark");
+                        //window.location.reload();
+                    }
+                    else {
+                        element.setAttribute("data-sap-ui-theme", "sap_horizon");
+                        //window.location.reload();
+                    };*/
+                  },
+
+                  onPressBack: function(oEvent) {
+                    window.history.go(-1);
+                  },
+
+                  onPress: function(oEvent) {
+                    var mail = document.createElement("a");
+                    mail.href = "mailto:f1_help@sap.com?subject=Feedback on ABAP Documentation from Help Portal version&body=Document: LOOP AT itab, Basic Form, ABAPLOOP_AT_ITAB, 824%0D%0A%0D%0AError:%0D%0A%0D%0A%0D%0A%0D%0ASuggestion for improvement:";
+                    mail.click();
+                  },
+
+                  /*handlePopoverPress: function(oEvent) {
+                    var oButton = oEvent.getSource(),
+                    oView = this.getView();
+
+                    if (!this._oPopover) {
+                       this._oPopover = new sap.ui.xmlfragment({
+                           fragmentContent: jQuery("#fragment_xml").html()
+                           }, this);
+                       oView.addDependent(this._oPopover);
+                    }
+                    this._oPopover.openBy(oButton);
+                   },*/
+
+                   handleClosePress: function(oEvent) {
+                       //this.byId("myPopover").close();
+                       //sap.m.MessageToast.show("You cannot close me.");
+                       this._oPopover.getParent().destroyContent();
+                   },
+
+                   popoverAfterClose: function(oEvent) {
+                        this._oPopover.destroy();
+                        this._oPopover.getParent().destroyContent();
+                    },
+
+                   onPressAddress: function(oEvent) {
+                     var address = "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/index.htm?file=abaploop_at_itab.htm";
+                     navigator.clipboard.writeText(address).then(function() {
+                         sap.m.MessageToast.show("'" + address + "' copied.");
+                     }, function(err) {
+                         sap.m.MessageToast.show("No address copied.");
+                     });
+                   },
+                  
+                    handlePopoverPress1: function(oEvent) {
+                      var oButton = oEvent.getSource(),
+                      oView = this.getView();
+
+                      this._oPopover = new sap.ui.xmlfragment({
+                        fragmentContent: jQuery("#fragment_xml1").html()
+                        }, this);
+
+                      this._oPopover.openBy(oButton);
+                     },
+                  
+                    handlePopoverPress2: function(oEvent) {
+                      var oButton = oEvent.getSource(),
+                      oView = this.getView();
+
+                      this._oPopover = new sap.ui.xmlfragment({
+                        fragmentContent: jQuery("#fragment_xml2").html()
+                        }, this);
+
+                      this._oPopover.openBy(oButton);
+                     },
+                  
+
+                  handlePopoverPressExa: function(oEvent) {
+                    window.open('');
+                  },
+
+                  
+                    onPressCopy1: function(oEvent) {
+                    var copy = this.byId("copy1").getCurrentValue();
+                    navigator.clipboard.writeText(copy).then(function() {
+                        sap.m.MessageToast.show("Copied to Clipboard.");
+                    }, function(err) {
+                        sap.m.MessageToast.show("Not copied to Clipboard.");
+                    });
+                  },
+                  
+                    onPressCopy2: function(oEvent) {
+                    var copy = this.byId("copy2").getCurrentValue();
+                    navigator.clipboard.writeText(copy).then(function() {
+                        sap.m.MessageToast.show("Copied to Clipboard.");
+                    }, function(err) {
+                        sap.m.MessageToast.show("Not copied to Clipboard.");
+                    });
+                  },
+                  
+
+                  onPressVersion: function(oEvent) {
+                    
+                    window.open('https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/index.htm&object=ABAPLOOP_AT_ITAB&style=adt', '_self');
+                  },
+
+                  
+                  onItemSelect: function(oEvent) {
+                  if (! this.sSelectedNavigationListItemId) {
+                      this.updateSelectedNavigationListItemId();
+                  }
+                  else {
+                      if (this.oSideNavigation.getSelectedItem() != this.sSelectedNavigationListItemId) {
+                          this.restoreSideNavigationSelection();
+                      }
+                  }
+                  },
+
+                  onCollapseExpandPress: function () {
+                  this.toggleControlExpand(this.oSideNavigation);
+                  },
+
+                  onMenuButtonPress : function() {
+                  var toolPage = this.byId("toolPage");
+
+                  toolPage.setSideExpanded(!toolPage.getSideExpanded());
+                  },
+
+                  /* ----------------
+                  [ event listeners ]
+                  ---------------- */
+
+                  /* ------------------------------------
+                  [ restoring side navigation selection ]
+                  ------------------------------------ */
+
+                  updateSelectedNavigationListItemId: function(sId) {
+                  this.sSelectedNavigationListItemId = sId;
+                  },
+
+                  restoreSideNavigationSelection: function() {
+                  this.oSideNavigation.setSelectedItem(this.sSelectedNavigationListItemId);
+                  this.oSideNavigation.invalidate();
+                  },
+
+                  /* ----------------
+                  [ collapse/expand ]
+                  ---------------- */
+
+                  toggleControlExpand: function(oControl) {
+                  oControl.setExpanded(! oControl.getExpanded());
+                  },
+
+                  /*TreeTable*/
+                  
+
+                  onLiveSearch: function (evt) {
+                    var filterString = evt.getParameter('newValue');
+                    var filter = filterString.toUpperCase();
+
+                    
+                           var treeJson = A.getDefaultJsonTree();
+                       
+                    var treeJsonModel = new sap.ui.model.json.JSONModel(treeJson);
+
+                    if (filterString == '') {
+                        this.getView().setModel(treeJsonModel, 'displayModel');
+                        var tree = this.getView().byId('treeTable');
+                        tree.expandToLevel(1);
+                    } else {
+                    //-----------------------------------------------------------
+                    // Function that flattens tree along a keyword "key", here the collection formally starts as empty
+                    // FIXED
+
+                    var bfs = function (treeJson, collection) {
+                        collection.push({ name: treeJson.name, object: treeJson.object, indices: treeJson.indices });
+                        if (!treeJson.children || treeJson.children.length === 0) return;
+                        for (var i = 0; i < treeJson.children.length; i++) {
+                            //flatten children recursively
+                            bfs(treeJson.children[i], collection);
+                        }
+                        return;
+                    }
+                    //flatten all the subtree categories seperately
+                    // FIXED
+                    var treeModelFlat = treeJson.TreeElements[0];
+                    //Loop over sub trees
+                    for (var i = 0; i < treeJson.TreeElements[0].children.length; i++) {
+                        subTree = treeJson.TreeElements[0].children[i];
+                        if (subTree.children) {
+                            for (var j = 0; j < subTree.children.length; j++) {
+                                var subSubTree = subTree.children[j];
+                                var flattenedCollection = [];
+                                bfs(subSubTree, flattenedCollection);
+                                treeModelFlat.children[i].children[j].children = flattenedCollection.slice(1); //omit first element (root node), would be doubled
+                            }
+                        }
+                        else {
+                            var flattenedCollection = [];
+                            bfs(subTree, flattenedCollection);
+                            treeModelFlat.children[i].children = flattenedCollection.slice(1);
+                        }
+                    }
+                    //filter Model
+                    // FIXED
+                    var filterMode = 0; var similaritySearch = false;
+                    //var filteredModel = structuredClone(treeModelFlat);
+                    var filteredModel = {};
+                    var buildingFilteredModel = {};
+                    var filteredSubtree = [];
+                    var filteredCollection = [];
+                    var treeModelClone = cloneJSON(treeModelFlat);
+
+
+                    for (var i = 0; i < treeModelFlat.children.length; i++) {
+                        var subTree = treeModelFlat.children[i];
+                        if (subTree.children) {
+                            var deleteSubTree = true;
+                            for (var j = 0; j < subTree.children.length; j++) {
+                                var subSubTree = subTree.children[j];
+                                var deleteSubSubTree = true;
+                                if (subSubTree.children.length > 0) {
+                                    for (var k in subSubTree.children) {
+                                        //if (subSubTree.children[k].name.toUpperCase().indexOf(filter) == -1) {
+                                        var indices = subSubTree.children[k].indices;
+
+                                        if (!matchesSearchCriteria(indices, filter)) {
+                                            delete treeModelClone.children[i].children[j].children[k];
+                                        } else {
+                                            deleteSubSubTree = false;
+                                            deleteSubTree = false;
+                                        }
+                                    }
+                                }
+                                if (deleteSubSubTree) {
+                                    delete treeModelClone.children[i].children[j];
+                                }
+                            }
+                            if (deleteSubTree) {
+                                delete treeModelClone.children[i];
+                            }
+                        }
+                    }
+                    var treeModelString = JSON.stringify(treeModelClone);
+                    treeModelString = '{"TreeElements": [' + treeModelString + ']}';
+                    var treeModelObj = JSON.parse(treeModelString);
+                    var DisplayModel = new sap.ui.model.json.JSONModel(treeModelObj);
+                    this.getView().setModel(DisplayModel, 'displayModel');
+                    this.onExpandAll();
+                }
+            },
+
+                  onExpandAll: function (evt) {
+                      var tree = this.getView().byId('treeTable');
+                      tree.expandToLevel(14);
+                  },
+
+                  onCollapseAll: function (evt) {
+                      var tree = this.getView().byId('treeTable');
+                      tree.collapseAll();
+                  },
+
+                  onMenuButtonPress: function () {
+                      if(this._oDSC.getShowSideContent()){
+                      this._oDSC.setShowSideContent(false);
+                      }else{
+                      this._oDSC.setShowSideContent(true);
+                      }
+                  },
+
+                  handleToggleClick: function () {
+                      this._oDSC.toggle();
+                  },
+
+              });
+
+              
+              
+
+              function setAddress(query) {
+                var address = ""
+                var textinput = query;
+                while (textinput.indexOf("&") > -1) {
+                    textinput = textinput.replace("&", "%26")
+                }
+                while (textinput.indexOf("+") > -1) {
+                    textinput = textinput.replace("+", "%2B")
+                }
+                while (textinput.indexOf("=") > -1) {
+                    textinput = textinput.replace("=", "%3D")
+                } while (textinput.indexOf("?") > -1) {
+                    textinput = textinput.replace("?", "%3F")
+                }
+              address = "" + "?query=" + textinput + "&";
+                return address;
+               }
+
+              
+              function cloneJSON(obj) {
+                    // basic type deep copy
+                    if (obj === null || obj === undefined || typeof obj !== 'object') {
+                        return obj
+                    }
+                    // array deep copy
+                    if (obj instanceof Array) {
+                        var cloneA = [];
+                        for (var i = 0; i < obj.length; ++i) {
+                            cloneA[i] = cloneJSON(obj[i]);
+                        }
+                        return cloneA;
+                    }
+                    // object deep copy
+                    var cloneO = {};
+                    for (var i in obj) {
+                      cloneO[i] = cloneJSON(obj[i]);
+                    }
+                  return cloneO;
+                }
+
+            function matchesSearchCriteria(indices, searchWord) {
+                var returnValue = false;
+                for (var index of indices) {
+                    if (index.key1.toUpperCase().indexOf(searchWord) !== -1) {
+                        returnValue = true;
+                        break;
+                    }
+                    var key2Key1Search = index.key2 && index.key1;
+                    if (key2Key1Search.toUpperCase().indexOf(searchWord) !== -1) {
+                        returnValue = true;
+                        break;
+                    }
+                }
+                return returnValue;
+             }
+
+              
+
+              sap.ui.xmlview({ viewContent: jQuery('#main_page_xml').html() }).placeAt("main_page");
+
+              });
+
+        </script>
+<script>
+window.adobeDataLayer = window.adobeDataLayer || [];
+window.adobeDataLayer.push({
+'event': 'globalDL',
+'site': { 
+'name': 'help',
+'country': 'glo'
+},
+'user': {
+'loginStatus': 'no'
+}
+});
+window.adobeDataLayer.push({ 
+'event': 'pageView', 
+'page': { 
+'name':  "", 
+'section': location.pathname.slice(1, location.pathname.indexOf("/", 1)), 
+'language': "en", 
+'country': "US", 
+'referrer': "null", 
+'url': location.href, 
+'details': { 
+'productID':  "ABAP", 
+'deliverableID': "abapdocu_cp_index_htm", 
+'topicID': "n/a", 
+'version': "CLOUD", 
+'machineTranslated': "no", 
+}, 
+}, 
+'user': { 
+'loginStatus': "no", 
+},
+}); 
+window.adobeDataLayer.push({
+'event': "stBeaconReady"
+}); 
+</script>
+</head><body class="sapUiBody sapUiSizeCompact"><div id="tree"></div><div id="main_page"></div></body></html>

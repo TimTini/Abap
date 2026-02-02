@@ -1,0 +1,28 @@
+{
+  "errors": [],
+  "missing_published_at": [
+    "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm",
+    "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/abenabap_statements.html",
+    "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPDATA.html",
+    "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPTYPES.html",
+    "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPIF.html",
+    "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPCASE.html",
+    "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPLOOP_AT_ITAB.html",
+    "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPDO.html",
+    "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/abapread_table.html",
+    "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPAPPEND.html",
+    "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPMODIFY_ITAB.html",
+    "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPDELETE_ITAB.html",
+    "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPSORT_ITAB.html",
+    "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPSELECT.html",
+    "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPPARAMETERS.html",
+    "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPSELECT-OPTIONS.html",
+    "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPFIELD-SYMBOLS.html",
+    "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPASSIGN.html",
+    "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/abapcall_function.html",
+    "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCALL_TRANSACTION.html",
+    "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPCALL_METHOD_STATIC.html",
+    "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPTRY.html",
+    "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPCATCH_TRY.html"
+  ]
+}

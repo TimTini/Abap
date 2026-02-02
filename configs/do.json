@@ -1,0 +1,14 @@
+{
+  "object": "DO",
+  "match": { "startKeyword": "DO" },
+  "block": { "endKeyword": "ENDDO" },
+  "keywordLabels": {
+    "DO": "stmt",
+    "TIMES": "times"
+  },
+  "keywordPhrases": {},
+  "captureRules": [
+    { "after": "DO", "name": "times", "label": "times" }
+  ]
+}
+

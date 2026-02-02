@@ -1,0 +1,23 @@
+{
+  "object": "TYPES",
+  "match": { "startKeyword": "TYPES" },
+  "keywordLabels": {
+    "TYPES": "stmt",
+    "TYPE": "type",
+    "LIKE": "like",
+    "BEGIN": "begin",
+    "OF": "of",
+    "END": "end"
+  },
+  "keywordPhrases": {
+    "BEGIN OF": "begin-of",
+    "END OF": "end-of"
+  },
+  "captureRules": [
+    { "after": "TYPES BEGIN OF", "name": "name", "label": "type-name" },
+    { "after": "TYPES END OF", "name": "name", "label": "type-name" },
+    { "after": "TYPES", "name": "name", "label": "type-name" },
+    { "after": "TYPE", "name": "type", "label": "type" },
+    { "after": "LIKE", "name": "like", "label": "like" }
+  ]
+}

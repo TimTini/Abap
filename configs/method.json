@@ -1,0 +1,13 @@
+{
+  "object": "METHOD",
+  "match": { "startKeyword": "METHOD" },
+  "block": { "endKeyword": "ENDMETHOD" },
+  "keywordLabels": {
+    "METHOD": "stmt"
+  },
+  "keywordPhrases": {},
+  "captureRules": [
+    { "after": "METHOD", "name": "name", "label": "method-name", "descKey": "name" }
+  ]
+}
+

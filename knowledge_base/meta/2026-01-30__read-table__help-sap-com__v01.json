@@ -1,0 +1,32 @@
+{
+  "id": "2026-01-30__read-table__help-sap-com",
+  "title": "READ TABLE itab | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/abapread_table.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T22:34:29",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "internal tables"
+  ],
+  "summary": "Tài liệu SAP Help cho câu lệnh READ TABLE.\nĐọc dòng từ internal table theo key hoặc index.\nHỗ trợ BINARY SEARCH với bảng đã SORT.\nCó tùy chọn TRANSPORTING NO FIELDS để kiểm tra tồn tại.\nThiết lập sy-subrc/sy-tabix sau khi đọc.",
+  "key_points": [
+    "Đọc một dòng nội bảng theo key/index.",
+    "BINARY SEARCH tối ưu cho bảng đã sắp xếp.",
+    "TRANSPORTING NO FIELDS để kiểm tra tồn tại.",
+    "INTO/ASSIGNING/REFERENCE INTO nhận kết quả.",
+    "Kiểm tra sy-subrc để biết kết quả."
+  ],
+  "abap_keywords": [
+    "READ TABLE",
+    "WITH KEY",
+    "INDEX",
+    "BINARY SEARCH",
+    "TRANSPORTING NO FIELDS",
+    "sy-subrc",
+    "sy-tabix"
+  ],
+  "notes_user": "",
+  "chunks": []
+}

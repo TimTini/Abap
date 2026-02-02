@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ABAP Parser Viewer</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --border: #d8dde6;
+      --text: #222b3a;
+      --muted: #6b7280;
+      --accent: #1f7ae0;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    header {
+      margin-bottom: 20px;
+    }
+
+    header h1 {
+      margin: 0 0 6px 0;
+      font-size: 22px;
+    }
+
+    header p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .controls input[type="file"] {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      padding: 6px;
+      border-radius: 6px;
+    }
+
+    .controls button {
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .controls input[type="search"],
+    .controls select {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      min-width: 220px;
+    }
+
+    .controls .toggle {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 13px;
+      user-select: none;
+    }
+
+    .controls .secondary {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .controls .secondary:hover {
+      background: #f3f4f6;
+    }
+
+    .secondary {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .secondary:hover {
+      background: #f3f4f6;
+    }
+
+    .controls .hint {
+      flex-basis: 100%;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      min-height: 300px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .panel h2 {
+      margin: 0 0 10px 0;
+      font-size: 18px;
+    }
+
+    #inputText {
+      width: 100%;
+      min-height: 360px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      resize: vertical;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .modal textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      resize: vertical;
+      min-height: 140px;
+      max-height: 40vh;
+    }
+
+    .error {
+      color: #b42318;
+      font-size: 13px;
+      margin-top: 8px;
+      white-space: pre-wrap;
+    }
+
+    #output {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding-right: 6px;
+    }
+
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .card.block {
+      border-left: 4px solid var(--accent);
+    }
+
+    .card.selected {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .card-title {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.2;
+    }
+
+    .card-actions {
+      display: inline-flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .btn-ghost {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      padding: 4px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .btn-ghost:hover {
+      background: #f3f4f6;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .raw {
+      margin-top: 8px;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #f8fafc;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #3730a3;
+      font-size: 12px;
+      margin: 2px 4px 2px 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 13px;
+    }
+
+    th, td {
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      padding: 6px 4px;
+      vertical-align: top;
+    }
+
+    .decl-desc,
+    .decl-desc-line {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .decl-desc-text {
+      flex: 1;
+      min-width: 0;
+      white-space: pre-wrap;
+    }
+
+    .icon-btn {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      padding: 2px 6px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      line-height: 1.1;
+    }
+
+    .icon-btn:hover {
+      background: #f3f4f6;
+      color: var(--text);
+    }
+
+    .icon-btn:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .children {
+      margin-top: 12px;
+      padding-left: 12px;
+      border-left: 2px solid var(--border);
+    }
+
+    .extras {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--border);
+    }
+
+    pre {
+      white-space: pre-wrap;
+      margin: 6px 0 0 0;
+    }
+
+    .modal[hidden] {
+      display: none;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 1000;
+    }
+
+    .modal-content {
+      width: min(1000px, 100%);
+      max-height: 85vh;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      gap: 10px;
+    }
+
+    .modal-header .modal-actions {
+      display: inline-flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .modal-body {
+      padding: 12px;
+      overflow: auto;
+      min-height: 0;
+    }
+
+    .modal-body pre {
+      white-space: pre;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>ABAP Parser Viewer</h1>
+      <p>Paste ABAP code (or JSON output) and click Render.</p>
+    </header>
+
+    <div class="controls">
+      <input type="file" id="fileInput" accept=".abap,.txt,.json,application/json,text/plain">
+      <button type="button" id="parseBtn">Render</button>
+      <input type="search" id="searchInput" placeholder="Search (raw/comment/value/decl)…">
+      <select id="typeFilter">
+        <option value="">All types</option>
+      </select>
+      <label class="toggle"><input type="checkbox" id="showRaw" checked>raw</label>
+      <label class="toggle"><input type="checkbox" id="showKeywords" checked>keywords</label>
+      <label class="toggle"><input type="checkbox" id="showValues" checked>values</label>
+      <label class="toggle"><input type="checkbox" id="showExtras" checked>extras</label>
+      <button type="button" id="expandAllBtn" class="secondary">Expand all</button>
+      <button type="button" id="collapseAllBtn" class="secondary">Collapse all</button>
+      <button type="button" id="clearFiltersBtn" class="secondary">Clear</button>
+      <button type="button" id="descBtn" class="secondary">Descriptions</button>
+      <button type="button" id="rulesBtn" class="secondary">Rules</button>
+      <button type="button" id="exportXmlBtn" class="secondary">Export XML</button>
+      <span class="muted hint">Tip: click “Code” on a card to select the corresponding lines in the input; click “JSON” to inspect the raw object.</span>
+    </div>
+
+    <div class="layout">
+      <div class="panel">
+        <h2>Input (ABAP / JSON)</h2>
+        <textarea id="inputText" placeholder="Paste ABAP code here"></textarea>
+        <div class="error" id="error"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Output</h2>
+        <div id="output" class="muted">No data loaded.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="jsonModal" hidden>
+    <div class="modal-content">
+      <div class="modal-header">
+        <strong id="jsonTitle">Object JSON</strong>
+        <div class="modal-actions">
+          <button type="button" id="jsonCopyBtn" class="secondary">Copy</button>
+          <button type="button" id="jsonCloseBtn" class="secondary">Close</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <pre id="jsonPre"></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="editModal" hidden>
+    <div class="modal-content">
+      <div class="modal-header">
+        <strong>Edit description</strong>
+        <div class="modal-actions">
+          <button type="button" id="editSaveBtn" class="secondary">Save</button>
+          <button type="button" id="editClearBtn" class="secondary">Clear</button>
+          <button type="button" id="editCancelBtn" class="secondary">Close</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="muted" id="editLabel" style="margin-bottom:8px"></div>
+        <div class="muted" id="editHint" style="margin-bottom:8px"></div>
+        <textarea id="editDesc" placeholder="Enter description…"></textarea>
+        <div class="muted" style="margin-top:8px">Tip: Ctrl+Enter to save, Esc to close.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="rulesModal" hidden>
+    <div class="modal-content">
+      <div class="modal-header">
+        <strong>Rules</strong>
+        <div class="modal-actions">
+          <button type="button" id="rulesNewBtn" class="secondary">New</button>
+          <button type="button" id="rulesSaveBtn" class="secondary">Save</button>
+          <button type="button" id="rulesDeleteBtn" class="secondary">Delete</button>
+          <button type="button" id="rulesDownloadBtn" class="secondary">Download</button>
+          <button type="button" id="rulesCloseBtn" class="secondary">Close</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="controls" style="margin-bottom:8px">
+          <select id="rulesSelect" style="min-width:320px">
+            <option value="">(New rule)</option>
+          </select>
+          <select id="rulesTemplate" style="min-width:220px">
+            <option value="startKeyword">Template: startKeyword</option>
+            <option value="startPhrase">Template: startPhrase</option>
+            <option value="assignment">Template: assignment</option>
+          </select>
+          <span class="muted">Saved in browser (localStorage). Custom rules take priority when parsing.</span>
+        </div>
+        <div class="error" id="rulesError"></div>
+        <textarea id="rulesJson" placeholder="Paste or edit config JSON here…"></textarea>
+        <div class="muted" style="margin-top:8px">Tip: click Save, then Render to test; Download creates a .json you can add into /configs.</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../shared/abap-parser.js" defer></script>
+  <!-- abap-parser-configs:start -->
+  <script src="./configs.generated/append.js" defer></script>
+  <script src="./configs.generated/assignment.js" defer></script>
+  <script src="./configs.generated/call-function.js" defer></script>
+  <script src="./configs.generated/call-method.js" defer></script>
+  <script src="./configs.generated/call-transaction.js" defer></script>
+  <script src="./configs.generated/case.js" defer></script>
+  <script src="./configs.generated/catch.js" defer></script>
+  <script src="./configs.generated/class-data.js" defer></script>
+  <script src="./configs.generated/class-methods.js" defer></script>
+  <script src="./configs.generated/class.js" defer></script>
+  <script src="./configs.generated/cleanup.js" defer></script>
+  <script src="./configs.generated/clear.js" defer></script>
+  <script src="./configs.generated/constants.js" defer></script>
+  <script src="./configs.generated/data.js" defer></script>
+  <script src="./configs.generated/delete-itab.js" defer></script>
+  <script src="./configs.generated/do.js" defer></script>
+  <script src="./configs.generated/else.js" defer></script>
+  <script src="./configs.generated/elseif.js" defer></script>
+  <script src="./configs.generated/field-symbols.js" defer></script>
+  <script src="./configs.generated/form.js" defer></script>
+  <script src="./configs.generated/if.js" defer></script>
+  <script src="./configs.generated/insert-itab.js" defer></script>
+  <script src="./configs.generated/loop-at-itab.js" defer></script>
+  <script src="./configs.generated/method.js" defer></script>
+  <script src="./configs.generated/methods.js" defer></script>
+  <script src="./configs.generated/modify-itab.js" defer></script>
+  <script src="./configs.generated/move-corresponding.js" defer></script>
+  <script src="./configs.generated/move.js" defer></script>
+  <script src="./configs.generated/parameters.js" defer></script>
+  <script src="./configs.generated/perform.js" defer></script>
+  <script src="./configs.generated/ranges.js" defer></script>
+  <script src="./configs.generated/read-table.js" defer></script>
+  <script src="./configs.generated/select-options.js" defer></script>
+  <script src="./configs.generated/select.js" defer></script>
+  <script src="./configs.generated/sort-itab.js" defer></script>
+  <script src="./configs.generated/statics.js" defer></script>
+  <script src="./configs.generated/try.js" defer></script>
+  <script src="./configs.generated/types.js" defer></script>
+  <script src="./configs.generated/when.js" defer></script>
+  <!-- abap-parser-configs:end -->
+  <script src="./variable-descriptions.js" defer></script>
+  <script src="./app.js" defer></script>
+</body>
+</html>

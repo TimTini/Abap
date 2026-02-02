@@ -1,0 +1,27 @@
+{
+  "id": "2026-01-30__clear__help-sap-com",
+  "title": "CLEAR | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCLEAR.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T23:45:00",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "data objects"
+  ],
+  "summary": "Tài liệu tham khảo cho CLEAR.\nDùng để đưa data object về initial value.\nCó thể dùng dạng chained CLEAR: ...,... .\nHay gặp khi reset biến/structure trong loop.\nVới header line (legacy) thì CLEAR itab clear header line.",
+  "key_points": [
+    "CLEAR reset về initial value.",
+    "Dùng cho biến/structure (legacy: header line).",
+    "Hỗ trợ chained statement: CLEAR: a, b.",
+    "Thường dùng trước khi fill lại dữ liệu.",
+    "Có thể thay bằng VALUE #( ) trong code hiện đại."
+  ],
+  "abap_keywords": [
+    "CLEAR"
+  ],
+  "notes_user": "",
+  "chunks": []
+}
+

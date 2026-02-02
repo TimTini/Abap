@@ -1,0 +1,22 @@
+{
+  "object": "FIELD-SYMBOLS",
+  "match": { "startKeyword": "FIELD-SYMBOLS" },
+  "keywordLabels": {
+    "FIELD-SYMBOLS": "stmt",
+    "TYPE": "type",
+    "LIKE": "like",
+    "REF": "ref",
+    "TO": "to",
+    "STRUCTURE": "structure"
+  },
+  "keywordPhrases": {
+    "REF TO": "ref-to"
+  },
+  "captureRules": [
+    { "after": "FIELD-SYMBOLS", "name": "name", "label": "fs-name", "descKey": "name" },
+    { "after": "TYPE REF TO", "name": "refTo", "label": "ref-to", "descKey": "refTo" },
+    { "after": "TYPE", "name": "type", "label": "type", "descKey": "type" },
+    { "after": "LIKE", "name": "like", "label": "like", "descKey": "like" },
+    { "after": "STRUCTURE", "name": "structure", "label": "structure", "descKey": "structure" }
+  ]
+}

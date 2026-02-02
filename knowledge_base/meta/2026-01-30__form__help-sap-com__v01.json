@@ -1,0 +1,33 @@
+{
+  "id": "2026-01-30__form__help-sap-com",
+  "title": "FORM | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPFORM.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T23:45:00",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "subroutines",
+    "legacy"
+  ],
+  "summary": "Tài liệu tham khảo cho FORM.\nĐịnh nghĩa subroutine block (FORM...ENDFORM).\nĐược gọi bằng PERFORM.\nKhai báo tham số trong header (USING/CHANGING/TABLES/RAISING).\nHay gặp trong code legacy.",
+  "key_points": [
+    "FORM mở block, ENDFORM kết thúc.",
+    "Được gọi bằng PERFORM.",
+    "USING/CHANGING/TABLES/RAISING cho tham số.",
+    "Scope thường là chương trình hiện tại.",
+    "Code legacy vẫn hay gặp."
+  ],
+  "abap_keywords": [
+    "FORM",
+    "ENDFORM",
+    "USING",
+    "CHANGING",
+    "TABLES",
+    "RAISING"
+  ],
+  "notes_user": "",
+  "chunks": []
+}
+

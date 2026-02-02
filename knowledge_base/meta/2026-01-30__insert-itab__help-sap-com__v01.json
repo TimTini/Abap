@@ -1,0 +1,32 @@
+{
+  "id": "2026-01-30__insert-itab__help-sap-com",
+  "title": "INSERT itab | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPINSERT_ITAB.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T23:45:00",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "internal tables"
+  ],
+  "summary": "Tài liệu tham khảo cho INSERT itab.\nThêm dòng vào internal table.\nHỗ trợ INTO TABLE, INDEX, ASSIGNING, REFERENCE INTO.\nKhác nhau theo table type (STANDARD/SORTED/HASHED).\nCập nhật sy-subrc theo kết quả thao tác.",
+  "key_points": [
+    "INSERT thêm 1 dòng hoặc nhiều dòng (LINES OF).",
+    "INDEX dùng cho standard table.",
+    "Sorted/hashed table dựa trên key.",
+    "Có ASSIGNING/REFERENCE INTO để nhận reference.",
+    "Kiểm tra sy-subrc để biết kết quả."
+  ],
+  "abap_keywords": [
+    "INSERT",
+    "INTO TABLE",
+    "INDEX",
+    "ASSIGNING",
+    "REFERENCE INTO",
+    "sy-subrc"
+  ],
+  "notes_user": "",
+  "chunks": []
+}
+

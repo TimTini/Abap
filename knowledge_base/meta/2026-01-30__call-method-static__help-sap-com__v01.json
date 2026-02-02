@@ -1,0 +1,32 @@
+{
+  "id": "2026-01-30__call-method-static__help-sap-com",
+  "title": "CALL METHOD, Static Method Call (Obsolete) | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPCALL_METHOD_STATIC.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T22:34:29",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "oo"
+  ],
+  "summary": "Tài liệu SAP Help cho CALL METHOD (static).\nGọi method tĩnh của class trong ABAP OO.\nTruyền tham số bằng EXPORTING/IMPORTING/CHANGING/RECEIVING.\nHỗ trợ xử lý exception.\nLà dạng gọi thay thế cho functional method call.",
+  "key_points": [
+    "CALL METHOD class=>method.",
+    "Section tham số rõ ràng.",
+    "EXCEPTIONS hoặc class-based exception.",
+    "Thay thế bằng class=>method( ) khi phù hợp.",
+    "Dùng trong API hướng đối tượng."
+  ],
+  "abap_keywords": [
+    "CALL METHOD",
+    "=>",
+    "EXPORTING",
+    "IMPORTING",
+    "CHANGING",
+    "RECEIVING",
+    "EXCEPTIONS"
+  ],
+  "notes_user": "",
+  "chunks": []
+}

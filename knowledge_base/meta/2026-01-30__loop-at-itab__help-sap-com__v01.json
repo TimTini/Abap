@@ -1,0 +1,33 @@
+{
+  "id": "2026-01-30__loop-at-itab__help-sap-com",
+  "title": "LOOP AT itab, Basic Form | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPLOOP_AT_ITAB.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T22:34:29",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "internal tables",
+    "loops"
+  ],
+  "summary": "Tài liệu SAP Help cho LOOP AT itab.\nMô tả duyệt internal table theo dòng.\nHỗ trợ INTO, ASSIGNING và REFERENCE INTO.\nCho phép lọc bằng WHERE và giới hạn FROM/TO.\nKết thúc bằng ENDLOOP.",
+  "key_points": [
+    "Duyệt nội bảng theo thứ tự.",
+    "WHERE lọc dòng cần xử lý.",
+    "INTO/ASSIGNING/REFERENCE INTO để nhận dòng.",
+    "FROM/TO/STEP giới hạn vòng lặp.",
+    "Kết thúc với ENDLOOP."
+  ],
+  "abap_keywords": [
+    "LOOP",
+    "AT",
+    "INTO",
+    "ASSIGNING",
+    "REFERENCE INTO",
+    "WHERE",
+    "ENDLOOP"
+  ],
+  "notes_user": "",
+  "chunks": []
+}

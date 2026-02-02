@@ -1,0 +1,22 @@
+{
+  "object": "RANGES",
+  "match": { "startKeyword": "RANGES" },
+  "keywordLabels": {
+    "RANGES": "stmt",
+    "FOR": "for",
+    "TYPE": "type",
+    "LIKE": "like",
+    "REF": "ref",
+    "TO": "to"
+  },
+  "keywordPhrases": {
+    "REF TO": "ref-to"
+  },
+  "captureRules": [
+    { "after": "RANGES", "name": "name", "label": "range-name", "descKey": "name" },
+    { "after": "FOR", "name": "for", "label": "for", "descKey": "for" },
+    { "after": "TYPE REF TO", "name": "refTo", "label": "ref-to", "descKey": "refTo" },
+    { "after": "TYPE", "name": "type", "label": "type", "descKey": "type" },
+    { "after": "LIKE", "name": "like", "label": "like", "descKey": "like" }
+  ]
+}

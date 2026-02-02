@@ -1,0 +1,26 @@
+{
+  "id": "2026-01-30__abap-statements-overview__help-sap-com",
+  "title": "ABAP Statements | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/abenabap_statements.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T22:34:29",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "statements",
+    "overview"
+  ],
+  "summary": "Trang tổng quan các câu lệnh ABAP trên SAP Help.\nNhóm các statement theo lĩnh vực chức năng và mục đích sử dụng.\nCung cấp liên kết tới tài liệu chi tiết từng câu lệnh.\nGiúp định hướng nhanh khi chọn statement phù hợp.\nHữu ích làm mục lục cho phần statements.",
+  "key_points": [
+    "Tổng quan hệ thống statement ABAP.",
+    "Phân nhóm theo chủ đề/chức năng.",
+    "Liên kết tới các keyword chi tiết.",
+    "Phù hợp để bắt đầu tra cứu statement."
+  ],
+  "abap_keywords": [
+    "ABAP"
+  ],
+  "notes_user": "",
+  "chunks": []
+}

@@ -1,0 +1,11 @@
+{
+  "object": "TRY",
+  "match": { "startKeyword": "TRY" },
+  "block": { "endKeyword": "ENDTRY" },
+  "keywordLabels": {
+    "TRY": "stmt"
+  },
+  "keywordPhrases": {},
+  "captureRules": []
+}
+

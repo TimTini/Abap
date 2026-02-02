@@ -1,0 +1,14 @@
+{
+  "object": "CATCH",
+  "match": { "startKeyword": "CATCH" },
+  "keywordLabels": {
+    "CATCH": "stmt",
+    "INTO": "into"
+  },
+  "keywordPhrases": {},
+  "captureRules": [
+    { "after": "CATCH", "name": "exception", "label": "exception", "capture": "rest", "stopTokens": ["INTO"] },
+    { "after": "INTO", "name": "into", "label": "into" }
+  ]
+}
+

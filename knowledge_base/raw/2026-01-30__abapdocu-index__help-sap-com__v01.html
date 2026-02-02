@@ -1,0 +1,83 @@
+
+  <!DOCTYPE html>
+  <html>
+    <head>
+        <meta charset='utf-8'>
+        <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+        <title>Redirect</title>
+        <meta name='viewport' content='width=device-width, initial-scale=1'>
+    
+<script>
+window.adobeDataLayer = window.adobeDataLayer || [];
+window.adobeDataLayer.push({
+'event': 'globalDL',
+'site': { 
+'name': 'help',
+'country': 'glo'
+},
+'user': {
+'loginStatus': 'no'
+}
+});
+window.adobeDataLayer.push({ 
+'event': 'pageView', 
+'page': { 
+'name':  "", 
+'section': location.pathname.slice(1, location.pathname.indexOf("/", 1)), 
+'language': "en", 
+'country': "US", 
+'referrer': "https://www.google.com/", 
+'url': location.href, 
+'details': { 
+'productID':  "ABAP", 
+'deliverableID': "abapdocu_latest_index_htm", 
+'topicID': "n/a", 
+'version': "latest", 
+'machineTranslated': "no", 
+}, 
+}, 
+'user': { 
+'loginStatus': "no", 
+},
+}); 
+window.adobeDataLayer.push({
+'event': "stBeaconReady"
+}); 
+</script>
+
+<meta name="semaphore_tech_ids" content="ABAP">
+<meta name="product" content="ABAP">
+<meta name="version" content="latest">
+<meta name="language" content="en-US">
+<meta name="contenthash" content="29ce52908e0473f7e853007d21cf3af668071694a2c498a42228744f667187a290ebfa9054bf28c21fc7c2f545eb57dbf2e309f0885b291db721631924e7c1e4">
+<meta name="contentloio" content="abapdocu_latest_index_htm">
+<meta name="created_timestamp" content="2025-10-20 07:30.37">
+<meta name="updated_timestamp" content="2025-08-13 14:14.51">
+<link rel="canonical" href="/doc/abapdocu_latest_index_htm/latest/en-US/index.htm">
+
+<script src="//assets.adobedtm.com/ccc66c06b30b/6fef444d50e0/launch-dec827c65643-staging.min.js"></script>
+<script src="https://cdn.schemaapp.com/javascript/highlight.js"></script><script src="https://cdn.schemaapp.com/javascript/schemaFunctions.min.js"></script><script>schemaLoad("Acronym/Helpsap", "325UM-NQRHZ-P7T97-M5SY8");</script></head>
+    <script>
+    function redirect() {
+        var url = window.location.href;
+        var newUrl = "";
+        if (url.includes("index.htm?file=")) {
+            newUrl = url.replace("index.htm?file=", "");
+        } else if (url.includes("index.htm")) {
+            newUrl = url.replace("index.htm", "ABENABAP.html");
+        }
+        else {
+            newUrl = url;
+        }
+
+        if (newUrl.endsWith("htm")) {
+            newUrl += "l";
+        }
+
+        location.href = newUrl;
+    }
+    </script>
+    <body onload="redirect()">
+    </body>
+  </html>
+

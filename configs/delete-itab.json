@@ -1,0 +1,24 @@
+{
+  "object": "DELETE_ITAB",
+  "match": { "startKeyword": "DELETE" },
+  "keywordLabels": {
+    "DELETE": "stmt",
+    "FROM": "from",
+    "INDEX": "index",
+    "WHERE": "where",
+    "ADJACENT": "adjacent",
+    "DUPLICATES": "duplicates",
+    "COMPARING": "comparing"
+  },
+  "keywordPhrases": {
+    "ADJACENT DUPLICATES": "adjacent-duplicates",
+    "DELETE ADJACENT DUPLICATES": "delete-adjacent-duplicates"
+  },
+  "captureRules": [
+    { "after": "DELETE", "name": "target", "label": "target" },
+    { "after": "FROM", "name": "from", "label": "from" },
+    { "after": "INDEX", "name": "index", "label": "index" },
+    { "after": "WHERE", "name": "where", "label": "where", "capture": "rest" }
+  ]
+}
+

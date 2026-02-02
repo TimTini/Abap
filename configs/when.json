@@ -1,0 +1,15 @@
+{
+  "object": "WHEN",
+  "match": { "startKeyword": "WHEN" },
+  "keywordLabels": {
+    "WHEN": "stmt",
+    "OTHERS": "others"
+  },
+  "keywordPhrases": {
+    "WHEN OTHERS": "when-others"
+  },
+  "captureRules": [
+    { "after": "WHEN", "name": "branch", "label": "branch", "capture": "rest" }
+  ]
+}
+

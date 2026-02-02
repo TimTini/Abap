@@ -1,0 +1,638 @@
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-16" /><meta http-equiv="X-UA-Compatible" content="IE=edge" /><meta charset="utf-8" /><link rel="shortcut icon" href="ABAPIcon.ico" type="image/ico" /><title>SORT itab | ABAP Keyword Documentation</title><script id="sap-ui-bootstrap" src="https://sapui5.hana.ondemand.com/resources/sap-ui-core.js" data-sap-ui-theme="sap_horizon" data-sap-ui-libs="sap.m" data-sap-ui-xx-bindingSyntax="complex"> </script><script id="main_page_xml" type="text/xmldata"><mvc:View xmlns="sap.m" xmlns:blocks="sap.uxap.blocks" xmlns:code="sap.ui.codeeditor" xmlns:core="sap.ui.core" xmlns:f="sap.f" xmlns:form="sap.ui.layout.form" xmlns:layout="sap.ui.layout" xmlns:mvc="sap.ui.core.mvc" xmlns:table="sap.ui.table" xmlns:tnt="sap.tnt" xmlns:uxap="sap.uxap" xmlns:xhtml="http://www.w3.org/1999/xhtml" controllerName="myController" height="100%" class="side-navigation-demo"><tnt:ToolPage id="toolPage"><tnt:header><f:ShellBar title="ABAP Keyword Documentation" secondTitle="Reference" showMenuButton="true" homeIcon="https://www.sap.com/dam/application/shared/logos/sap-logo-svg.svg.adapt.svg/1493030643828.svg" homeIconTooltip="Home" showNavButton="false" menuButtonPressed="onMenuButtonPress" homeIconPressed="onIconPress"></f:ShellBar></tnt:header><tnt:mainContents><Page id="page" showHeader="false" showNavButton="false" enableScrolling="true"><layout:DynamicSideContent id="DynamicSideContent" class="sapUiDSCExplored sapUiContentPadding" sideContentFallDown="BelowM" sideContentPosition="Begin" containerQuery="true" breakpointChanged="handleBreakpointChanged"><xhtml:div class="pageDiv"><uxap:ObjectPageLayout id="ObjectPageLayout" showTitleInHeaderContent="true" showEditHeaderButton="true" enableLazyLoading="true" editHeaderButtonPress="handleEditBtnPress" upperCaseAnchorBar="false" useIconTabBar="false"><uxap:headerTitle><uxap:ObjectPageDynamicHeaderTitle><uxap:breadcrumbs><Breadcrumbs currentLocationText="SORT itab"><Link text="ABAP - Keyword Documentation" href="{/breadcrumb1}" /><Link text="ABAP Programming Language" href="{/breadcrumb2}" /><Link text="ABAP - Processing Internal Data" href="{/breadcrumb3}" /><Link text="Internal Tables (itab)" href="{/breadcrumb4}" /><Link text="itab - Processing Statements" href="{/breadcrumb5}" /></Breadcrumbs></uxap:breadcrumbs><uxap:expandedHeading><Title text="SORT itab" wrapping="true"></Title></uxap:expandedHeading><uxap:expandedContent><layout:VerticalLayout><HBox><core:Icon src="sap-icon://source-code"></core:Icon><Text renderWhitespace="true" text="  Keyword"></Text></HBox><HBox></HBox></layout:VerticalLayout></uxap:expandedContent><uxap:actions><ComboBox class="sapMLIBActionable" placeholder="ABAP Release 8.16 (latest)" items="{path:'displayList>/Elements', sorter:{path:'text', descending: true}}" change="onChange"><core:Item key="{displayList>key}" text="{displayList>text}"></core:Item></ComboBox><Button text="News" press="handleNews" type="Ghost"></Button><Button icon="sap-icon://email" tooltip="Email us" press="onPress"></Button><OverflowToolbarButton icon="sap-icon://chain-link" tooltip="Get link" press="onPressAddress"></OverflowToolbarButton></uxap:actions></uxap:ObjectPageDynamicHeaderTitle></uxap:headerTitle><uxap:headerContent><layout:HorizontalLayout class="sapUiSmallMarginBeginEnd"><VBox><FormattedText htmlText="{/par2}"></FormattedText></VBox></layout:HorizontalLayout><layout:HorizontalLayout class="sapUiSmallMarginBeginEnd"><Text renderWhitespace="true" text="&#x9;&#x9;"></Text></layout:HorizontalLayout><layout:HorizontalLayout class="sapUiSmallMarginBeginEnd"></layout:HorizontalLayout></uxap:headerContent><uxap:sections><uxap:ObjectPageSection titleUppercase="false" title="Overview"><uxap:subSections><uxap:ObjectPageSubSection titleUppercase="false"><uxap:blocks><VBox><form:SimpleForm title="Description" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanM="12" adjustLabelSpan="false" emptySpanXL="0" columnsXL="2"><form:content><VBox><FormattedText htmlText="{/par9}"></FormattedText><FormattedText htmlText="{/ul1}"></FormattedText><FormattedText htmlText="{/par10}"></FormattedText><FormattedText htmlText="{/par11}"></FormattedText><FormattedText htmlText="{/par12}"></FormattedText><FormattedText htmlText="{/ul2}"></FormattedText><FormattedText htmlText="{/par13}"></FormattedText><FormattedText htmlText="{/par14}"></FormattedText><FormattedText htmlText="{/ul3}"></FormattedText><FormattedText htmlText="{/par15}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Hints" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanL="4" labelSpanM="12" labelSpanS="12" adjustLabelSpan="false" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="2" columnsL="2" columnsM="1"><form:content><VBox><FormattedText htmlText="{/ul4}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Example" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="-1" labelSpanL="4" labelSpanM="2" labelSpanS="12" adjustLabelSpan="true" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="1" columnsL="1" columnsM="1" singleContainerFullSize="false"><form:content><VBox><FormattedText htmlText="{/par16}"></FormattedText><Button class="sapUiTinyMarginBeginEnd" icon="sap-icon://copy" tooltip="Copy example" press="onPressCopy1"></Button><code:CodeEditor type="abap" editable="false" value="{/code1}" maxLines="15" width="auto" id="copy1"></code:CodeEditor><FormattedText htmlText="{/par17}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Executable Examples" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanL="4" labelSpanM="12" labelSpanS="12" adjustLabelSpan="false" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="2" columnsL="2" columnsM="1"><form:content><VBox><FormattedText htmlText="{/ul5}"></FormattedText></VBox></form:content></form:SimpleForm></VBox></uxap:blocks></uxap:ObjectPageSubSection></uxap:subSections></uxap:ObjectPageSection><uxap:ObjectPageSection title="... STABLE" titleUppercase="false"><uxap:subSections><uxap:ObjectPageSubSection titleUppercase="false"><uxap:blocks><VBox><HBox><core:Icon src="sap-icon://dimension"></core:Icon><Text renderWhitespace="true" text="  "></Text><Text renderWhitespace="true" text="Addition"></Text></HBox><Text renderWhitespace="true" text="&#x9;&#x9;"></Text><form:SimpleForm title="Description" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanM="12" adjustLabelSpan="false" emptySpanXL="0" columnsXL="2"><form:content><VBox><FormattedText htmlText="{/par18}"></FormattedText><FormattedText htmlText="{/ul6}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Example" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="-1" labelSpanL="4" labelSpanM="2" labelSpanS="12" adjustLabelSpan="true" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="1" columnsL="1" columnsM="1" singleContainerFullSize="false"><form:content><VBox><FormattedText htmlText="{/par19}"></FormattedText><Button class="sapUiTinyMarginBeginEnd" icon="sap-icon://copy" tooltip="Copy example" press="onPressCopy2"></Button><code:CodeEditor type="abap" editable="false" value="{/code2}" maxLines="15" width="auto" id="copy2"></code:CodeEditor><FormattedText htmlText="{/par20}"></FormattedText></VBox></form:content></form:SimpleForm></VBox></uxap:blocks></uxap:ObjectPageSubSection></uxap:subSections></uxap:ObjectPageSection><uxap:ObjectPageSection title="... ASCENDING|DESCENDING" titleUppercase="false"><uxap:subSections><uxap:ObjectPageSubSection titleUppercase="false"><uxap:blocks><VBox><HBox><core:Icon src="sap-icon://dimension"></core:Icon><Text renderWhitespace="true" text="  "></Text><Text renderWhitespace="true" text="Addition"></Text></HBox><Text renderWhitespace="true" text="&#x9;&#x9;"></Text><form:SimpleForm title="Description" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanM="12" adjustLabelSpan="false" emptySpanXL="0" columnsXL="2"><form:content><VBox><FormattedText htmlText="{/par21}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Example" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="-1" labelSpanL="4" labelSpanM="2" labelSpanS="12" adjustLabelSpan="true" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="1" columnsL="1" columnsM="1" singleContainerFullSize="false"><form:content><VBox><FormattedText htmlText="{/par22}"></FormattedText><Button class="sapUiTinyMarginBeginEnd" icon="sap-icon://copy" tooltip="Copy example" press="onPressCopy3"></Button><code:CodeEditor type="abap" editable="false" value="{/code3}" maxLines="15" width="auto" id="copy3"></code:CodeEditor><FormattedText htmlText="{/par23}"></FormattedText></VBox></form:content></form:SimpleForm></VBox></uxap:blocks></uxap:ObjectPageSubSection></uxap:subSections></uxap:ObjectPageSection><uxap:ObjectPageSection title="... AS TEXT" titleUppercase="false"><uxap:subSections><uxap:ObjectPageSubSection titleUppercase="false"><uxap:blocks><VBox><HBox><core:Icon src="sap-icon://dimension"></core:Icon><Text renderWhitespace="true" text="  "></Text><Text renderWhitespace="true" text="Addition"></Text></HBox><Text renderWhitespace="true" text="&#x9;&#x9;"></Text><form:SimpleForm title="Description" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanM="12" adjustLabelSpan="false" emptySpanXL="0" columnsXL="2"><form:content><VBox><FormattedText htmlText="{/par24}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Hints" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanL="4" labelSpanM="12" labelSpanS="12" adjustLabelSpan="false" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="2" columnsL="2" columnsM="1"><form:content><VBox><FormattedText htmlText="{/ul7}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Example" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="-1" labelSpanL="4" labelSpanM="2" labelSpanS="12" adjustLabelSpan="true" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="1" columnsL="1" columnsM="1" singleContainerFullSize="false"><form:content><VBox><FormattedText htmlText="{/par25}"></FormattedText><Button class="sapUiTinyMarginBeginEnd" icon="sap-icon://copy" tooltip="Copy example" press="onPressCopy4"></Button><code:CodeEditor type="abap" editable="false" value="{/code4}" maxLines="15" width="auto" id="copy4"></code:CodeEditor><FormattedText htmlText="{/par26}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Executable Example" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanL="4" labelSpanM="12" labelSpanS="12" adjustLabelSpan="false" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="2" columnsL="2" columnsM="1"><form:content><VBox><FormattedText htmlText="{/par27}"></FormattedText></VBox></form:content></form:SimpleForm></VBox></uxap:blocks></uxap:ObjectPageSubSection></uxap:subSections></uxap:ObjectPageSection><uxap:ObjectPageSection title="... BY compi [ASCENDING|DESCENDING] [AS TEXT]" titleUppercase="false"><uxap:subSections><uxap:ObjectPageSubSection titleUppercase="false"><uxap:blocks><VBox><HBox><core:Icon src="sap-icon://dimension"></core:Icon><Text renderWhitespace="true" text="  "></Text><Text renderWhitespace="true" text="Addition"></Text></HBox><Text renderWhitespace="true" text="&#x9;&#x9;"></Text><form:SimpleForm title="Description" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanM="12" adjustLabelSpan="false" emptySpanXL="0" columnsXL="2"><form:content><VBox><FormattedText htmlText="{/par28}"></FormattedText><FormattedText htmlText="{/par29}"></FormattedText><FormattedText htmlText="{/par30}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Hints" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanL="4" labelSpanM="12" labelSpanS="12" adjustLabelSpan="false" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="2" columnsL="2" columnsM="1"><form:content><VBox><FormattedText htmlText="{/ul8}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Example" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="-1" labelSpanL="4" labelSpanM="2" labelSpanS="12" adjustLabelSpan="true" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="1" columnsL="1" columnsM="1" singleContainerFullSize="false"><form:content><VBox><FormattedText htmlText="{/par31}"></FormattedText><Button class="sapUiTinyMarginBeginEnd" icon="sap-icon://copy" tooltip="Copy example" press="onPressCopy5"></Button><code:CodeEditor type="abap" editable="false" value="{/code5}" maxLines="15" width="auto" id="copy5"></code:CodeEditor><FormattedText htmlText="{/par32}"></FormattedText></VBox></form:content></form:SimpleForm></VBox></uxap:blocks></uxap:ObjectPageSubSection></uxap:subSections></uxap:ObjectPageSection><uxap:ObjectPageSection title="... BY (otab)" titleUppercase="false"><uxap:subSections><uxap:ObjectPageSubSection titleUppercase="false"><uxap:blocks><VBox><HBox><core:Icon src="sap-icon://dimension"></core:Icon><Text renderWhitespace="true" text="  "></Text><Text renderWhitespace="true" text="Addition"></Text></HBox><Text renderWhitespace="true" text="&#x9;&#x9;"></Text><form:SimpleForm title="Description" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanM="12" adjustLabelSpan="false" emptySpanXL="0" columnsXL="2"><form:content><VBox><FormattedText htmlText="{/par33}"></FormattedText><FormattedText htmlText="{/par34}"></FormattedText><FormattedText htmlText="{/ul9}"></FormattedText><FormattedText htmlText="{/par35}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Hints" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanL="4" labelSpanM="12" labelSpanS="12" adjustLabelSpan="false" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="2" columnsL="2" columnsM="1"><form:content><VBox><FormattedText htmlText="{/ul10}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Example" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="-1" labelSpanL="4" labelSpanM="2" labelSpanS="12" adjustLabelSpan="true" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="1" columnsL="1" columnsM="1" singleContainerFullSize="false"><form:content><VBox><FormattedText htmlText="{/par36}"></FormattedText><Button class="sapUiTinyMarginBeginEnd" icon="sap-icon://copy" tooltip="Copy example" press="onPressCopy6"></Button><code:CodeEditor type="abap" editable="false" value="{/code6}" maxLines="15" width="auto" id="copy6"></code:CodeEditor><FormattedText htmlText="{/par37}"></FormattedText></VBox></form:content></form:SimpleForm></VBox></uxap:blocks></uxap:ObjectPageSubSection></uxap:subSections></uxap:ObjectPageSection><uxap:ObjectPageSection title="... BY expr" titleUppercase="false"><uxap:subSections><uxap:ObjectPageSubSection titleUppercase="false"><uxap:blocks><VBox><HBox><core:Icon src="sap-icon://dimension"></core:Icon><Text renderWhitespace="true" text="  "></Text><Text renderWhitespace="true" text="Addition"></Text></HBox><Text renderWhitespace="true" text="&#x9;&#x9;"></Text><form:SimpleForm title="Description" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanM="12" adjustLabelSpan="false" emptySpanXL="0" columnsXL="2"><form:content><VBox><FormattedText htmlText="{/par38}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Hint" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanL="4" labelSpanM="12" labelSpanS="12" adjustLabelSpan="false" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="2" columnsL="2" columnsM="1"><form:content><VBox><FormattedText htmlText="{/par39}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Example" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="-1" labelSpanL="4" labelSpanM="2" labelSpanS="12" adjustLabelSpan="true" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="1" columnsL="1" columnsM="1" singleContainerFullSize="false"><form:content><VBox><FormattedText htmlText="{/par40}"></FormattedText><Button class="sapUiTinyMarginBeginEnd" icon="sap-icon://copy" tooltip="Copy example" press="onPressCopy7"></Button><code:CodeEditor type="abap" editable="false" value="{/code7}" maxLines="15" width="auto" id="copy7"></code:CodeEditor><FormattedText htmlText="{/par41}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Executable Example" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanL="4" labelSpanM="12" labelSpanS="12" adjustLabelSpan="false" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="2" columnsL="2" columnsM="1"><form:content><VBox><FormattedText htmlText="{/par42}"></FormattedText></VBox></form:content></form:SimpleForm></VBox></uxap:blocks></uxap:ObjectPageSubSection></uxap:subSections></uxap:ObjectPageSection><uxap:ObjectPageSection title="Exceptions" titleUppercase="false"><uxap:subSections><uxap:ObjectPageSubSection titleUppercase="false"><uxap:blocks><VBox><HBox><core:Icon src="sap-icon://dimension"></core:Icon><Text renderWhitespace="true" text="  "></Text><Link text="Exception" press="handleException" /></HBox><Text renderWhitespace="true" text="&#x9;&#x9;"></Text><form:SimpleForm title="Catchable Exceptions" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanL="4" labelSpanM="12" labelSpanS="12" adjustLabelSpan="false" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="2" columnsL="2" columnsM="1"><form:content><VBox><FormattedText htmlText="{/par43}"></FormattedText><FormattedText htmlText="{/ul11}"></FormattedText><FormattedText htmlText="{/par44}"></FormattedText><FormattedText htmlText="{/ul12}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Uncatchable Exceptions" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanL="4" labelSpanM="12" labelSpanS="12" adjustLabelSpan="false" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="2" columnsL="2" columnsM="1"><form:content><VBox><FormattedText htmlText="{/ul13}"></FormattedText></VBox></form:content></form:SimpleForm></VBox></uxap:blocks></uxap:ObjectPageSubSection></uxap:subSections></uxap:ObjectPageSection></uxap:sections></uxap:ObjectPageLayout></xhtml:div><layout:sideContent><HBox height="100%"><table:TreeTable id="treeTable" rows="{path:'displayModel>/TreeElements', parameters:{arrayNames:['children']}}" visibleRowCountMode="Auto" selectionMode="None"><table:toolbar><Toolbar><Button icon="sap-icon://expand-group" press="onExpandAll"></Button><Button icon="sap-icon://collapse-group" press="onCollapseAll"></Button><SearchField liveChange="onLiveSearch" search="onSearchSubmit"></SearchField></Toolbar></table:toolbar><table:rowSettingsTemplate></table:rowSettingsTemplate><table:Column autoResizable="true" width="auto"><Label text="Topics"></Label><table:template><Link href="{displayModel>object}.html" text="{displayModel>name}" emphasized="{= ${displayModel>object} === 'ABAPSORT_ITAB' ? true : false}" /></table:template></table:Column></table:TreeTable></HBox></layout:sideContent></layout:DynamicSideContent><footer><Toolbar><ToolbarSpacer></ToolbarSpacer><Label text="AS ABAP Release 816, &#x00A9;Copyright 2025 SAP SE. All rights reserved."></Label><ToolbarSpacer></ToolbarSpacer><Button icon="sap-icon://arrow-top" press="onScrollUp" tooltip="Scroll up" enabled="true"></Button></Toolbar></footer></Page></tnt:mainContents></tnt:ToolPage></mvc:View></script><link rel="stylesheet" href="layout.css" /><script type="text/javascript" src="global.js"></script><script type="text/javascript" src="defaultJsonTree.js"></script><script>
+          sap.ui.require([
+            'sap/ui/core/mvc/Controller',
+            'sap/ui/core/mvc/XMLView',
+            'sap/base/security/URLListValidator'
+          ],
+
+          function (Controller, XMLView, URLListValidator) {
+
+            URLListValidator.add('adt');
+            URLListValidator.add('http');
+            URLListValidator.add('https');
+
+              //'use strict';
+              //var clicked = 0;
+
+              sap.ui.controller("myController", {
+                  onInit: function() {
+
+                    /*Theme Setting*/
+                    if (window.matchMedia) {
+                      if(window.matchMedia('(prefers-color-scheme: dark)').matches){
+                        sap.ui.core.Configuration.setTheme("sap_horizon_dark");
+                      } else {
+                        sap.ui.core.Configuration.setTheme("sap_horizon");
+                      }
+                    } else {
+                      sap.ui.core.Configuration.setTheme("sap_horizon");
+                    }
+
+                     /*TreeTable*/
+                     
+                           var treeJson = A.getDefaultJsonTree();
+                       
+                     var DisplayModel = new sap.ui.model.json.JSONModel(treeJson);
+                     this.getView().setModel(DisplayModel, 'displayModel');
+                     var tree = this.getView().byId('treeTable');
+
+                     tree.expand(0);tree.expand(3);tree.expand(15);tree.expand(21);tree.expand(22);
+
+                     var oModel = new sap.ui.model.json.JSONModel({
+
+                        par1: "<p><a target='_parent' href='ABAPSORT_ITAB_SHORTREF.html' class='blue'>Short Reference</a></p>",par2: "<pre><p><code class='code'>SORT itab <span class='meta_style'>[</span>STABLE<span class='meta_style'>]</span>\ <br>          <span class='meta_style'>\{</span>\ <span class='meta_style'>\{</span>\ <span class='meta_style'>[</span>ASCENDING<span class='meta_style'>|</span>DESCENDING<span class='meta_style'>]</span>\ <br>              <span class='meta_style'>[</span>AS TEXT<span class='meta_style'>]</span>\ <br>              <span class='meta_style'>[</span>BY <span class='meta_style'>\{</span><a target='_parent' href='ABENITAB_COMPONENTS.html' class='@class'><code class='code'>comp1</code></a>\ <span class='meta_style'>[</span>ASCENDING<span class='meta_style'>|</span>DESCENDING<span class='meta_style'>]</span>\ <span class='meta_style'>[</span>AS TEXT<span class='meta_style'>]</span><span class='meta_style'>\}</span>\ <br>                  <span class='meta_style'>\{</span><a target='_parent' href='ABENITAB_COMPONENTS.html' class='@class'><code class='code'>comp2</code></a>\ <span class='meta_style'>[</span>ASCENDING<span class='meta_style'>|</span>DESCENDING<span class='meta_style'>]</span>\ <span class='meta_style'>[</span>AS TEXT<span class='meta_style'>]</span><span class='meta_style'>\}</span>\ <br>                  ... <span class='meta_style'>]</span>\ <span class='meta_style'>\}</span>\ <br>          <span class='meta_style'>|</span>\ <span class='meta_style'>\{</span>\ <span class='meta_style'>[</span>BY (otab)<span class='meta_style'>]</span>\ <span class='meta_style'>\}</span>\ <br>          <span class='meta_style'>|</span>\ <span class='meta_style'>\{</span>\ <span class='meta_style'>[</span>BY expr<span class='meta_style'>]</span>\ <span class='meta_style'>\}</span>\ <span class='meta_style'>\}</span>.</code></p></pre>",par3: "<p><a target='' href='#ABAP_ADDITION_1@3@' class=''>1.&nbsp;<code class='code'>... STABLE</code> </a></p>",par4: "<p><a target='' href='#ABAP_ADDITION_2@3@' class=''>2.&nbsp;<code class='code'>... ASCENDING<span class='meta_style'>|</span>DESCENDING</code> </a></p>",par5: "<p><a target='' href='#ABAP_ADDITION_3@3@' class=''>3.&nbsp;<code class='code'>... AS TEXT</code> </a></p>",par6: "<p><a target='' href='#ABAP_ADDITION_4@3@' class=''>4.&nbsp;<code class='code'>... BY compi <span class='meta_style'>[</span>ASCENDING<span class='meta_style'>|</span>DESCENDING<span class='meta_style'>]</span>\ <span class='meta_style'>[</span>AS TEXT<span class='meta_style'>]</span></code> </a></p>",par7: "<p><a target='' href='#ABAP_ADDITION_5@3@' class=''>5.&nbsp;<code class='code'>... BY (otab)</code> </a></p>",par8: "<p><a target='' href='#ABAP_ADDITION_6@3@' class=''>6.&nbsp;<code class='code'>... BY expr</code></a></p>",par9: "<p>This statement sorts an internal table <code class='code'>itab</code> according to the content of its components. Here, size comparisons are performed by default using the general <a target='_parent' href='ABENLOGEXP_RULES.html' class='blue'>comparison rules</a>, that is:</p>",par10: "<p>If no explicit sort key is specified using the addition <code class='code'>BY</code>, the internal table <code class='code'>itab</code> is sorted by the <a target='_parent' href='ABENPRIMARY_TABLE_KEY_GLOSRY.html' class='green'>primary table key</a>. The priority of the sort depends on the order in which the <a target='_parent' href='ABAPTYPES_KEYDEF.html' class='blue'>key fields</a> are specified in the table definition. In <a target='_parent' href='ABENSTANDARD_KEY_GLOSRY.html' class='green'>standard keys</a>, the sort is prioritized according to the order of the key fields in the line type of the table. If the primary table key of a standard table is <a target='_parent' href='ABENITAB_EMPTY_KEY.html' class='blue'>empty</a>, no sort takes place. If this is known statically, the syntax check produces a warning.</p>",par11: "<p>Sorting is unstable by default, which means that the relative order of lines that do not differ in sort keys is not preserved when they are sorted. The order can be different depending on the platform or when sorted multiple times. The addition <code class='code'>STABLE</code> can be used for stable sorting.</p>",par12: "<p><code class='code'>itab</code> expects a <a target='_parent' href='ABENSTANDARD_TABLE_GLOSRY.html' class='green'>standard table</a> or a <a target='_parent' href='ABENHASHED_TABLE_GLOSRY.html' class='green'>hashed table</a>.</p>",par13: "<p>In both table categories, <code class='code'>SORT</code> specifies the order in which a subsequent <a target='_parent' href='ABAPLOOP_AT_ITAB.html' class='blue'><code class='code'>LOOP</code></a> runs without the addition <code class='code'>USING KEY</code>.</p>",par14: "<p>Sorted tables cannot be sorted using <code class='code'>SORT</code> and applying the statement <code class='code'>SORT</code> to <a target='_parent' href='ABENSORTED_TABLE_GLOSRY.html' class='green'>sorted tables</a> is forbidden by the syntax. If it is not determined until runtime that a sorted table is to be sorted, an uncatchable exception is raised if this action could modify the existing sorting. The latter occurs in the following cases:</p>",par15: "<p>Otherwise, the statement <code class='code'>SORT</code> is ignored for sorted tables.</p>",par16: "<p>Simplest form of the statement <code class='code'>SORT</code> for internal tables. The hashed table <code class='code'>carriers</code> is sorted by its primary key, that is by the column <code class='code'>carrid</code>.</p>",par17: "<p></p>",par18: "<p><code class='code'>STABLE</code> is used to achieve stable sorting, which means that the relative order of lines that do not differ in the sort key remains unchanged in the sort. If the addition <code class='code'>STABLE</code> is not specified, the order is not stable:</p>",par19: "<p>Stable sorting of the internal table <code class='code'>flights</code> by columns <code class='code'>cityfrom</code>\ <code class='code'>cityto</code>, whereby the order within this sorting with respect to <code class='code'>carrid</code> and <code class='code'>connid</code> is preserved.</p>",par20: "<p></p>",par21: "<p>The addition <code class='code'>ASCENDING</code> or <code class='code'>DESCENDING</code> can be used to specify the sort direction explicitly as ascending or descending. If neither of the additions is specified, the table is sorted in ascending order. This sort direction can be overwritten after the addition <code class='code'>BY</code> for components listed individually here.</p>",par22: "<p>The internal table <code class='code'>itab</code> is sorted by its primary key in descending order, that is, by its lines. Next, <a target='_parent' href='ABAPLOOP_AT_ITAB_GROUP_BY.html' class='blue'><code class='code'>LOOP AT GROUP BY</code></a> can be used for grouping and determine the number of lines per group.</p>",par23: "<p></p>",par24: "<p>The addition <code class='code'>AS TEXT</code> specifies that <a target='_parent' href='ABENTEXTLIKE_DATA_TYPE_GLOSRY.html' class='green'>text-like</a> components are sorted in accordance with the <a target='_parent' href='ABENLOCALE_GLOSRY.html' class='green'>locale</a> of the current <a target='_parent' href='ABENTEXT_ENVIRONMENT_GLOSRY.html' class='green'>text environment</a>. If <code class='code'>AS TEXT</code> is not specified, text-like components are sorted according to the encoding in the code page of the current text environment. This can be overwritten after the addition <code class='code'>BY</code> for the components listed individually here. The text environment is set when an <a target='_parent' href='ABENINTERNAL_SESSION_GLOSRY.html' class='green'>internal session</a> is opened or by using the statement <a target='_parent' href='ABAPSET_LOCALE.html' class='blue'><code class='code'>SET LOCALE</code></a>.</p>",par25: "<p>Sorting of a <a target='_parent' href='ABENHASHED_TABLE_GLOSRY.html' class='green'>hashed table</a>\ <code class='code'>text_tab</code> by the order in the code page and in accordance with the locale of the current <a target='_parent' href='ABENTEXT_ENVIRONMENT.html' class='blue'>text environment</a>. If a western European text environment is configured, the sorts produce the orders <code class='code'>Miller</code>, <code class='code'>Moller</code>, <code class='code'>Muller</code>, <code class='code'>M&#x00F6;ller</code> and <code class='code'>Miller</code>, <code class='code'>Moller</code>, <code class='code'>M&#x00F6;ller</code>, <code class='code'>Muller</code> respectively (see also the <a target='_parent' href='ABENSET_LOCALE_ABEXA.html' class='blue'>executable example</a> for <code class='code'>SET LOCALE</code>).</p>",par26: "<p></p>",par27: "<p><a target='_parent' href='ABENSORT_TEXT_ABEXA.html' class='blue'>Sorting Internal Tables Alphabetically</a></p>",par28: "<p>The addition <code class='code'>BY compi</code> does not sort the table by the <a target='_parent' href='ABAPTYPES_KEYDEF.html' class='blue'>primary table key</a>, but by the components <code class='code'>comp1 comp2...</code> specified after it. The components are specified as described under <a target='_parent' href='ABENITAB_COMPONENTS.html' class='blue'>Specifying Components</a>. If all components are specified using <code class='code'>name</code> variables and these contain only blanks, no sort takes place. The priority of the sort depends on the order in which the components <code class='code'>comp1 comp2 ...</code> are specified from left to right. The specified components can also be duplicated or overlapping. The specified components can have any data type. The relevant <a target='_parent' href='ABENLOGEXP_RULES.html' class='blue'>comparison rules</a> apply to the evaluation.</p>",par29: "<p>If neither of the additions <code class='code'>ASCENDING</code> or <code class='code'>DESCENDING</code> are specified after <code class='code'>compi</code>, the sort direction specified by addition 2 is used. If one of the additions <code class='code'>ASCENDING</code> or <code class='code'>DESCENDING</code> is specified, it overwrites the default for this component.</p>",par30: "<p>If the addition <code class='code'>AS TEXT</code> is not specified after a text-like component <code class='code'>compi</code>, the default specified by addition 3 is used. If the addition <code class='code'>AS TEXT</code> is specified after a text-like component, it overwrites the default for this component. In non-text-like components, <code class='code'>AS TEXT</code> cannot be specified, unless a structured component is specified. In structured components, <code class='code'>AS TEXT</code> only affects text-like components.</p>",par31: "<p>Sorting of the internal table <code class='code'>itab</code> in ascending order by column <code class='code'>col1</code> and in descending order by column <code class='code'>col2</code>.</p>",par32: "<p></p>",par33: "<p>The addition <code class='code'>BY (otab)</code> does not sort the table by the <a target='_parent' href='ABAPTYPES_KEYDEF.html' class='blue'>primary table key</a>, but by the component specified dynamically in the internal table <code class='code'>otab</code>. Each line of the table <code class='code'>otab</code> defines a component of the sort key. The priority of the sort is based on the order of the lines in <code class='code'>otab</code>. If the table <code class='code'>otab</code> is initial, the table is not sorted.</p>",par34: "<p>For <code class='code'>otab</code>, a standard table of the table type <code class='code'>ABAP_SORTORDER_TAB</code> from the ABAP Dictionary must be specified. The line type of this table is the dictionary structure <code class='code'>ABAP_SORTORDER</code> with the following components:</p>",par35: "<p>If a column of <code class='code'>otab</code> has invalid content, that is, if <code class='code'>NAME</code> contains the name of a component that does not exist or an incorrect offset/length or if <code class='code'>DESCENDING</code> and <code class='code'>ASTEXT</code> do not contain <em>X</em> or the initial value, a catchable exception of the class <code class='code'>CX_SY_DYN_TABLE_ILL_COMP_VAL</code> is raised.</p>",par36: "<p>Reading of a database table into a dynamic internal table dynamically and sorting its content dynamically. The name of the database table and the names of the columns by which the table sorted can be entered.</p>",par37: "<p></p>",par38: "<p>The addition <code class='code'>BY expr</code> can be used to specify an expression or a functional method call <code class='code'>expr</code> whose result is an internal table with the same type and content as in the preceding addition <code class='code'>BY (otab)</code>. <code class='code'>expr</code> is a <a target='_parent' href='ABENGENERAL_EXPR_POSITION_GLOSRY.html' class='green'>general expression position</a>. The behavior is the same as when specifying a parenthesized internal table directly.</p>",par39: "<p>Parentheses cannot be placed around <code class='code'>expr</code>.</p>",par40: "<p>The above example for specifying <code class='code'>BY (otab)</code> can be written shorter as shown below. Instead of specifying the unnecessary internal table <code class='code'>order</code>, it is possible to directly specify the tabular value constructed using the value operator <a target='_parent' href='ABENCONSTRUCTOR_EXPRESSION_VALUE.html' class='blue'><code class='code'>VALUE</code></a> of the required content.</p>",par41: "<p></p>",par42: "<p><a target='_parent' href='ABENSORT_ITAB_EXP_ABEXA.html' class='blue'>Sorting Internal Tables Dynamically</a>.</p>",par43: "<p><code class='code'>CX_SY_DYN_TABLE_ILL_LINE_TYPE</code></p>",par44: "<p><code class='code'>CX_SY_DYN_TABLE_ILL_COMP_VAL</code></p>",ul1: "<ul><li>Numeric and byte-like components are sorted by their values.</li><li>Character-like components are sorted by default by their binary representation (<a target='_parent' href='ABENCODEPAGE_GLOSRY.html' class='green'>code page</a>). Textual sorting of character-like components can be performed using the addition <code class='code'>AS TEXT</code>.</li><li>The sizes of other component types are compared using the corresponding rules for <a target='_parent' href='ABENLOGEXP_RULES_OPERANDS_REF.html' class='blue'>reference variables</a>, <a target='_parent' href='ABENLOGEXP_RULES_OPERANDS_STRUC.html' class='blue'>structures</a>, and <a target='_parent' href='ABENLOGEXP_RULES_OPERANDS_ITAB.html' class='blue'>internal tables</a>.</li></ul>",ul2: "<ul><li>In standard tables, the <a target='_parent' href='ABENPRIMARY_TABLE_INDEX_GLOSRY.html' class='green'>primary table index</a> is applied in accordance with the sort order</li><li>In hashed tables, the internal order is modified. This internal order was defined either by inserting lines into the internal table or by a previous sort using the statement <code class='code'>SORT</code>.</li></ul>",ul3: "<ul><li>if the addition <code class='code'>BY</code> is used to specify a different sort key as the initial part of the table key.</li><li>if the addition <code class='code'>DESCENDING</code> is used.</li><li>if the addition <code class='code'>AS TEXT</code> is used.</li><li>if an attribute of an object is specified as a component in the addition <code class='code'>BY</code>.</li></ul>",ul4: "<ul><li>It is best to specify an explicit sort key behind <code class='code'>BY</code>, if possible. An implicit sort behind the <a target='_parent' href='ABENTABLE_KEY_GLOSRY.html' class='green'>primary table key</a>, which can itself, in standard tables, be defined implicitly as a <a target='_parent' href='ABENSTANDARD_KEY_GLOSRY.html' class='green'>standard key</a>, makes a program difficult to understand and possibly unpredictable.</li><li>When using the primary table key, it should be noted that this key can be the <a target='_parent' href='ABENSTANDARD_KEY_GLOSRY.html' class='green'>standard key</a>, which can also have unexpected consequences:</li><ul><li>If the line type is structured, the table is sorted by all character-like and byte-like components.</li><li>The standard key of a standard table can be <a target='_parent' href='ABENITAB_EMPTY_KEY.html' class='blue'>empty</a>.</li></ul><li>Secondary table keys cannot be specified as sort keys.</li><li>Sorting using <code class='code'>SORT</code> does not affect the assignment of lines to a <a target='_parent' href='ABENSECONDARY_TABLE_INDEX_GLOSRY.html' class='green'>secondary table index</a>.</li><li>It is possible to sort columns with <a target='_parent' href='ABENREFERENCE_TYPE_GLOSRY.html' class='green'>reference types</a> but doing this is questionable. Here, it is important to note that no comparison rule is defined for non-initial invalid references. An internal table can only be sorted by valid or initial references. A non-initial, invalid reference leads to a runtime error if it is involved in sorting.</li><li>The addition <a target='_parent' href='ABAPLOOP_AT_ITAB_GROUP_BY.html' class='blue'><code class='code'>GROUP BY</code></a> of the statement <a target='_parent' href='ABAPLOOP_AT_ITAB.html' class='blue'><code class='code'>LOOP AT itab</code></a> or of a <a target='_parent' href='ABENFOR_GROUPS_OF.html' class='blue'><code class='code'>FOR</code>&nbsp;expression</a> also has the additions <code class='code'>ASCENDING</code> and <code class='code'>DESCENDING</code> for sorting groups. These can be used as an extension to the statement <code class='code'>SORT</code> if its sort criteria are not sufficient.</li><li>For the latter see the <a target='_parent' href='ABENLOOP_GROUP_BY_SORT_ABEXA.html' class='blue'>executable example</a>.</li><li>The system class <code class='code'>CL_ABAP_ITAB_UTILITIES</code> contains method <code class='code'>VIRTUAL_SORT</code>, which can be used to virtually sort a set of internal tables. See also the executable <a target='_parent' href='ABENVIRTUAL_SORT_ABEXAS.html' class='blue'>examples</a> listed below.</li></ul>",ul5: "<ul><li><a target='_parent' href='ABENSORT_STABLE_ABEXA.html' class='blue'>Sorting Internal Tables</a></li><li><a target='_parent' href='ABENSORT_ITAB_SEC_KEY_ABEXA.html' class='blue'>Sorting Internal Tables with Secondary Keys</a></li></ul>",ul6: "<ul><li>The order can depend on the platform.</li><li>Multiple sorting of a table using the same sort key can produce a different order each time the table is sorted.</li></ul>",ul7: "<ul><li>The result of a sorting without the addition <code class='code'>AS TEXT</code> depends on the operating system of the <a target='_parent' href='ABENHOST_COMPUTER_GLOSRY.html' class='green'>host computer</a> of the current <a target='_parent' href='ABENAS_INSTANCE_GLOSRY.html' class='green'>AS instance</a>. Although the sequence of individual letters that belong to the activated language remains the same across different operating systems, there are differences in terms of the characters that do not belong to the alphabet of the activated language. Even if only the letters from the alphabet of the activated language are used, some slight differences occur when sorting complete words. Furthermore, the order of uppercase and lowercase letters is specific to the operating system.</li><li>The use of the addition <code class='code'>AS TEXT</code> usually makes the statement <a target='_parent' href='ABAPCONVERT_TEXT.html' class='blue'><code class='code'>CONVERT TEXT</code></a> superfluous in the context of internal tables.</li><li>A sort without the addition <code class='code'>AS TEXT</code> is considerably faster than a sort with this addition. If it is certain that both sorts produce the same order, the addition <code class='code'>AS TEXT</code> is not necessary. The latter can be the case if, for example, text-like components contain characters from the <a target='_parent' href='ABENASCII_GLOSRY.html' class='green'>ASCII</a> character set only and only lowercase or uppercase letters.</li></ul>",ul8: "<ul><li>If the line type of the internal table is not known statically, the components can only be specified dynamically and not directly.</li><li>Instead of individual dynamic components, an internal table can be specified directly as <code class='code'>otab</code> or as the result of an expression <code class='code'>expr</code> as a dynamic sort key (see additions 5 and 6). Using a table like this has the advantage that any exceptions are catchable. When specifying the table, the number of components of the sort key is also dynamic. In contrast, when individual dynamic components are used, a character-like data object must be specified for any required component, which is ignored if it only contains blank characters.</li><li>An <a target='_parent' href='ABAPSORT_ITAB_OBSOLETE.html' class='blue'>obsolete variant</a> allows field symbols to also be specified for the components outside of classes, for standard tables.</li></ul>",ul9: "<ul><li><code class='code'>NAME</code> of the type <a target='_parent' href='ABENDDIC_BUILTIN_TYPES.html' class='blue'><code class='code'>SSTRING</code></a></li><li class='no_list_style'>for specifying a component of the sort key. The component is specified in the form <em>comp_name[+off(len)]</em>, where <em>comp_name</em> must be the name of a component in <code class='code'>itab</code> in uppercase letters. The component name may contain <a target='_parent' href='ABENOFFSET_LENGTH.html' class='blue'>offsets and lengths</a>, structure component selectors, and component selectors for assigning structured data objects and attributes in classes or objects.</li><li><code class='code'>DESCENDING</code> of the type <code class='code'>CHAR</code> with length 1</li><li class='no_list_style'>for specifying the sort direction for the current component. If <code class='code'>DESCENDING</code> is initial, the sort is performed in ascending order. If <code class='code'>DESCENDING</code> has the value <em>X</em>, the table is sorted in descending order.</li><li><code class='code'>ASTEXT</code> of the type <code class='code'>CHAR</code> with length 1</li><li class='no_list_style'>for the text sorting of the current component. If <code class='code'>ASTEXT</code> has the value <em>X</em>, the sort is performed as with the addition <code class='code'>AS TEXT</code>. This is only possible for character-like components. If <code class='code'>ASTEXT</code> is initial, character-like components are sorted in accordance with their binary representation.</li></ul>",ul10: "<ul><li>The addition <code class='code'>BY (otab)</code> cannot be combined with <code class='code'>BY compi</code>.</li><li>When using the addition <code class='code'>BY (otab)</code>, it is not possible to use <code class='code'>DESCENDING</code> or <code class='code'>AS TEXT</code> to specify a descending sort direction or textual sorting for all components.</li><li>If a single parenthesized data object <code class='code'>(dobj)</code> is specified after the addition <code class='code'>BY</code>, its data type decides whether its content is used to specify a <a target='_parent' href='ABENITAB_COMPONENTS.html' class='blue'>single dynamic component</a> or multiple components. In either case, no sort takes place if <code class='code'>dobj</code> is initial.</li></ul>",ul11: "<ul><li><em>Cause:</em> The table <code class='code'>otab</code> has an invalid line type. <br><em>Runtime error:</em>\ <code class='code'>DYN_TABLE_ILL_LINE_TYPE</code></li></ul>",ul12: "<ul><li><em>Cause:</em> A column of the table <code class='code'>otab</code> contains an invalid value. <br><em>Runtime error:</em>\ <code class='code'>DYN_TABLE_ILL_COMP_VAL</code></li></ul>",ul13: "<ul><li><em>Cause:</em> A sort criterion specified dynamically in the form <code class='code'>(name)</code> with the explicit addition <code class='code'>AS TEXT</code> is not text-like. <br><em>Runtime error:</em>\ <code class='code'>SORT_AS_TEXT_BAD_DYN_TYPE</code></li><li><em>Cause:</em> A field symbol used as a dynamic sort criterion with an explicit addition <code class='code'>AS TEXT</code> is not text-like. <br><em>Runtime error:</em>\ <code class='code'>SORT_AS_TEXT_BAD_FS_TYPE</code></li><li><em>Cause:</em> A field symbol used as a dynamic sort criterion does not point to the header line of the internal table to be sorted. <br><em>Runtime error:</em>\ <code class='code'>SORT_ITAB_FIELD_INVALID</code></li><li><em>Cause:</em> For a table of the type <code class='code'>SORTED TABLE</code>, the sort key does not match a beginning piece of the table key. <br><em>Runtime error:</em>\ <code class='code'>SORT_SORT_ILL_KEY_ORDER</code></li><li><em>Cause:</em> The additions <code class='code'>DESCENDING</code> and <code class='code'>AS TEXT</code> are not allowed for tables of the type <code class='code'>SORTED TABLE</code>. <br><em>Runtime error:</em>\ <code class='code'>SORT_SORT_ILLEGAL</code></li><li><em>Cause:</em> Sorting method is not external (E) or internal (I) <br><em>Runtime error:</em>\ <code class='code'>SORT_ILLEGAL_MODE</code></li></ul>",code1: "DATA carriers TYPE HASHED TABLE OF scarr \n              WITH UNIQUE KEY carrid. \n\ \nSELECT * \n       FROM scarr \n       INTO TABLE @carriers. \n\ \nSORT carriers.",code2: "SELECT carrid, connid, cityfrom, cityto \n       FROM spfli \n       ORDER BY carrid, connid \n       INTO TABLE @DATA(flights). \n\ \nSORT flights STABLE BY cityfrom cityto.",code3: "FINAL(out) = cl_demo_output=>new( ). \n\ \nDATA itab TYPE TABLE OF i WITH NON-UNIQUE KEY table_line. \n\ \nFINAL(t) = cl_demo_date_time=>get_utc_time( ). \nFINAL(rnd) = cl_abap_random_int=>create( seed = CONV i( t ) \n                                        min  = 1 \n                                        max  = 10 ). \n\ \nitab = VALUE #( FOR i = 1 UNTIL i > 100 ( rnd->get_next( ) ) ). \n\ \nSORT itab DESCENDING. \n\ \nLOOP AT itab ASSIGNING FIELD-SYMBOL(<fs>) \n             GROUP BY ( key = <fs> size = GROUP SIZE ) \n             ASSIGNING FIELD-SYMBOL(<key>). \n  out->write( |\{ <key>-key WIDTH = 4 \n              \}\{ <key>-size \}| ). \nENDLOOP. \n\ \nout->display( ).",code4: "CLASS demo DEFINITION. \n  PUBLIC SECTION. \n    CLASS-METHODS meth. \n  PRIVATE SECTION. \n    CLASS-DATA text_tab TYPE HASHED TABLE OF string \n               WITH UNIQUE KEY table_line. \nENDCLASS. \n\ \nCLASS exa DEFINITION. \n  PUBLIC SECTION. \n    CLASS-METHODS main. \nENDCLASS. \n\ \nCLASS demo IMPLEMENTATION. \n  METHOD meth. \n    FINAL(out) = cl_demo_output=>new( ). \n\ \n    text_tab = VALUE #( \n      ( `Muller` ) \n      ( `M&#x00F6;ller` ) \n      ( `Moller` ) \n      ( `Miller` ) ). \n    SORT text_tab. \n    out->write_data( text_tab ). \n    SORT text_tab AS TEXT. \n    out->write_data( text_tab ). \n\ \n    out->display( ). \n  ENDMETHOD. \nENDCLASS. \n\ \nCLASS exa IMPLEMENTATION. \n  METHOD main. \n    demo=>meth( ). \n  ENDMETHOD. \nENDCLASS.",code5: "FINAL(out) = cl_demo_output=>new( ). \n\ \nTYPES: \n  BEGIN OF line, \n    col1 TYPE c LENGTH 1, \n    col2 TYPE i, \n  END OF line. \n\ \nDATA itab TYPE STANDARD TABLE OF line WITH EMPTY KEY. \n\ \nitab = VALUE #( ( col1 = 'A' col2 = 6 ) \n                ( col1 = 'B' col2 = 4 ) \n                ( col1 = 'B' col2 = 7 ) \n                ( col1 = 'C' col2 = 1 ) \n                ( col1 = 'C' col2 = 3 ) \n                ( col1 = 'B' col2 = 9 ) \n                ( col1 = 'A' col2 = 2 ) \n                ( col1 = 'A' col2 = 5 ) \n                ( col1 = 'C' col2 = 8 ) ). \n\ \nSORT itab BY col1 ASCENDING col2 DESCENDING. \n\ \nout->write( itab ). \n\ \nout->display( ).",code6: "FINAL(out) = cl_demo_output=>new( ). \n\ \nDATA dbtab TYPE c LENGTH 30 VALUE 'spfli'. \ncl_demo_input=>add_field( CHANGING field = dbtab ). \nDATA columns TYPE string VALUE `cityfrom, cityto`. \ncl_demo_input=>request( CHANGING field = columns ). \ndbtab = condense( to_upper( dbtab ) ). \n\ \nDATA dref  TYPE REF TO data. \nFIELD-SYMBOLS <itab> TYPE STANDARD TABLE. \n\ \nTRY. \n    CREATE DATA dref TYPE STANDARD TABLE OF (dbtab). \n  CATCH cx_sy_create_data_error. \n    out->write( 'Wrong data type!' ). \n    LEAVE PROGRAM. \nENDTRY. \n\ \nTRY. \n    SELECT * \n           FROM (dbtab) \n           INTO TABLE @dref->*. \n  CATCH cx_sy_dynamic_osql_semantics. \n    out->write( 'Wrong database table!' ). \n    LEAVE PROGRAM. \nENDTRY. \n\ \nSPLIT columns AT `,` INTO TABLE FINAL(column_tab). \nFINAL(order) = VALUE abap_sortorder_tab( \n                FOR wa IN column_tab \n               ( name = condense( to_upper( wa ) ) ) ). \n\ \nTRY. \n    SORT <itab> BY (order). \n  CATCH cx_sy_dyn_table_ill_comp_val. \n    out->write(  'Wrong column name!' ). \n    LEAVE PROGRAM. \nENDTRY. \n\ \nout->write( <itab> ). \n\ \nout->display( ).",code7: "FINAL(out) = cl_demo_output=>new( ). \n\ \nDATA dbtab TYPE c LENGTH 30 VALUE 'spfli'. \ncl_demo_input=>add_field( CHANGING field = dbtab ). \nDATA columns TYPE string VALUE `cityfrom, cityto`. \ncl_demo_input=>request( CHANGING field = columns ). \ndbtab = condense( to_upper( dbtab ) ). \n\ \nDATA dref  TYPE REF TO data. \n\ \nTRY. \n    CREATE DATA dref TYPE STANDARD TABLE OF (dbtab). \n  CATCH cx_sy_create_data_error. \n    out->write( 'Wrong data type!' ). \nENDTRY. \n\ \nTRY. \n    SELECT * \n           FROM (dbtab) \n           INTO TABLE @dref->*. \n  CATCH cx_sy_dynamic_osql_semantics. \n    out->write( 'Wrong database table!' ). \nENDTRY. \n\ \nSPLIT columns AT `,` INTO TABLE DATA(column_tab). \nTRY. \n    SORT dref->* BY VALUE #( FOR wa IN column_tab \n                     ( name = condense( to_upper( wa ) ) ) ). \n  CATCH cx_sy_dyn_table_ill_comp_val. \n    out->write(  'Wrong column name!' ). \nENDTRY. \n\ \nout->write( dref->* ). \n\ \nout->display( ).",breadcrumb1: "abenabap.html",breadcrumb2: "abenabap_reference.html",breadcrumb3: "abenabap_data_working.html",breadcrumb4: "abenitab.html",breadcrumb5: "abentable_processing_statements.html",
+
+                      });
+                      this.getView().setModel(oModel);
+
+                      var DisplayList = new sap.ui.model.json.JSONModel({
+                        "Elements": [
+
+                        
+                                {
+                                    
+                                        "key": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/index.htm?file=ABAPSORT_ITAB.htm",
+                                        "text": "ABAP Release 9.16",
+                                    
+                                },
+                            
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_758_index_htm/7.58/en-US/index.htm",
+                            "text": "ABAP Release 7.58",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_757_index_htm/7.57/en-US/index.htm",
+                            "text": "ABAP Release 7.57",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_756_index_htm/7.56/en-US/index.htm",
+                            "text": "ABAP Release 7.56",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_755_index_htm/7.55/en-US/index.htm",
+                            "text": "ABAP Release 7.55",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_754_index_htm/7.54/en-US/index.htm",
+                            "text": "ABAP Release 7.54",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_753_index_htm/7.53/en-US/index.htm",
+                            "text": "ABAP Release 7.53",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_752_index_htm/7.52/en-US/index.htm",
+                            "text": "ABAP Release 7.52",
+                        }
+                        
+                        ]
+                      });
+                      this.getView().setModel(DisplayList, 'displayList');
+
+                  
+
+                      this._oDSC = this.byId("DynamicSideContent");
+                      this._oToggleButton = this.byId("toggleButton");
+                    },
+
+                  /* -------
+                  [ events ]
+                  ------- */
+
+                  onChange: function(oEvent) {
+                    var oControl = oEvent.getSource();
+                    window.location.href = oControl.getSelectedKey();
+                    /*sap.m.MessageToast.show("Switch to " + oControl.getSelectedKey() + "?");*/
+                  },
+
+                  
+
+                  onIconPress: function(oEvent) {
+                    window.location.href="https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm?file=ABENABAP.htm";
+                  },
+
+                  handleNews: function(oEvent) {
+                    var docu_url = window.location.href;
+                    if(docu_url.includes('version=5')) {
+                      
+                      window.open('https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm&object=ABENNEWS-916', '_self');
+                    }
+                    else if(docu_url.includes('abapdocu_latest')) {
+                      window.open('https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm?file=abennews-816.htm', '_self');
+                    }
+                    else if(docu_url.includes('abapdocu_cp')) {
+                      window.open('https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABENNEWS-916.html', '_self');
+                    }
+                    else {
+                      
+                      window.open('https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm&object=ABENNEWS-816', '_self');
+                    }
+                  },
+
+                  handleException: function(oEvent) {
+                    
+                    window.open('ABENABAP_LANGUAGE_EXCEPTIONS.html', '_self');
+                  },
+
+                  
+                  onScrollUp: function() {
+                    this.byId("ObjectPageLayout").setSelectedSection(null);
+                  },
+
+
+                  onPressTheme: function(oEvent) {
+                    clicked++;
+                    if (clicked === 1 ) {
+                        //sap.ui.getCore().applyTheme("sap_horizon_dark");
+                        sap.ui.core.Configuration.setTheme("sap_horizon_dark");
+                        var subtleId = this.getView().getId('subtle');
+                        var subtle = document.getElementById(subtleId);
+                        a.style.color = '#1d2d3e';
+                    }
+                    if (clicked === 2)
+                    {
+                        //sap.ui.getCore().applyTheme("sap_horizon");
+                        sap.ui.core.Configuration.setTheme("sap_horizon");
+                        clicked = 0;
+                    }
+
+                    /*const element = document.getElementById("sap-ui-bootstrap");
+                    if (element.hasAttribute("data-sap-ui-theme", "sap_horizon")) {
+                        element.setAttribute("data-sap-ui-theme", "sap_horizon_dark");
+                        //window.location.reload();
+                    }
+                    else {
+                        element.setAttribute("data-sap-ui-theme", "sap_horizon");
+                        //window.location.reload();
+                    };*/
+                  },
+
+                  onPressBack: function(oEvent) {
+                    window.history.go(-1);
+                  },
+
+                  onPress: function(oEvent) {
+                    var mail = document.createElement("a");
+                    mail.href = "mailto:f1_help@sap.com?subject=Feedback on ABAP Documentation from Help Portal version&body=Document: SORT itab, ABAPSORT_ITAB, 816%0D%0A%0D%0AError:%0D%0A%0D%0A%0D%0A%0D%0ASuggestion for improvement:";
+                    mail.click();
+                  },
+
+                  /*handlePopoverPress: function(oEvent) {
+                    var oButton = oEvent.getSource(),
+                    oView = this.getView();
+
+                    if (!this._oPopover) {
+                       this._oPopover = new sap.ui.xmlfragment({
+                           fragmentContent: jQuery("#fragment_xml").html()
+                           }, this);
+                       oView.addDependent(this._oPopover);
+                    }
+                    this._oPopover.openBy(oButton);
+                   },*/
+
+                   handleClosePress: function(oEvent) {
+                       //this.byId("myPopover").close();
+                       //sap.m.MessageToast.show("You cannot close me.");
+                       this._oPopover.getParent().destroyContent();
+                   },
+
+                   popoverAfterClose: function(oEvent) {
+                        this._oPopover.destroy();
+                        this._oPopover.getParent().destroyContent();
+                    },
+
+                   onPressAddress: function(oEvent) {
+                     var address = "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm?file=abapsort_itab.htm";
+                     navigator.clipboard.writeText(address).then(function() {
+                         sap.m.MessageToast.show("'" + address + "' copied.");
+                     }, function(err) {
+                         sap.m.MessageToast.show("No address copied.");
+                     });
+                   },
+                  
+                    handlePopoverPress1: function(oEvent) {
+                      var oButton = oEvent.getSource(),
+                      oView = this.getView();
+
+                      this._oPopover = new sap.ui.xmlfragment({
+                        fragmentContent: jQuery("#fragment_xml1").html()
+                        }, this);
+
+                      this._oPopover.openBy(oButton);
+                     },
+                  
+                    handlePopoverPress2: function(oEvent) {
+                      var oButton = oEvent.getSource(),
+                      oView = this.getView();
+
+                      this._oPopover = new sap.ui.xmlfragment({
+                        fragmentContent: jQuery("#fragment_xml2").html()
+                        }, this);
+
+                      this._oPopover.openBy(oButton);
+                     },
+                  
+                    handlePopoverPress3: function(oEvent) {
+                      var oButton = oEvent.getSource(),
+                      oView = this.getView();
+
+                      this._oPopover = new sap.ui.xmlfragment({
+                        fragmentContent: jQuery("#fragment_xml3").html()
+                        }, this);
+
+                      this._oPopover.openBy(oButton);
+                     },
+                  
+                    handlePopoverPress4: function(oEvent) {
+                      var oButton = oEvent.getSource(),
+                      oView = this.getView();
+
+                      this._oPopover = new sap.ui.xmlfragment({
+                        fragmentContent: jQuery("#fragment_xml4").html()
+                        }, this);
+
+                      this._oPopover.openBy(oButton);
+                     },
+                  
+                    handlePopoverPress5: function(oEvent) {
+                      var oButton = oEvent.getSource(),
+                      oView = this.getView();
+
+                      this._oPopover = new sap.ui.xmlfragment({
+                        fragmentContent: jQuery("#fragment_xml5").html()
+                        }, this);
+
+                      this._oPopover.openBy(oButton);
+                     },
+                  
+                    handlePopoverPress6: function(oEvent) {
+                      var oButton = oEvent.getSource(),
+                      oView = this.getView();
+
+                      this._oPopover = new sap.ui.xmlfragment({
+                        fragmentContent: jQuery("#fragment_xml6").html()
+                        }, this);
+
+                      this._oPopover.openBy(oButton);
+                     },
+                  
+                    handlePopoverPress7: function(oEvent) {
+                      var oButton = oEvent.getSource(),
+                      oView = this.getView();
+
+                      this._oPopover = new sap.ui.xmlfragment({
+                        fragmentContent: jQuery("#fragment_xml7").html()
+                        }, this);
+
+                      this._oPopover.openBy(oButton);
+                     },
+                  
+
+                  handlePopoverPressExa: function(oEvent) {
+                    window.open('');
+                  },
+
+                  
+                    onPressCopy1: function(oEvent) {
+                    var copy = this.byId("copy1").getCurrentValue();
+                    navigator.clipboard.writeText(copy).then(function() {
+                        sap.m.MessageToast.show("Copied to Clipboard.");
+                    }, function(err) {
+                        sap.m.MessageToast.show("Not copied to Clipboard.");
+                    });
+                  },
+                  
+                    onPressCopy2: function(oEvent) {
+                    var copy = this.byId("copy2").getCurrentValue();
+                    navigator.clipboard.writeText(copy).then(function() {
+                        sap.m.MessageToast.show("Copied to Clipboard.");
+                    }, function(err) {
+                        sap.m.MessageToast.show("Not copied to Clipboard.");
+                    });
+                  },
+                  
+                    onPressCopy3: function(oEvent) {
+                    var copy = this.byId("copy3").getCurrentValue();
+                    navigator.clipboard.writeText(copy).then(function() {
+                        sap.m.MessageToast.show("Copied to Clipboard.");
+                    }, function(err) {
+                        sap.m.MessageToast.show("Not copied to Clipboard.");
+                    });
+                  },
+                  
+                    onPressCopy4: function(oEvent) {
+                    var copy = this.byId("copy4").getCurrentValue();
+                    navigator.clipboard.writeText(copy).then(function() {
+                        sap.m.MessageToast.show("Copied to Clipboard.");
+                    }, function(err) {
+                        sap.m.MessageToast.show("Not copied to Clipboard.");
+                    });
+                  },
+                  
+                    onPressCopy5: function(oEvent) {
+                    var copy = this.byId("copy5").getCurrentValue();
+                    navigator.clipboard.writeText(copy).then(function() {
+                        sap.m.MessageToast.show("Copied to Clipboard.");
+                    }, function(err) {
+                        sap.m.MessageToast.show("Not copied to Clipboard.");
+                    });
+                  },
+                  
+                    onPressCopy6: function(oEvent) {
+                    var copy = this.byId("copy6").getCurrentValue();
+                    navigator.clipboard.writeText(copy).then(function() {
+                        sap.m.MessageToast.show("Copied to Clipboard.");
+                    }, function(err) {
+                        sap.m.MessageToast.show("Not copied to Clipboard.");
+                    });
+                  },
+                  
+                    onPressCopy7: function(oEvent) {
+                    var copy = this.byId("copy7").getCurrentValue();
+                    navigator.clipboard.writeText(copy).then(function() {
+                        sap.m.MessageToast.show("Copied to Clipboard.");
+                    }, function(err) {
+                        sap.m.MessageToast.show("Not copied to Clipboard.");
+                    });
+                  },
+                  
+
+                  onPressVersion: function(oEvent) {
+                    
+                    window.open('https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm&object=ABAPSORT_ITAB&style=adt', '_self');
+                  },
+
+                  
+                  onItemSelect: function(oEvent) {
+                  if (! this.sSelectedNavigationListItemId) {
+                      this.updateSelectedNavigationListItemId();
+                  }
+                  else {
+                      if (this.oSideNavigation.getSelectedItem() != this.sSelectedNavigationListItemId) {
+                          this.restoreSideNavigationSelection();
+                      }
+                  }
+                  },
+
+                  onCollapseExpandPress: function () {
+                  this.toggleControlExpand(this.oSideNavigation);
+                  },
+
+                  onMenuButtonPress : function() {
+                  var toolPage = this.byId("toolPage");
+
+                  toolPage.setSideExpanded(!toolPage.getSideExpanded());
+                  },
+
+                  /* ----------------
+                  [ event listeners ]
+                  ---------------- */
+
+                  /* ------------------------------------
+                  [ restoring side navigation selection ]
+                  ------------------------------------ */
+
+                  updateSelectedNavigationListItemId: function(sId) {
+                  this.sSelectedNavigationListItemId = sId;
+                  },
+
+                  restoreSideNavigationSelection: function() {
+                  this.oSideNavigation.setSelectedItem(this.sSelectedNavigationListItemId);
+                  this.oSideNavigation.invalidate();
+                  },
+
+                  /* ----------------
+                  [ collapse/expand ]
+                  ---------------- */
+
+                  toggleControlExpand: function(oControl) {
+                  oControl.setExpanded(! oControl.getExpanded());
+                  },
+
+                  /*TreeTable*/
+                  
+
+                  onLiveSearch: function (evt) {
+                    var filterString = evt.getParameter('newValue');
+                    var filter = filterString.toUpperCase();
+
+                    
+                           var treeJson = A.getDefaultJsonTree();
+                       
+                    var treeJsonModel = new sap.ui.model.json.JSONModel(treeJson);
+
+                    if (filterString == '') {
+                        this.getView().setModel(treeJsonModel, 'displayModel');
+                        var tree = this.getView().byId('treeTable');
+                        tree.expandToLevel(1);
+                    } else {
+                    //-----------------------------------------------------------
+                    // Function that flattens tree along a keyword "key", here the collection formally starts as empty
+                    // FIXED
+
+                    var bfs = function (treeJson, collection) {
+                        collection.push({ name: treeJson.name, object: treeJson.object, indices: treeJson.indices });
+                        if (!treeJson.children || treeJson.children.length === 0) return;
+                        for (var i = 0; i < treeJson.children.length; i++) {
+                            //flatten children recursively
+                            bfs(treeJson.children[i], collection);
+                        }
+                        return;
+                    }
+                    //flatten all the subtree categories seperately
+                    // FIXED
+                    var treeModelFlat = treeJson.TreeElements[0];
+                    //Loop over sub trees
+                    for (var i = 0; i < treeJson.TreeElements[0].children.length; i++) {
+                        subTree = treeJson.TreeElements[0].children[i];
+                        if (subTree.children) {
+                            for (var j = 0; j < subTree.children.length; j++) {
+                                var subSubTree = subTree.children[j];
+                                var flattenedCollection = [];
+                                bfs(subSubTree, flattenedCollection);
+                                treeModelFlat.children[i].children[j].children = flattenedCollection.slice(1); //omit first element (root node), would be doubled
+                            }
+                        }
+                        else {
+                            var flattenedCollection = [];
+                            bfs(subTree, flattenedCollection);
+                            treeModelFlat.children[i].children = flattenedCollection.slice(1);
+                        }
+                    }
+                    //filter Model
+                    // FIXED
+                    var filterMode = 0; var similaritySearch = false;
+                    //var filteredModel = structuredClone(treeModelFlat);
+                    var filteredModel = {};
+                    var buildingFilteredModel = {};
+                    var filteredSubtree = [];
+                    var filteredCollection = [];
+                    var treeModelClone = cloneJSON(treeModelFlat);
+
+
+                    for (var i = 0; i < treeModelFlat.children.length; i++) {
+                        var subTree = treeModelFlat.children[i];
+                        if (subTree.children) {
+                            var deleteSubTree = true;
+                            for (var j = 0; j < subTree.children.length; j++) {
+                                var subSubTree = subTree.children[j];
+                                var deleteSubSubTree = true;
+                                if (subSubTree.children.length > 0) {
+                                    for (var k in subSubTree.children) {
+                                        //if (subSubTree.children[k].name.toUpperCase().indexOf(filter) == -1) {
+                                        var indices = subSubTree.children[k].indices;
+
+                                        if (!matchesSearchCriteria(indices, filter)) {
+                                            delete treeModelClone.children[i].children[j].children[k];
+                                        } else {
+                                            deleteSubSubTree = false;
+                                            deleteSubTree = false;
+                                        }
+                                    }
+                                }
+                                if (deleteSubSubTree) {
+                                    delete treeModelClone.children[i].children[j];
+                                }
+                            }
+                            if (deleteSubTree) {
+                                delete treeModelClone.children[i];
+                            }
+                        }
+                    }
+                    var treeModelString = JSON.stringify(treeModelClone);
+                    treeModelString = '{"TreeElements": [' + treeModelString + ']}';
+                    var treeModelObj = JSON.parse(treeModelString);
+                    var DisplayModel = new sap.ui.model.json.JSONModel(treeModelObj);
+                    this.getView().setModel(DisplayModel, 'displayModel');
+                    this.onExpandAll();
+                }
+            },
+
+                  onExpandAll: function (evt) {
+                      var tree = this.getView().byId('treeTable');
+                      tree.expandToLevel(14);
+                  },
+
+                  onCollapseAll: function (evt) {
+                      var tree = this.getView().byId('treeTable');
+                      tree.collapseAll();
+                  },
+
+                  onMenuButtonPress: function () {
+                      if(this._oDSC.getShowSideContent()){
+                      this._oDSC.setShowSideContent(false);
+                      }else{
+                      this._oDSC.setShowSideContent(true);
+                      }
+                  },
+
+                  handleToggleClick: function () {
+                      this._oDSC.toggle();
+                  },
+
+              });
+
+              
+              
+
+              function setAddress(query) {
+                var address = ""
+                var textinput = query;
+                while (textinput.indexOf("&") > -1) {
+                    textinput = textinput.replace("&", "%26")
+                }
+                while (textinput.indexOf("+") > -1) {
+                    textinput = textinput.replace("+", "%2B")
+                }
+                while (textinput.indexOf("=") > -1) {
+                    textinput = textinput.replace("=", "%3D")
+                } while (textinput.indexOf("?") > -1) {
+                    textinput = textinput.replace("?", "%3F")
+                }
+              address = "" + "?query=" + textinput + "&";
+                return address;
+               }
+
+              
+              function cloneJSON(obj) {
+                    // basic type deep copy
+                    if (obj === null || obj === undefined || typeof obj !== 'object') {
+                        return obj
+                    }
+                    // array deep copy
+                    if (obj instanceof Array) {
+                        var cloneA = [];
+                        for (var i = 0; i < obj.length; ++i) {
+                            cloneA[i] = cloneJSON(obj[i]);
+                        }
+                        return cloneA;
+                    }
+                    // object deep copy
+                    var cloneO = {};
+                    for (var i in obj) {
+                      cloneO[i] = cloneJSON(obj[i]);
+                    }
+                  return cloneO;
+                }
+
+            function matchesSearchCriteria(indices, searchWord) {
+                var returnValue = false;
+                for (var index of indices) {
+                    if (index.key1.toUpperCase().indexOf(searchWord) !== -1) {
+                        returnValue = true;
+                        break;
+                    }
+                    var key2Key1Search = index.key2 && index.key1;
+                    if (key2Key1Search.toUpperCase().indexOf(searchWord) !== -1) {
+                        returnValue = true;
+                        break;
+                    }
+                }
+                return returnValue;
+             }
+
+              
+
+              sap.ui.xmlview({ viewContent: jQuery('#main_page_xml').html() }).placeAt("main_page");
+
+              });
+
+        </script>
+<script>
+window.adobeDataLayer = window.adobeDataLayer || [];
+window.adobeDataLayer.push({
+'event': 'globalDL',
+'site': { 
+'name': 'help',
+'country': 'glo'
+},
+'user': {
+'loginStatus': 'no'
+}
+});
+window.adobeDataLayer.push({ 
+'event': 'pageView', 
+'page': { 
+'name':  "", 
+'section': location.pathname.slice(1, location.pathname.indexOf("/", 1)), 
+'language': "en", 
+'country': "US", 
+'referrer': "https://www.google.com/", 
+'url': location.href, 
+'details': { 
+'productID':  "ABAP", 
+'deliverableID': "abapdocu_latest_index_htm", 
+'topicID': "n/a", 
+'version': "latest", 
+'machineTranslated': "no", 
+}, 
+}, 
+'user': { 
+'loginStatus': "no", 
+},
+}); 
+window.adobeDataLayer.push({
+'event': "stBeaconReady"
+}); 
+</script>
+</head><body class="sapUiBody sapUiSizeCompact"><div id="tree"></div><div id="main_page"></div></body></html>

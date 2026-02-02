@@ -1,0 +1,330 @@
+{
+  "generated_at": "2026-01-30T23:45:00",
+  "document_count": 31,
+  "documents": [
+    {
+      "id": "2026-01-30__abapdocu-index__help-sap-com",
+      "title": "ABAP Keyword Documentation (Index)",
+      "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm",
+      "captured_at": "2026-01-30T22:34:29",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__abapdocu-index__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__abapdocu-index__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__abapdocu-index__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__abap-statements-overview__help-sap-com",
+      "title": "ABAP Statements | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/abenabap_statements.html",
+      "captured_at": "2026-01-30T22:34:29",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__abap-statements-overview__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__abap-statements-overview__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__abap-statements-overview__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__data__help-sap-com",
+      "title": "DATA | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPDATA.html",
+      "captured_at": "2026-01-30T22:34:29",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__data__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__data__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__data__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__types__help-sap-com",
+      "title": "TYPES | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPTYPES.html",
+      "captured_at": "2026-01-30T22:34:29",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__types__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__types__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__types__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__if__help-sap-com",
+      "title": "IF | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPIF.html",
+      "captured_at": "2026-01-30T22:34:29",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__if__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__if__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__if__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__case__help-sap-com",
+      "title": "CASE | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPCASE.html",
+      "captured_at": "2026-01-30T22:34:29",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__case__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__case__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__case__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__loop-at-itab__help-sap-com",
+      "title": "LOOP AT itab, Basic Form | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPLOOP_AT_ITAB.html",
+      "captured_at": "2026-01-30T22:34:29",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__loop-at-itab__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__loop-at-itab__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__loop-at-itab__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__do__help-sap-com",
+      "title": "DO | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPDO.html",
+      "captured_at": "2026-01-30T22:34:29",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__do__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__do__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__do__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__read-table__help-sap-com",
+      "title": "READ TABLE itab | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/abapread_table.html",
+      "captured_at": "2026-01-30T22:34:29",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__read-table__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__read-table__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__read-table__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__append__help-sap-com",
+      "title": "APPEND | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPAPPEND.html",
+      "captured_at": "2026-01-30T22:34:29",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__append__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__append__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__append__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__modify-itab__help-sap-com",
+      "title": "MODIFY itab | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPMODIFY_ITAB.html",
+      "captured_at": "2026-01-30T22:34:29",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__modify-itab__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__modify-itab__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__modify-itab__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__delete-itab__help-sap-com",
+      "title": "DELETE itab | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPDELETE_ITAB.html",
+      "captured_at": "2026-01-30T22:34:29",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__delete-itab__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__delete-itab__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__delete-itab__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__sort-itab__help-sap-com",
+      "title": "SORT itab | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPSORT_ITAB.html",
+      "captured_at": "2026-01-30T22:34:29",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__sort-itab__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__sort-itab__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__sort-itab__help-sap-com__v01.json",
+      "chunks": [
+        "knowledge_base\\clean\\2026-01-30__sort-itab__help-sap-com__v01__chunk-01.md",
+        "knowledge_base\\clean\\2026-01-30__sort-itab__help-sap-com__v01__chunk-02.md",
+        "knowledge_base\\clean\\2026-01-30__sort-itab__help-sap-com__v01__chunk-03.md"
+      ]
+    },
+    {
+      "id": "2026-01-30__select__help-sap-com",
+      "title": "SELECT | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPSELECT.html",
+      "captured_at": "2026-01-30T22:34:29",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__select__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__select__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__select__help-sap-com__v01.json",
+      "chunks": [
+        "knowledge_base\\clean\\2026-01-30__select__help-sap-com__v01__chunk-01.md",
+        "knowledge_base\\clean\\2026-01-30__select__help-sap-com__v01__chunk-02.md"
+      ]
+    },
+    {
+      "id": "2026-01-30__parameters__help-sap-com",
+      "title": "PARAMETERS | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPPARAMETERS.html",
+      "captured_at": "2026-01-30T22:34:29",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__parameters__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__parameters__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__parameters__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__select-options__help-sap-com",
+      "title": "SELECT-OPTIONS | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPSELECT-OPTIONS.html",
+      "captured_at": "2026-01-30T22:34:29",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__select-options__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__select-options__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__select-options__help-sap-com__v01.json",
+      "chunks": [
+        "knowledge_base\\clean\\2026-01-30__select-options__help-sap-com__v01__chunk-01.md",
+        "knowledge_base\\clean\\2026-01-30__select-options__help-sap-com__v01__chunk-02.md",
+        "knowledge_base\\clean\\2026-01-30__select-options__help-sap-com__v01__chunk-03.md"
+      ]
+    },
+    {
+      "id": "2026-01-30__field-symbols__help-sap-com",
+      "title": "FIELD-SYMBOLS | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPFIELD-SYMBOLS.html",
+      "captured_at": "2026-01-30T22:34:29",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__field-symbols__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__field-symbols__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__field-symbols__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__assign__help-sap-com",
+      "title": "ASSIGN | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPASSIGN.html",
+      "captured_at": "2026-01-30T22:34:29",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__assign__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__assign__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__assign__help-sap-com__v01.json",
+      "chunks": [
+        "knowledge_base\\clean\\2026-01-30__assign__help-sap-com__v01__chunk-01.md",
+        "knowledge_base\\clean\\2026-01-30__assign__help-sap-com__v01__chunk-02.md"
+      ]
+    },
+    {
+      "id": "2026-01-30__call-function__help-sap-com",
+      "title": "CALL FUNCTION | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/abapcall_function.html",
+      "captured_at": "2026-01-30T22:34:29",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__call-function__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__call-function__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__call-function__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__call-transaction__help-sap-com",
+      "title": "CALL TRANSACTION | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCALL_TRANSACTION.html",
+      "captured_at": "2026-01-30T22:34:29",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__call-transaction__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__call-transaction__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__call-transaction__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__call-method-static__help-sap-com",
+      "title": "CALL METHOD, Static Method Call (Obsolete) | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPCALL_METHOD_STATIC.html",
+      "captured_at": "2026-01-30T22:34:29",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__call-method-static__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__call-method-static__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__call-method-static__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__try__help-sap-com",
+      "title": "TRY | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPTRY.html",
+      "captured_at": "2026-01-30T22:34:29",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__try__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__try__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__try__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__catch__help-sap-com",
+      "title": "CATCH | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPCATCH_TRY.html",
+      "captured_at": "2026-01-30T22:34:29",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__catch__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__catch__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__catch__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__clear__help-sap-com",
+      "title": "CLEAR | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCLEAR.html",
+      "captured_at": "2026-01-30T23:45:00",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__clear__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__clear__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__clear__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__move-corresponding__help-sap-com",
+      "title": "MOVE-CORRESPONDING | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPMOVE-CORRESPONDING.html",
+      "captured_at": "2026-01-30T23:45:00",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__move-corresponding__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__move-corresponding__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__move-corresponding__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__insert-itab__help-sap-com",
+      "title": "INSERT itab | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPINSERT_ITAB.html",
+      "captured_at": "2026-01-30T23:45:00",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__insert-itab__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__insert-itab__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__insert-itab__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__class__help-sap-com",
+      "title": "CLASS | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPCLASS.html",
+      "captured_at": "2026-01-30T23:45:00",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__class__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__class__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__class__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__methods__help-sap-com",
+      "title": "METHODS | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPMETHODS.html",
+      "captured_at": "2026-01-30T23:45:00",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__methods__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__methods__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__methods__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__class-methods__help-sap-com",
+      "title": "CLASS-METHODS | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPCLASS-METHODS.html",
+      "captured_at": "2026-01-30T23:45:00",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__class-methods__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__class-methods__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__class-methods__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__perform__help-sap-com",
+      "title": "PERFORM | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPPERFORM.html",
+      "captured_at": "2026-01-30T23:45:00",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__perform__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__perform__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__perform__help-sap-com__v01.json",
+      "chunks": []
+    },
+    {
+      "id": "2026-01-30__form__help-sap-com",
+      "title": "FORM | ABAP Keyword Documentation",
+      "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPFORM.html",
+      "captured_at": "2026-01-30T23:45:00",
+      "raw_path": "knowledge_base\\raw\\2026-01-30__form__help-sap-com__v01.html",
+      "clean_path": "knowledge_base\\clean\\2026-01-30__form__help-sap-com__v01.md",
+      "meta_path": "knowledge_base\\meta\\2026-01-30__form__help-sap-com__v01.json",
+      "chunks": []
+    }
+  ]
+}

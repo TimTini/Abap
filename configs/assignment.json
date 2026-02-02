@@ -1,0 +1,15 @@
+{
+  "object": "ASSIGNMENT",
+  "match": { "type": "assignment" },
+  "keywordLabels": {
+    "=": "assign",
+    "+=": "add-assign",
+    "-=": "sub-assign",
+    "*=": "mul-assign",
+    "/=": "div-assign",
+    "?=": "cast"
+  },
+  "keywordPhrases": {},
+  "captureRules": []
+}
+

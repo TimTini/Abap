@@ -1,0 +1,35 @@
+{
+  "id": "2026-01-30__sort-itab__help-sap-com",
+  "title": "SORT itab | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPSORT_ITAB.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T22:34:29",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "internal tables"
+  ],
+  "summary": "Tài liệu SAP Help cho câu lệnh SORT itab.\nSắp xếp internal table theo khóa chỉ định.\nHỗ trợ ASCENDING/DESCENDING và STABLE.\nQuan trọng trước khi BINARY SEARCH hoặc DELETE ADJACENT DUPLICATES.\nÁp dụng cho standard table.",
+  "key_points": [
+    "SORT itab BY ... để sắp xếp.",
+    "Nhiều khóa và thứ tự sắp xếp.",
+    "STABLE giữ thứ tự bản ghi bằng nhau.",
+    "AS TEXT cho so sánh text.",
+    "Tối ưu đọc tìm kiếm."
+  ],
+  "abap_keywords": [
+    "SORT",
+    "BY",
+    "ASCENDING",
+    "DESCENDING",
+    "STABLE",
+    "AS TEXT"
+  ],
+  "notes_user": "",
+  "chunks": [
+    "knowledge_base\\clean\\2026-01-30__sort-itab__help-sap-com__v01__chunk-01.md",
+    "knowledge_base\\clean\\2026-01-30__sort-itab__help-sap-com__v01__chunk-02.md",
+    "knowledge_base\\clean\\2026-01-30__sort-itab__help-sap-com__v01__chunk-03.md"
+  ]
+}

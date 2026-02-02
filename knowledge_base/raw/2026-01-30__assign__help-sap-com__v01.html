@@ -1,0 +1,518 @@
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-16" /><meta http-equiv="X-UA-Compatible" content="IE=edge" /><meta charset="utf-8" /><link rel="shortcut icon" href="ABAPIcon.ico" type="image/ico" /><title>ASSIGN | ABAP Keyword Documentation</title><script id="sap-ui-bootstrap" src="https://sapui5.hana.ondemand.com/resources/sap-ui-core.js" data-sap-ui-theme="sap_horizon" data-sap-ui-libs="sap.m" data-sap-ui-xx-bindingSyntax="complex"> </script><script id="main_page_xml" type="text/xmldata"><mvc:View xmlns="sap.m" xmlns:blocks="sap.uxap.blocks" xmlns:code="sap.ui.codeeditor" xmlns:core="sap.ui.core" xmlns:f="sap.f" xmlns:form="sap.ui.layout.form" xmlns:layout="sap.ui.layout" xmlns:mvc="sap.ui.core.mvc" xmlns:table="sap.ui.table" xmlns:tnt="sap.tnt" xmlns:uxap="sap.uxap" xmlns:xhtml="http://www.w3.org/1999/xhtml" controllerName="myController" height="100%" class="side-navigation-demo"><tnt:ToolPage id="toolPage"><tnt:header><f:ShellBar title="ABAP Keyword Documentation" secondTitle="Reference" showMenuButton="true" homeIcon="https://www.sap.com/dam/application/shared/logos/sap-logo-svg.svg.adapt.svg/1493030643828.svg" homeIconTooltip="Home" showNavButton="false" menuButtonPressed="onMenuButtonPress" homeIconPressed="onIconPress"></f:ShellBar></tnt:header><tnt:mainContents><Page id="page" showHeader="false" showNavButton="false" enableScrolling="true"><layout:DynamicSideContent id="DynamicSideContent" class="sapUiDSCExplored sapUiContentPadding" sideContentFallDown="BelowM" sideContentPosition="Begin" containerQuery="true" breakpointChanged="handleBreakpointChanged"><xhtml:div class="pageDiv"><uxap:ObjectPageLayout id="ObjectPageLayout" showTitleInHeaderContent="true" showEditHeaderButton="true" enableLazyLoading="true" editHeaderButtonPress="handleEditBtnPress" upperCaseAnchorBar="false" useIconTabBar="false"><uxap:headerTitle><uxap:ObjectPageDynamicHeaderTitle><uxap:breadcrumbs><Breadcrumbs currentLocationText="ASSIGN"><Link text="ABAP - Keyword Documentation" href="{/breadcrumb1}" /><Link text="ABAP Programming Language" href="{/breadcrumb2}" /><Link text="ABAP - Processing Internal Data" href="{/breadcrumb3}" /><Link text="Assignments" href="{/breadcrumb4}" /><Link text="Assigning References" href="{/breadcrumb5}" /><Link text="Assigning Field Symbols" href="{/breadcrumb6}" /></Breadcrumbs></uxap:breadcrumbs><uxap:expandedHeading><Title text="ASSIGN" wrapping="true"></Title></uxap:expandedHeading><uxap:expandedContent><layout:VerticalLayout><HBox><core:Icon src="sap-icon://source-code"></core:Icon><Text renderWhitespace="true" text="  Keyword"></Text></HBox><HBox></HBox></layout:VerticalLayout></uxap:expandedContent><uxap:actions><ComboBox class="sapMLIBActionable" placeholder="ABAP Release 8.16 (latest)" items="{path:'displayList>/Elements', sorter:{path:'text', descending: true}}" change="onChange"><core:Item key="{displayList>key}" text="{displayList>text}"></core:Item></ComboBox><Button text="News" press="handleNews" type="Ghost"></Button><Button icon="sap-icon://email" tooltip="Email us" press="onPress"></Button><OverflowToolbarButton icon="sap-icon://chain-link" tooltip="Get link" press="onPressAddress"></OverflowToolbarButton></uxap:actions></uxap:ObjectPageDynamicHeaderTitle></uxap:headerTitle><uxap:headerContent><layout:HorizontalLayout class="sapUiSmallMarginBeginEnd"><VBox><FormattedText htmlText="{/par2}"></FormattedText></VBox></layout:HorizontalLayout><layout:HorizontalLayout class="sapUiSmallMarginBeginEnd"><Text renderWhitespace="true" text="&#x9;&#x9;"></Text></layout:HorizontalLayout><layout:HorizontalLayout class="sapUiSmallMarginBeginEnd"></layout:HorizontalLayout></uxap:headerContent><uxap:sections><uxap:ObjectPageSection titleUppercase="false" title="Overview"><uxap:subSections><uxap:ObjectPageSubSection titleUppercase="false"><uxap:blocks><VBox><form:SimpleForm title="Description" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanM="12" adjustLabelSpan="false" emptySpanXL="0" columnsXL="2"><form:content><VBox><FormattedText htmlText="{/par3}"></FormattedText><FormattedText htmlText="{/par4}"></FormattedText><FormattedText htmlText="{/ul1}"></FormattedText><FormattedText htmlText="{/par5}"></FormattedText><FormattedText htmlText="{/par6}"></FormattedText><FormattedText htmlText="{/par7}"></FormattedText><FormattedText htmlText="{/par8}"></FormattedText><FormattedText htmlText="{/ul2}"></FormattedText><FormattedText htmlText="{/par9}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="System Fields" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanL="4" labelSpanM="12" labelSpanS="12" adjustLabelSpan="false" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="2" columnsL="2" columnsM="1"><form:content><VBox><FormattedText htmlText="{/par10}"></FormattedText><ScrollContainer><Table fixedLayout="false"><columns><Column demandPopin="false"><FormattedText htmlText="{/th1}"></FormattedText></Column><Column demandPopin="false"><FormattedText htmlText="{/th2}"></FormattedText></Column></columns><items><ColumnListItem vAlign="Middle" type="Active"><cells><FormattedText htmlText="{/td1}"></FormattedText><FormattedText htmlText="{/td2}"></FormattedText></cells></ColumnListItem><ColumnListItem vAlign="Middle" type="Active"><cells><FormattedText htmlText="{/td3}"></FormattedText><FormattedText htmlText="{/td4}"></FormattedText></cells></ColumnListItem><ColumnListItem vAlign="Middle" type="Active"><cells><FormattedText htmlText="{/td5}"></FormattedText><FormattedText htmlText="{/td6}"></FormattedText></cells></ColumnListItem></items></Table></ScrollContainer></VBox></form:content></form:SimpleForm><form:SimpleForm title="Hints" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanL="4" labelSpanM="12" labelSpanS="12" adjustLabelSpan="false" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="2" columnsL="2" columnsM="1"><form:content><VBox><FormattedText htmlText="{/ul3}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Example" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="-1" labelSpanL="4" labelSpanM="2" labelSpanS="12" adjustLabelSpan="true" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="1" columnsL="1" columnsM="1" singleContainerFullSize="false"><form:content><VBox><FormattedText htmlText="{/par11}"></FormattedText><Button class="sapUiTinyMarginBeginEnd" icon="sap-icon://copy" tooltip="Copy example" press="onPressCopy1"></Button><code:CodeEditor type="abap" editable="false" value="{/code1}" maxLines="15" width="auto" id="copy1"></code:CodeEditor><FormattedText htmlText="{/par12}"></FormattedText></VBox></form:content></form:SimpleForm></VBox></uxap:blocks></uxap:ObjectPageSubSection></uxap:subSections></uxap:ObjectPageSection><uxap:ObjectPageSection title="Exceptions" titleUppercase="false"><uxap:subSections><uxap:ObjectPageSubSection titleUppercase="false"><uxap:blocks><VBox><HBox><core:Icon src="sap-icon://dimension"></core:Icon><Text renderWhitespace="true" text="  "></Text><Link text="Exception" press="handleException" /></HBox><Text renderWhitespace="true" text="&#x9;&#x9;"></Text><form:SimpleForm title="Catchable Exceptions" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanL="4" labelSpanM="12" labelSpanS="12" adjustLabelSpan="false" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="2" columnsL="2" columnsM="1"><form:content><VBox><FormattedText htmlText="{/par13}"></FormattedText><FormattedText htmlText="{/ul4}"></FormattedText><FormattedText htmlText="{/par14}"></FormattedText><FormattedText htmlText="{/ul5}"></FormattedText><FormattedText htmlText="{/par15}"></FormattedText><FormattedText htmlText="{/ul6}"></FormattedText><FormattedText htmlText="{/par16}"></FormattedText><FormattedText htmlText="{/ul7}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Uncatchable Exceptions" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanL="4" labelSpanM="12" labelSpanS="12" adjustLabelSpan="false" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="2" columnsL="2" columnsM="1"><form:content><VBox><FormattedText htmlText="{/ul8}"></FormattedText></VBox></form:content></form:SimpleForm></VBox></uxap:blocks></uxap:ObjectPageSubSection></uxap:subSections></uxap:ObjectPageSection></uxap:sections></uxap:ObjectPageLayout></xhtml:div><layout:sideContent><HBox height="100%"><table:TreeTable id="treeTable" rows="{path:'displayModel>/TreeElements', parameters:{arrayNames:['children']}}" visibleRowCountMode="Auto" selectionMode="None"><table:toolbar><Toolbar><Button icon="sap-icon://expand-group" press="onExpandAll"></Button><Button icon="sap-icon://collapse-group" press="onCollapseAll"></Button><SearchField liveChange="onLiveSearch" search="onSearchSubmit"></SearchField></Toolbar></table:toolbar><table:rowSettingsTemplate></table:rowSettingsTemplate><table:Column autoResizable="true" width="auto"><Label text="Topics"></Label><table:template><Link href="{displayModel>object}.html" text="{displayModel>name}" emphasized="{= ${displayModel>object} === 'ABAPASSIGN' ? true : false}" /></table:template></table:Column></table:TreeTable></HBox></layout:sideContent></layout:DynamicSideContent><footer><Toolbar><ToolbarSpacer></ToolbarSpacer><Label text="AS ABAP Release 816, &#x00A9;Copyright 2025 SAP SE. All rights reserved."></Label><ToolbarSpacer></ToolbarSpacer><Button icon="sap-icon://arrow-top" press="onScrollUp" tooltip="Scroll up" enabled="true"></Button></Toolbar></footer></Page></tnt:mainContents></tnt:ToolPage></mvc:View></script><link rel="stylesheet" href="layout.css" /><script type="text/javascript" src="global.js"></script><script type="text/javascript" src="defaultJsonTree.js"></script><script>
+          sap.ui.require([
+            'sap/ui/core/mvc/Controller',
+            'sap/ui/core/mvc/XMLView',
+            'sap/base/security/URLListValidator'
+          ],
+
+          function (Controller, XMLView, URLListValidator) {
+
+            URLListValidator.add('adt');
+            URLListValidator.add('http');
+            URLListValidator.add('https');
+
+              //'use strict';
+              //var clicked = 0;
+
+              sap.ui.controller("myController", {
+                  onInit: function() {
+
+                    /*Theme Setting*/
+                    if (window.matchMedia) {
+                      if(window.matchMedia('(prefers-color-scheme: dark)').matches){
+                        sap.ui.core.Configuration.setTheme("sap_horizon_dark");
+                      } else {
+                        sap.ui.core.Configuration.setTheme("sap_horizon");
+                      }
+                    } else {
+                      sap.ui.core.Configuration.setTheme("sap_horizon");
+                    }
+
+                     /*TreeTable*/
+                     
+                           var treeJson = A.getDefaultJsonTree();
+                       
+                     var DisplayModel = new sap.ui.model.json.JSONModel(treeJson);
+                     this.getView().setModel(DisplayModel, 'displayModel');
+                     var tree = this.getView().byId('treeTable');
+
+                     tree.expand(0);tree.expand(3);tree.expand(15);tree.expand(16);tree.expand(21);tree.expand(23);
+
+                     var oModel = new sap.ui.model.json.JSONModel({
+
+                        par1: "<p><a target='_parent' href='ABAPASSIGN_SHORTREF.html' class='blue'>Short Reference</a></p>",par2: "<pre><p><code class='code'>ASSIGN <a target='_parent' href='ABAPASSIGN_MEM_AREA.html' class='@class'><code class='code'>mem_area</code></a> TO &lt;fs&gt; <a target='_parent' href='ABAPASSIGN_CASTING.html' class='@class'><code class='code'>casting_spec</code></a>\ <br>                        <a target='_parent' href='ABAPASSIGN_RANGE.html' class='@class'><code class='code'>range_spec</code></a>\ <br>                        <span class='meta_style'>[</span><a target='_parent' href='ABAPASSIGN_ELSE_UNASSIGN.html' class='@class'><code class='code'>ELSE UNASSIGN</code></a><span class='meta_style'>]</span>.</code></p></pre>",par3: "<p>This statement assigns the memory area specified using <a target='_parent' href='ABAPASSIGN_MEM_AREA.html' class='blue'><code class='code'>mem_area</code></a> to the field symbol <code class='code'>&lt;fs&gt;</code>. A data object or a memory area calculated from the address of a data object can be assigned. After a successful assignment, the field symbol refers to the assigned memory area and can be used in operand positions. When used in a statement, it works like a dereferenced data reference, meaning that the statement works with the content of the memory area.</p>",par4: "<p>The following can be specified for <code class='code'>&lt;fs&gt;</code>:</p>",par5: "<p>The data type used to handle the assigned memory area depends on the specification in <a target='_parent' href='ABAPASSIGN_CASTING.html' class='blue'><code class='code'>casting_spec</code></a>. Either an explicit <a target='_parent' href='ABENCAST_CASTING_GLOSRY.html' class='green'>casting</a> can be performed, or the field symbol inherits the data type of the data object specified in the assignment. In both cases, the data type used must <a target='_parent' href='ABENTYPING_CHECK_GENERAL.html' class='blue'>match</a> the <a target='_parent' href='ABENTYPING_GLOSRY.html' class='green'>typing</a> of the field symbol. A field symbol to which a memory area is assigned, has this data type after the assignment and behaves like a data object of this type.</p>",par6: "<p>The assigned memory area <code class='code'>mem_area</code> must be at least as long as the data type specified in <code class='code'>casting_spec</code> and must have at least the same <a target='_parent' href='ABENALIGNMENT_GLOSRY.html' class='green'>alignment</a>. If the data type determined in <code class='code'>casting_spec</code> is <a target='_parent' href='ABENDEEP_GLOSRY.html' class='green'>deep</a>, the deep components must correspond exactly in their type and position.</p>",par7: "<p>The specification in <a target='_parent' href='ABAPASSIGN_RANGE.html' class='blue'><code class='code'>range_spec</code></a> is used to define the memory area that can be assigned to the field symbol.</p>",par8: "<p>If the assignment is not successful. the behavior depends on the assigned <a target='_parent' href='ABAPASSIGN_MEM_AREA.html' class='blue'><code class='code'>mem_area</code></a> and on the addition <a target='_parent' href='ABAPASSIGN_ELSE_UNASSIGN.html' class='blue'><code class='code'>ELSE UNASSIGN</code></a>:</p>",par9: "<p>If an assignment would lead to illegal memory accesses, an exception is raised for both static and dynamic <code class='code'>ASSIGN</code> statements.</p>",par10: "<p>The <code class='code'>ASSIGN</code> statement sets the return code for a <a target='_parent' href='ABAPASSIGN_MEM_AREA_DYNAMIC_DOBJ.html' class='blue'>dynamic assignment</a>, an <a target='_parent' href='ABAPASSIGN_DYNAMIC_COMPONENTS.html' class='blue'>assignment of dynamic components</a>, a <a target='_parent' href='ABAPASSIGN_MEM_AREA_DYNAMIC_ACCESS.html' class='blue'>dynamic access</a> or an <a target='_parent' href='ABAPASSIGN_MEM_AREA_WRITABLE_EXP.html' class='blue'>assignment of a table expression</a>. For an <a target='_parent' href='ABAPASSIGN_MEM_AREA_WRITABLE_EXP.html' class='blue'>assignment&nbsp;of&nbsp;the&nbsp;constructor&nbsp;operator&nbsp;<code class='code'>NEW</code></a>, the return code is set by the constructor operator. The return code is not set for a <a target='_parent' href='ABAPASSIGN_MEM_AREA_STATIC_DOBJ.html' class='blue'>static assignment</a> and an <a target='_parent' href='ABAPASSIGN_MEM_AREA_WRITABLE_EXP.html' class='blue'>assignment&nbsp;of&nbsp;the&nbsp;constructor&nbsp;operator&nbsp;<code class='code'>CAST</code></a>.</p>",par11: "<p>Three field symbols are assigned the substrings for year, month, and day of the system field <code class='code'>sy-datlo</code>. The substrings can then be addressed using field symbols.</p>",par12: "<p></p>",par13: "<p><code class='code'>CX_SY_ASSIGN_CAST_ILLEGAL_CAST</code></p>",par14: "<p><code class='code'>CX_SY_ASSIGN_CAST_UNKNOWN_TYPE</code></p>",par15: "<p><code class='code'>CX_SY_ASSIGN_OUT_OF_RANGE</code></p>",par16: "<p><code class='code'>CX_SY_ASSIGN_ILLEGAL_COMPONENT</code></p>",ul1: "<ul><li>An existing field symbol with appropriate typing.</li><li>An inline declaration <a target='_parent' href='ABENFIELD-SYMBOL_INLINE.html' class='blue'><code class='code'>FIELD-SYMBOL(&lt;fs&gt;)</code></a>. The typing depends on the <a target='_parent' href='ABAPASSIGN_MEM_AREA.html' class='blue'><code class='code'>mem_area</code></a> specified.</li></ul>",ul2: "<ul><li>If a <a target='_parent' href='ABAPASSIGN_MEM_AREA_STATIC_DOBJ.html' class='blue'>static assignment</a> is not successful, <code class='code'>sy-subrc</code> is not set. No memory area is assigned to the field symbol. The field symbol has the state unassigned after the <code class='code'>ASSIGN</code> statement. The addition <code class='code'>ELSE UNASSIGN</code> is used implicitly and must not be specified.</li><li>If a <a target='_parent' href='ABAPASSIGN_MEM_AREA_DYNAMIC_DOBJ.html' class='blue'>dynamic assignment</a>, an <a target='_parent' href='ABAPASSIGN_DYNAMIC_COMPONENTS.html' class='blue'>assignment of dynamic components</a>, a <a target='_parent' href='ABAPASSIGN_MEM_AREA_DYNAMIC_ACCESS.html' class='blue'>dynamic access</a> or an <a target='_parent' href='ABAPASSIGN_MEM_AREA_WRITABLE_EXP.html' class='blue'>assignment of a table expression</a> is not successful, <code class='code'>sy-subrc</code> is set to 4 or 8 and:</li><ul><li>If <code class='code'>ELSE UNASSIGN</code> is not specified, the field symbol keeps its previous state.</li><li>If <code class='code'>ELSE UNASSIGN</code> is specified, no memory area is assigned to the field symbol. The field symbol has the state unassigned after the <code class='code'>ASSIGN</code> statement.</li></ul><li class='no_list_style'>Some invalid dynamic specifications in the <a target='_parent' href='ABAPASSIGN_DYNAMIC_COMPONENTS.html' class='blue'>assignment of dynamic components</a> do not set <code class='code'>sy-subrc</code> but raise an exception.</li><li>An assignment of the constructor operators <a target='_parent' href='ABAPASSIGN_MEM_AREA_WRITABLE_EXP.html' class='blue'><code class='code'>NEW</code></a> or <a target='_parent' href='ABAPASSIGN_MEM_AREA_WRITABLE_EXP.html' class='blue'><code class='code'>CASE</code></a> is either successful or leads to an exception and the addition <code class='code'>ELSE UNASSIGN</code> must not be used.</li></ul>",ul3: "<ul><li>The state of the field symbol can be checked with the <a target='_parent' href='ABENPREDICATE_EXPRESSION_GLOSRY.html' class='green'>predicate expression</a>\ <a target='_parent' href='ABENLOGEXP_ASSIGNED.html' class='blue'><code class='code'>&lt;fs&gt; IS ASSIGNED</code></a>.</li><li>When setting field symbols using <code class='code'>ASSIGN</code>, permission to access the assigned data object is only checked at the position of the statement. The field symbol can then be passed on and used to access the assigned data object in any position. To prevent access to private and read-only attributes using field symbols outside classes, field symbols for these attributes should not be published externally. A constant a read-only input parameter or an <a target='_parent' href='ABENIMMUTABLE_VARIABLE_GLOSRY.html' class='green'>immutable variable</a>, however, can never be made modifiable by passing a field symbol.</li><li>An obsolete form of the statement <code class='code'>ASSIGN</code> is <a target='_parent' href='ABAPASSIGN_LOCAL_COPY.html' class='blue'><code class='code'>ASSIGN LOCAL COPY</code></a>.</li></ul>",ul4: "<ul><li><em>Cause:</em> The type of the source field and the target type do not match exactly in offset and type in those components that are strings, tables, or references. <br><em>Runtime error:</em>\ <code class='code'>ASSIGN_CASTING_ILLEGAL_CAST</code></li></ul>",ul5: "<ul><li><em>Cause:</em> A type specified dynamically after <code class='code'>CASTING</code> is unknown. <br><em>Runtime error:</em>\ <code class='code'>ASSIGN_CASTING_UNKNOWN_TYPE</code></li></ul>",ul6: "<ul><li><em>Cause:</em> The data object in addition <code class='code'>RANGE</code> does not contain the assigned data object. <br><em>Runtime error:</em>\ <code class='code'>ASSIGN_FIELD_NOT_IN_RANGE</code></li></ul>",ul7: "<ul><li><em>Cause:</em> A dynamically specified component does not exist. <br><em>Runtime error:</em>\ <code class='code'>ASSIGN_ILLEGAL_COMPONENT</code>\ <br><br></li></ul>",ul8: "<ul><li><em>Cause:</em> The field symbol is structured and the assigned field is shorter than the structure. <br><em>Runtime error:</em>\ <code class='code'>ASSIGN_BASE_TOO_SHORT</code></li><li><em>Cause:</em> The alignment for field <code class='code'>f</code> is too short for the type of the field symbol. <br><em>Runtime error:</em>\ <code class='code'>ASSIGN_BASE_WRONG_ALIGNMENT</code></li><li><em>Cause:</em> Only simple types can be specified for <code class='code'>TYPE</code>. <br><em>Runtime error:</em>\ <code class='code'>ASSIGN_CAST_COMPLEX_TYPE</code></li><li><em>Cause:</em> The source field is longer than 16 bytes and cannot be interpreted as a type <code class='code'>p</code> field. <br><em>Runtime error:</em>\ <code class='code'>ASSIGN_CAST_P_TOO_LARGE</code></li><li><em>Cause:</em> The alignment of field <code class='code'>f</code> is too short for the type specified in <code class='code'>TYPE</code>. <br><em>Runtime error:</em>\ <code class='code'>ASSIGN_CAST_WRONG_ALIGNMENT</code></li><li><em>Cause:</em> The length of field <code class='code'>f</code> does not match the type specified in <code class='code'>TYPE</code>. <br><em>Runtime error:</em>\ <code class='code'>ASSIGN_CAST_WRONG_ALIGNMENT</code></li><li><em>Cause:</em> The type specified in <code class='code'>TYPE</code> is unknown. <br><em>Runtime error:</em>\ <code class='code'>ASSIGN_CAST_WRONG_TYPE</code></li><li><em>Cause:</em> A maximum of 14 columns is allowed. <br><em>Runtime error:</em>\ <code class='code'>ASSIGN_DECIMALS_TOO_HIGH</code></li><li><em>Cause:</em> Decimal places are allowed only for type <code class='code'>p</code>. <br><em>Runtime error:</em>\ <code class='code'>ASSIGN_DECIMALS_WRONG_TYPE</code></li><li><em>Cause:</em> A length of 0 was specified for field <code class='code'>f</code>. <br><em>Runtime error:</em>\ <code class='code'>ASSIGN_LENGTH_0</code></li><li><em>Cause:</em> A length less than 0 was specified for field <code class='code'>f</code>. <br><em>Runtime error:</em>\ <code class='code'>ASSIGN_LENGTH_NEGATIVE</code></li><li><em>Cause:</em> An offset or length was specified for field <code class='code'>f</code> and the data type of the assigning field does not allow partial access. (This is the case for data types I, F, and P.) <br><em>Runtime error:</em>\ <code class='code'>ASSIGN_OFFSET_NOTALLOWED</code></li><li><em>Cause:</em> In the area addressed in the offset and length specifications for field <code class='code'>f</code>, deep components exist (data references, object references, strings, internal tables), which may not be overwritten. <br><em>Runtime error:</em>\ <code class='code'>ASSIGN_OFF+LENGTH_ILLEGAL_CAST</code></li><li><em>Cause:</em> Field <code class='code'>f</code> is not a data reference. However, a data reference was expected. <br><em>Runtime error:</em>\ <code class='code'>ASSIGN_REFERENCE_EXPECTED</code></li><li><em>Cause:</em> The type of the source field and the target type do not match exactly in offset and type in those components that are strings, tables, or references. <br><em>Runtime error:</em>\ <code class='code'>ASSIGN_STRUCTURE_ILLEGAL_CAST</code></li><li><em>Cause:</em> Substrings cannot be assigned to a field symbol. <br><em>Runtime error:</em>\ <code class='code'>ASSIGN_SUBSTRING_NOT_ALLOWED</code></li><li><em>Cause:</em> The field symbol is typed and the type of the assigned field is incompatible with it. <br><em>Runtime error:</em>\ <code class='code'>ASSIGN_TYPE_CONFLICT</code></li><li><em>Cause:</em> The type of the source field contains strings, tables, or references. <br><em>Runtime error:</em>\ <code class='code'>ASSIGN_TYPE_ILLEGAL_CAST</code></li><li><em>Cause:</em> The type of the source field is a structure not compatible with the target type. <br><em>Runtime error:</em>\ <code class='code'>ASSIGN_UC_STRUCT_CONFLICT</code></li></ul>",code1: "FIELD-SYMBOLS <year>  TYPE n. \nFIELD-SYMBOLS <month> TYPE n. \nFIELD-SYMBOLS <day>   TYPE n. \n\ \nASSIGN sy-datlo+0(4) TO <year>. \nASSIGN sy-datlo+4(2) TO <month>. \nASSIGN sy-datlo+6(2) TO <day>. \n\ \ncl_demo_output=>new( \n  )->write(   <year>\ \n  )->write(   <month>\ \n  )->display( <day> ).",th1: "<code class='code'><strong>sy-subrc</strong></code>",th2: "<strong>Meaning</strong>",td1: "0",td2: "Assignment was successful.",td3: "4",td4: "Assignment was not successful.",td5: "8",td6: "Assignment of <a target='_parent' href='ABAPASSIGN_MEM_AREA_WRITABLE_EXP.html' class='blue'>table expression</a> was not successful.",breadcrumb1: "abenabap.html",breadcrumb2: "abenabap_reference.html",breadcrumb3: "abenabap_data_working.html",breadcrumb4: "abenvalue_assignments.html",breadcrumb5: "abenreference_assignments.html",breadcrumb6: "abenset_field_symbols.html",
+
+                      });
+                      this.getView().setModel(oModel);
+
+                      var DisplayList = new sap.ui.model.json.JSONModel({
+                        "Elements": [
+
+                        
+                                {
+                                    
+                                        "key": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/index.htm?file=ABAPASSIGN.htm",
+                                        "text": "ABAP Release 9.16",
+                                    
+                                },
+                            
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_758_index_htm/7.58/en-US/index.htm",
+                            "text": "ABAP Release 7.58",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_757_index_htm/7.57/en-US/index.htm",
+                            "text": "ABAP Release 7.57",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_756_index_htm/7.56/en-US/index.htm",
+                            "text": "ABAP Release 7.56",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_755_index_htm/7.55/en-US/index.htm",
+                            "text": "ABAP Release 7.55",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_754_index_htm/7.54/en-US/index.htm",
+                            "text": "ABAP Release 7.54",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_753_index_htm/7.53/en-US/index.htm",
+                            "text": "ABAP Release 7.53",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_752_index_htm/7.52/en-US/index.htm",
+                            "text": "ABAP Release 7.52",
+                        }
+                        
+                        ]
+                      });
+                      this.getView().setModel(DisplayList, 'displayList');
+
+                  
+
+                      this._oDSC = this.byId("DynamicSideContent");
+                      this._oToggleButton = this.byId("toggleButton");
+                    },
+
+                  /* -------
+                  [ events ]
+                  ------- */
+
+                  onChange: function(oEvent) {
+                    var oControl = oEvent.getSource();
+                    window.location.href = oControl.getSelectedKey();
+                    /*sap.m.MessageToast.show("Switch to " + oControl.getSelectedKey() + "?");*/
+                  },
+
+                  
+
+                  onIconPress: function(oEvent) {
+                    window.location.href="https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm?file=ABENABAP.htm";
+                  },
+
+                  handleNews: function(oEvent) {
+                    var docu_url = window.location.href;
+                    if(docu_url.includes('version=5')) {
+                      
+                      window.open('https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm&object=ABENNEWS-916', '_self');
+                    }
+                    else if(docu_url.includes('abapdocu_latest')) {
+                      window.open('https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm?file=abennews-816.htm', '_self');
+                    }
+                    else if(docu_url.includes('abapdocu_cp')) {
+                      window.open('https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABENNEWS-916.html', '_self');
+                    }
+                    else {
+                      
+                      window.open('https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm&object=ABENNEWS-816', '_self');
+                    }
+                  },
+
+                  handleException: function(oEvent) {
+                    
+                    window.open('ABENABAP_LANGUAGE_EXCEPTIONS.html', '_self');
+                  },
+
+                  
+                  onScrollUp: function() {
+                    this.byId("ObjectPageLayout").setSelectedSection(null);
+                  },
+
+
+                  onPressTheme: function(oEvent) {
+                    clicked++;
+                    if (clicked === 1 ) {
+                        //sap.ui.getCore().applyTheme("sap_horizon_dark");
+                        sap.ui.core.Configuration.setTheme("sap_horizon_dark");
+                        var subtleId = this.getView().getId('subtle');
+                        var subtle = document.getElementById(subtleId);
+                        a.style.color = '#1d2d3e';
+                    }
+                    if (clicked === 2)
+                    {
+                        //sap.ui.getCore().applyTheme("sap_horizon");
+                        sap.ui.core.Configuration.setTheme("sap_horizon");
+                        clicked = 0;
+                    }
+
+                    /*const element = document.getElementById("sap-ui-bootstrap");
+                    if (element.hasAttribute("data-sap-ui-theme", "sap_horizon")) {
+                        element.setAttribute("data-sap-ui-theme", "sap_horizon_dark");
+                        //window.location.reload();
+                    }
+                    else {
+                        element.setAttribute("data-sap-ui-theme", "sap_horizon");
+                        //window.location.reload();
+                    };*/
+                  },
+
+                  onPressBack: function(oEvent) {
+                    window.history.go(-1);
+                  },
+
+                  onPress: function(oEvent) {
+                    var mail = document.createElement("a");
+                    mail.href = "mailto:f1_help@sap.com?subject=Feedback on ABAP Documentation from Help Portal version&body=Document: ASSIGN, ABAPASSIGN, 816%0D%0A%0D%0AError:%0D%0A%0D%0A%0D%0A%0D%0ASuggestion for improvement:";
+                    mail.click();
+                  },
+
+                  /*handlePopoverPress: function(oEvent) {
+                    var oButton = oEvent.getSource(),
+                    oView = this.getView();
+
+                    if (!this._oPopover) {
+                       this._oPopover = new sap.ui.xmlfragment({
+                           fragmentContent: jQuery("#fragment_xml").html()
+                           }, this);
+                       oView.addDependent(this._oPopover);
+                    }
+                    this._oPopover.openBy(oButton);
+                   },*/
+
+                   handleClosePress: function(oEvent) {
+                       //this.byId("myPopover").close();
+                       //sap.m.MessageToast.show("You cannot close me.");
+                       this._oPopover.getParent().destroyContent();
+                   },
+
+                   popoverAfterClose: function(oEvent) {
+                        this._oPopover.destroy();
+                        this._oPopover.getParent().destroyContent();
+                    },
+
+                   onPressAddress: function(oEvent) {
+                     var address = "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm?file=abapassign.htm";
+                     navigator.clipboard.writeText(address).then(function() {
+                         sap.m.MessageToast.show("'" + address + "' copied.");
+                     }, function(err) {
+                         sap.m.MessageToast.show("No address copied.");
+                     });
+                   },
+                  
+                    handlePopoverPress1: function(oEvent) {
+                      var oButton = oEvent.getSource(),
+                      oView = this.getView();
+
+                      this._oPopover = new sap.ui.xmlfragment({
+                        fragmentContent: jQuery("#fragment_xml1").html()
+                        }, this);
+
+                      this._oPopover.openBy(oButton);
+                     },
+                  
+
+                  handlePopoverPressExa: function(oEvent) {
+                    window.open('');
+                  },
+
+                  
+                    onPressCopy1: function(oEvent) {
+                    var copy = this.byId("copy1").getCurrentValue();
+                    navigator.clipboard.writeText(copy).then(function() {
+                        sap.m.MessageToast.show("Copied to Clipboard.");
+                    }, function(err) {
+                        sap.m.MessageToast.show("Not copied to Clipboard.");
+                    });
+                  },
+                  
+
+                  onPressVersion: function(oEvent) {
+                    
+                    window.open('https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm&object=ABAPASSIGN&style=adt', '_self');
+                  },
+
+                  
+                  onItemSelect: function(oEvent) {
+                  if (! this.sSelectedNavigationListItemId) {
+                      this.updateSelectedNavigationListItemId();
+                  }
+                  else {
+                      if (this.oSideNavigation.getSelectedItem() != this.sSelectedNavigationListItemId) {
+                          this.restoreSideNavigationSelection();
+                      }
+                  }
+                  },
+
+                  onCollapseExpandPress: function () {
+                  this.toggleControlExpand(this.oSideNavigation);
+                  },
+
+                  onMenuButtonPress : function() {
+                  var toolPage = this.byId("toolPage");
+
+                  toolPage.setSideExpanded(!toolPage.getSideExpanded());
+                  },
+
+                  /* ----------------
+                  [ event listeners ]
+                  ---------------- */
+
+                  /* ------------------------------------
+                  [ restoring side navigation selection ]
+                  ------------------------------------ */
+
+                  updateSelectedNavigationListItemId: function(sId) {
+                  this.sSelectedNavigationListItemId = sId;
+                  },
+
+                  restoreSideNavigationSelection: function() {
+                  this.oSideNavigation.setSelectedItem(this.sSelectedNavigationListItemId);
+                  this.oSideNavigation.invalidate();
+                  },
+
+                  /* ----------------
+                  [ collapse/expand ]
+                  ---------------- */
+
+                  toggleControlExpand: function(oControl) {
+                  oControl.setExpanded(! oControl.getExpanded());
+                  },
+
+                  /*TreeTable*/
+                  
+
+                  onLiveSearch: function (evt) {
+                    var filterString = evt.getParameter('newValue');
+                    var filter = filterString.toUpperCase();
+
+                    
+                           var treeJson = A.getDefaultJsonTree();
+                       
+                    var treeJsonModel = new sap.ui.model.json.JSONModel(treeJson);
+
+                    if (filterString == '') {
+                        this.getView().setModel(treeJsonModel, 'displayModel');
+                        var tree = this.getView().byId('treeTable');
+                        tree.expandToLevel(1);
+                    } else {
+                    //-----------------------------------------------------------
+                    // Function that flattens tree along a keyword "key", here the collection formally starts as empty
+                    // FIXED
+
+                    var bfs = function (treeJson, collection) {
+                        collection.push({ name: treeJson.name, object: treeJson.object, indices: treeJson.indices });
+                        if (!treeJson.children || treeJson.children.length === 0) return;
+                        for (var i = 0; i < treeJson.children.length; i++) {
+                            //flatten children recursively
+                            bfs(treeJson.children[i], collection);
+                        }
+                        return;
+                    }
+                    //flatten all the subtree categories seperately
+                    // FIXED
+                    var treeModelFlat = treeJson.TreeElements[0];
+                    //Loop over sub trees
+                    for (var i = 0; i < treeJson.TreeElements[0].children.length; i++) {
+                        subTree = treeJson.TreeElements[0].children[i];
+                        if (subTree.children) {
+                            for (var j = 0; j < subTree.children.length; j++) {
+                                var subSubTree = subTree.children[j];
+                                var flattenedCollection = [];
+                                bfs(subSubTree, flattenedCollection);
+                                treeModelFlat.children[i].children[j].children = flattenedCollection.slice(1); //omit first element (root node), would be doubled
+                            }
+                        }
+                        else {
+                            var flattenedCollection = [];
+                            bfs(subTree, flattenedCollection);
+                            treeModelFlat.children[i].children = flattenedCollection.slice(1);
+                        }
+                    }
+                    //filter Model
+                    // FIXED
+                    var filterMode = 0; var similaritySearch = false;
+                    //var filteredModel = structuredClone(treeModelFlat);
+                    var filteredModel = {};
+                    var buildingFilteredModel = {};
+                    var filteredSubtree = [];
+                    var filteredCollection = [];
+                    var treeModelClone = cloneJSON(treeModelFlat);
+
+
+                    for (var i = 0; i < treeModelFlat.children.length; i++) {
+                        var subTree = treeModelFlat.children[i];
+                        if (subTree.children) {
+                            var deleteSubTree = true;
+                            for (var j = 0; j < subTree.children.length; j++) {
+                                var subSubTree = subTree.children[j];
+                                var deleteSubSubTree = true;
+                                if (subSubTree.children.length > 0) {
+                                    for (var k in subSubTree.children) {
+                                        //if (subSubTree.children[k].name.toUpperCase().indexOf(filter) == -1) {
+                                        var indices = subSubTree.children[k].indices;
+
+                                        if (!matchesSearchCriteria(indices, filter)) {
+                                            delete treeModelClone.children[i].children[j].children[k];
+                                        } else {
+                                            deleteSubSubTree = false;
+                                            deleteSubTree = false;
+                                        }
+                                    }
+                                }
+                                if (deleteSubSubTree) {
+                                    delete treeModelClone.children[i].children[j];
+                                }
+                            }
+                            if (deleteSubTree) {
+                                delete treeModelClone.children[i];
+                            }
+                        }
+                    }
+                    var treeModelString = JSON.stringify(treeModelClone);
+                    treeModelString = '{"TreeElements": [' + treeModelString + ']}';
+                    var treeModelObj = JSON.parse(treeModelString);
+                    var DisplayModel = new sap.ui.model.json.JSONModel(treeModelObj);
+                    this.getView().setModel(DisplayModel, 'displayModel');
+                    this.onExpandAll();
+                }
+            },
+
+                  onExpandAll: function (evt) {
+                      var tree = this.getView().byId('treeTable');
+                      tree.expandToLevel(14);
+                  },
+
+                  onCollapseAll: function (evt) {
+                      var tree = this.getView().byId('treeTable');
+                      tree.collapseAll();
+                  },
+
+                  onMenuButtonPress: function () {
+                      if(this._oDSC.getShowSideContent()){
+                      this._oDSC.setShowSideContent(false);
+                      }else{
+                      this._oDSC.setShowSideContent(true);
+                      }
+                  },
+
+                  handleToggleClick: function () {
+                      this._oDSC.toggle();
+                  },
+
+              });
+
+              
+              
+
+              function setAddress(query) {
+                var address = ""
+                var textinput = query;
+                while (textinput.indexOf("&") > -1) {
+                    textinput = textinput.replace("&", "%26")
+                }
+                while (textinput.indexOf("+") > -1) {
+                    textinput = textinput.replace("+", "%2B")
+                }
+                while (textinput.indexOf("=") > -1) {
+                    textinput = textinput.replace("=", "%3D")
+                } while (textinput.indexOf("?") > -1) {
+                    textinput = textinput.replace("?", "%3F")
+                }
+              address = "" + "?query=" + textinput + "&";
+                return address;
+               }
+
+              
+              function cloneJSON(obj) {
+                    // basic type deep copy
+                    if (obj === null || obj === undefined || typeof obj !== 'object') {
+                        return obj
+                    }
+                    // array deep copy
+                    if (obj instanceof Array) {
+                        var cloneA = [];
+                        for (var i = 0; i < obj.length; ++i) {
+                            cloneA[i] = cloneJSON(obj[i]);
+                        }
+                        return cloneA;
+                    }
+                    // object deep copy
+                    var cloneO = {};
+                    for (var i in obj) {
+                      cloneO[i] = cloneJSON(obj[i]);
+                    }
+                  return cloneO;
+                }
+
+            function matchesSearchCriteria(indices, searchWord) {
+                var returnValue = false;
+                for (var index of indices) {
+                    if (index.key1.toUpperCase().indexOf(searchWord) !== -1) {
+                        returnValue = true;
+                        break;
+                    }
+                    var key2Key1Search = index.key2 && index.key1;
+                    if (key2Key1Search.toUpperCase().indexOf(searchWord) !== -1) {
+                        returnValue = true;
+                        break;
+                    }
+                }
+                return returnValue;
+             }
+
+              
+
+              sap.ui.xmlview({ viewContent: jQuery('#main_page_xml').html() }).placeAt("main_page");
+
+              });
+
+        </script>
+<script>
+window.adobeDataLayer = window.adobeDataLayer || [];
+window.adobeDataLayer.push({
+'event': 'globalDL',
+'site': { 
+'name': 'help',
+'country': 'glo'
+},
+'user': {
+'loginStatus': 'no'
+}
+});
+window.adobeDataLayer.push({ 
+'event': 'pageView', 
+'page': { 
+'name':  "", 
+'section': location.pathname.slice(1, location.pathname.indexOf("/", 1)), 
+'language': "en", 
+'country': "US", 
+'referrer': "null", 
+'url': location.href, 
+'details': { 
+'productID':  "ABAP", 
+'deliverableID': "abapdocu_latest_index_htm", 
+'topicID': "n/a", 
+'version': "latest", 
+'machineTranslated': "no", 
+}, 
+}, 
+'user': { 
+'loginStatus': "no", 
+},
+}); 
+window.adobeDataLayer.push({
+'event': "stBeaconReady"
+}); 
+</script>
+</head><body class="sapUiBody sapUiSizeCompact"><div id="tree"></div><div id="main_page"></div></body></html>

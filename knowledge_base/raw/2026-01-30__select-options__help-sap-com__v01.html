@@ -1,0 +1,498 @@
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-16" /><meta http-equiv="X-UA-Compatible" content="IE=edge" /><meta charset="utf-8" /><link rel="shortcut icon" href="ABAPIcon.ico" type="image/ico" /><title>SELECT-OPTIONS | ABAP Keyword Documentation</title><script id="sap-ui-bootstrap" src="https://sapui5.hana.ondemand.com/resources/sap-ui-core.js" data-sap-ui-theme="sap_horizon" data-sap-ui-libs="sap.m" data-sap-ui-xx-bindingSyntax="complex"> </script><script id="main_page_xml" type="text/xmldata"><mvc:View xmlns="sap.m" xmlns:blocks="sap.uxap.blocks" xmlns:code="sap.ui.codeeditor" xmlns:core="sap.ui.core" xmlns:f="sap.f" xmlns:form="sap.ui.layout.form" xmlns:layout="sap.ui.layout" xmlns:mvc="sap.ui.core.mvc" xmlns:table="sap.ui.table" xmlns:tnt="sap.tnt" xmlns:uxap="sap.uxap" xmlns:xhtml="http://www.w3.org/1999/xhtml" controllerName="myController" height="100%" class="side-navigation-demo"><tnt:ToolPage id="toolPage"><tnt:header><f:ShellBar title="ABAP Keyword Documentation" secondTitle="Reference" showMenuButton="true" homeIcon="https://www.sap.com/dam/application/shared/logos/sap-logo-svg.svg.adapt.svg/1493030643828.svg" homeIconTooltip="Home" showNavButton="false" menuButtonPressed="onMenuButtonPress" homeIconPressed="onIconPress"></f:ShellBar></tnt:header><tnt:mainContents><Page id="page" showHeader="false" showNavButton="false" enableScrolling="true"><layout:DynamicSideContent id="DynamicSideContent" class="sapUiDSCExplored sapUiContentPadding" sideContentFallDown="BelowM" sideContentPosition="Begin" containerQuery="true" breakpointChanged="handleBreakpointChanged"><xhtml:div class="pageDiv"><uxap:ObjectPageLayout id="ObjectPageLayout" showTitleInHeaderContent="true" showEditHeaderButton="true" enableLazyLoading="true" editHeaderButtonPress="handleEditBtnPress" upperCaseAnchorBar="false" useIconTabBar="false"><uxap:headerTitle><uxap:ObjectPageDynamicHeaderTitle><uxap:breadcrumbs><Breadcrumbs currentLocationText="SELECT-OPTIONS"><Link text="ABAP - Keyword Documentation" href="{/breadcrumb1}" /><Link text="ABAP Programming Language" href="{/breadcrumb2}" /><Link text="ABAP - SAP GUI User Dialogs" href="{/breadcrumb3}" /><Link text="Selection Screens" href="{/breadcrumb4}" /><Link text="Selection Screens - Create" href="{/breadcrumb5}" /></Breadcrumbs></uxap:breadcrumbs><uxap:expandedHeading><Title text="SELECT-OPTIONS" wrapping="true"></Title></uxap:expandedHeading><uxap:expandedContent><layout:VerticalLayout><HBox><core:Icon src="sap-icon://source-code"></core:Icon><Text renderWhitespace="true" text="  Keyword"></Text></HBox><HBox></HBox></layout:VerticalLayout></uxap:expandedContent><uxap:actions><ComboBox class="sapMLIBActionable" placeholder="ABAP Release 8.16 (latest)" items="{path:'displayList>/Elements', sorter:{path:'text', descending: true}}" change="onChange"><core:Item key="{displayList>key}" text="{displayList>text}"></core:Item></ComboBox><Button text="News" press="handleNews" type="Ghost"></Button><Button icon="sap-icon://email" tooltip="Email us" press="onPress"></Button><OverflowToolbarButton icon="sap-icon://chain-link" tooltip="Get link" press="onPressAddress"></OverflowToolbarButton></uxap:actions></uxap:ObjectPageDynamicHeaderTitle></uxap:headerTitle><uxap:headerContent><layout:HorizontalLayout class="sapUiSmallMarginBeginEnd"><VBox><FormattedText htmlText="{/par2}"></FormattedText></VBox></layout:HorizontalLayout><layout:HorizontalLayout class="sapUiSmallMarginBeginEnd"><Text renderWhitespace="true" text="&#x9;&#x9;"></Text></layout:HorizontalLayout><layout:HorizontalLayout class="sapUiSmallMarginBeginEnd"></layout:HorizontalLayout></uxap:headerContent><uxap:sections><uxap:ObjectPageSection titleUppercase="false" title=""><uxap:subSections><uxap:ObjectPageSubSection titleUppercase="false"><uxap:blocks><VBox><FormattedText htmlText="{/par1}"></FormattedText><form:SimpleForm title="Description" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanM="12" adjustLabelSpan="false" emptySpanXL="0" columnsXL="2"><form:content><VBox><FormattedText htmlText="{/par3}"></FormattedText><FormattedText htmlText="{/par4}"></FormattedText><FormattedText htmlText="{/par5}"></FormattedText><FormattedText htmlText="{/ul1}"></FormattedText></VBox></form:content></form:SimpleForm><form:SimpleForm title="Hints" minWidth="1024" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanL="4" labelSpanM="12" labelSpanS="12" adjustLabelSpan="false" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="2" columnsL="2" columnsM="1"><form:content><VBox><FormattedText htmlText="{/ul2}"></FormattedText></VBox></form:content></form:SimpleForm></VBox></uxap:blocks></uxap:ObjectPageSubSection></uxap:subSections></uxap:ObjectPageSection></uxap:sections></uxap:ObjectPageLayout></xhtml:div><layout:sideContent><HBox height="100%"><table:TreeTable id="treeTable" rows="{path:'displayModel>/TreeElements', parameters:{arrayNames:['children']}}" visibleRowCountMode="Auto" selectionMode="None"><table:toolbar><Toolbar><Button icon="sap-icon://expand-group" press="onExpandAll"></Button><Button icon="sap-icon://collapse-group" press="onCollapseAll"></Button><SearchField liveChange="onLiveSearch" search="onSearchSubmit"></SearchField></Toolbar></table:toolbar><table:rowSettingsTemplate></table:rowSettingsTemplate><table:Column autoResizable="true" width="auto"><Label text="Topics"></Label><table:template><Link href="{displayModel>object}.html" text="{displayModel>name}" emphasized="{= ${displayModel>object} === 'ABAPSELECT-OPTIONS' ? true : false}" /></table:template></table:Column></table:TreeTable></HBox></layout:sideContent></layout:DynamicSideContent><footer><Toolbar><ToolbarSpacer></ToolbarSpacer><Label text="AS ABAP Release 816, &#x00A9;Copyright 2025 SAP SE. All rights reserved."></Label><ToolbarSpacer></ToolbarSpacer><Button icon="sap-icon://arrow-top" press="onScrollUp" tooltip="Scroll up" enabled="true"></Button></Toolbar></footer></Page></tnt:mainContents></tnt:ToolPage></mvc:View></script><link rel="stylesheet" href="layout.css" /><script type="text/javascript" src="global.js"></script><script type="text/javascript" src="defaultJsonTree.js"></script><script>
+          sap.ui.require([
+            'sap/ui/core/mvc/Controller',
+            'sap/ui/core/mvc/XMLView',
+            'sap/base/security/URLListValidator'
+          ],
+
+          function (Controller, XMLView, URLListValidator) {
+
+            URLListValidator.add('adt');
+            URLListValidator.add('http');
+            URLListValidator.add('https');
+
+              //'use strict';
+              //var clicked = 0;
+
+              sap.ui.controller("myController", {
+                  onInit: function() {
+
+                    /*Theme Setting*/
+                    if (window.matchMedia) {
+                      if(window.matchMedia('(prefers-color-scheme: dark)').matches){
+                        sap.ui.core.Configuration.setTheme("sap_horizon_dark");
+                      } else {
+                        sap.ui.core.Configuration.setTheme("sap_horizon");
+                      }
+                    } else {
+                      sap.ui.core.Configuration.setTheme("sap_horizon");
+                    }
+
+                     /*TreeTable*/
+                     
+                           var treeJson = A.getDefaultJsonTree();
+                       
+                     var DisplayModel = new sap.ui.model.json.JSONModel(treeJson);
+                     this.getView().setModel(DisplayModel, 'displayModel');
+                     var tree = this.getView().byId('treeTable');
+
+                     tree.expand(0);tree.expand(3);tree.expand(24);tree.expand(27);tree.expand(29);
+
+                     var oModel = new sap.ui.model.json.JSONModel({
+
+                        par1: "<p><a target='_parent' href='ABAPSELECT-OPTIONS_SHORTREF.html' class='blue'>Short Reference</a></p>",par2: "<pre><p><code class='code'>SELECT-OPTIONS selcrit <a target='_parent' href='ABAPSELECT-OPTIONS_FOR.html' class='@class'><code class='code'>FOR <span class='meta_style'>\{</span>dobj<span class='meta_style'>|</span>(name)<span class='meta_style'>\}</span></code></a></code>\ <br><code class='code'>               <span class='meta_style'>[</span><a target='_parent' href='ABAPSELECT-OPTIONS_SCREEN.html' class='@class'><code class='code'>screen_options</code></a><span class='meta_style'>]</span></code>\ <br><code class='code'>               <span class='meta_style'>[</span><a target='_parent' href='ABAPSELECT-OPTIONS_VALUE.html' class='@class'><code class='code'>value_options</code></a><span class='meta_style'>]</span></code>\ <br><code class='code'>               <span class='meta_style'>[</span><a target='_parent' href='ABAPSELECT-OPTIONS_NO_DB_SEL.html' class='@class'><code class='code'>NO DATABASE SELECTION</code></a><span class='meta_style'>]</span></code>\ <br><code class='code'>               <span class='meta_style'>[</span><a target='_parent' href='ABAPSELECT-OPTIONS_LDB.html' class='@class'><code class='code'>ldb_options</code></a><span class='meta_style'>]</span>.</code></p></pre>",par3: "<p>This declares a <a target='_parent' href='ABENSELECTION_CRITERION_GLOSRY.html' class='green'>selection criterion</a>\ <code class='code'>selcrit</code> for a data object <code class='code'>dobj</code> or a type specified in <code class='code'>name</code>. Selection criteria are components of a <a target='_parent' href='ABENSELECTION_SCREEN_GLOSRY.html' class='green'>selection screen</a>, which are assigned a <a target='_parent' href='ABENSELECTION_TABLE_GLOSRY.html' class='green'>selection table</a> in the ABAP program, as well as two input fields and a pushbutton for multiple selection.</p>",par4: "<p>The name of the selection criterion <code class='code'>selcrit</code> is limited to a maximum of 8 characters. This statement is allowed in the global declaration part of <a target='_parent' href='ABENEXECUTABLE_PROGRAM_GLOSRY.html' class='green'>executable programs</a>, <a target='_parent' href='ABENFUNCTION_POOL_GLOSRY.html' class='green'>function pools</a>, and <a target='_parent' href='ABENMODUL_POOL_GLOSRY.html' class='green'>module pools</a>. In function pools and module pools, the statement is only allowed within the definition of a <a target='_parent' href='ABAPSELECTION-SCREEN_DEFINITION.html' class='blue'>standalone selection screen</a>. In executable programs, the statement is otherwise automatically assigned to the <a target='_parent' href='ABAPSELECTION-SCREEN_STANDARD.html' class='blue'>standard selection screen</a>.</p>",par5: "<p>The statement <code class='code'>SELECT-OPTIONS</code> has the following effect:</p>",ul1: "<ul><li>The statement declares a <a target='_parent' href='ABENSELECTION_TABLE_GLOSRY.html' class='green'>selection table</a>  in the program with the name <code class='code'>selcrit</code>. A selection table is an internal <a target='_parent' href='ABENSTANDARD_TABLE_GLOSRY.html' class='green'>standard table</a> with <a target='_parent' href='ABENHEADER_LINE_GLOSRY.html' class='green'>header line</a> and <a target='_parent' href='ABENSTANDARD_KEY_GLOSRY.html' class='green'>standard key</a>. Selection tables can be used to store <a target='_parent' href='ABENRANGES_CONDITION_GLOSRY.html' class='green'>ranges conditions</a> that link multiple comparison expressions with each other. The content of selection tables can be evaluated in a <a target='_parent' href='ABENCOMPARISON_EXPRESSION_GLOSRY.html' class='green'>comparison expression</a> with the <a target='_parent' href='ABENCOMP_OPERATOR_GLOSRY.html' class='green'>comparison operator</a>\ <a target='_parent' href='ABENLOGEXP_SELECT_OPTION.html' class='blue'><code class='code'>IN</code></a> or in a <a target='_parent' href='ABENWHERE_LOGEXP_SELTAB.html' class='blue'>similar expression</a> of a <code class='code'>WHERE</code> condition in ABAP SQL. Selection tables have the same layout as <a target='_parent' href='ABENRANGES_TABLE_GLOSRY.html' class='green'>ranges tables</a> and have the following four columns:</li><ul><li><code class='code'>sign</code> of type <code class='code'>c</code> and length 1. The content of <code class='code'>sign</code> determines for every line whether the result of the condition formulated in the column is included or excluded in the entire resulting set for all lines. Valid values are <em>I</em> for include and <em>E</em> for exclude.</li><li><code class='code'>option</code> of type <code class='code'>c</code> with length 2. <code class='code'>option</code> contains the selection option for the condition of the line in the form of comparison operators. Valid operators are <em>EQ</em>, <em>NE</em>, <em>GE</em>, <em>GT</em>, <em>LE</em>, <em>LT</em>, <em>CP</em>, and <em>NP</em>, if the column <code class='code'>high</code> is initial, and <em>BT</em>, <em>NB</em>, if column <code class='code'>high</code> is not initial. For the options <em>CP</em> and <em>NP</em>, the data type of the columns <code class='code'>low</code> and <code class='code'>high</code> must be <code class='code'>c</code>, and special rules apply to input on the selection screen.</li><li><code class='code'>low</code> of the data type defined after <a target='_parent' href='ABAPSELECT-OPTIONS_FOR.html' class='blue'><code class='code'>FOR</code></a>. This column is intended for the comparison value in single comparisons or the lower interval limit for interval selections.</li><li><code class='code'>high</code> of the data type defined after <a target='_parent' href='ABAPSELECT-OPTIONS_FOR.html' class='blue'><code class='code'>FOR</code></a>. This column is intended for the upper interval limit for interval selections.</li></ul><li>Two input fields with the name <code class='code'>selcrit-low</code> and <code class='code'>selcrit-high</code> are created on the current selection screen using a matching DDIC data type in a new line at positions 35 and 60. The length of the input fields depends on the length of the data type, which is defined after <code class='code'>FOR</code>. The maximum length of the input fields is 255. The maximum visible length of the input fields is between 10 and 18, depending on the nesting depth in framed blocks. If the length is greater than the maximum visible length, the content is displayed as movable.</li><li class='no_list_style'>An automatically generated output field is displayed in the first possible position in front of the first input field as a label with a length of between 20 and 30 depending on the nesting depth in framed blocks. The output field contains either the name of the <code class='code'>selcrit</code> selection criterion or the selection text to which the selection criterion is assigned in the text elements of the program. If the user requests field or input help on the output field using the function key F1 or F4, the same output appears as if one of the input fields were chosen.</li><li class='no_list_style'>A <em>multiple selection</em> pushbutton is created after the second input field. If this pushbutton is selected, a dialog box with four <a target='_parent' href='ABENTAB_PAGE_GLOSRY.html' class='green'>tabstrip control pages</a> appears, in which the input fields are again displayed in tabular form in <a target='_parent' href='ABENTABLE_CONTROL_GLOSRY.html' class='green'>Table Controls</a>. The tabstrip pages are separated based on individual value comparison, interval selections, and settings for the column <code class='code'>sign</code>.</li><li class='no_list_style'>Users can select an input field with a double-click on the selection screen or use the dialog box for multiple selection. On the selection screen, the value of the column <code class='code'>sign</code> can also be chosen. On the dialog box for multiple selection, this is done by selecting the respective tabstrip page. If the selection option is not equal to <em>EQ</em> or <em>BT</em>, it is displayed as an icon in front of the first input field. The color of the icon is green if the content of the column <code class='code'>sign</code> is <em>I</em>, and red if it is <em>E</em>.</li><li class='no_list_style'>The selection options <em>CP</em> and <em>NP</em> can be selected only if the first input field contains at least one of the wildcard characters <em>*</em> or <em>+</em>. <em>+</em> masks a single character, <em>*</em> masks any character string, even an empty one.  If one of these characters is entered, the selection option is automatically set to <em>CP</em>. If <em>CP</em> is set, and all wildcard characters have been removed, the selection option is automatically set to <em>EQ</em> for a user action. This restriction does not apply within the program. When the selection table is evaluated, the column <code class='code'>low</code> can also contain a string without wildcard characters for the selection options <em>CP</em> and <em>NP</em>.</li><li class='no_list_style'>The properties of the elements on the selection screen can be affected with the statement <a target='_parent' href='ABAPSELECT-OPTIONS_SCREEN.html' class='blue'><code class='code'>screen_options</code></a> or the statement <a target='_parent' href='ABAPSELECTION-SCREEN.html' class='blue'><code class='code'>SELECTION-SCREEN</code></a>.</li><li>The first line of the selection table <code class='code'>selcrit</code> is linked with the input fields on the selection screen. All lines are displayed in the dialog box for multiple selection.</li><li class='no_list_style'>Each time before the selection screen is sent to the <a target='_parent' href='ABENSELECTION_SCREEN_EVENT_GLOSRY.html' class='green'>selection screen event</a>\ <code class='code'>AT SELECTION-SCREEN OUTPUT</code>, the content of first line in the selection table is transported to the selection screen, with a <a target='_parent' href='ABENCONVERSION_EXIT_GLOSRY.html' class='green'>conversion exit</a> being executed if required. If the length of the columns <code class='code'>low</code> and <code class='code'>high</code> in the first line of the selection table is greater than 255, the surplus content is cut off on the right. It is only possible for all lines to be transported if the button for multiple selections is selected. A conversion exit might be executed here, and lines might be truncated. Settings for the content of the input fields can be made in <a target='_parent' href='ABAPSELECT-OPTIONS_VALUE.html' class='blue'><code class='code'>value_options</code></a>.</li><li class='no_list_style'>After a user action on the selection screen, the content of the input fields and the selected settings is transported to the first line and the header line of the selection table.</li><li class='no_list_style'>After a user action on the dialog box for multiple selections, the content of all input fields and the selected settings are transported to the lines of the selection table. These transports convert the content of character-like fields by default into uppercase letters by default, after which a conversion exit is performed, if required. After each transport, various <a target='_parent' href='ABAPAT_SELECTION-SCREEN_EVENTS.html' class='blue'>selection screen events</a> are raised.</li><li class='no_list_style'>If a value has been entered in the entry field for the upper interval <code class='code'>high</code>, the system automatically checks whether this value is greater than the lower interval limit <code class='code'>low</code> following each transport and conversion exit (if performed). If necessary, an <a target='_parent' href='ABENERROR_MESSAGE_GLOSRY.html' class='green'>error message</a> is sent. This check can be switched off before the selection screen is sent, using the function module <code class='code'>RS_SELOPT_NO_INTERVAL_CHECK</code>.</li><li>If selection criteria are defined in the selection include of a logical database, further additions <a target='_parent' href='ABAPSELECT-OPTIONS_LDB.html' class='blue'><code class='code'>ldb_options</code></a> are necessary or possible.</li><li>If, in an executable program, a selection criterion is defined for a component of a node of the linked logical database, declared by <a target='_parent' href='ABAPTABLES.html' class='blue'><code class='code'>TABLES</code></a> or <a target='_parent' href='ABAPNODES.html' class='blue'><code class='code'>NODES</code></a>, and the node in question is intended for dynamic selection on the logical database, the selection table is passed to the logical database by default after <a target='_parent' href='ABENSELSCREEN_PROCESSING_GLOSRY.html' class='green'>selection screen processing</a>, where it is handled as a dynamic selection. Furthermore, in this case, the input fields for the corresponding dynamic selection are displayed directly on the selection screen. Therefore, the user does not need to select the fields using the <em>Dynamic Selections</em> function. This transfer can be suppressed using the addition <a target='_parent' href='ABAPSELECT-OPTIONS_NO_DB_SEL.html' class='blue'><code class='code'>NO DATABASE SELECTION</code></a>.</li></ul>",ul2: "<ul><li>To avoid undefined system behavior, the header line of a selection table should not be changed in the program. Read access should also be avoided. Instead separate work areas, field symbols, or data references should be used, as always for internal tables.</li><li>If a selection criterion is supplied with data when an executable program is called using <a target='_parent' href='ABAPSUBMIT.html' class='blue'><code class='code'>SUBMIT</code></a>, a <a target='_parent' href='ABENCONVERSION_EXIT_GLOSRY.html' class='green'>conversion exit</a> is performed for the first line only, while the value of the columns <code class='code'>low</code> and <code class='code'>high</code> will be truncated at position 255 for the first line only. If the selection criterion is declared with the addition <a target='_parent' href='ABAPSELECT-OPTIONS_SCREEN.html' class='blue'><code class='code'>NO-DISPLAY</code></a>, no conversion exit or truncation will be performed for the first line either.</li><li>If the type of the selection criterion is a <a target='_parent' href='ABENDECFLOAT_GLOSRY.html' class='green'>decimal floating point number</a> that does not refer to a data type in the ABAP Dictionary, the output style <em>preserve scaling</em> is set for the input field of the selection screen. Here, any trailing zeros are preserved in the decimal places. If there is a reference to a data type in the ABAP Dictionary, the output style defined there is used.</li><li>If the type of the selection criteria is a <a target='_parent' href='ABENPACKED_NUMBER_TYPE_GLOSRY.html' class='green'>packed number type</a> or a <a target='_parent' href='ABENDECFLOAT_TYPE_GLOSRY.html' class='green'>decimal floating point number type</a> defined in the ABAP Dictionary, the property <em>sign</em> must be set for the type property, so that negative numbers can be displayed on the selection screen. This setting is only possible for <a target='_parent' href='ABENDOMAIN_GLOSRY.html' class='green'>DDIC domains</a> and not for specifying a built-in type directly for <a target='_parent' href='ABENDATA_ELEMENT_GLOSRY.html' class='green'>DDIC data elements</a> or structure components. If a negative number is entered on the selection screen and this property is not set, the system rejects it with an error message. If the columns <code class='code'>low</code> or <code class='code'>high</code> contain a negative number when the selection screen is called, an uncatchable exception is raised.</li><li>If the type of the selection criterion is a <a target='_parent' href='ABENDECFLOAT_TYPE_GLOSRY.html' class='green'>decimal floating point number type</a> defined in the ABAP Dictionary for which the <em>output style</em>\ <em>currency amount</em> is specified, only numbers with the corresponding amount of decimal places can be entered on the selection screen. If a corresponding ABAP data object contains a number with too many decimal places when the selection screen is called, an uncatchable exception is raised. If the output style is <em>extended currency amount</em>, additional decimal places can be displayed.</li><li>The selection option <em>CP</em> is selected automatically when entering escape characters and is undone when removing escape characters only after user input is made in the associated input field on the selection screen. Escape characters in fields whose content is passed to the selection screen from the program do not cause the selection option to be selected automatically.</li><li>The columns <code class='code'>sign</code> and <code class='code'>option</code> of a selection table declared using <code class='code'>SELECT-OPTIONS</code> are not related to data types in the ABAP Dictionary. In the case of <a target='_parent' href='ABENRANGES_TABLE_GLOSRY.html' class='green'>ranges tables</a> defined in the ABAP Dictionary, these columns refer to the data elements <code class='code'>DDSIGN</code> and <code class='code'>DDOPTION</code>.</li><li>To avoid conflicts with internal names, do not name a selection criterion <code class='code'>o</code>. The <a target='_parent' href='ABAPAT_SELECTION-SCREEN.html' class='blue'>selection screen events</a> are not raised properly for that name.</li><li><strong>Caution</strong> When evaluating input values from selection screens the common rules for dynpros and comparisons must be considered. This involves the handling of lower case letters by dynpros and the comparison rules for character-like data. For some examples, see <a target='_parent' href='ABENSEL_SCREEN_TRAPS_ABEXA.html' class='blue'>Selection Screens - Traps and Pitfalls</a>.</li></ul>",breadcrumb1: "abenabap.html",breadcrumb2: "abenabap_reference.html",breadcrumb3: "abenabap_screens.html",breadcrumb4: "abenselection_screen.html",breadcrumb5: "abenselection_screen_create.html",
+
+                      });
+                      this.getView().setModel(oModel);
+
+                      var DisplayList = new sap.ui.model.json.JSONModel({
+                        "Elements": [
+
+                        
+                                {
+                                    
+                                        "key": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/index.htm?file=ABAPSELECT-OPTIONS.htm",
+                                        "text": "ABAP Release 9.16",
+                                    
+                                },
+                            
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_758_index_htm/7.58/en-US/index.htm",
+                            "text": "ABAP Release 7.58",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_757_index_htm/7.57/en-US/index.htm",
+                            "text": "ABAP Release 7.57",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_756_index_htm/7.56/en-US/index.htm",
+                            "text": "ABAP Release 7.56",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_755_index_htm/7.55/en-US/index.htm",
+                            "text": "ABAP Release 7.55",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_754_index_htm/7.54/en-US/index.htm",
+                            "text": "ABAP Release 7.54",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_753_index_htm/7.53/en-US/index.htm",
+                            "text": "ABAP Release 7.53",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_752_index_htm/7.52/en-US/index.htm",
+                            "text": "ABAP Release 7.52",
+                        }
+                        
+                        ]
+                      });
+                      this.getView().setModel(DisplayList, 'displayList');
+
+                  
+
+                      this._oDSC = this.byId("DynamicSideContent");
+                      this._oToggleButton = this.byId("toggleButton");
+                    },
+
+                  /* -------
+                  [ events ]
+                  ------- */
+
+                  onChange: function(oEvent) {
+                    var oControl = oEvent.getSource();
+                    window.location.href = oControl.getSelectedKey();
+                    /*sap.m.MessageToast.show("Switch to " + oControl.getSelectedKey() + "?");*/
+                  },
+
+                  
+
+                  onIconPress: function(oEvent) {
+                    window.location.href="https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm?file=ABENABAP.htm";
+                  },
+
+                  handleNews: function(oEvent) {
+                    var docu_url = window.location.href;
+                    if(docu_url.includes('version=5')) {
+                      
+                      window.open('https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm&object=ABENNEWS-916', '_self');
+                    }
+                    else if(docu_url.includes('abapdocu_latest')) {
+                      window.open('https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm?file=abennews-816.htm', '_self');
+                    }
+                    else if(docu_url.includes('abapdocu_cp')) {
+                      window.open('https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABENNEWS-916.html', '_self');
+                    }
+                    else {
+                      
+                      window.open('https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm&object=ABENNEWS-816', '_self');
+                    }
+                  },
+
+                  handleException: function(oEvent) {
+                    
+                    window.open('', '_self');
+                  },
+
+                  
+                  onScrollUp: function() {
+                    this.byId("ObjectPageLayout").setSelectedSection(null);
+                  },
+
+
+                  onPressTheme: function(oEvent) {
+                    clicked++;
+                    if (clicked === 1 ) {
+                        //sap.ui.getCore().applyTheme("sap_horizon_dark");
+                        sap.ui.core.Configuration.setTheme("sap_horizon_dark");
+                        var subtleId = this.getView().getId('subtle');
+                        var subtle = document.getElementById(subtleId);
+                        a.style.color = '#1d2d3e';
+                    }
+                    if (clicked === 2)
+                    {
+                        //sap.ui.getCore().applyTheme("sap_horizon");
+                        sap.ui.core.Configuration.setTheme("sap_horizon");
+                        clicked = 0;
+                    }
+
+                    /*const element = document.getElementById("sap-ui-bootstrap");
+                    if (element.hasAttribute("data-sap-ui-theme", "sap_horizon")) {
+                        element.setAttribute("data-sap-ui-theme", "sap_horizon_dark");
+                        //window.location.reload();
+                    }
+                    else {
+                        element.setAttribute("data-sap-ui-theme", "sap_horizon");
+                        //window.location.reload();
+                    };*/
+                  },
+
+                  onPressBack: function(oEvent) {
+                    window.history.go(-1);
+                  },
+
+                  onPress: function(oEvent) {
+                    var mail = document.createElement("a");
+                    mail.href = "mailto:f1_help@sap.com?subject=Feedback on ABAP Documentation from Help Portal version&body=Document: SELECT-OPTIONS, ABAPSELECT-OPTIONS, 816%0D%0A%0D%0AError:%0D%0A%0D%0A%0D%0A%0D%0ASuggestion for improvement:";
+                    mail.click();
+                  },
+
+                  /*handlePopoverPress: function(oEvent) {
+                    var oButton = oEvent.getSource(),
+                    oView = this.getView();
+
+                    if (!this._oPopover) {
+                       this._oPopover = new sap.ui.xmlfragment({
+                           fragmentContent: jQuery("#fragment_xml").html()
+                           }, this);
+                       oView.addDependent(this._oPopover);
+                    }
+                    this._oPopover.openBy(oButton);
+                   },*/
+
+                   handleClosePress: function(oEvent) {
+                       //this.byId("myPopover").close();
+                       //sap.m.MessageToast.show("You cannot close me.");
+                       this._oPopover.getParent().destroyContent();
+                   },
+
+                   popoverAfterClose: function(oEvent) {
+                        this._oPopover.destroy();
+                        this._oPopover.getParent().destroyContent();
+                    },
+
+                   onPressAddress: function(oEvent) {
+                     var address = "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm?file=abapselect-options.htm";
+                     navigator.clipboard.writeText(address).then(function() {
+                         sap.m.MessageToast.show("'" + address + "' copied.");
+                     }, function(err) {
+                         sap.m.MessageToast.show("No address copied.");
+                     });
+                   },
+                  
+
+                  handlePopoverPressExa: function(oEvent) {
+                    window.open('');
+                  },
+
+                  
+
+                  onPressVersion: function(oEvent) {
+                    
+                    window.open('https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm&object=ABAPSELECT-OPTIONS&style=adt', '_self');
+                  },
+
+                  
+                  onItemSelect: function(oEvent) {
+                  if (! this.sSelectedNavigationListItemId) {
+                      this.updateSelectedNavigationListItemId();
+                  }
+                  else {
+                      if (this.oSideNavigation.getSelectedItem() != this.sSelectedNavigationListItemId) {
+                          this.restoreSideNavigationSelection();
+                      }
+                  }
+                  },
+
+                  onCollapseExpandPress: function () {
+                  this.toggleControlExpand(this.oSideNavigation);
+                  },
+
+                  onMenuButtonPress : function() {
+                  var toolPage = this.byId("toolPage");
+
+                  toolPage.setSideExpanded(!toolPage.getSideExpanded());
+                  },
+
+                  /* ----------------
+                  [ event listeners ]
+                  ---------------- */
+
+                  /* ------------------------------------
+                  [ restoring side navigation selection ]
+                  ------------------------------------ */
+
+                  updateSelectedNavigationListItemId: function(sId) {
+                  this.sSelectedNavigationListItemId = sId;
+                  },
+
+                  restoreSideNavigationSelection: function() {
+                  this.oSideNavigation.setSelectedItem(this.sSelectedNavigationListItemId);
+                  this.oSideNavigation.invalidate();
+                  },
+
+                  /* ----------------
+                  [ collapse/expand ]
+                  ---------------- */
+
+                  toggleControlExpand: function(oControl) {
+                  oControl.setExpanded(! oControl.getExpanded());
+                  },
+
+                  /*TreeTable*/
+                  
+
+                  onLiveSearch: function (evt) {
+                    var filterString = evt.getParameter('newValue');
+                    var filter = filterString.toUpperCase();
+
+                    
+                           var treeJson = A.getDefaultJsonTree();
+                       
+                    var treeJsonModel = new sap.ui.model.json.JSONModel(treeJson);
+
+                    if (filterString == '') {
+                        this.getView().setModel(treeJsonModel, 'displayModel');
+                        var tree = this.getView().byId('treeTable');
+                        tree.expandToLevel(1);
+                    } else {
+                    //-----------------------------------------------------------
+                    // Function that flattens tree along a keyword "key", here the collection formally starts as empty
+                    // FIXED
+
+                    var bfs = function (treeJson, collection) {
+                        collection.push({ name: treeJson.name, object: treeJson.object, indices: treeJson.indices });
+                        if (!treeJson.children || treeJson.children.length === 0) return;
+                        for (var i = 0; i < treeJson.children.length; i++) {
+                            //flatten children recursively
+                            bfs(treeJson.children[i], collection);
+                        }
+                        return;
+                    }
+                    //flatten all the subtree categories seperately
+                    // FIXED
+                    var treeModelFlat = treeJson.TreeElements[0];
+                    //Loop over sub trees
+                    for (var i = 0; i < treeJson.TreeElements[0].children.length; i++) {
+                        subTree = treeJson.TreeElements[0].children[i];
+                        if (subTree.children) {
+                            for (var j = 0; j < subTree.children.length; j++) {
+                                var subSubTree = subTree.children[j];
+                                var flattenedCollection = [];
+                                bfs(subSubTree, flattenedCollection);
+                                treeModelFlat.children[i].children[j].children = flattenedCollection.slice(1); //omit first element (root node), would be doubled
+                            }
+                        }
+                        else {
+                            var flattenedCollection = [];
+                            bfs(subTree, flattenedCollection);
+                            treeModelFlat.children[i].children = flattenedCollection.slice(1);
+                        }
+                    }
+                    //filter Model
+                    // FIXED
+                    var filterMode = 0; var similaritySearch = false;
+                    //var filteredModel = structuredClone(treeModelFlat);
+                    var filteredModel = {};
+                    var buildingFilteredModel = {};
+                    var filteredSubtree = [];
+                    var filteredCollection = [];
+                    var treeModelClone = cloneJSON(treeModelFlat);
+
+
+                    for (var i = 0; i < treeModelFlat.children.length; i++) {
+                        var subTree = treeModelFlat.children[i];
+                        if (subTree.children) {
+                            var deleteSubTree = true;
+                            for (var j = 0; j < subTree.children.length; j++) {
+                                var subSubTree = subTree.children[j];
+                                var deleteSubSubTree = true;
+                                if (subSubTree.children.length > 0) {
+                                    for (var k in subSubTree.children) {
+                                        //if (subSubTree.children[k].name.toUpperCase().indexOf(filter) == -1) {
+                                        var indices = subSubTree.children[k].indices;
+
+                                        if (!matchesSearchCriteria(indices, filter)) {
+                                            delete treeModelClone.children[i].children[j].children[k];
+                                        } else {
+                                            deleteSubSubTree = false;
+                                            deleteSubTree = false;
+                                        }
+                                    }
+                                }
+                                if (deleteSubSubTree) {
+                                    delete treeModelClone.children[i].children[j];
+                                }
+                            }
+                            if (deleteSubTree) {
+                                delete treeModelClone.children[i];
+                            }
+                        }
+                    }
+                    var treeModelString = JSON.stringify(treeModelClone);
+                    treeModelString = '{"TreeElements": [' + treeModelString + ']}';
+                    var treeModelObj = JSON.parse(treeModelString);
+                    var DisplayModel = new sap.ui.model.json.JSONModel(treeModelObj);
+                    this.getView().setModel(DisplayModel, 'displayModel');
+                    this.onExpandAll();
+                }
+            },
+
+                  onExpandAll: function (evt) {
+                      var tree = this.getView().byId('treeTable');
+                      tree.expandToLevel(14);
+                  },
+
+                  onCollapseAll: function (evt) {
+                      var tree = this.getView().byId('treeTable');
+                      tree.collapseAll();
+                  },
+
+                  onMenuButtonPress: function () {
+                      if(this._oDSC.getShowSideContent()){
+                      this._oDSC.setShowSideContent(false);
+                      }else{
+                      this._oDSC.setShowSideContent(true);
+                      }
+                  },
+
+                  handleToggleClick: function () {
+                      this._oDSC.toggle();
+                  },
+
+              });
+
+              
+              
+
+              function setAddress(query) {
+                var address = ""
+                var textinput = query;
+                while (textinput.indexOf("&") > -1) {
+                    textinput = textinput.replace("&", "%26")
+                }
+                while (textinput.indexOf("+") > -1) {
+                    textinput = textinput.replace("+", "%2B")
+                }
+                while (textinput.indexOf("=") > -1) {
+                    textinput = textinput.replace("=", "%3D")
+                } while (textinput.indexOf("?") > -1) {
+                    textinput = textinput.replace("?", "%3F")
+                }
+              address = "" + "?query=" + textinput + "&";
+                return address;
+               }
+
+              
+              function cloneJSON(obj) {
+                    // basic type deep copy
+                    if (obj === null || obj === undefined || typeof obj !== 'object') {
+                        return obj
+                    }
+                    // array deep copy
+                    if (obj instanceof Array) {
+                        var cloneA = [];
+                        for (var i = 0; i < obj.length; ++i) {
+                            cloneA[i] = cloneJSON(obj[i]);
+                        }
+                        return cloneA;
+                    }
+                    // object deep copy
+                    var cloneO = {};
+                    for (var i in obj) {
+                      cloneO[i] = cloneJSON(obj[i]);
+                    }
+                  return cloneO;
+                }
+
+            function matchesSearchCriteria(indices, searchWord) {
+                var returnValue = false;
+                for (var index of indices) {
+                    if (index.key1.toUpperCase().indexOf(searchWord) !== -1) {
+                        returnValue = true;
+                        break;
+                    }
+                    var key2Key1Search = index.key2 && index.key1;
+                    if (key2Key1Search.toUpperCase().indexOf(searchWord) !== -1) {
+                        returnValue = true;
+                        break;
+                    }
+                }
+                return returnValue;
+             }
+
+              
+
+              sap.ui.xmlview({ viewContent: jQuery('#main_page_xml').html() }).placeAt("main_page");
+
+              });
+
+        </script>
+<script>
+window.adobeDataLayer = window.adobeDataLayer || [];
+window.adobeDataLayer.push({
+'event': 'globalDL',
+'site': { 
+'name': 'help',
+'country': 'glo'
+},
+'user': {
+'loginStatus': 'no'
+}
+});
+window.adobeDataLayer.push({ 
+'event': 'pageView', 
+'page': { 
+'name':  "", 
+'section': location.pathname.slice(1, location.pathname.indexOf("/", 1)), 
+'language': "en", 
+'country': "US", 
+'referrer': "https://www.google.com/", 
+'url': location.href, 
+'details': { 
+'productID':  "ABAP", 
+'deliverableID': "abapdocu_latest_index_htm", 
+'topicID': "n/a", 
+'version': "latest", 
+'machineTranslated': "no", 
+}, 
+}, 
+'user': { 
+'loginStatus': "no", 
+},
+}); 
+window.adobeDataLayer.push({
+'event': "stBeaconReady"
+}); 
+</script>
+</head><body class="sapUiBody sapUiSizeCompact"><div id="tree"></div><div id="main_page"></div></body></html>

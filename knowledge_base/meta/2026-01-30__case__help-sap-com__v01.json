@@ -1,0 +1,30 @@
+{
+  "id": "2026-01-30__case__help-sap-com",
+  "title": "CASE | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPCASE.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T22:34:29",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "control flow",
+    "conditional"
+  ],
+  "summary": "Tài liệu SAP Help cho câu lệnh CASE trong ABAP.\nMô tả rẽ nhánh theo giá trị biểu thức.\nHỗ trợ WHEN và WHEN OTHERS.\nKết thúc bằng ENDCASE.\nThích hợp cho nhiều nhánh lựa chọn.",
+  "key_points": [
+    "CASE dùng để chọn nhánh theo giá trị.",
+    "WHEN định nghĩa từng nhánh.",
+    "WHEN OTHERS cho nhánh mặc định.",
+    "Kết thúc bằng ENDCASE.",
+    "Rõ ràng hơn chuỗi IF dài."
+  ],
+  "abap_keywords": [
+    "CASE",
+    "WHEN",
+    "WHEN OTHERS",
+    "ENDCASE"
+  ],
+  "notes_user": "",
+  "chunks": []
+}

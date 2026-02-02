@@ -1,0 +1,33 @@
+{
+  "id": "2026-01-30__assign__help-sap-com",
+  "title": "ASSIGN | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPASSIGN.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T22:34:29",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "dynamic programming"
+  ],
+  "summary": "Tài liệu SAP Help cho câu lệnh ASSIGN.\nGán đối tượng dữ liệu vào field symbol.\nHỗ trợ dynamic name và component access.\nCó tùy chọn CASTING để ép kiểu.\nThiết lập sy-subrc theo kết quả gán.",
+  "key_points": [
+    "ASSIGN ... TO <fs> để gán tham chiếu.",
+    "ASSIGN COMPONENT truy cập cấu trúc.",
+    "ASSIGN (name) cho dynamic.",
+    "CASTING để xử lý kiểu.",
+    "sy-subrc cho biết thành công."
+  ],
+  "abap_keywords": [
+    "ASSIGN",
+    "TO",
+    "COMPONENT",
+    "CASTING",
+    "sy-subrc"
+  ],
+  "notes_user": "",
+  "chunks": [
+    "knowledge_base\\clean\\2026-01-30__assign__help-sap-com__v01__chunk-01.md",
+    "knowledge_base\\clean\\2026-01-30__assign__help-sap-com__v01__chunk-02.md"
+  ]
+}

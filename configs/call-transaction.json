@@ -1,0 +1,32 @@
+{
+  "object": "CALL_TRANSACTION",
+  "match": { "startPhrase": "CALL TRANSACTION" },
+  "keywordLabels": {
+    "CALL": "stmt",
+    "TRANSACTION": "transaction",
+    "USING": "using",
+    "SKIP": "skip",
+    "FIRST": "first",
+    "SCREEN": "screen",
+    "AND": "and",
+    "RETURN": "return",
+    "MODE": "mode",
+    "UPDATE": "update",
+    "MESSAGES": "messages",
+    "INTO": "into"
+  },
+  "keywordPhrases": {
+    "CALL TRANSACTION": "call-transaction",
+    "SKIP FIRST SCREEN": "skip-first-screen",
+    "AND RETURN": "and-return",
+    "MESSAGES INTO": "messages-into"
+  },
+  "captureRules": [
+    { "after": "CALL TRANSACTION", "name": "tcode", "label": "tcode", "descKey": "tcode" },
+    { "after": "USING", "name": "using", "label": "using" },
+    { "after": "MODE", "name": "mode", "label": "mode" },
+    { "after": "UPDATE", "name": "update", "label": "update" },
+    { "after": "MESSAGES INTO", "name": "messagesInto", "label": "messages-into" }
+  ]
+}
+

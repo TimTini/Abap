@@ -1,0 +1,14 @@
+{
+  "object": "CLEAR",
+  "match": { "startKeyword": "CLEAR" },
+  "keywordLabels": {
+    "CLEAR": "stmt",
+    "WITH": "with"
+  },
+  "keywordPhrases": {},
+  "captureRules": [
+    { "after": "CLEAR", "name": "target", "label": "target" },
+    { "after": "WITH", "name": "with", "label": "with" }
+  ]
+}
+

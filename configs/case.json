@@ -1,0 +1,13 @@
+{
+  "object": "CASE",
+  "match": { "startKeyword": "CASE" },
+  "block": { "endKeyword": "ENDCASE" },
+  "keywordLabels": {
+    "CASE": "stmt"
+  },
+  "keywordPhrases": {},
+  "captureRules": [
+    { "after": "CASE", "name": "expr", "label": "expression", "capture": "rest" }
+  ]
+}
+

@@ -1,0 +1,30 @@
+{
+  "id": "2026-01-30__delete-itab__help-sap-com",
+  "title": "DELETE itab | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPDELETE_ITAB.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T22:34:29",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "internal tables"
+  ],
+  "summary": "Tài liệu SAP Help cho câu lệnh DELETE itab.\nXóa dòng nội bảng theo key, index hoặc điều kiện WHERE.\nHỗ trợ DELETE ADJACENT DUPLICATES sau SORT.\nÁp dụng cho mọi loại internal table.\nCập nhật sy-subrc khi thực thi.",
+  "key_points": [
+    "DELETE xóa dòng theo key hoặc index.",
+    "DELETE ... WHERE xóa nhiều dòng.",
+    "DELETE ADJACENT DUPLICATES loại bỏ trùng.",
+    "Hashed table xóa theo key.",
+    "Kiểm tra sy-subrc."
+  ],
+  "abap_keywords": [
+    "DELETE",
+    "WHERE",
+    "INDEX",
+    "ADJACENT DUPLICATES",
+    "sy-subrc"
+  ],
+  "notes_user": "",
+  "chunks": []
+}

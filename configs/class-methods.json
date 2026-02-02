@@ -1,0 +1,22 @@
+{
+  "object": "CLASS-METHODS",
+  "match": { "startKeyword": "CLASS-METHODS" },
+  "extras": { "type": "methodSignature" },
+  "keywordLabels": {
+    "CLASS-METHODS": "stmt",
+    "IMPORTING": "importing",
+    "EXPORTING": "exporting",
+    "CHANGING": "changing",
+    "RETURNING": "returning",
+    "RAISING": "raising"
+  },
+  "keywordPhrases": {},
+  "captureRules": [
+    { "after": "CLASS-METHODS", "name": "name", "label": "method-name", "descKey": "name" },
+    { "after": "IMPORTING", "name": "importingRaw", "label": "importing", "capture": "rest", "stopTokens": ["EXPORTING", "CHANGING", "RETURNING", "RAISING"] },
+    { "after": "EXPORTING", "name": "exportingRaw", "label": "exporting", "capture": "rest", "stopTokens": ["IMPORTING", "CHANGING", "RETURNING", "RAISING"] },
+    { "after": "CHANGING", "name": "changingRaw", "label": "changing", "capture": "rest", "stopTokens": ["IMPORTING", "EXPORTING", "RETURNING", "RAISING"] },
+    { "after": "RETURNING", "name": "returningRaw", "label": "returning", "capture": "rest", "stopTokens": ["IMPORTING", "EXPORTING", "CHANGING", "RAISING"] },
+    { "after": "RAISING", "name": "raisingRaw", "label": "raising", "capture": "rest" }
+  ]
+}

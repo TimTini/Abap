@@ -1,0 +1,31 @@
+{
+  "id": "2026-01-30__field-symbols__help-sap-com",
+  "title": "FIELD-SYMBOLS | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPFIELD-SYMBOLS.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T22:34:29",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "dynamic programming"
+  ],
+  "summary": "Tài liệu SAP Help cho FIELD-SYMBOLS.\nKhai báo field symbol để tham chiếu động.\nHỗ trợ typing với TYPE/LIKE/ANY.\nKết hợp với ASSIGN để trỏ tới dữ liệu.\nDùng trong xử lý động và tối ưu hiệu năng.",
+  "key_points": [
+    "FIELD-SYMBOLS khai báo con trỏ dữ liệu.",
+    "Có thể typed hoặc generic.",
+    "ASSIGN gán dữ liệu cho field symbol.",
+    "UNASSIGN để hủy gán.",
+    "Phù hợp cho thao tác động."
+  ],
+  "abap_keywords": [
+    "FIELD-SYMBOLS",
+    "TYPE",
+    "LIKE",
+    "ANY",
+    "ASSIGN",
+    "UNASSIGN"
+  ],
+  "notes_user": "",
+  "chunks": []
+}

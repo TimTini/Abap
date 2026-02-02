@@ -1,0 +1,35 @@
+{
+  "object": "READ_TABLE",
+  "match": { "startPhrase": "READ TABLE" },
+  "keywordLabels": {
+    "READ": "stmt",
+    "TABLE": "table",
+    "WITH": "with",
+    "KEY": "key",
+    "INDEX": "index",
+    "INTO": "into",
+    "ASSIGNING": "assigning",
+    "REFERENCE": "reference",
+    "TRANSPORTING": "transporting",
+    "NO": "no",
+    "FIELDS": "fields",
+    "BINARY": "binary",
+    "SEARCH": "search"
+  },
+  "keywordPhrases": {
+    "READ TABLE": "read-table",
+    "WITH KEY": "with-key",
+    "TRANSPORTING NO FIELDS": "transporting-no-fields",
+    "BINARY SEARCH": "binary-search",
+    "REFERENCE INTO": "reference-into"
+  },
+  "captureRules": [
+    { "after": "READ TABLE", "name": "itab", "label": "itab" },
+    { "after": "INDEX", "name": "index", "label": "index" },
+    { "after": "WITH KEY", "name": "withKey", "label": "with-key", "capture": "rest", "stopTokens": ["INTO", "ASSIGNING", "REFERENCE", "TRANSPORTING", "BINARY"] },
+    { "after": "INTO", "name": "into", "label": "into" },
+    { "after": "ASSIGNING", "name": "assigning", "label": "assigning" },
+    { "after": "REFERENCE INTO", "name": "refInto", "label": "reference-into" }
+  ]
+}
+

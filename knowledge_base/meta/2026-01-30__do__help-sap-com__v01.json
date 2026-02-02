@@ -1,0 +1,31 @@
+{
+  "id": "2026-01-30__do__help-sap-com",
+  "title": "DO | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABAPDO.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T22:34:29",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "control flow",
+    "loops"
+  ],
+  "summary": "Tài liệu SAP Help cho vòng lặp DO trong ABAP.\nCho phép lặp với số lần xác định hoặc vô hạn.\nHỗ trợ EXIT/CONTINUE để điều khiển vòng lặp.\nTheo dõi chỉ số lặp bằng sy-index.\nKết thúc bằng ENDDO.",
+  "key_points": [
+    "DO n TIMES hoặc DO vô hạn.",
+    "ENDDO kết thúc vòng lặp.",
+    "EXIT thoát khỏi vòng lặp.",
+    "CONTINUE bỏ qua lượt hiện tại.",
+    "sy-index lưu chỉ số lặp."
+  ],
+  "abap_keywords": [
+    "DO",
+    "ENDDO",
+    "EXIT",
+    "CONTINUE",
+    "sy-index"
+  ],
+  "notes_user": "",
+  "chunks": []
+}

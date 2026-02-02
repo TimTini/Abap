@@ -1,0 +1,28 @@
+{
+  "id": "2026-01-30__move-corresponding__help-sap-com",
+  "title": "MOVE-CORRESPONDING | ABAP Keyword Documentation",
+  "source_url": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPMOVE-CORRESPONDING.html",
+  "source_domain": "help.sap.com",
+  "captured_at": "2026-01-30T23:45:00",
+  "published_at": null,
+  "language": "en",
+  "topics": [
+    "abap",
+    "structures"
+  ],
+  "summary": "Tài liệu tham khảo cho MOVE-CORRESPONDING.\nCopy các field cùng tên giữa 2 structure.\nHữu ích khi mapping data giữa type khác nhau.\nCó option EXPANDING NESTED TABLES.\nTrong ABAP mới hay dùng CORRESPONDING #( ).",
+  "key_points": [
+    "Chỉ copy field trùng tên.",
+    "Giữ nguyên field không được map.",
+    "Có thể mở rộng nested table (option).",
+    "Dùng nhiều khi map DTO/structure.",
+    "Alternative hiện đại: CORRESPONDING #( )."
+  ],
+  "abap_keywords": [
+    "MOVE-CORRESPONDING",
+    "EXPANDING NESTED TABLES"
+  ],
+  "notes_user": "",
+  "chunks": []
+}
+

@@ -1,0 +1,17 @@
+{
+  "object": "ELSEIF",
+  "match": { "startKeyword": "ELSEIF" },
+  "keywordLabels": {
+    "ELSEIF": "stmt",
+    "AND": "and",
+    "OR": "or",
+    "NOT": "not",
+    "IS": "is",
+    "INITIAL": "initial"
+  },
+  "keywordPhrases": {},
+  "captureRules": [
+    { "after": "ELSEIF", "name": "condition", "label": "condition", "capture": "rest" }
+  ]
+}
+

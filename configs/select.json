@@ -1,0 +1,37 @@
+{
+  "object": "SELECT",
+  "match": { "startKeyword": "SELECT" },
+  "keywordLabels": {
+    "SELECT": "stmt",
+    "SINGLE": "single",
+    "DISTINCT": "distinct",
+    "FROM": "from",
+    "INTO": "into",
+    "APPENDING": "appending",
+    "TABLE": "table",
+    "WHERE": "where",
+    "ORDER": "order",
+    "BY": "by",
+    "GROUP": "group",
+    "HAVING": "having",
+    "UP": "up",
+    "TO": "to",
+    "ROWS": "rows"
+  },
+  "keywordPhrases": {
+    "INTO TABLE": "into-table",
+    "APPENDING TABLE": "appending-table",
+    "ORDER BY": "order-by",
+    "GROUP BY": "group-by",
+    "UP TO": "up-to"
+  },
+  "captureRules": [
+    { "after": "SELECT", "name": "fields", "label": "fields", "capture": "rest", "stopTokens": ["FROM"] },
+    { "after": "FROM", "name": "from", "label": "from" },
+    { "after": "INTO TABLE", "name": "intoTable", "label": "into-table" },
+    { "after": "APPENDING TABLE", "name": "appendingTable", "label": "appending-table" },
+    { "after": "INTO", "name": "into", "label": "into" },
+    { "after": "WHERE", "name": "where", "label": "where", "capture": "rest", "stopTokens": ["ORDER", "GROUP", "HAVING"] }
+  ]
+}
+

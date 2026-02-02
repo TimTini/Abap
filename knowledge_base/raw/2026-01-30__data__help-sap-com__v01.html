@@ -1,0 +1,498 @@
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-16" /><meta http-equiv="X-UA-Compatible" content="IE=edge" /><meta charset="utf-8" /><link rel="shortcut icon" href="ABAPIcon.ico" type="image/ico" /><title>DATA | ABAP Keyword Documentation</title><script id="sap-ui-bootstrap" src="https://ui5.sap.com/1.136.4/resources/sap-ui-core.js" data-sap-ui-async="true" data-sap-ui-theme="sap_horizon" data-sap-ui-libs="sap.m" data-sap-ui-xx-bindingsyntax="complex"> </script><script id="main_page_xml" type="text/xmldata"><mvc:View xmlns="sap.m" xmlns:blocks="sap.uxap.blocks" xmlns:code="sap.ui.codeeditor" xmlns:core="sap.ui.core" xmlns:f="sap.f" xmlns:form="sap.ui.layout.form" xmlns:layout="sap.ui.layout" xmlns:mvc="sap.ui.core.mvc" xmlns:table="sap.ui.table" xmlns:tnt="sap.tnt" xmlns:uxap="sap.uxap" xmlns:xhtml="http://www.w3.org/1999/xhtml" controllerName="myController" height="100%" class="side-navigation-demo"><tnt:ToolPage id="toolPage"><tnt:header><f:ShellBar title="ABAP Keyword Documentation" secondTitle="Reference" showMenuButton="true" homeIcon="https://www.sap.com/dam/application/shared/logos/sap-logo-svg.svg.adapt.svg/1493030643828.svg" homeIconTooltip="Home" showNavButton="false" menuButtonPressed="onMenuButtonPress" homeIconPressed="onIconPress"></f:ShellBar></tnt:header><tnt:mainContents><Page id="page" showHeader="false" showNavButton="false" enableScrolling="true"><layout:DynamicSideContent id="DynamicSideContent" class="sapUiDSCExplored sapUiContentPadding" sideContentFallDown="BelowM" sideContentPosition="Begin" containerQuery="true" breakpointChanged="handleBreakpointChanged"><xhtml:div class="pageDiv"><uxap:ObjectPageLayout id="ObjectPageLayout" showTitleInHeaderContent="true" showEditHeaderButton="true" enableLazyLoading="true" editHeaderButtonPress="handleEditBtnPress" upperCaseAnchorBar="false" useIconTabBar="false"><uxap:headerTitle><uxap:ObjectPageDynamicHeaderTitle><uxap:breadcrumbs><Breadcrumbs currentLocationText="DATA"><Link text="ABAP - Keyword Documentation" href="{/breadcrumb1}" /><Link text="ABAP Programming Language" href="{/breadcrumb2}" /><Link text="ABAP - Declarations" href="{/breadcrumb3}" /><Link text="Declaration Statements" href="{/breadcrumb4}" /><Link text="Data Objects" href="{/breadcrumb5}" /></Breadcrumbs></uxap:breadcrumbs><uxap:expandedHeading><Title text="DATA" wrapping="true"></Title></uxap:expandedHeading><uxap:expandedContent><layout:VerticalLayout><HBox><core:Icon src="sap-icon://source-code"></core:Icon><Text renderWhitespace="true" text="  Keyword"></Text></HBox><HBox></HBox></layout:VerticalLayout></uxap:expandedContent><uxap:actions><ComboBox class="sapMLIBActionable" placeholder="ABAP Release 9.17" items="{path:'displayList>/Elements', sorter:{path:'text', descending: true}}" change="onChange"><core:Item key="{displayList>key}" text="{displayList>text}"></core:Item></ComboBox><Button text="News" press="handleNews" type="Ghost"></Button><Button icon="sap-icon://email" tooltip="Email us" press="onPress"></Button><OverflowToolbarButton icon="sap-icon://chain-link" tooltip="Get link" press="onPressAddress"></OverflowToolbarButton></uxap:actions></uxap:ObjectPageDynamicHeaderTitle></uxap:headerTitle><uxap:headerContent></uxap:headerContent><uxap:sections><uxap:ObjectPageSection titleUppercase="false" title="Syntax Forms"><uxap:subSections><uxap:ObjectPageSubSection titleUppercase="false"><uxap:blocks><VBox><layout:VerticalLayout class="sapUiSmallMarginBeginEnd"><FormattedText htmlText="{/sfhead1}"></FormattedText><FormattedText htmlText="{/par1}"></FormattedText></layout:VerticalLayout><layout:VerticalLayout class="sapUiSmallMarginBeginEnd"><FormattedText htmlText="{/sfhead2}"></FormattedText><FormattedText htmlText="{/par2}"></FormattedText></layout:VerticalLayout><layout:VerticalLayout class="sapUiSmallMarginBeginEnd"><FormattedText htmlText="{/sfhead3}"></FormattedText><FormattedText htmlText="{/par3}"></FormattedText></layout:VerticalLayout><layout:VerticalLayout class="sapUiSmallMarginBeginEnd"><FormattedText htmlText="{/sfhead4}"></FormattedText><FormattedText htmlText="{/par4}"></FormattedText></layout:VerticalLayout><layout:VerticalLayout class="sapUiSmallMarginBeginEnd"><FormattedText htmlText="{/sfhead5}"></FormattedText><FormattedText htmlText="{/par5}"></FormattedText></layout:VerticalLayout><layout:VerticalLayout class="sapUiSmallMarginBeginEnd"><FormattedText htmlText="{/sfhead6}"></FormattedText><FormattedText htmlText="{/par6}"></FormattedText></layout:VerticalLayout><layout:VerticalLayout class="sapUiSmallMarginBeginEnd"><FormattedText htmlText="{/sfhead7}"></FormattedText><FormattedText htmlText="{/par7}"></FormattedText></layout:VerticalLayout><layout:VerticalLayout class="sapUiSmallMarginBeginEnd"><FormattedText htmlText="{/sfhead8}"></FormattedText><FormattedText htmlText="{/par8}"></FormattedText></layout:VerticalLayout><layout:VerticalLayout class="sapUiSmallMarginBeginEnd"><FormattedText htmlText="{/sfhead9}"></FormattedText><FormattedText htmlText="{/par9}"></FormattedText></layout:VerticalLayout></VBox></uxap:blocks></uxap:ObjectPageSubSection></uxap:subSections></uxap:ObjectPageSection><uxap:ObjectPageSection titleUppercase="false" title="Overview"><uxap:subSections><uxap:ObjectPageSubSection title="Description" titleUppercase="false"><uxap:blocks><VBox><FormattedText htmlText="{/par10}"></FormattedText><FormattedText htmlText="{/par11}"></FormattedText><FormattedText htmlText="{/par12}"></FormattedText><FormattedText htmlText="{/par13}"></FormattedText><FormattedText htmlText="{/par14}"></FormattedText></VBox></uxap:blocks></uxap:ObjectPageSubSection><uxap:ObjectPageSubSection title="Hints" titleUppercase="false"><uxap:blocks><VBox><FormattedText htmlText="{/ul1}"></FormattedText></VBox></uxap:blocks></uxap:ObjectPageSubSection></uxap:subSections></uxap:ObjectPageSection></uxap:sections></uxap:ObjectPageLayout></xhtml:div><layout:sideContent><HBox height="100%"><table:TreeTable id="treeTable" rows="{path:'displayModel>/TreeElements', parameters:{arrayNames:['children']}}" visibleRowCountMode="Auto" selectionMode="None"><table:toolbar><Toolbar><Button icon="sap-icon://expand-group" press="onExpandAll"></Button><Button icon="sap-icon://collapse-group" press="onCollapseAll"></Button><SearchField liveChange="onLiveSearch" search="onSearchSubmit"></SearchField></Toolbar></table:toolbar><table:rowSettingsTemplate></table:rowSettingsTemplate><table:Column autoResizable="true" width="auto"><Label text="Topics"></Label><table:template><Link href="{displayModel>object}.html" text="{displayModel>name}" emphasized="{= ${displayModel>object} === 'ABAPDATA' ? true : false}" /></table:template></table:Column></table:TreeTable></HBox></layout:sideContent></layout:DynamicSideContent><footer><Toolbar><ToolbarSpacer></ToolbarSpacer><Label text="ABAP for Cloud Development, &#x00A9;Copyright 2025 SAP SE. All rights reserved."></Label><ToolbarSpacer></ToolbarSpacer><Button icon="sap-icon://arrow-top" press="onScrollUp" tooltip="Scroll up" enabled="true"></Button></Toolbar></footer></Page></tnt:mainContents></tnt:ToolPage></mvc:View></script><link rel="stylesheet" href="layout.css" /><script type="text/javascript" src="global.js"></script><script type="text/javascript" src="defaultJsonTree.js"></script><script>
+          sap.ui.require([
+            'sap/ui/core/mvc/Controller',
+            'sap/ui/core/mvc/XMLView',
+            'sap/base/security/URLListValidator'
+          ],
+
+          function (Controller, XMLView, URLListValidator) {
+
+            URLListValidator.add('adt');
+            URLListValidator.add('http');
+            URLListValidator.add('https');
+
+              //'use strict';
+              //var clicked = 0;
+
+              sap.ui.controller("myController", {
+                  onInit: function() {
+
+                    /*Theme Setting*/
+                    if (window.matchMedia) {
+                      if(window.matchMedia('(prefers-color-scheme: dark)').matches){
+                        sap.ui.core.Configuration.setTheme("sap_horizon_dark");
+                      } else {
+                        sap.ui.core.Configuration.setTheme("sap_horizon");
+                      }
+                    } else {
+                      sap.ui.core.Configuration.setTheme("sap_horizon");
+                    }
+
+                     /*TreeTable*/
+                     
+                           var treeJson = A.getDefaultJsonTree();
+                       
+                     var DisplayModel = new sap.ui.model.json.JSONModel(treeJson);
+                     this.getView().setModel(DisplayModel, 'displayModel');
+                     var tree = this.getView().byId('treeTable');
+
+                     tree.expand(0);tree.expand(4);tree.expand(12);tree.expand(13);tree.expand(16);
+
+                     var oModel = new sap.ui.model.json.JSONModel({
+
+                        par1: "<p>1. <code class='code'>DATA <span class='meta_style'>\{</span>\ <span class='meta_style'>\{</span>var<span class='meta_style'>[</span>(len)<span class='meta_style'>]</span> TYPE abap_type <span class='meta_style'>[</span>DECIMALS dec<span class='meta_style'>]</span><span class='meta_style'>\}</span></code>\ <br><code class='code'>       <span class='meta_style'>|</span>\ <span class='meta_style'>\{</span>var TYPE abap_type <span class='meta_style'>[</span>LENGTH len<span class='meta_style'>]</span>\ <span class='meta_style'>[</span>DECIMALS dec<span class='meta_style'>]</span><span class='meta_style'>\}</span>\ <span class='meta_style'>\}</span></code>\ <br><code class='code'>       <span class='meta_style'>[</span>VALUE val<span class='meta_style'>|</span><span class='meta_style'>\{</span>IS INITIAL<span class='meta_style'>\}</span><span class='meta_style'>]</span></code>\ <br><code class='code'>       <span class='meta_style'>[</span>READ-ONLY<span class='meta_style'>]</span>.</code></p>",par2: "<p>2. <code class='code'>DATA var <span class='meta_style'>\{</span>\ <span class='meta_style'>\{</span>TYPE <span class='meta_style'>[</span>LINE OF<span class='meta_style'>]</span> type<span class='meta_style'>\}</span></code>\ <br><code class='code'>           <span class='meta_style'>|</span>\ <span class='meta_style'>\{</span>LIKE <span class='meta_style'>[</span>LINE OF<span class='meta_style'>]</span> dobj<span class='meta_style'>\}</span>\ <span class='meta_style'>\}</span></code>\ <br><code class='code'>           <span class='meta_style'>[</span>VALUE val<span class='meta_style'>|</span><span class='meta_style'>\{</span>IS INITIAL<span class='meta_style'>\}</span><span class='meta_style'>]</span></code>\ <br><code class='code'>           <span class='meta_style'>[</span>READ-ONLY<span class='meta_style'>]</span>.</code></p>",par3: "<p>3. <code class='code'>DATA enum_var <span class='meta_style'>\{</span>\ <span class='meta_style'>\{</span>TYPE enum_type<span class='meta_style'>\}</span></code>\ <br><code class='code'>                <span class='meta_style'>|</span>\ <span class='meta_style'>\{</span>LIKE enum_dobj<span class='meta_style'>\}</span>\ <span class='meta_style'>\}</span></code>\ <br><code class='code'>                <span class='meta_style'>[</span>VALUE val<span class='meta_style'>|</span><span class='meta_style'>\{</span>IS INITIAL<span class='meta_style'>\}</span><span class='meta_style'>]</span></code>\ <br><code class='code'>                <span class='meta_style'>[</span>READ-ONLY<span class='meta_style'>]</span>.</code></p>",par4: "<p>4. <code class='code'>DATA ref <span class='meta_style'>\{</span>\ <span class='meta_style'>\{</span>TYPE REF TO type<span class='meta_style'>\}</span></code>\ <br><code class='code'>           <span class='meta_style'>|</span>\ <span class='meta_style'>\{</span>LIKE REF TO dobj<span class='meta_style'>\}</span>\ <span class='meta_style'>\}</span></code>\ <br><code class='code'>           <span class='meta_style'>[</span>VALUE IS INITIAL<span class='meta_style'>]</span></code>\ <br><code class='code'>           <span class='meta_style'>[</span>READ-ONLY<span class='meta_style'>]</span>.</code></p>",par5: "<p>5. <code class='code'>DATA BEGIN OF struc <span class='meta_style'>[</span>READ-ONLY<span class='meta_style'>]</span>.</code>\ <br><code class='code'>     ...</code>\ <br><code class='code'>     DATA comp ...</code>\ <br><code class='code'>     INCLUDE <span class='meta_style'>\{</span>TYPE<span class='meta_style'>|</span>STRUCTURE<span class='meta_style'>\}</span> ...</code>\ <br><code class='code'>     ...</code>\ <br><code class='code'>  DATA END OF struc.</code></p>",par6: "<p>6. <code class='code'>DATA itab <span class='meta_style'>\{</span>\ <span class='meta_style'>\{</span>TYPE <a target='_parent' href='ABAPDATA_ITAB.html' class='blue'>tabkind</a> OF <span class='meta_style'>[</span>REF TO<span class='meta_style'>]</span> type<span class='meta_style'>\}</span></code>\ <br><code class='code'>            <span class='meta_style'>|</span>\ <span class='meta_style'>\{</span>LIKE <a target='_parent' href='ABAPDATA_ITAB.html' class='blue'>tabkind</a> OF dobj<span class='meta_style'>\}</span>\ <span class='meta_style'>\}</span></code>\ <br><code class='code'>            <span class='meta_style'>[</span><a target='_parent' href='ABAPDATA_KEYDEF.html' class='blue'>tabkeys</a><span class='meta_style'>]</span>\ <span class='meta_style'>[</span>INITIAL SIZE n<span class='meta_style'>]</span></code>\ <br><code class='code'>            <span class='meta_style'>[</span>WITH HEADER LINE<span class='meta_style'>]</span></code>\ <br><code class='code'>            <span class='meta_style'>[</span>VALUE IS INITIAL<span class='meta_style'>]</span></code>\ <br><code class='code'>            <span class='meta_style'>[</span>READ-ONLY<span class='meta_style'>]</span>.</code></p>",par7: "<p>7. <code class='code'>DATA range_tab <span class='meta_style'>\{</span>TYPE RANGE OF type<span class='meta_style'>\}</span><span class='meta_style'>|</span><span class='meta_style'>\{</span>LIKE RANGE OF dobj<span class='meta_style'>\}</span></code>\ <br><code class='code'>                 <span class='meta_style'>[</span>INITIAL SIZE n<span class='meta_style'>]</span></code>\ <br><code class='code'>                 <span class='meta_style'>[</span>WITH HEADER LINE<span class='meta_style'>]</span></code>\ <br><code class='code'>                 <span class='meta_style'>[</span>VALUE IS INITIAL<span class='meta_style'>]</span></code>\ <br><code class='code'>                 <span class='meta_style'>[</span>READ-ONLY<span class='meta_style'>]</span>.</code></p>",par8: "<p>9. <code class='code'>DATA struc TYPE struc_type BOXED.</code></p>",par9: "<p>10. <code class='code'>DATA var <span class='meta_style'>\{</span>\ <span class='meta_style'>\{</span>TYPE TABLE FOR<span class='meta_style'>\}</span></code>\ <br><code class='code'>            <span class='meta_style'>|</span>\ <span class='meta_style'>\{</span>TYPE STRUCTURE FOR<span class='meta_style'>\}</span></code>\ <br><code class='code'>            <span class='meta_style'>|</span>\ <span class='meta_style'>\{</span>TYPE REQUEST FOR<span class='meta_style'>\}</span></code>\ <br><code class='code'>            <span class='meta_style'>|</span>\ <span class='meta_style'>\{</span>TYPE RESPONSE FOR<span class='meta_style'>\}</span>\ <span class='meta_style'>\}</span> ...</code></p>",par10: "<p>The statement <code class='code'>DATA</code> declares a <a target='_parent' href='ABENVARIABLE_GLOSRY.html' class='green'>variable</a> of any data type. The declared data object is visible within the current context as of this position. Within the declaration part of a class or an interface, <code class='code'>DATA</code> declares an instance attribute whose validity is bound to an instance of a class.</p>",par11: "<p>This statement has different syntax forms that enable elementary data types, reference types, structured types, and table types to be defined. With the exception of two additions (<a target='_parent' href='ABAPDATA_OPTIONS.html' class='blue'><code class='code'>VALUE</code></a> and <a target='_parent' href='ABAPDATA_OPTIONS.html' class='blue'><code class='code'>READ-ONLY</code></a>), these are the same syntax forms as in the statement <a target='_parent' href='ABAPTYPES.html' class='blue'><code class='code'>TYPES</code></a>. In this way, a new data type can be defined when declaring a data object. The main difference to the statement <code class='code'>TYPES</code> is that a data type defined using <code class='code'>DATA</code>, which is not derived from an existing type, is available only as a property of the declared data object and not on its own. This kind of data type is bound to its data object.</p>",par12: "<p>For the definition of a structure <code class='code'>struc</code>, any data declarations are enclosed in two <code class='code'>DATA</code> statements with the additions <code class='code'>BEGIN OF</code> and <code class='code'>END OF</code>. This declares a structure <code class='code'>struc</code> that contains the enclosed data objects <code class='code'>comp</code> as <code class='code'>struc-comp</code> components. Structure definitions can be nested.</p>",par13: "<p>Without the addition <a target='_parent' href='ABAPDATA_OPTIONS.html' class='blue'><code class='code'>VALUE</code></a>, data objects are filled with their type-specific  <a target='_parent' href='ABENINITIAL_VALUE_GLOSRY.html' class='green'>initial values</a>, which are always based on the initial values of the elementary <a target='_parent' href='ABENBUILT_IN_TYPES_COMPLETE.html' class='blue'>built-in</a> ABAP types or on initial reference values.</p>",par14: "<p>The <a target='_parent' href='ABENNAMING_CONVENTIONS.html' class='blue'>naming conventions</a> apply to the names <code class='code'>var</code>, <code class='code'>ref</code>, <code class='code'>struc</code>, <code class='code'>comp</code>, <code class='code'>itab</code>, and <code class='code'>range_tab</code>.</p>",par15: "<p></p>",sfhead1: "<p><a target='_parent' href='ABAPDATA_SIMPLE.html' class='blue'>Using Built-In Types</a></p>",sfhead2: "<p><a target='_parent' href='ABAPDATA_REFERRING.html' class='blue'>Reference to Existing Types</a></p>",sfhead3: "<p><a target='_parent' href='ABAPDATA_ENUM.html' class='blue'>Enumerated Variables</a></p>",sfhead4: "<p><a target='_parent' href='ABAPDATA_REFERENCES.html' class='blue'>Reference Variables</a></p>",sfhead5: "<p><a target='_parent' href='ABAPDATA_STRUC.html' class='blue'>Structures</a></p>",sfhead6: "<p><a target='_parent' href='ABAPDATA_ITAB.html' class='blue'>Internal Tables</a></p>",sfhead7: "<p><a target='_parent' href='ABAPDATA_RANGES.html' class='blue'>Ranges Table</a></p>",sfhead8: "<p><a target='_parent' href='ABAPDATA_BOXED.html' class='blue'>Static Boxed Components</a></p>",sfhead9: "<p><a target='_parent' href='ABENRPM_DERIVED_TYPES.html' class='blue'>BDEF Derived Types</a></p>",ul1: "<ul><li class='list_style'>Data objects that are declared in a program, but cannot be accessed there statically, produce a warning from the enhanced program check.</li><li class='list_style'>An <a target='_parent' href='ABENINLINE_DECLARATION_GLOSRY.html' class='green'>inline declaration</a> of variables is possible using the declaration operator <a target='_parent' href='ABENDATA_INLINE.html' class='blue'><code class='code'>DATA</code></a> and <a target='_parent' href='ABENFINAL_INLINE.html' class='blue'><code class='code'>FINAL</code></a>. The latter declares an <a target='_parent' href='ABENIMMUTABLE_VARIABLE_GLOSRY.html' class='green'>Immutable variable</a> that can improve the robustness of programs.</li></ul>",breadcrumb1: "abenabap.html",breadcrumb2: "abenabap_reference.html",breadcrumb3: "abendeclarations.html",breadcrumb4: "abenabap_declarations.html",breadcrumb5: "abenobjects_statements.html",
+
+                      });
+                      this.getView().setModel(oModel);
+
+                      var DisplayList = new sap.ui.model.json.JSONModel({
+                        "Elements": [
+
+                        
+                                {
+                                    
+                                        "key": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm?file=ABAPDATA.htm",
+                                        "text": "ABAP Release 8.16 (latest)",
+                                            
+                                },
+                            
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_758_index_htm/7.58/en-US/index.htm",
+                            "text": "ABAP Release 7.58",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_757_index_htm/7.57/en-US/index.htm",
+                            "text": "ABAP Release 7.57",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_756_index_htm/7.56/en-US/index.htm",
+                            "text": "ABAP Release 7.56",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_755_index_htm/7.55/en-US/index.htm",
+                            "text": "ABAP Release 7.55",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_754_index_htm/7.54/en-US/index.htm",
+                            "text": "ABAP Release 7.54",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_753_index_htm/7.53/en-US/index.htm",
+                            "text": "ABAP Release 7.53",
+                        },
+                        {
+                            "key": "https://help.sap.com/doc/abapdocu_752_index_htm/7.52/en-US/index.htm",
+                            "text": "ABAP Release 7.52",
+                        }
+                        
+                        ]
+                      });
+                      this.getView().setModel(DisplayList, 'displayList');
+
+                  
+
+                      this._oDSC = this.byId("DynamicSideContent");
+                      this._oToggleButton = this.byId("toggleButton");
+                    },
+
+                  /* -------
+                  [ events ]
+                  ------- */
+
+                  onChange: function(oEvent) {
+                    var oControl = oEvent.getSource();
+                    window.location.href = oControl.getSelectedKey();
+                    /*sap.m.MessageToast.show("Switch to " + oControl.getSelectedKey() + "?");*/
+                  },
+
+                  
+
+                  onIconPress: function(oEvent) {
+                    window.location.href="https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/index.htm?file=ABENABAP.htm";
+                  },
+
+                  handleNews: function(oEvent) {
+                    var docu_url = window.location.href;
+                    if(docu_url.includes('version=5')) {
+                      
+                      window.open('https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/index.htm&object=ABENNEWS-917', '_self');
+                    }
+                    else if(docu_url.includes('abapdocu_latest')) {
+                      window.open('https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/index.htm?file=abennews-816.htm', '_self');
+                    }
+                    else if(docu_url.includes('abapdocu_cp')) {
+                      window.open('https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/ABENNEWS-917.html', '_self');
+                    }
+                    else {
+                      
+                      window.open('https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/index.htm&object=ABENNEWS-816', '_self');
+                    }
+                  },
+
+                  handleException: function(oEvent) {
+                    
+                    window.open('', '_self');
+                  },
+
+                  
+                  onScrollUp: function() {
+                    this.byId("ObjectPageLayout").setSelectedSection(null);
+                  },
+
+
+                  onPressTheme: function(oEvent) {
+                    clicked++;
+                    if (clicked === 1 ) {
+                        //sap.ui.getCore().applyTheme("sap_horizon_dark");
+                        sap.ui.core.Configuration.setTheme("sap_horizon_dark");
+                        var subtleId = this.getView().getId('subtle');
+                        var subtle = document.getElementById(subtleId);
+                        a.style.color = '#1d2d3e';
+                    }
+                    if (clicked === 2)
+                    {
+                        //sap.ui.getCore().applyTheme("sap_horizon");
+                        sap.ui.core.Configuration.setTheme("sap_horizon");
+                        clicked = 0;
+                    }
+
+                    /*const element = document.getElementById("sap-ui-bootstrap");
+                    if (element.hasAttribute("data-sap-ui-theme", "sap_horizon")) {
+                        element.setAttribute("data-sap-ui-theme", "sap_horizon_dark");
+                        //window.location.reload();
+                    }
+                    else {
+                        element.setAttribute("data-sap-ui-theme", "sap_horizon");
+                        //window.location.reload();
+                    };*/
+                  },
+
+                  onPressBack: function(oEvent) {
+                    window.history.go(-1);
+                  },
+
+                  onPress: function(oEvent) {
+                    var mail = document.createElement("a");
+                    mail.href = "mailto:f1_help@sap.com?subject=Feedback on ABAP Documentation from Help Portal version&body=Document: DATA, ABAPDATA, 824%0D%0A%0D%0AError:%0D%0A%0D%0A%0D%0A%0D%0ASuggestion for improvement:";
+                    mail.click();
+                  },
+
+                  /*handlePopoverPress: function(oEvent) {
+                    var oButton = oEvent.getSource(),
+                    oView = this.getView();
+
+                    if (!this._oPopover) {
+                       this._oPopover = new sap.ui.xmlfragment({
+                           fragmentContent: jQuery("#fragment_xml").html()
+                           }, this);
+                       oView.addDependent(this._oPopover);
+                    }
+                    this._oPopover.openBy(oButton);
+                   },*/
+
+                   handleClosePress: function(oEvent) {
+                       //this.byId("myPopover").close();
+                       //sap.m.MessageToast.show("You cannot close me.");
+                       this._oPopover.getParent().destroyContent();
+                   },
+
+                   popoverAfterClose: function(oEvent) {
+                        this._oPopover.destroy();
+                        this._oPopover.getParent().destroyContent();
+                    },
+
+                   onPressAddress: function(oEvent) {
+                     var address = "https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/index.htm?file=abapdata.htm";
+                     navigator.clipboard.writeText(address).then(function() {
+                         sap.m.MessageToast.show("'" + address + "' copied.");
+                     }, function(err) {
+                         sap.m.MessageToast.show("No address copied.");
+                     });
+                   },
+                  
+
+                  handlePopoverPressExa: function(oEvent) {
+                    window.open('');
+                  },
+
+                  
+
+                  onPressVersion: function(oEvent) {
+                    
+                    window.open('https://help.sap.com/doc/abapdocu_cp_index_htm/CLOUD/en-US/index.htm&object=ABAPDATA&style=adt', '_self');
+                  },
+
+                  
+                  onItemSelect: function(oEvent) {
+                  if (! this.sSelectedNavigationListItemId) {
+                      this.updateSelectedNavigationListItemId();
+                  }
+                  else {
+                      if (this.oSideNavigation.getSelectedItem() != this.sSelectedNavigationListItemId) {
+                          this.restoreSideNavigationSelection();
+                      }
+                  }
+                  },
+
+                  onCollapseExpandPress: function () {
+                  this.toggleControlExpand(this.oSideNavigation);
+                  },
+
+                  onMenuButtonPress : function() {
+                  var toolPage = this.byId("toolPage");
+
+                  toolPage.setSideExpanded(!toolPage.getSideExpanded());
+                  },
+
+                  /* ----------------
+                  [ event listeners ]
+                  ---------------- */
+
+                  /* ------------------------------------
+                  [ restoring side navigation selection ]
+                  ------------------------------------ */
+
+                  updateSelectedNavigationListItemId: function(sId) {
+                  this.sSelectedNavigationListItemId = sId;
+                  },
+
+                  restoreSideNavigationSelection: function() {
+                  this.oSideNavigation.setSelectedItem(this.sSelectedNavigationListItemId);
+                  this.oSideNavigation.invalidate();
+                  },
+
+                  /* ----------------
+                  [ collapse/expand ]
+                  ---------------- */
+
+                  toggleControlExpand: function(oControl) {
+                  oControl.setExpanded(! oControl.getExpanded());
+                  },
+
+                  /*TreeTable*/
+                  
+
+                  onLiveSearch: function (evt) {
+                    var filterString = evt.getParameter('newValue');
+                    var filter = filterString.toUpperCase();
+
+                    
+                           var treeJson = A.getDefaultJsonTree();
+                       
+                    var treeJsonModel = new sap.ui.model.json.JSONModel(treeJson);
+
+                    if (filterString == '') {
+                        this.getView().setModel(treeJsonModel, 'displayModel');
+                        var tree = this.getView().byId('treeTable');
+                        tree.expandToLevel(1);
+                    } else {
+                    //-----------------------------------------------------------
+                    // Function that flattens tree along a keyword "key", here the collection formally starts as empty
+                    // FIXED
+
+                    var bfs = function (treeJson, collection) {
+                        collection.push({ name: treeJson.name, object: treeJson.object, indices: treeJson.indices });
+                        if (!treeJson.children || treeJson.children.length === 0) return;
+                        for (var i = 0; i < treeJson.children.length; i++) {
+                            //flatten children recursively
+                            bfs(treeJson.children[i], collection);
+                        }
+                        return;
+                    }
+                    //flatten all the subtree categories seperately
+                    // FIXED
+                    var treeModelFlat = treeJson.TreeElements[0];
+                    //Loop over sub trees
+                    for (var i = 0; i < treeJson.TreeElements[0].children.length; i++) {
+                        subTree = treeJson.TreeElements[0].children[i];
+                        if (subTree.children) {
+                            for (var j = 0; j < subTree.children.length; j++) {
+                                var subSubTree = subTree.children[j];
+                                var flattenedCollection = [];
+                                bfs(subSubTree, flattenedCollection);
+                                treeModelFlat.children[i].children[j].children = flattenedCollection.slice(1); //omit first element (root node), would be doubled
+                            }
+                        }
+                        else {
+                            var flattenedCollection = [];
+                            bfs(subTree, flattenedCollection);
+                            treeModelFlat.children[i].children = flattenedCollection.slice(1);
+                        }
+                    }
+                    //filter Model
+                    // FIXED
+                    var filterMode = 0; var similaritySearch = false;
+                    //var filteredModel = structuredClone(treeModelFlat);
+                    var filteredModel = {};
+                    var buildingFilteredModel = {};
+                    var filteredSubtree = [];
+                    var filteredCollection = [];
+                    var treeModelClone = cloneJSON(treeModelFlat);
+
+
+                    for (var i = 0; i < treeModelFlat.children.length; i++) {
+                        var subTree = treeModelFlat.children[i];
+                        if (subTree.children) {
+                            var deleteSubTree = true;
+                            for (var j = 0; j < subTree.children.length; j++) {
+                                var subSubTree = subTree.children[j];
+                                var deleteSubSubTree = true;
+                                if (subSubTree.children.length > 0) {
+                                    for (var k in subSubTree.children) {
+                                        //if (subSubTree.children[k].name.toUpperCase().indexOf(filter) == -1) {
+                                        var indices = subSubTree.children[k].indices;
+
+                                        if (!matchesSearchCriteria(indices, filter)) {
+                                            delete treeModelClone.children[i].children[j].children[k];
+                                        } else {
+                                            deleteSubSubTree = false;
+                                            deleteSubTree = false;
+                                        }
+                                    }
+                                }
+                                if (deleteSubSubTree) {
+                                    delete treeModelClone.children[i].children[j];
+                                }
+                            }
+                            if (deleteSubTree) {
+                                delete treeModelClone.children[i];
+                            }
+                        }
+                    }
+                    var treeModelString = JSON.stringify(treeModelClone);
+                    treeModelString = '{"TreeElements": [' + treeModelString + ']}';
+                    var treeModelObj = JSON.parse(treeModelString);
+                    var DisplayModel = new sap.ui.model.json.JSONModel(treeModelObj);
+                    this.getView().setModel(DisplayModel, 'displayModel');
+                    this.onExpandAll();
+                }
+            },
+
+                  onExpandAll: function (evt) {
+                      var tree = this.getView().byId('treeTable');
+                      tree.expandToLevel(14);
+                  },
+
+                  onCollapseAll: function (evt) {
+                      var tree = this.getView().byId('treeTable');
+                      tree.collapseAll();
+                  },
+
+                  onMenuButtonPress: function () {
+                      if(this._oDSC.getShowSideContent()){
+                      this._oDSC.setShowSideContent(false);
+                      }else{
+                      this._oDSC.setShowSideContent(true);
+                      }
+                  },
+
+                  handleToggleClick: function () {
+                      this._oDSC.toggle();
+                  },
+
+              });
+
+              
+              
+
+              function setAddress(query) {
+                var address = ""
+                var textinput = query;
+                while (textinput.indexOf("&") > -1) {
+                    textinput = textinput.replace("&", "%26")
+                }
+                while (textinput.indexOf("+") > -1) {
+                    textinput = textinput.replace("+", "%2B")
+                }
+                while (textinput.indexOf("=") > -1) {
+                    textinput = textinput.replace("=", "%3D")
+                } while (textinput.indexOf("?") > -1) {
+                    textinput = textinput.replace("?", "%3F")
+                }
+              address = "" + "?query=" + textinput + "&";
+                return address;
+               }
+
+              
+              function cloneJSON(obj) {
+                    // basic type deep copy
+                    if (obj === null || obj === undefined || typeof obj !== 'object') {
+                        return obj
+                    }
+                    // array deep copy
+                    if (obj instanceof Array) {
+                        var cloneA = [];
+                        for (var i = 0; i < obj.length; ++i) {
+                            cloneA[i] = cloneJSON(obj[i]);
+                        }
+                        return cloneA;
+                    }
+                    // object deep copy
+                    var cloneO = {};
+                    for (var i in obj) {
+                      cloneO[i] = cloneJSON(obj[i]);
+                    }
+                  return cloneO;
+                }
+
+            function matchesSearchCriteria(indices, searchWord) {
+                var returnValue = false;
+                for (var index of indices) {
+                    if (index.key1.toUpperCase().indexOf(searchWord) !== -1) {
+                        returnValue = true;
+                        break;
+                    }
+                    var key2Key1Search = index.key2 && index.key1;
+                    if (key2Key1Search.toUpperCase().indexOf(searchWord) !== -1) {
+                        returnValue = true;
+                        break;
+                    }
+                }
+                return returnValue;
+             }
+
+              
+
+              sap.ui.xmlview({ viewContent: jQuery('#main_page_xml').html() }).placeAt("main_page");
+
+              });
+
+        </script>
+<script>
+window.adobeDataLayer = window.adobeDataLayer || [];
+window.adobeDataLayer.push({
+'event': 'globalDL',
+'site': { 
+'name': 'help',
+'country': 'glo'
+},
+'user': {
+'loginStatus': 'no'
+}
+});
+window.adobeDataLayer.push({ 
+'event': 'pageView', 
+'page': { 
+'name':  "", 
+'section': location.pathname.slice(1, location.pathname.indexOf("/", 1)), 
+'language': "en", 
+'country': "US", 
+'referrer': "null", 
+'url': location.href, 
+'details': { 
+'productID':  "ABAP", 
+'deliverableID': "abapdocu_cp_index_htm", 
+'topicID': "n/a", 
+'version': "CLOUD", 
+'machineTranslated': "no", 
+}, 
+}, 
+'user': { 
+'loginStatus': "no", 
+},
+}); 
+window.adobeDataLayer.push({
+'event': "stBeaconReady"
+}); 
+</script>
+</head><body class="sapUiBody sapUiSizeCompact"><div id="tree"></div><div id="main_page"></div></body></html>
