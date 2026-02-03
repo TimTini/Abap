@@ -141,11 +141,12 @@
     const list = Array.isArray(configs) ? configs : registeredConfigs;
     const objects = parseStatements(statements, list, fileName || "");
 
-    attachDeclarationRefs({ statements, objects, fileName: fileName || "" });
+    const decls = attachDeclarationRefs({ statements, objects, fileName: fileName || "" });
 
     return {
       file: fileName || "",
-      objects
+      objects,
+      decls
     };
   }
 
@@ -187,7 +188,9 @@
         current = {
           lineStart: lineNumber,
           rawParts: [],
-          comments: pendingComments
+          comments: pendingComments,
+          leadingComments: pendingComments.slice(),
+          lineEntries: []
         };
         pendingComments = [];
       }
@@ -196,6 +199,7 @@
       if (comment) {
         current.comments.push(comment);
       }
+      current.lineEntries.push({ line: lineNumber, code: codeTrim, comment: comment || "" });
 
       if (codeTrim.endsWith(".")) {
         const raw = current.rawParts.join(" ").replace(/\s+/g, " ").trim();
@@ -205,7 +209,9 @@
           lineStart: current.lineStart,
           raw,
           comment: commentText,
-          commentLines: current.comments.filter(Boolean)
+          commentLines: current.comments.filter(Boolean),
+          leadingComments: current.leadingComments ? current.leadingComments.slice() : [],
+          lineEntries: current.lineEntries.slice()
         });
 
         current = null;
@@ -293,18 +299,125 @@
       const startKeyword = config.match && config.match.startKeyword;
       if (startKeyword && isChainedStatementStart(statement.raw, startKeyword)) {
         const chainedStatements = splitChainedStatement(statement.raw, startKeyword);
-        const chainedObjects = chainedStatements
-          .map((raw) => buildObjectFromRaw(raw, config, statement, fileName, nextId(), parentId))
-          .filter(Boolean);
+        const chainedObjects = [];
+        const structStack = [];
+
+        for (const raw of chainedStatements) {
+          const obj = buildObjectFromRaw(raw, config, statement, fileName, nextId(), parentId);
+          if (!obj) {
+            continue;
+          }
+
+          const segTokens = tokenize(raw);
+          const marker = detectStructMarkerFromTokens(segTokens, startKeyword);
+          if (marker) {
+            const normalizedName = normalizeIdentifierCandidate(marker.name);
+            const nameUpper = normalizedName ? normalizedName.toUpperCase() : "";
+            const rootUpper = structStack.length ? structStack[0].nameUpper : nameUpper;
+            const isRootBegin = marker.kind === "BEGIN" && structStack.length === 0;
+
+            if (marker.kind === "BEGIN") {
+              structStack.push({ nameUpper, name: normalizedName || marker.name });
+            } else if (marker.kind === "END") {
+              // Pop 1 level when names match; otherwise just pop once (best-effort).
+              if (structStack.length) {
+                const top = structStack[structStack.length - 1];
+                if (top && top.nameUpper && top.nameUpper === nameUpper) {
+                  structStack.pop();
+                } else {
+                  structStack.pop();
+                }
+              }
+            }
+
+            attachStructMeta(obj, {
+              kind: marker.kind,
+              rootNameUpper: rootUpper || nameUpper,
+              depth: marker.kind === "BEGIN" ? structStack.length : structStack.length + 1,
+              isDecl: isRootBegin
+            });
+          } else if (structStack.length) {
+            attachStructMeta(obj, {
+              kind: "FIELD",
+              rootNameUpper: structStack[0].nameUpper,
+              depth: structStack.length,
+              isDecl: false
+            });
+          } else {
+            attachStructMeta(obj, null);
+          }
+
+          chainedObjects.push(obj);
+        }
 
         return chainedObjects.length ? chainedObjects : null;
       }
 
       const object = buildObjectFromRaw(statement.raw, config, statement, fileName, nextId(), parentId);
+      if (object && startKeyword) {
+        const marker = detectStructMarkerFromTokens(tokenize(statement.raw), startKeyword);
+        if (marker) {
+          const normalizedName = normalizeIdentifierCandidate(marker.name);
+          const nameUpper = normalizedName ? normalizedName.toUpperCase() : "";
+          attachStructMeta(object, {
+            kind: marker.kind,
+            rootNameUpper: nameUpper,
+            depth: 1,
+            isDecl: marker.kind === "BEGIN"
+          });
+        } else {
+          attachStructMeta(object, null);
+        }
+      }
       return object ? [object] : null;
     }
 
     return null;
+  }
+
+  function detectStructMarkerFromTokens(tokens, startKeyword) {
+    if (!startKeyword || !Array.isArray(tokens) || tokens.length < 4) {
+      return null;
+    }
+
+    if (!tokens[0] || tokens[0].upper !== String(startKeyword).toUpperCase()) {
+      return null;
+    }
+
+    const t1 = tokens[1] ? tokens[1].upper : "";
+    const t2 = tokens[2] ? tokens[2].upper : "";
+    const t3 = tokens[3] ? tokens[3].raw : "";
+
+    if (t1 === "BEGIN" && t2 === "OF" && t3) {
+      return { kind: "BEGIN", name: t3 };
+    }
+
+    if (t1 === "END" && t2 === "OF" && t3) {
+      return { kind: "END", name: t3 };
+    }
+
+    return null;
+  }
+
+  function attachStructMeta(obj, meta) {
+    if (!obj) {
+      return;
+    }
+
+    if (!meta) {
+      return;
+    }
+
+    const existingExtras = obj.extras && typeof obj.extras === "object" ? obj.extras : null;
+    obj.extras = {
+      ...(existingExtras || {}),
+      structDef: {
+        kind: meta.kind || "",
+        rootNameUpper: meta.rootNameUpper || "",
+        depth: Number(meta.depth || 0) || 0,
+        isDecl: Boolean(meta.isDecl)
+      }
+    };
   }
 
   function matchesConfig(tokens, config) {
@@ -584,6 +697,26 @@
       }
     }
 
+    const structDefs = buildStructDefsFromStatements({
+      statements,
+      procedureBlocks,
+      classBlocks,
+      scopeInfoById,
+      fileName: fileName || ""
+    });
+
+    attachStructFieldDecls({
+      allObjects,
+      idToObject,
+      declByScope,
+      scopeInfoById,
+      procedureBlocks,
+      classBlocks,
+      classInfo,
+      fileName: fileName || "",
+      structDefs
+    });
+
     for (const obj of allObjects) {
       const resolveContext = buildResolveContext(obj, idToObject, declByScope, classInfo);
       annotateValuesWithDecls(obj.values, resolveContext);
@@ -591,6 +724,398 @@
     }
 
     attachPerformOriginDecls({ allObjects, formsByNameUpper: buildFormsByNameUpper(allObjects), scopeInfoById });
+
+    const decls = [];
+    for (const scopeMap of declByScope.values()) {
+      for (const decl of scopeMap.values()) {
+        decls.push(decl);
+      }
+    }
+    return decls;
+  }
+
+  function ensureStructDefScopeMap(mapByScope, scopeId) {
+    if (!mapByScope.has(scopeId)) {
+      mapByScope.set(scopeId, new Map());
+    }
+  }
+
+  function buildStructDefsFromStatements({ statements, procedureBlocks, classBlocks, scopeInfoById, fileName }) {
+    const dataByScope = new Map();
+    const typeByScope = new Map();
+
+    for (const statement of statements || []) {
+      const startKeyword = getStatementStartKeyword(statement.raw || "");
+      if (startKeyword !== "DATA" && startKeyword !== "TYPES") {
+        continue;
+      }
+
+      const lineEntries = Array.isArray(statement.lineEntries) ? statement.lineEntries : [];
+      if (!lineEntries.length) {
+        continue;
+      }
+
+      const scopeId = getStatementScopeId(statement.lineStart, procedureBlocks, classBlocks);
+      const scopeInfo = scopeInfoById.get(scopeId) || buildFallbackScopeInfo(scopeId);
+
+      const defs = parseStructDefsFromLineEntries({
+        kind: startKeyword,
+        lineEntries,
+        leadingComments: Array.isArray(statement.leadingComments) ? statement.leadingComments : [],
+        fileName: fileName || "",
+        scopeId,
+        scopeInfo
+      });
+
+      const target = startKeyword === "DATA" ? dataByScope : typeByScope;
+      ensureStructDefScopeMap(target, scopeId);
+      const scopeMap = target.get(scopeId);
+
+      for (const def of defs) {
+        if (!def || !def.nameUpper) {
+          continue;
+        }
+        if (!scopeMap.has(def.nameUpper)) {
+          scopeMap.set(def.nameUpper, def);
+        }
+      }
+    }
+
+    return { dataByScope, typeByScope };
+  }
+
+  function parseStructDefsFromLineEntries({ kind, lineEntries, leadingComments, fileName, scopeId, scopeInfo }) {
+    const defs = [];
+    let current = null;
+    const stack = [];
+    const leadingText = Array.isArray(leadingComments) ? leadingComments.filter(Boolean).join(" ").trim() : "";
+
+    function currentNestedPrefix() {
+      if (stack.length <= 1) {
+        return "";
+      }
+      return stack
+        .slice(1)
+        .map((ctx) => ctx.name)
+        .filter(Boolean)
+        .join("-");
+    }
+
+    function addField(path, info) {
+      if (!current || !path) {
+        return;
+      }
+
+      const normalized = normalizeIdentifierCandidate(path);
+      if (!normalized) {
+        return;
+      }
+
+      const pathUpper = normalized.toUpperCase();
+      if (!current.fields.has(pathUpper)) {
+        current.fields.set(pathUpper, {
+          path: normalized,
+          pathUpper,
+          file: fileName || "",
+          lineStart: info && info.lineStart ? info.lineStart : null,
+          raw: info && info.raw ? info.raw : "",
+          comment: info && info.comment ? info.comment : ""
+        });
+      }
+    }
+
+    for (const entry of lineEntries) {
+      const code = String(entry && entry.code ? entry.code : "").trim();
+      if (!code) {
+        continue;
+      }
+
+      const comment = entry && entry.comment ? String(entry.comment || "") : "";
+      const lineStart = entry && entry.line ? Number(entry.line || 0) || null : null;
+
+      const withoutDot = code.replace(/\.$/, "").trim();
+      const segments = splitByCommaOutsideQuotes(withoutDot)
+        .map((segment) => segment.trim())
+        .filter(Boolean);
+
+      for (const segment of segments) {
+        const marker = parseStructMarker(segment);
+        if (marker && marker.kind === "BEGIN") {
+          const name = normalizeIdentifierCandidate(marker.name);
+          if (!name) {
+            continue;
+          }
+          const nameUpper = name.toUpperCase();
+
+          if (!stack.length) {
+            current = {
+              kind,
+              name,
+              nameUpper,
+              file: fileName || "",
+              scopeId,
+              scopeLabel: scopeInfo ? scopeInfo.scopeLabel : "",
+              lineStart,
+              rawStart: segment,
+              comment: String(comment || "").trim() || leadingText,
+              fields: new Map()
+            };
+            stack.push({ name, nameUpper });
+            continue;
+          }
+
+          const prefix = currentNestedPrefix();
+          const path = prefix ? `${prefix}-${name}` : name;
+          addField(path, { lineStart, raw: segment, comment: String(comment || "").trim() });
+          stack.push({ name, nameUpper });
+          continue;
+        }
+
+        if (marker && marker.kind === "END") {
+          const name = normalizeIdentifierCandidate(marker.name);
+          const nameUpper = name ? name.toUpperCase() : "";
+
+          if (stack.length) {
+            const top = stack[stack.length - 1];
+            if (top && top.nameUpper && nameUpper && top.nameUpper === nameUpper) {
+              stack.pop();
+            } else {
+              stack.pop();
+            }
+          }
+
+          if (!stack.length && current) {
+            defs.push(current);
+            current = null;
+          }
+          continue;
+        }
+
+        if (!stack.length || !current) {
+          continue;
+        }
+
+        const fieldName = extractStructFieldName(segment);
+        if (!fieldName) {
+          continue;
+        }
+
+        const prefix = currentNestedPrefix();
+        const path = prefix ? `${prefix}-${fieldName}` : fieldName;
+        addField(path, { lineStart, raw: segment, comment: String(comment || "").trim() });
+      }
+    }
+
+    return defs;
+  }
+
+  function parseStructMarker(segment) {
+    const text = String(segment || "");
+    const beginMatch = text.match(/\bBEGIN\s+OF\s+([A-Za-z_][A-Za-z0-9_]*)/i);
+    if (beginMatch) {
+      return { kind: "BEGIN", name: beginMatch[1] };
+    }
+
+    const endMatch = text.match(/\bEND\s+OF\s+([A-Za-z_][A-Za-z0-9_]*)/i);
+    if (endMatch) {
+      return { kind: "END", name: endMatch[1] };
+    }
+
+    return null;
+  }
+
+  function extractStructFieldName(segment) {
+    const text = String(segment || "").trim();
+    if (!text) {
+      return "";
+    }
+
+    const match = text.match(/^([A-Za-z_][A-Za-z0-9_]*)/);
+    if (!match) {
+      return "";
+    }
+
+    const candidate = match[1] || "";
+    const upper = candidate.toUpperCase();
+    if (["BEGIN", "END", "INCLUDE"].includes(upper)) {
+      return "";
+    }
+
+    return normalizeIdentifierCandidate(candidate) || "";
+  }
+
+  function resolveStructDefByContext(typeUpper, context, typeStructDefsByScope) {
+    if (!typeUpper || !typeStructDefsByScope) {
+      return null;
+    }
+
+    const procMap = context && context.procId ? typeStructDefsByScope.get(context.procId) : null;
+    if (procMap && procMap.has(typeUpper)) {
+      return procMap.get(typeUpper);
+    }
+
+    const classMap = context && context.classDefId ? typeStructDefsByScope.get(context.classDefId) : null;
+    if (classMap && classMap.has(typeUpper)) {
+      return classMap.get(typeUpper);
+    }
+
+    const globalMap = typeStructDefsByScope.get(0);
+    if (globalMap && globalMap.has(typeUpper)) {
+      return globalMap.get(typeUpper);
+    }
+
+    return null;
+  }
+
+  function getStructTypeCandidateFromDeclObject(obj) {
+    if (!obj) {
+      return "";
+    }
+
+    const type = getFirstValue(obj.values, "type");
+    const like = getFirstValue(obj.values, "like");
+    const structure = getFirstValue(obj.values, "structure");
+
+    const candidate = type || like || structure;
+    const normalized = normalizeIdentifierCandidate(candidate);
+    return normalized || "";
+  }
+
+  function patchDeclComment(declByScope, scopeId, nameUpper, comment) {
+    const trimmed = String(comment || "").trim();
+    if (!declByScope || !declByScope.has(scopeId)) {
+      return;
+    }
+
+    const scopeMap = declByScope.get(scopeId);
+    if (!scopeMap || !scopeMap.has(nameUpper)) {
+      return;
+    }
+
+    const decl = scopeMap.get(nameUpper);
+    if (decl && String(decl.comment || "").trim() !== trimmed) {
+      decl.comment = trimmed;
+    }
+  }
+
+  function attachStructFieldDecls({
+    allObjects,
+    idToObject,
+    declByScope,
+    scopeInfoById,
+    procedureBlocks,
+    classBlocks,
+    classInfo,
+    fileName,
+    structDefs
+  }) {
+    const dataByScope = structDefs && structDefs.dataByScope ? structDefs.dataByScope : new Map();
+    const typeByScope = structDefs && structDefs.typeByScope ? structDefs.typeByScope : new Map();
+
+    // 1) DATA inline structs: create `${var}-${field}` decls with per-field comments.
+    for (const [scopeId, defsByName] of dataByScope.entries()) {
+      const scopeInfo = scopeInfoById.get(scopeId) || buildFallbackScopeInfo(scopeId);
+
+      for (const def of defsByName.values()) {
+        if (!def || !def.name || !def.nameUpper) {
+          continue;
+        }
+
+        patchDeclComment(declByScope, scopeId, def.nameUpper, def.comment || "");
+
+        for (const field of def.fields.values()) {
+          const fullName = `${def.name}-${field.path}`;
+          addDecl(declByScope, scopeId, fullName, {
+            id: null,
+            objectType: "STRUCT_FIELD",
+            name: fullName,
+            file: fileName || "",
+            lineStart: field.lineStart || null,
+            raw: field.raw || "",
+            comment: field.comment || "",
+            scopeId,
+            scopeLabel: scopeInfo.scopeLabel,
+            scopeType: scopeInfo.scopeType,
+            scopeName: scopeInfo.scopeName,
+            structName: def.name,
+            fieldPath: field.path,
+            structObjectType: def.kind || "DATA",
+            structLineStart: def.lineStart || null,
+            structRaw: def.rawStart || "",
+            structComment: def.comment || ""
+          });
+        }
+      }
+    }
+
+    // 2) Typed declarations: `DATA ls_s TYPE ty_s.` -> create `ls_s-field` from `TYPES ... BEGIN OF ty_s`.
+    for (const obj of allObjects || []) {
+      if (!obj || !obj.objectType || !obj.values) {
+        continue;
+      }
+
+      const structMeta = obj.extras && typeof obj.extras === "object" ? obj.extras.structDef : null;
+      if (structMeta && structMeta.isDecl === false) {
+        continue;
+      }
+
+      const declName = getFirstValue(obj.values, "name");
+      const normalizedDeclName = normalizeIdentifierCandidate(declName);
+      if (!normalizedDeclName) {
+        continue;
+      }
+
+      const scopeId = getDeclarationScopeId(obj, idToObject, procedureBlocks, classBlocks);
+      const scopeInfo = scopeInfoById.get(scopeId) || buildFallbackScopeInfo(scopeId);
+
+      // Skip if already an inline DATA struct in the same scope (DATA wins; addDecl also protects).
+      const dataScopeMap = dataByScope.get(scopeId);
+      if (dataScopeMap && dataScopeMap.has(normalizedDeclName.toUpperCase())) {
+        continue;
+      }
+
+      const typeName = getStructTypeCandidateFromDeclObject(obj);
+      if (!typeName) {
+        continue;
+      }
+
+      const typeUpper = typeName.toUpperCase();
+      const context = buildResolveContext(obj, idToObject, declByScope, classInfo);
+      const typeDef = resolveStructDefByContext(typeUpper, context, typeByScope);
+      if (!typeDef) {
+        continue;
+      }
+
+      patchDeclComment(declByScope, typeDef.scopeId || scopeId, typeUpper, typeDef.comment || "");
+
+      for (const field of typeDef.fields.values()) {
+        const fullName = `${normalizedDeclName}-${field.path}`;
+        addDecl(declByScope, scopeId, fullName, {
+          id: null,
+          objectType: "STRUCT_FIELD",
+          name: fullName,
+          file: fileName || "",
+          lineStart: field.lineStart || null,
+          raw: field.raw || "",
+          comment: field.comment || "",
+          scopeId,
+          scopeLabel: scopeInfo.scopeLabel,
+          scopeType: scopeInfo.scopeType,
+          scopeName: scopeInfo.scopeName,
+          structName: normalizedDeclName,
+          fieldPath: field.path,
+          structObjectType: obj.objectType || "DATA",
+          structId: obj.id || null,
+          structLineStart: obj.lineStart || null,
+          structRaw: obj.raw || "",
+          structComment: obj.comment || "",
+          structTypeName: typeDef.name || typeName,
+          structTypeLineStart: typeDef.lineStart || null,
+          structTypeRaw: typeDef.rawStart || "",
+          structTypeComment: typeDef.comment || ""
+        });
+      }
+    }
   }
 
   function collectAllObjects(roots) {
@@ -792,6 +1317,11 @@
 
   function getDeclaredNamesFromObject(obj) {
     if (!obj || !obj.objectType) {
+      return [];
+    }
+
+    const structMeta = obj.extras && typeof obj.extras === "object" ? obj.extras.structDef : null;
+    if (structMeta && structMeta.isDecl === false) {
       return [];
     }
 
@@ -1156,6 +1686,9 @@
     if (/^SY-[A-Za-z_][A-Za-z0-9_]*$/i.test(trimmed)) {
       return trimmed.toUpperCase();
     }
+    if (/^(<[^>]+>|[A-Za-z_][A-Za-z0-9_]*)(-[A-Za-z_][A-Za-z0-9_]*)+$/i.test(trimmed)) {
+      return trimmed;
+    }
     if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(trimmed)) {
       return trimmed;
     }
@@ -1378,6 +1911,11 @@
       return sysMatch[0].toUpperCase();
     }
 
+    const fieldPath = extractFirstFieldPathFromExpression(text);
+    if (fieldPath) {
+      return fieldPath;
+    }
+
     const inline = extractFirstInlineDeclaration(text);
     if (inline) {
       return inline;
@@ -1392,6 +1930,15 @@
     }
 
     return "";
+  }
+
+  function extractFirstFieldPathFromExpression(text) {
+    const match = String(text || "").match(/^(<[^>]+>|[A-Za-z_][A-Za-z0-9_]*)(?:-[A-Za-z_][A-Za-z0-9_]*)+/);
+    if (!match) {
+      return "";
+    }
+    const candidate = normalizeIdentifierCandidate(match[0]);
+    return candidate || "";
   }
 
   function extractFirstInlineDeclaration(text) {

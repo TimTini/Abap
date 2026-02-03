@@ -26,6 +26,9 @@
       "DATA": "stmt",
       "TYPE": "type",
       "LIKE": "like",
+      "BEGIN": "begin",
+      "OF": "of",
+      "END": "end",
       "REF": "ref",
       "TO": "to",
       "VALUE": "value",
@@ -34,9 +37,23 @@
       "READ-ONLY": "read-only"
     },
     "keywordPhrases": {
+      "BEGIN OF": "begin-of",
+      "END OF": "end-of",
       "REF TO": "ref-to"
     },
     "captureRules": [
+      {
+        "after": "DATA BEGIN OF",
+        "name": "name",
+        "label": "struct-name",
+        "descKey": "name"
+      },
+      {
+        "after": "DATA END OF",
+        "name": "name",
+        "label": "struct-name",
+        "descKey": "name"
+      },
       {
         "after": "DATA",
         "name": "name",
