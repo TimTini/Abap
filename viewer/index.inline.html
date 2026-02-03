@@ -1025,12 +1025,21 @@
 
       const startKeyword = config.match && config.match.startKeyword;
       if (startKeyword && isChainedStatementStart(statement.raw, startKeyword)) {
-        const chainedStatements = splitChainedStatement(statement.raw, startKeyword);
+        const chainedStatements = splitChainedStatementWithMeta(statement, startKeyword);
         const chainedObjects = [];
         const structStack = [];
 
-        for (const raw of chainedStatements) {
-          const obj = buildObjectFromRaw(raw, config, statement, fileName, nextId(), parentId);
+        for (const segment of chainedStatements) {
+          const raw = segment && typeof segment === "object" ? segment.raw : segment;
+          const overrides = segment && typeof segment === "object"
+            ? {
+                lineStart: segment.lineStart || null,
+                comment: segment.comment || "",
+                commentLines: Array.isArray(segment.commentLines) ? segment.commentLines : []
+              }
+            : null;
+
+          const obj = buildObjectFromRaw(raw, config, statement, fileName, nextId(), parentId, overrides);
           if (!obj) {
             continue;
           }
@@ -1165,22 +1174,32 @@
     return false;
   }
 
-  function buildObjectFromRaw(raw, config, statement, fileName, id, parentId) {
+  function buildObjectFromRaw(raw, config, statement, fileName, id, parentId, overrides) {
+    return buildObjectFromRawWithOverrides(raw, config, statement, fileName, id, parentId, overrides || null);
+  }
+
+  function buildObjectFromRawWithOverrides(raw, config, statement, fileName, id, parentId, overrides) {
     const tokens = tokenize(raw);
     if (tokens.length === 0) {
       return null;
     }
 
+    const commentText = overrides && typeof overrides.comment === "string" ? overrides.comment : statement.comment;
+    const commentLines = overrides && Array.isArray(overrides.commentLines)
+      ? overrides.commentLines
+      : statement.commentLines || [];
+    const lineStart = overrides && overrides.lineStart ? Number(overrides.lineStart) || null : statement.lineStart;
+
     const keywords = detectKeywords(tokens, config);
     const match = config.match || {};
     const matchType = match.type ? String(match.type).trim().toLowerCase() : "";
     const values = matchType === "assignment"
-      ? captureAssignmentValues(tokens, statement.comment)
-      : captureValues(tokens, config, statement.comment);
+      ? captureAssignmentValues(tokens, commentText)
+      : captureValues(tokens, config, commentText);
     const extras = buildExtras(config, {
       raw,
       values,
-      commentLines: statement.commentLines || []
+      commentLines
     });
     const block = config.block && config.block.endKeyword
       ? {
@@ -1195,11 +1214,11 @@
       parent: parentId,
       objectType: config.object,
       file: fileName,
-      lineStart: statement.lineStart,
+      lineStart,
       raw,
       block,
       extras,
-      comment: statement.comment,
+      comment: commentText,
       keywords,
       values,
       children: []
@@ -2950,6 +2969,141 @@
 
     const pattern = new RegExp(`^\\s*${escapeRegExp(startKeyword)}\\s*:`, "i");
     return pattern.test(raw);
+  }
+
+  function splitChainedStatementWithMeta(statement, startKeyword) {
+    const raw = statement && typeof statement.raw === "string" ? statement.raw : "";
+    const baseLineStart = statement && statement.lineStart ? Number(statement.lineStart) || null : null;
+    const lineEntries = statement && Array.isArray(statement.lineEntries) ? statement.lineEntries : [];
+
+    if (!lineEntries.length) {
+      const parts = splitChainedStatement(raw, startKeyword);
+      return parts.map((partRaw) => ({
+        raw: partRaw,
+        lineStart: baseLineStart,
+        comment: statement && typeof statement.comment === "string" ? statement.comment : "",
+        commentLines: statement && Array.isArray(statement.commentLines) ? statement.commentLines.slice() : []
+      }));
+    }
+
+    const prefixPattern = new RegExp(`^\\s*${escapeRegExp(startKeyword)}\\s*:\\s*`, "i");
+    const segments = [];
+
+    let current = "";
+    let currentStartLine = null;
+    let inSingleQuote = false;
+    let inPipe = false;
+
+    const pushSegment = ({ comment, endLine }) => {
+      const text = current.replace(/\s+/g, " ").trim();
+      if (!text) {
+        current = "";
+        currentStartLine = null;
+        return;
+      }
+
+      const commentText = String(comment || "").trim();
+      segments.push({
+        raw: `${startKeyword} ${text}.`,
+        lineStart: currentStartLine || endLine || baseLineStart,
+        comment: commentText,
+        commentLines: commentText ? [commentText] : []
+      });
+      current = "";
+      currentStartLine = null;
+    };
+
+    for (const entry of lineEntries) {
+      const lineNumber = entry && entry.line ? Number(entry.line || 0) || null : null;
+      const lineComment = entry && entry.comment ? String(entry.comment || "").trim() : "";
+      let code = entry && entry.code ? String(entry.code || "") : "";
+      code = code.trim();
+      if (!code) {
+        continue;
+      }
+      code = code.replace(prefixPattern, "").trim();
+      if (!code) {
+        continue;
+      }
+
+      if (current.trim()) {
+        current += " ";
+      }
+
+      for (let index = 0; index < code.length; index += 1) {
+        const char = code[index];
+        const next = index + 1 < code.length ? code[index + 1] : "";
+
+        if (char === "'" && !inPipe) {
+          if (inSingleQuote && next === "'") {
+            if (!currentStartLine && current.trim().length === 0) {
+              currentStartLine = lineNumber || baseLineStart;
+            }
+            current += "''";
+            index += 1;
+            continue;
+          }
+          inSingleQuote = !inSingleQuote;
+          if (!currentStartLine && current.trim().length === 0 && char.trim()) {
+            currentStartLine = lineNumber || baseLineStart;
+          }
+          current += char;
+          continue;
+        }
+
+        if (char === "|" && !inSingleQuote) {
+          if (inPipe && next === "|") {
+            if (!currentStartLine && current.trim().length === 0) {
+              currentStartLine = lineNumber || baseLineStart;
+            }
+            current += "||";
+            index += 1;
+            continue;
+          }
+          inPipe = !inPipe;
+          if (!currentStartLine && current.trim().length === 0 && char.trim()) {
+            currentStartLine = lineNumber || baseLineStart;
+          }
+          current += char;
+          continue;
+        }
+
+        if (char === "," && !inSingleQuote && !inPipe) {
+          const rest = code.slice(index + 1).trim();
+          const commentForSegment = rest ? "" : lineComment;
+          pushSegment({ comment: commentForSegment, endLine: lineNumber });
+          continue;
+        }
+
+        if (char === "." && !inSingleQuote && !inPipe) {
+          const rest = code.slice(index + 1).trim();
+          if (!rest) {
+            pushSegment({ comment: lineComment, endLine: lineNumber });
+            break;
+          }
+        }
+
+        if (!currentStartLine && current.trim().length === 0 && char.trim()) {
+          currentStartLine = lineNumber || baseLineStart;
+        }
+        current += char;
+      }
+    }
+
+    if (current.trim()) {
+      pushSegment({ comment: "", endLine: null });
+    }
+
+    if (!segments.length) {
+      return splitChainedStatement(raw, startKeyword).map((partRaw) => ({
+        raw: partRaw,
+        lineStart: baseLineStart,
+        comment: "",
+        commentLines: []
+      }));
+    }
+
+    return segments;
   }
 
   function splitChainedStatement(raw, startKeyword) {
