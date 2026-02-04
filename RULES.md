@@ -210,9 +210,11 @@ Mỗi object trong `objects[]` (cũng xuất hiện trong `children[]`):
   "lineStart": 7,
   "raw": "PARAMETERS ... .",
   "comment": "inline comment + comment lines (nếu có)",
-  "keywords": [ { "text": "PARAMETERS", "label": "stmt" } ],
-  "values": [
-    {
+  "keywords": {
+    "stmt": { "text": "PARAMETERS", "label": "stmt" }
+  },
+  "values": {
+    "name": {
       "name": "name",
       "value": "p_user",
       "label": "param-name",
@@ -232,7 +234,7 @@ Mỗi object trong `objects[]` (cũng xuất hiện trong `children[]`):
         "scopeName": ""
       }
     }
-  ],
+  },
   "extras": { ... },
   "block": { "endKeyword": "ENDIF", "endRaw": "ENDIF.", "lineEnd": 123 },
   "children": [ ... ]
@@ -253,7 +255,7 @@ Viewer export dạng:
 
 Lưu ý cho Excel:
 - VBA hiện dùng XPath `/abapflowObjects/objects/object` và đọc chủ yếu: `id`, `objectType`, `lineStart`, `raw`.
-- “Routine key” trong Excel được lấy ưu tiên từ `values[].name/value` với key `name|target|form`, hoặc fallback trong `extras.callFunction.name`, `extras.callMethod.target`, `extras.performCall.form`, `extras.form.name`, `extras.methodSignature.name`.
+- “Routine key” trong Excel được lấy ưu tiên từ `values/<name>/value` với key `name|target|form`, hoặc fallback trong `extras.callFunction.name`, `extras.callMethod.target`, `extras.performCall.form`, `extras.form.name`, `extras.methodSignature.name`.
   - Nếu bạn thêm statement mới mà muốn Excel nhận đúng routine key: nên tạo `captureRules` có `name` là `name` hoặc `target` hoặc `form` (hoặc update VBA).
 
 ## 9) Quy trình thêm rule mới (khuyến nghị)
@@ -262,4 +264,3 @@ Lưu ý cho Excel:
 2) (Chính thức) Tạo file `configs/<your-rule>.json`.
 3) Chạy `node scripts/build-viewer-configs.js`.
 4) Reload `viewer/index.html` và test lại.
-

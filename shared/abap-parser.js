@@ -32,8 +32,12 @@
       this.block = block;
       this.extras = extras;
       this.comment = comment;
-      this.keywords = keywords;
-      this.values = values;
+      if (keywords && Object.keys(keywords).length) {
+        this.keywords = keywords;
+      }
+      if (values && Object.keys(values).length) {
+        this.values = values;
+      }
       this.children = children;
     }
   }
@@ -463,12 +467,16 @@
       : statement.commentLines || [];
     const lineStart = overrides && overrides.lineStart ? Number(overrides.lineStart) || null : statement.lineStart;
 
-    const keywords = detectKeywords(tokens, config);
+    const keywordEntries = detectKeywords(tokens, config);
     const match = config.match || {};
     const matchType = match.type ? String(match.type).trim().toLowerCase() : "";
-    const values = matchType === "assignment"
+    const valueEntries = matchType === "assignment"
       ? captureAssignmentValues(tokens, commentText)
       : captureValues(tokens, config, commentText);
+
+    const keywords = groupEntriesByKey(keywordEntries, "label");
+    const values = groupEntriesByKey(valueEntries, "name");
+
     const extras = buildExtras(config, {
       raw,
       values,
@@ -1248,12 +1256,30 @@
   }
 
   function getFirstValue(values, name) {
-    for (const entry of values || []) {
-      if (entry && entry.name === name) {
-        return entry.value || "";
-      }
+    if (!values) {
+      return "";
     }
-    return "";
+
+    if (Array.isArray(values)) {
+      for (const entry of values) {
+        if (entry && entry.name === name) {
+          return entry.value || "";
+        }
+      }
+      return "";
+    }
+
+    if (typeof values !== "object") {
+      return "";
+    }
+
+    const entryOrList = values[name];
+    if (!entryOrList) {
+      return "";
+    }
+
+    const entry = Array.isArray(entryOrList) ? entryOrList[0] : entryOrList;
+    return entry && entry.value ? entry.value || "" : "";
   }
 
   function ensureScopeMap(declByScope, scopeId) {
@@ -1752,24 +1778,42 @@
   }
 
   function annotateValuesWithDecls(values, context) {
-    if (!Array.isArray(values)) {
-      return;
-    }
-
-    for (const entry of values) {
+    const annotateEntry = (entry) => {
       if (!entry || !entry.value) {
-        continue;
+        return;
       }
       const ref = extractFirstIdentifierFromExpression(entry.value);
       if (!ref) {
-        continue;
+        return;
       }
       const decl = resolveDecl(ref, context);
       if (!decl) {
-        continue;
+        return;
       }
       entry.declRef = ref;
       entry.decl = decl;
+    };
+
+    if (Array.isArray(values)) {
+      for (const entry of values) {
+        annotateEntry(entry);
+      }
+      return;
+    }
+
+    if (!values || typeof values !== "object") {
+      return;
+    }
+
+    for (const key of Object.keys(values)) {
+      const entryOrList = values[key];
+      if (Array.isArray(entryOrList)) {
+        for (const entry of entryOrList) {
+          annotateEntry(entry);
+        }
+        continue;
+      }
+      annotateEntry(entryOrList);
     }
   }
 
@@ -2047,13 +2091,58 @@
 
   function valuesToFirstValueMap(values) {
     const map = {};
-    for (const entry of values || []) {
-      if (!entry || !entry.name) {
+
+    if (Array.isArray(values)) {
+      for (const entry of values) {
+        if (!entry || !entry.name) {
+          continue;
+        }
+        if (map[entry.name] === undefined) {
+          map[entry.name] = entry.value || "";
+        }
+      }
+      return map;
+    }
+
+    if (!values || typeof values !== "object") {
+      return map;
+    }
+
+    for (const [name, entryOrList] of Object.entries(values)) {
+      const entry = Array.isArray(entryOrList) ? entryOrList[0] : entryOrList;
+      if (!entry) {
         continue;
       }
-      if (map[entry.name] === undefined) {
-        map[entry.name] = entry.value || "";
+      map[name] = entry.value || "";
+    }
+
+    return map;
+  }
+
+  function groupEntriesByKey(entries, key) {
+    const map = {};
+    for (const entry of entries || []) {
+      if (!entry || entry[key] === undefined || entry[key] === null) {
+        continue;
       }
+
+      const name = String(entry[key]).trim();
+      if (!name) {
+        continue;
+      }
+
+      const current = map[name];
+      if (current === undefined) {
+        map[name] = entry;
+        continue;
+      }
+
+      if (Array.isArray(current)) {
+        current.push(entry);
+        continue;
+      }
+
+      map[name] = [current, entry];
     }
     return map;
   }

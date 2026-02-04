@@ -720,7 +720,31 @@ Private Function GetRoutineKeyFromObjectNode(ByVal objNode As Object) As String
     On Error Resume Next
     If objNode Is Nothing Then Exit Function
 
-    ' 1) Try common fields in values[]: name/target/form
+    ' 1) Try common fields in values: name/target/form (new map shape)
+    Dim v1 As String
+
+    v1 = Trim$(SafeChildText(objNode, "values/name/value"))
+    If Len(v1) = 0 Then v1 = Trim$(SafeChildText(objNode, "values/name/item[1]/value"))
+    If Len(v1) > 0 Then
+        GetRoutineKeyFromObjectNode = v1
+        Exit Function
+    End If
+
+    v1 = Trim$(SafeChildText(objNode, "values/target/value"))
+    If Len(v1) = 0 Then v1 = Trim$(SafeChildText(objNode, "values/target/item[1]/value"))
+    If Len(v1) > 0 Then
+        GetRoutineKeyFromObjectNode = v1
+        Exit Function
+    End If
+
+    v1 = Trim$(SafeChildText(objNode, "values/form/value"))
+    If Len(v1) = 0 Then v1 = Trim$(SafeChildText(objNode, "values/form/item[1]/value"))
+    If Len(v1) > 0 Then
+        GetRoutineKeyFromObjectNode = v1
+        Exit Function
+    End If
+
+    ' 1b) Backward compatible: old array-ish iteration (also works for new shape when not nested arrays)
     Dim valuesNode As Object
     Set valuesNode = objNode.selectSingleNode("values")
     If Not valuesNode Is Nothing Then
@@ -1526,32 +1550,32 @@ Private Sub SeedGenericTemplate(ByVal inner As Range)
     SetTemplateCell inner, "A8", "raw"
     SetTemplateCell inner, "B8", "{raw}"
 
-    SetTemplateCell inner, "A9", "keywords[0].text"
-    SetTemplateCell inner, "B9", "{keywords[0].text}"
+    SetTemplateCell inner, "A9", "keywords.stmt.text"
+    SetTemplateCell inner, "B9", "{keywords.stmt.text}"
 
-    SetTemplateCell inner, "A10", "keywords[0].label"
-    SetTemplateCell inner, "B10", "{keywords[0].label}"
+    SetTemplateCell inner, "A10", "keywords.stmt.label"
+    SetTemplateCell inner, "B10", "{keywords.stmt.label}"
 
-    SetTemplateCell inner, "A11", "values[0].name"
-    SetTemplateCell inner, "B11", "{values[0].name}"
+    SetTemplateCell inner, "A11", "values.name.value"
+    SetTemplateCell inner, "B11", "{values.name.value}"
 
-    SetTemplateCell inner, "A12", "values[0].value"
-    SetTemplateCell inner, "B12", "{values[0].value}"
+    SetTemplateCell inner, "A12", "values.name.label"
+    SetTemplateCell inner, "B12", "{values.name.label}"
 
-    SetTemplateCell inner, "A13", "values[0].label"
-    SetTemplateCell inner, "B13", "{values[0].label}"
+    SetTemplateCell inner, "A13", "values.name.codeDesc"
+    SetTemplateCell inner, "B13", "{values.name.codeDesc}"
 
-    SetTemplateCell inner, "A14", "values[0].codeDesc"
-    SetTemplateCell inner, "B14", "{values[0].codeDesc}"
+    SetTemplateCell inner, "A14", "values.name.decl.name"
+    SetTemplateCell inner, "B14", "{values.name.decl.name}"
 
-    SetTemplateCell inner, "A15", "values[0].decl.name"
-    SetTemplateCell inner, "B15", "{values[0].decl.name}"
+    SetTemplateCell inner, "A15", "values.name.decl.desc"
+    SetTemplateCell inner, "B15", "{values.name.decl.desc}"
 
-    SetTemplateCell inner, "A16", "values[0].decl.desc"
-    SetTemplateCell inner, "B16", "{values[0].decl.desc}"
+    SetTemplateCell inner, "A16", "values.name.decl.scopeLabel"
+    SetTemplateCell inner, "B16", "{values.name.decl.scopeLabel}"
 
-    SetTemplateCell inner, "A17", "values[0].decl.scopeLabel"
-    SetTemplateCell inner, "B17", "{values[0].decl.scopeLabel}"
+    SetTemplateCell inner, "A17", "values.type.value"
+    SetTemplateCell inner, "B17", "{values.type.value}"
 
     SetTemplateCell inner, "A18", "extras.performCall.form"
     SetTemplateCell inner, "B18", "{extras.performCall.form}"

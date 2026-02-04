@@ -195,6 +195,68 @@
     return String(id);
   }
 
+  function flattenEntryMap(map) {
+    if (!map || typeof map !== "object") {
+      return [];
+    }
+
+    const out = [];
+    for (const key of Object.keys(map)) {
+      const entryOrList = map[key];
+      if (Array.isArray(entryOrList)) {
+        for (const entry of entryOrList) {
+          if (entry && typeof entry === "object") {
+            out.push(entry);
+          }
+        }
+        continue;
+      }
+      if (entryOrList && typeof entryOrList === "object") {
+        out.push(entryOrList);
+      }
+    }
+    return out;
+  }
+
+  function getKeywordEntries(obj) {
+    if (!obj) {
+      return [];
+    }
+    if (Array.isArray(obj.keywords)) {
+      return obj.keywords;
+    }
+    return flattenEntryMap(obj.keywords);
+  }
+
+  function getValueEntries(obj) {
+    if (!obj) {
+      return [];
+    }
+    if (Array.isArray(obj.values)) {
+      return obj.values;
+    }
+    return flattenEntryMap(obj.values);
+  }
+
+  function getFirstValueFromValues(values, key) {
+    if (!values) {
+      return "";
+    }
+
+    if (Array.isArray(values)) {
+      const match = values.find((v) => v && v.name === key && v.value);
+      return match ? String(match.value) : "";
+    }
+
+    if (typeof values !== "object") {
+      return "";
+    }
+
+    const entryOrList = values[key];
+    const entry = Array.isArray(entryOrList) ? entryOrList[0] : entryOrList;
+    return entry && entry.value ? String(entry.value) : "";
+  }
+
   function loadStorageObject(key) {
     try {
       const raw = localStorage.getItem(key);
@@ -845,10 +907,8 @@
     };
 
     walkObjects(state.data && Array.isArray(state.data.objects) ? state.data.objects : [], (obj) => {
-      if (obj && Array.isArray(obj.values)) {
-        for (const value of obj.values) {
-          addDecl(value && value.decl);
-        }
+      for (const value of getValueEntries(obj)) {
+        addDecl(value && value.decl);
       }
 
       const extras = obj && obj.extras && typeof obj.extras === "object" ? obj.extras : null;
@@ -2071,12 +2131,14 @@
         return;
       }
 
-      const keywordsText = Array.isArray(obj.keywords)
-        ? obj.keywords.map((k) => `${k.text || ""} ${k.label || ""}`.trim()).join("\n")
+      const keywordEntries = getKeywordEntries(obj);
+      const keywordsText = keywordEntries.length
+        ? keywordEntries.map((k) => `${k.text || ""} ${k.label || ""}`.trim()).join("\n")
         : "";
 
-      const valuesText = Array.isArray(obj.values)
-        ? obj.values
+      const valueEntries = getValueEntries(obj);
+      const valuesText = valueEntries.length
+        ? valueEntries
             .map((v) => {
               const declText = stringifyDecl(v && v.decl);
               const declDesc = getEffectiveDeclDesc(v && v.decl);
@@ -2692,7 +2754,7 @@
   }
 
   function renderKeywords(obj) {
-    const keywords = Array.isArray(obj.keywords) ? obj.keywords : [];
+    const keywords = getKeywordEntries(obj);
     if (!keywords.length) {
       return null;
     }
@@ -2711,7 +2773,7 @@
   }
 
   function renderValues(obj) {
-    const values = Array.isArray(obj.values) ? obj.values : [];
+    const values = getValueEntries(obj);
     if (!values.length) {
       return null;
     }
@@ -3022,11 +3084,10 @@
   }
 
   function getObjectLabel(obj) {
-    const values = Array.isArray(obj.values) ? obj.values : [];
     for (const key of ["name", "target", "form"]) {
-      const match = values.find((v) => v && v.name === key && v.value);
-      if (match) {
-        return String(match.value);
+      const value = getFirstValueFromValues(obj.values, key);
+      if (value) {
+        return value;
       }
     }
 

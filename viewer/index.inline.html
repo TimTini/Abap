@@ -759,8 +759,12 @@
       this.block = block;
       this.extras = extras;
       this.comment = comment;
-      this.keywords = keywords;
-      this.values = values;
+      if (keywords && Object.keys(keywords).length) {
+        this.keywords = keywords;
+      }
+      if (values && Object.keys(values).length) {
+        this.values = values;
+      }
       this.children = children;
     }
   }
@@ -1190,12 +1194,16 @@
       : statement.commentLines || [];
     const lineStart = overrides && overrides.lineStart ? Number(overrides.lineStart) || null : statement.lineStart;
 
-    const keywords = detectKeywords(tokens, config);
+    const keywordEntries = detectKeywords(tokens, config);
     const match = config.match || {};
     const matchType = match.type ? String(match.type).trim().toLowerCase() : "";
-    const values = matchType === "assignment"
+    const valueEntries = matchType === "assignment"
       ? captureAssignmentValues(tokens, commentText)
       : captureValues(tokens, config, commentText);
+
+    const keywords = groupEntriesByKey(keywordEntries, "label");
+    const values = groupEntriesByKey(valueEntries, "name");
+
     const extras = buildExtras(config, {
       raw,
       values,
@@ -1975,12 +1983,30 @@
   }
 
   function getFirstValue(values, name) {
-    for (const entry of values || []) {
-      if (entry && entry.name === name) {
-        return entry.value || "";
-      }
+    if (!values) {
+      return "";
     }
-    return "";
+
+    if (Array.isArray(values)) {
+      for (const entry of values) {
+        if (entry && entry.name === name) {
+          return entry.value || "";
+        }
+      }
+      return "";
+    }
+
+    if (typeof values !== "object") {
+      return "";
+    }
+
+    const entryOrList = values[name];
+    if (!entryOrList) {
+      return "";
+    }
+
+    const entry = Array.isArray(entryOrList) ? entryOrList[0] : entryOrList;
+    return entry && entry.value ? entry.value || "" : "";
   }
 
   function ensureScopeMap(declByScope, scopeId) {
@@ -2479,24 +2505,42 @@
   }
 
   function annotateValuesWithDecls(values, context) {
-    if (!Array.isArray(values)) {
-      return;
-    }
-
-    for (const entry of values) {
+    const annotateEntry = (entry) => {
       if (!entry || !entry.value) {
-        continue;
+        return;
       }
       const ref = extractFirstIdentifierFromExpression(entry.value);
       if (!ref) {
-        continue;
+        return;
       }
       const decl = resolveDecl(ref, context);
       if (!decl) {
-        continue;
+        return;
       }
       entry.declRef = ref;
       entry.decl = decl;
+    };
+
+    if (Array.isArray(values)) {
+      for (const entry of values) {
+        annotateEntry(entry);
+      }
+      return;
+    }
+
+    if (!values || typeof values !== "object") {
+      return;
+    }
+
+    for (const key of Object.keys(values)) {
+      const entryOrList = values[key];
+      if (Array.isArray(entryOrList)) {
+        for (const entry of entryOrList) {
+          annotateEntry(entry);
+        }
+        continue;
+      }
+      annotateEntry(entryOrList);
     }
   }
 
@@ -2774,13 +2818,58 @@
 
   function valuesToFirstValueMap(values) {
     const map = {};
-    for (const entry of values || []) {
-      if (!entry || !entry.name) {
+
+    if (Array.isArray(values)) {
+      for (const entry of values) {
+        if (!entry || !entry.name) {
+          continue;
+        }
+        if (map[entry.name] === undefined) {
+          map[entry.name] = entry.value || "";
+        }
+      }
+      return map;
+    }
+
+    if (!values || typeof values !== "object") {
+      return map;
+    }
+
+    for (const [name, entryOrList] of Object.entries(values)) {
+      const entry = Array.isArray(entryOrList) ? entryOrList[0] : entryOrList;
+      if (!entry) {
         continue;
       }
-      if (map[entry.name] === undefined) {
-        map[entry.name] = entry.value || "";
+      map[name] = entry.value || "";
+    }
+
+    return map;
+  }
+
+  function groupEntriesByKey(entries, key) {
+    const map = {};
+    for (const entry of entries || []) {
+      if (!entry || entry[key] === undefined || entry[key] === null) {
+        continue;
       }
+
+      const name = String(entry[key]).trim();
+      if (!name) {
+        continue;
+      }
+
+      const current = map[name];
+      if (current === undefined) {
+        map[name] = entry;
+        continue;
+      }
+
+      if (Array.isArray(current)) {
+        current.push(entry);
+        continue;
+      }
+
+      map[name] = [current, entry];
     }
     return map;
   }
@@ -6462,6 +6551,68 @@
     return String(id);
   }
 
+  function flattenEntryMap(map) {
+    if (!map || typeof map !== "object") {
+      return [];
+    }
+
+    const out = [];
+    for (const key of Object.keys(map)) {
+      const entryOrList = map[key];
+      if (Array.isArray(entryOrList)) {
+        for (const entry of entryOrList) {
+          if (entry && typeof entry === "object") {
+            out.push(entry);
+          }
+        }
+        continue;
+      }
+      if (entryOrList && typeof entryOrList === "object") {
+        out.push(entryOrList);
+      }
+    }
+    return out;
+  }
+
+  function getKeywordEntries(obj) {
+    if (!obj) {
+      return [];
+    }
+    if (Array.isArray(obj.keywords)) {
+      return obj.keywords;
+    }
+    return flattenEntryMap(obj.keywords);
+  }
+
+  function getValueEntries(obj) {
+    if (!obj) {
+      return [];
+    }
+    if (Array.isArray(obj.values)) {
+      return obj.values;
+    }
+    return flattenEntryMap(obj.values);
+  }
+
+  function getFirstValueFromValues(values, key) {
+    if (!values) {
+      return "";
+    }
+
+    if (Array.isArray(values)) {
+      const match = values.find((v) => v && v.name === key && v.value);
+      return match ? String(match.value) : "";
+    }
+
+    if (typeof values !== "object") {
+      return "";
+    }
+
+    const entryOrList = values[key];
+    const entry = Array.isArray(entryOrList) ? entryOrList[0] : entryOrList;
+    return entry && entry.value ? String(entry.value) : "";
+  }
+
   function loadStorageObject(key) {
     try {
       const raw = localStorage.getItem(key);
@@ -7112,10 +7263,8 @@
     };
 
     walkObjects(state.data && Array.isArray(state.data.objects) ? state.data.objects : [], (obj) => {
-      if (obj && Array.isArray(obj.values)) {
-        for (const value of obj.values) {
-          addDecl(value && value.decl);
-        }
+      for (const value of getValueEntries(obj)) {
+        addDecl(value && value.decl);
       }
 
       const extras = obj && obj.extras && typeof obj.extras === "object" ? obj.extras : null;
@@ -8338,12 +8487,14 @@
         return;
       }
 
-      const keywordsText = Array.isArray(obj.keywords)
-        ? obj.keywords.map((k) => `${k.text || ""} ${k.label || ""}`.trim()).join("\n")
+      const keywordEntries = getKeywordEntries(obj);
+      const keywordsText = keywordEntries.length
+        ? keywordEntries.map((k) => `${k.text || ""} ${k.label || ""}`.trim()).join("\n")
         : "";
 
-      const valuesText = Array.isArray(obj.values)
-        ? obj.values
+      const valueEntries = getValueEntries(obj);
+      const valuesText = valueEntries.length
+        ? valueEntries
             .map((v) => {
               const declText = stringifyDecl(v && v.decl);
               const declDesc = getEffectiveDeclDesc(v && v.decl);
@@ -8959,7 +9110,7 @@
   }
 
   function renderKeywords(obj) {
-    const keywords = Array.isArray(obj.keywords) ? obj.keywords : [];
+    const keywords = getKeywordEntries(obj);
     if (!keywords.length) {
       return null;
     }
@@ -8978,7 +9129,7 @@
   }
 
   function renderValues(obj) {
-    const values = Array.isArray(obj.values) ? obj.values : [];
+    const values = getValueEntries(obj);
     if (!values.length) {
       return null;
     }
@@ -9289,11 +9440,10 @@
   }
 
   function getObjectLabel(obj) {
-    const values = Array.isArray(obj.values) ? obj.values : [];
     for (const key of ["name", "target", "form"]) {
-      const match = values.find((v) => v && v.name === key && v.value);
-      if (match) {
-        return String(match.value);
+      const value = getFirstValueFromValues(obj.values, key);
+      if (value) {
+        return value;
       }
     }
 
