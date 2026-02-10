@@ -1,0 +1,136 @@
+Các Yêu cầu đã yêu cầu.
+hãy trả về code cũ.
+Ý tôi `Giúp tôi thêm option để lọc các object chưa có mô tả.`
+Là lọc trên web, chứ không phải từ vba.
+
+Ngoài ra xử lý nâng cao giúp tôi trường hợp khai báo và xử dụng struct, các mô tả ... 
+
+Tôi nghĩ xử lý này khá phức tạp, nên hãy trình bày nội dung bạn hiểu và confirm lại trước khi thực hiện.
+Nếu có câu hỏi thì hãy confirm trước khi thực hiện.
+----------------
+1. Bỏ qua, tôi đã tự trả về code cũ rồi nên hãy bỏ qua.
+2. Của cả 2
+3. Mức đầy đủ. Nhưng hãy lưu ý khi chỉnh sửa mô tả của các struct dạng này.
+Hãy cho phép chỉnh sửa cả mô tả của struct và mô tả của item trong struct.
+Khi hiển thị lên thì hãy hiển thị dang StructDesc-ItemOfStructDesc
+
+Hãy tạo thêm một modal để setting kí tự nào sẽ gạch nối giữa Mô tả của struct và item nữa.
+Ví dụ có thể format như này:
+ [StructDesc][ItemOfStructDesc]
+[StructDesc]-[ItemOfStructDesc]
+StructDesc-[ItemOfStructDesc]
+
+Ngoài ra đối với các đặt tên biến.
+Hãy giúp tôi chuẩn hóa lại cho thống nhất, vì có thể trong một program được chỉnh sửa nhiều lần, cách đặt tên cũng lẫn lộn.
+Với các tiền tố.
+1 ký tự ngẫu nhiên + `CN` thì hãy tự động đặt lại tên là => HẰNG:[Mô tả từ user|code]
+1 ký tự ngẫu nhiên + `DS` thì hãy tự động đặt lại tên là => STRUCT:[Mô tả từ user|code]
+1 ký tự ngẫu nhiên + `DT` thì hãy tự động đặt lại tên là => TABLE:[Mô tả từ user|code]
+1 ký tự ngẫu nhiên + `DR` thì hãy tự động đặt lại tên là => RANGETABLE:[Mô tả từ user|code]
+1 ký tự ngẫu nhiên + `DF thì hãy tự động đặt lại tên là => BIẾN:[Mô tả từ user|code]
+1 ký tự ngẫu nhiên + `FL` thì hãy tự động đặt lại tên là => CỜ:[Mô tả từ user|code]
+1 ký tự ngẫu nhiên + `FS` thì hãy tự động đặt lại tên là => FIELDSYMBOL:[Mô tả từ user|code]
+Các trường hợp bên trên hãy cho vào modal để user có thể chỉnh sửa riêng.
+
+Trường hợp Mô tả của USER|Code đã bắt từ "Hằng", "STRUCT", "TABLE", ... thì chỉ cần format lại phía sau cho thống nhật.
+Tránh bị trùng.
+
+
+Tôi nghĩ xử lý này khá phức tạp, nên hãy trình bày nội dung bạn hiểu và confirm lại trước khi thực hiện.
+Nếu có câu hỏi thì hãy confirm trước khi thực hiện.
+
+---
+Hiện tại tôi rất khó để chỉnh sửa mô tả.
+Hãy tách chức năng `missing decl desc` sang một modal.
+Có thể hiển thị toàn bộ object hoặc chỉ object chưa có mô tả.
+Chỉ cần hiển thị đủ để có thể chỉnh sửa mô tả cho thuận tiện thôi nhé.
+Tôi nghĩ xử lý này khá phức tạp, nên hãy trình bày nội dung bạn hiểu và confirm lại trước khi thực hiện.
+Nếu có câu hỏi thì hãy confirm trước khi thực hiện.
+
+---
+Ở Input (ABAP / JSON)
+Thêm Number line code từng dòng giúp tôi.
+Ngoài ra hãy thêm một icon nhỏ, khi nhấn vào thì sẽ scroll ở Output|Descriptions lại đúng mục đó nếu có được không?
+Tôi nghĩ xử lý này khá phức tạp, nên hãy trình bày nội dung bạn hiểu và confirm lại trước khi thực hiện.
+Nếu có câu hỏi thì hãy confirm trước khi thực hiện.
+
+----
+
+1. icon sẽ hiện ở các câu lệnh abap có convert đc sang Object, không phải dòng nào cũng hiện.
+2. Chỉ Jump tab đang mở.
+3. Ẩn luôn icon ở line code nếu nó bị filter ẩn đi.
+Tôi nghĩ xử lý này khá phức tạp, nên hãy trình bày nội dung bạn hiểu và confirm lại trước khi thực hiện.
+Nếu có câu hỏi thì hãy confirm trước khi thực hiện. Nếu không có thì hãy thực hiện.
+---
+Tạo một option cờ chuẩn hóa, default là On
+Đổi thẳng luôn desc, tương tự vs khi user đặt desc.
+Nhưng đối vs desc user đặt, thêm một sub cờ ghi đè chuẩn hóa, chỉ đổi vs item đó, đôi vs struct thì cũng chỉ ảnh hưởng đến item, không ảnh hưởng đến cả struct.
+
+Khi còn chuẩn hóa ở item mà tắt thì không chuẩn hóa
+
+Tôi nghĩ xử lý này khá phức tạp, nên hãy trình bày nội dung bạn hiểu và confirm lại trước khi thực hiện.
+Nếu có câu hỏi thì hãy confirm trước khi thực hiện. Nếu không có thì hãy thực hiện.
+------
+Kiểm tra và Update phần lấy mô tả từ code. Đang có lỗi xảy ra.
+Trường hợp khi dùng nhiều câu lệnh cùng lúc (đùng dấu :), thi mô tả của nó bị cộng dồn.
+Ví dụ:
+`* TYPES (BEGIN/END) + plain TYPES
+TYPES: BEGIN OF ty_row,
+         bukrs TYPE t001-bukrs, "Mã Công ty
+         butxt TYPE t001-butxt, "Tên Công ty
+       END OF ty_row.
+TYPES ty_rows TYPE STANDARD TABLE OF ty_row.
+
+* DATA / CONSTANTS / RANGES / FIELD-SYMBOLS / STATICS
+DATA gv_user TYPE syuname. "Global user
+DATA: gt_rows TYPE ty_rows, "Thông tin công ty
+      gs_row  TYPE ty_row,  "Danh sách thông tin công ty
+      gv_cnt  TYPE i VALUE 0,
+      lo_demo TYPE REF TO lcl_demo,
+      lv_text TYPE string.`
+
+
+Ở khai báo data có dùng ":"
+Kết quả lấy mô tả từ code hiện tại sẽ là "Thông tin công ty Danh sách thông tin công ty"
+Nó đang bị nối lại với nhau cho toàn bộ data được khai báo. Như v là không đúng.
+Đúng phải là:
+    Chỉ gt_rows sẽ có mô tả là "Thông tin công ty"
+    Chỉ gs_row sẽ có mô tả la "Danh sách thông tin công ty"
+    gv_cnt, lo_demo, lv_text không có mô tả.
+
+Tôi nghĩ xử lý này khá phức tạp, nên hãy trình bày nội dung bạn hiểu và confirm lại trước khi thực hiện.
+Nếu có câu hỏi thì hãy confirm trước khi thực hiện. Nếu không có thì hãy thực hiện.
+
+----
+
+thay vi tạo json/xml dùng array như này.
+`{keywords[0].text}
+{keywords[0].label}
+{values[0].name}
+{values[0].value}`
+Hãy sửa thành tên của phần đó được không?
+Vì nhiều câu lệnh chỉ là optional, nên khó mà phân biệt được phần nào của phần nào.
+Tôi thấy ở phần code Extra bạn đang làm tốt phần đó. Có thể dùng code đó dùng cho toàn bộ câu lênh không?
+Tôi nghĩ xử lý này khá phức tạp, nên hãy trình bày nội dung bạn hiểu và confirm lại trước khi thực hiện.
+Nếu có câu hỏi thì hãy confirm trước khi thực hiện. Nếu không có thì hãy thực hiện.
+-----
+Tôi nghĩ map theo tên có thể thay thế hoàn toàn map theo array rồi, đúng không?
+Nên hãy xóa luôn các đoạn code về array thì có ảnh hưởng gì không?
+Tôi nghĩ xử lý này khá phức tạp, nên hãy trình bày nội dung bạn hiểu và confirm lại trước khi thực hiện.
+Nếu có câu hỏi thì hãy confirm trước khi thực hiện. Nếu không có thì hãy thực hiện.
+--------
+Trường hợp nào có thể có nhiều entries thì dùng array.
+Nhưng không dùng kiẻu keywords[]/values[]
+Mà sẽ dùng dạng, ví dụ cho perform/form, using là có thể có nhiều.
+Thì mình sễ để object.using[
+    {name...label...}
+] 
+Cấu trúc tương tự v. chỉ là tôi ví dụ, bạn có thể tự cấu trúc cho phù hợp hơn.
+Như v là sẽ không bị mất entries nữa đúng không?
+Tôi nghĩ xử lý này khá phức tạp, nên hãy trình bày nội dung bạn hiểu và confirm lại trước khi thực hiện.
+Nếu có câu hỏi thì hãy confirm trước khi thực hiện. Nếu không có thì hãy thực hiện.
+------
+Thêm một node để hiển thị final desc.
+Ưu tiên lấy mô tả từ user, nếu k có thì lấy từ code. Đã chuẩn hóa.
+Tôi nghĩ xử lý này khá phức tạp, nên hãy trình bày nội dung bạn hiểu và confirm lại trước khi thực hiện.
+Nếu có câu hỏi thì hãy confirm trước khi thực hiện. Nếu không có thì hãy thực hiện.

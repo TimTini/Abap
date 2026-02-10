@@ -237,14 +237,40 @@
   }
 
   function splitCodeAndInlineComment(line) {
-    const index = line.indexOf('"');
-    if (index === -1) {
-      return { code: line, comment: "" };
+    const text = String(line || "");
+    let inSingleQuote = false;
+    let inPipe = false;
+
+    for (let index = 0; index < text.length; index += 1) {
+      const char = text[index];
+      const next = index + 1 < text.length ? text[index + 1] : "";
+
+      if (char === "'" && !inPipe) {
+        if (inSingleQuote && next === "'") {
+          index += 1;
+          continue;
+        }
+        inSingleQuote = !inSingleQuote;
+        continue;
+      }
+
+      if (char === "|" && !inSingleQuote) {
+        if (inPipe && next === "|") {
+          index += 1;
+          continue;
+        }
+        inPipe = !inPipe;
+        continue;
+      }
+
+      if (char === '"' && !inSingleQuote && !inPipe) {
+        const code = text.slice(0, index);
+        const comment = text.slice(index + 1).trim();
+        return { code, comment };
+      }
     }
 
-    const code = line.slice(0, index);
-    const comment = line.slice(index + 1).trim();
-    return { code, comment };
+    return { code: text, comment: "" };
   }
 
   function parseStatements(statements, configs, fileName) {
@@ -1965,7 +1991,7 @@
     if (text.startsWith("'") || text.startsWith("|")) {
       return "";
     }
-    if (/^[+-]?\\d/.test(text)) {
+    if (/^[+-]?\d/.test(text)) {
       return "";
     }
 
@@ -2006,9 +2032,9 @@
 
   function extractFirstInlineDeclaration(text) {
     const patterns = [
-      { regex: /@?DATA\\s*\\(\\s*([^)]+)\\s*\\)/i, group: 1 },
-      { regex: /@?FINAL\\s*\\(\\s*([^)]+)\\s*\\)/i, group: 1 },
-      { regex: /FIELD-SYMBOL\\s*\\(\\s*(<[^>]+>)\\s*\\)/i, group: 1 }
+      { regex: /@?DATA\s*\(\s*([^)]+)\s*\)/i, group: 1 },
+      { regex: /@?FINAL\s*\(\s*([^)]+)\s*\)/i, group: 1 },
+      { regex: /FIELD-SYMBOL\s*\(\s*(<[^>]+>)\s*\)/i, group: 1 }
     ];
 
     let best = null;
@@ -2048,42 +2074,72 @@
     const tokens = tokenize(`${trimmed}.`).map((token) => token.raw).filter(Boolean);
     const assignments = [];
 
-    for (let index = 0; index < tokens.length; index += 1) {
+    function findNextAssignmentStart(startIndex) {
+      for (let index = startIndex; index < tokens.length; index += 1) {
+        const token = tokens[index];
+        if (token === "=") {
+          continue;
+        }
+
+        if (tokens[index + 1] === "=" && normalizeFormParamName(token)) {
+          return index;
+        }
+
+        const equalIndex = token.indexOf("=");
+        if (equalIndex > 0) {
+          const left = token.slice(0, equalIndex).trim();
+          if (normalizeFormParamName(left)) {
+            return index;
+          }
+        }
+      }
+      return tokens.length;
+    }
+
+    for (let index = 0; index < tokens.length;) {
       const token = tokens[index];
+      let name = "";
+      let valueStartIndex = -1;
+      let inlineFirstValue = "";
 
-      if (token === "=") {
+      if (token !== "=") {
+        const equalIndex = token.indexOf("=");
+        if (equalIndex > 0) {
+          const left = token.slice(0, equalIndex).trim();
+          const rightInline = token.slice(equalIndex + 1).trim();
+          const parsedName = normalizeFormParamName(left);
+          if (parsedName) {
+            name = parsedName;
+            inlineFirstValue = rightInline;
+            valueStartIndex = index + 1;
+            index += 1;
+          }
+        } else if (tokens[index + 1] === "=") {
+          const parsedName = normalizeFormParamName(token);
+          if (parsedName) {
+            name = parsedName;
+            valueStartIndex = index + 2;
+            index += 2;
+          }
+        }
+      }
+
+      if (!name) {
+        index += 1;
         continue;
       }
 
-      const equalIndex = token.indexOf("=");
-      if (equalIndex > 0) {
-        const left = token.slice(0, equalIndex).trim();
-        const rightInline = token.slice(equalIndex + 1).trim();
-
-        const name = normalizeFormParamName(left);
-        if (!name) {
-          continue;
-        }
-
-        const value = rightInline || (tokens[index + 1] || "");
-        if (!rightInline) {
-          index += 1;
-        }
-
-        assignments.push({ name, value });
-        continue;
+      const nextAssignmentIndex = findNextAssignmentStart(valueStartIndex);
+      const valueParts = [];
+      if (inlineFirstValue) {
+        valueParts.push(inlineFirstValue);
+      }
+      for (let valueIndex = valueStartIndex; valueIndex < nextAssignmentIndex; valueIndex += 1) {
+        valueParts.push(tokens[valueIndex]);
       }
 
-      if (tokens[index + 1] === "=" && tokens[index + 2]) {
-        const name = normalizeFormParamName(token);
-        if (!name) {
-          continue;
-        }
-
-        const value = tokens[index + 2];
-        assignments.push({ name, value });
-        index += 2;
-      }
+      assignments.push({ name, value: valueParts.join(" ").trim() });
+      index = nextAssignmentIndex;
     }
 
     return assignments;
@@ -2561,10 +2617,17 @@
       if (char === "'" || char === "|") {
         const quoteChar = char;
         let end = index + 1;
-        while (end < withoutDot.length && withoutDot[end] !== quoteChar) {
-          end += 1;
-        }
-        if (end < withoutDot.length) {
+        while (end < withoutDot.length) {
+          const current = withoutDot[end];
+          const next = end + 1 < withoutDot.length ? withoutDot[end + 1] : "";
+          if (current === quoteChar) {
+            if ((quoteChar === "'" || quoteChar === "|") && next === quoteChar) {
+              end += 2;
+              continue;
+            }
+            end += 1;
+            break;
+          }
           end += 1;
         }
         const token = withoutDot.slice(index, end);

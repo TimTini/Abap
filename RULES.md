@@ -257,6 +257,7 @@ Lưu ý cho Excel:
 - VBA hiện dùng XPath `/abapflowObjects/objects/object` và đọc chủ yếu: `id`, `objectType`, `lineStart`, `raw`.
 - “Routine key” trong Excel được lấy ưu tiên từ `values/<name>/value` với key `name|target|form`, hoặc fallback trong `extras.callFunction.name`, `extras.callMethod.target`, `extras.performCall.form`, `extras.form.name`, `extras.methodSignature.name`.
   - Nếu bạn thêm statement mới mà muốn Excel nhận đúng routine key: nên tạo `captureRules` có `name` là `name` hoặc `target` hoặc `form` (hoặc update VBA).
+- `finalDesc`: trong XML, nếu 1 value entry có `decl` thì Viewer sẽ thêm node `<finalDesc>` (ưu tiên user desc nếu có, fallback code desc, đã normalize) để tiện dùng placeholder (vd: `values.name.finalDesc`).
 
 ## 9) Quy trình thêm rule mới (khuyến nghị)
 

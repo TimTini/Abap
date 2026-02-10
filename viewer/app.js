@@ -1589,6 +1589,30 @@
     return normalizeEnabled ? normalizeDeclDescText(decl, base) : base;
   }
 
+  function getFinalDeclAtomicDescNormalized(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+
+    const settings = state.settings || DEFAULT_SETTINGS;
+    const normalizeEnabled = Boolean(settings.normalizeDeclDesc);
+
+    const overrideEntry = getDeclOverrideEntry(decl);
+    const overrideText = overrideEntry.text ? String(overrideEntry.text) : "";
+    if (overrideText) {
+      if (!normalizeEnabled || overrideEntry.noNormalize) {
+        return overrideText;
+      }
+      return normalizeDeclDescText(decl, overrideText);
+    }
+
+    const source = getSourceDeclDesc(decl);
+    if (!source) {
+      return "";
+    }
+    return normalizeEnabled ? normalizeDeclDescText(decl, source) : source;
+  }
+
   function buildStructDeclFromFieldDecl(decl) {
     if (!decl || typeof decl !== "object") {
       return null;
@@ -1649,6 +1673,39 @@
     }
 
     return getEffectiveDeclAtomicDescNormalized(decl);
+  }
+
+  function formatStructFieldFinalDesc(decl) {
+    if (!isStructFieldDecl(decl)) {
+      return getFinalDeclAtomicDescNormalized(decl);
+    }
+
+    const structDecl = buildStructDeclFromFieldDecl(decl);
+    const structText = structDecl ? String(getFinalDeclAtomicDescNormalized(structDecl) || "").trim() : "";
+    const itemText = String(getFinalDeclAtomicDescNormalized(decl) || "").trim();
+
+    if (!structText && !itemText) {
+      return "";
+    }
+    if (!structText) {
+      return itemText;
+    }
+    if (!itemText) {
+      return structText;
+    }
+
+    const settings = state.settings || DEFAULT_SETTINGS;
+    const template = settings.structDescTemplate || DEFAULT_SETTINGS.structDescTemplate;
+    return String(template || DEFAULT_SETTINGS.structDescTemplate)
+      .replace(/\{\{struct\}\}/g, structText)
+      .replace(/\{\{item\}\}/g, itemText);
+  }
+
+  function getFinalDeclDesc(decl) {
+    if (isStructFieldDecl(decl)) {
+      return formatStructFieldFinalDesc(decl);
+    }
+    return getFinalDeclAtomicDescNormalized(decl);
   }
 
   function openEditModal({ mode, key, structKey, itemKey, label, hint, initialValue, structValue, itemValue, skipNormalize }) {
@@ -1971,6 +2028,15 @@
 
         const declName = getDeclDisplayName(value) || getDeclTechName(value);
         lines.push(`${" ".repeat(indent + 2)}<name>${escapeXmlText(declName)}</name>`);
+      }
+
+      if (!isDeclLikeObject(value) && isDeclLikeObject(value.decl)) {
+        const finalDesc = getFinalDeclDesc(value.decl);
+        if (finalDesc) {
+          lines.push(`${" ".repeat(indent + 2)}<finalDesc>${escapeXmlText(finalDesc)}</finalDesc>`);
+        } else {
+          lines.push(`${" ".repeat(indent + 2)}<finalDesc/>`);
+        }
       }
 
       const preferredOrder = [

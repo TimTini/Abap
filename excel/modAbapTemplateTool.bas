@@ -1595,6 +1595,9 @@ Private Sub SeedGenericTemplate(ByVal inner As Range)
     SetTemplateCell inner, "A23", "__DUMP__"
     SetTemplateCell inner, "B23", "{__DUMP__}"
 
+    SetTemplateCell inner, "A24", "values.name.finalDesc"
+    SetTemplateCell inner, "B24", "{values.name.finalDesc}"
+
     ApplyJapanesePathValueTableStyle inner
 End Sub
 
