@@ -582,11 +582,21 @@ Public Sub GenerateAllTemplatesFromXml()
         removeEmpty = ShouldRemoveEmptyRows(wsCfg, templateKey)
         Dim removeAdv As Boolean
         removeAdv = ShouldRemoveEmptyRowsAdvanced(wsCfg, templateKey)
+        Dim expandArrayRows As Boolean
+        expandArrayRows = ShouldExpandArrayRows(wsCfg, templateKey)
 
         Dim rowInfo As Object
         If removeAdv Then Set rowInfo = CreateObject("Scripting.Dictionary")
 
         FillRangePlaceholders outRange, objNode, rowInfo
+
+        Dim expandedRows As Long
+        If expandArrayRows Then
+            expandedRows = ExpandMultiLineCellsToRows(outRange, rowInfo)
+            If expandedRows > 0 Then
+                Set outRange = wsTpl.Range(dest, dest.Offset(sample.Rows.Count + expandedRows - 1, sample.Columns.Count - 1))
+            End If
+        End If
 
         Dim removed As Long
         If removeAdv Then
@@ -597,7 +607,7 @@ Public Sub GenerateAllTemplatesFromXml()
             removed = 0
         End If
 
-        rowPtr = rowPtr + (sample.Rows.Count - removed) + BLOCK_GAP_ROWS
+        rowPtr = rowPtr + (sample.Rows.Count + expandedRows - removed) + BLOCK_GAP_ROWS
 
 NextObj:
         If stepIndex Mod 20 = 0 Or stepIndex = totalCount Then
@@ -974,6 +984,69 @@ Private Function ShouldRemoveEmptyRowsAdvanced(ByVal wsCfg As Worksheet, ByVal t
     Next c
 End Function
 
+Private Function ShouldExpandArrayRows(ByVal wsCfg As Worksheet, ByVal templateKey As String) As Boolean
+    ShouldExpandArrayRows = False
+
+    Dim tlMarker As String, trMarker As String
+    tlMarker = MakeMarker(templateKey, "TL")
+    trMarker = MakeMarker(templateKey, "TR")
+
+    Dim tl As Range, tr As Range
+    Set tl = FindMarkerCell(wsCfg, tlMarker)
+    Set tr = FindMarkerCell(wsCfg, trMarker)
+    If tl Is Nothing Or tr Is Nothing Then Exit Function
+    If tl.Row <> tr.Row Then Exit Function
+
+    Dim c As Long
+    For c = tl.Column + 1 To tr.Column - 1
+        Dim v As Variant
+        v = wsCfg.Cells(tl.Row, c).Value2
+        If VarType(v) = vbString Then
+            Dim flag As Boolean
+            If ParseBoolOption(CStr(v), "expandArrayRows", flag) Then
+                ShouldExpandArrayRows = flag
+                Exit Function
+            End If
+            If ParseBoolOption(CStr(v), "expandMultilineRows", flag) Then
+                ShouldExpandArrayRows = flag
+                Exit Function
+            End If
+            If ParseBoolOption(CStr(v), "arrayToRows", flag) Then
+                ShouldExpandArrayRows = flag
+                Exit Function
+            End If
+        End If
+    Next c
+
+    ' Fallback: allow placing the option inside the template body rows as plain text,
+    ' e.g. "expandArrayRows=true" in any cell within the template sample block.
+    Dim inner As Range
+    Set inner = GetTemplateSampleRange(wsCfg, templateKey)
+    If inner Is Nothing Then Exit Function
+
+    Dim r As Long
+    For r = 1 To inner.Rows.Count
+        For c = 1 To inner.Columns.Count
+            v = inner.Cells(r, c).Value2
+            If VarType(v) = vbString Then
+                Dim flag2 As Boolean
+                If ParseBoolOption(CStr(v), "expandArrayRows", flag2) Then
+                    ShouldExpandArrayRows = flag2
+                    Exit Function
+                End If
+                If ParseBoolOption(CStr(v), "expandMultilineRows", flag2) Then
+                    ShouldExpandArrayRows = flag2
+                    Exit Function
+                End If
+                If ParseBoolOption(CStr(v), "arrayToRows", flag2) Then
+                    ShouldExpandArrayRows = flag2
+                    Exit Function
+                End If
+            End If
+        Next c
+    Next r
+End Function
+
 Private Function ParseBoolOption(ByVal text As String, ByVal key As String, ByRef outValue As Boolean) As Boolean
     Dim s As String
     s = LCase$(Trim$(CStr(text)))
@@ -1113,6 +1186,185 @@ Private Function IsRowBlank(ByVal rowRange As Range) As Boolean
 NextCell:
     Next cell
     IsRowBlank = True
+End Function
+
+Private Function ExpandMultiLineCellsToRows(ByVal targetRange As Range, Optional ByVal rowInfo As Object = Nothing) As Long
+    If targetRange Is Nothing Then Exit Function
+
+    Dim ws As Worksheet
+    Set ws = targetRange.Worksheet
+    If ws Is Nothing Then Exit Function
+
+    Dim firstCol As Long
+    firstCol = targetRange.Column
+    Dim lastCol As Long
+    lastCol = targetRange.Column + targetRange.Columns.Count - 1
+
+    Dim r As Long
+    For r = targetRange.Rows.Count To 1 Step -1
+        Dim absoluteRow As Long
+        absoluteRow = targetRange.Row + r - 1
+
+        Dim c As Long
+        Dim maxLines As Long
+        maxLines = 1
+
+        Dim cellTexts() As String
+        ReDim cellTexts(firstCol To lastCol) As String
+
+        For c = firstCol To lastCol
+            cellTexts(c) = CStr(ws.Cells(absoluteRow, c).Value2)
+            Dim lineCount As Long
+            lineCount = CountTextLines(cellTexts(c))
+            If lineCount > maxLines Then maxLines = lineCount
+        Next c
+
+        If maxLines <= 1 Then GoTo NextRow
+
+        Dim extraRows As Long
+        extraRows = maxLines - 1
+
+        If Not rowInfo Is Nothing Then
+            ShiftRowInfoDown rowInfo, absoluteRow + 1, extraRows
+        End If
+
+        Dim i As Long
+        For i = 1 To extraRows
+            ws.Rows(absoluteRow + i).Insert Shift:=xlDown
+            ws.Range(ws.Cells(absoluteRow, firstCol), ws.Cells(absoluteRow, lastCol)).Copy _
+                Destination:=ws.Cells(absoluteRow + i, firstCol)
+            If Not rowInfo Is Nothing Then
+                CopyRowInfoEntry rowInfo, absoluteRow, absoluteRow + i
+            End If
+        Next i
+
+        For c = firstCol To lastCol
+            Dim lineValues As Variant
+            lineValues = SplitTextLines(cellTexts(c))
+
+            For i = 1 To maxLines
+                If IsArray(lineValues) Then
+                    If UBound(lineValues) >= LBound(lineValues) Then
+                        If (i - 1) <= UBound(lineValues) Then
+                            ws.Cells(absoluteRow + i - 1, c).Value2 = CStr(lineValues(i - 1))
+                        Else
+                            ws.Cells(absoluteRow + i - 1, c).Value2 = CStr(lineValues(UBound(lineValues)))
+                        End If
+                    Else
+                        ws.Cells(absoluteRow + i - 1, c).Value2 = vbNullString
+                    End If
+                Else
+                    ws.Cells(absoluteRow + i - 1, c).Value2 = CStr(lineValues)
+                End If
+            Next i
+        Next c
+
+        ExpandMultiLineCellsToRows = ExpandMultiLineCellsToRows + extraRows
+NextRow:
+    Next r
+
+    Application.CutCopyMode = False
+End Function
+
+Private Sub ShiftRowInfoDown(ByVal rowInfo As Object, ByVal fromRow As Long, ByVal delta As Long)
+    If rowInfo Is Nothing Then Exit Sub
+    If delta <= 0 Then Exit Sub
+
+    Dim keys As Variant
+    keys = rowInfo.Keys
+    If Not IsArray(keys) Then Exit Sub
+
+    Dim rows() As Long
+    Dim count As Long
+    count = -1
+
+    Dim key As Variant
+    For Each key In keys
+        Dim rowNo As Long
+        rowNo = CLng(Val(CStr(key)))
+        If rowNo >= fromRow Then
+            count = count + 1
+            ReDim Preserve rows(0 To count)
+            rows(count) = rowNo
+        End If
+    Next key
+
+    If count < 0 Then Exit Sub
+
+    Dim i As Long, j As Long
+    For i = 0 To count - 1
+        For j = i + 1 To count
+            If rows(j) > rows(i) Then
+                Dim tmp As Long
+                tmp = rows(i)
+                rows(i) = rows(j)
+                rows(j) = tmp
+            End If
+        Next j
+    Next i
+
+    For i = 0 To count
+        Dim srcKey As String
+        srcKey = CStr(rows(i))
+        If rowInfo.Exists(srcKey) Then
+            Dim dstKey As String
+            dstKey = CStr(rows(i) + delta)
+            Dim info As Object
+            Set info = rowInfo(srcKey)
+            If rowInfo.Exists(dstKey) Then rowInfo.Remove dstKey
+            rowInfo.Add dstKey, info
+            rowInfo.Remove srcKey
+        End If
+    Next i
+End Sub
+
+Private Sub CopyRowInfoEntry(ByVal rowInfo As Object, ByVal srcRow As Long, ByVal dstRow As Long)
+    If rowInfo Is Nothing Then Exit Sub
+
+    Dim srcKey As String
+    srcKey = CStr(srcRow)
+    If Not rowInfo.Exists(srcKey) Then Exit Sub
+
+    Dim srcInfo As Object
+    Set srcInfo = rowInfo(srcKey)
+    If srcInfo Is Nothing Then Exit Sub
+
+    Dim dstInfo As Object
+    Set dstInfo = CreateObject("Scripting.Dictionary")
+
+    Dim k As Variant
+    For Each k In srcInfo.Keys
+        dstInfo(CStr(k)) = srcInfo(k)
+    Next k
+
+    Dim dstKey As String
+    dstKey = CStr(dstRow)
+    If rowInfo.Exists(dstKey) Then rowInfo.Remove dstKey
+    rowInfo.Add dstKey, dstInfo
+End Sub
+
+Private Function SplitTextLines(ByVal text As String) As Variant
+    Dim normalized As String
+    normalized = CStr(text)
+    normalized = Replace(normalized, vbCrLf, vbLf)
+    normalized = Replace(normalized, vbCr, vbLf)
+
+    If Len(normalized) = 0 Then
+        SplitTextLines = Array(vbNullString)
+    Else
+        SplitTextLines = Split(normalized, vbLf)
+    End If
+End Function
+
+Private Function CountTextLines(ByVal text As String) As Long
+    Dim arr As Variant
+    arr = SplitTextLines(text)
+
+    If IsArray(arr) Then
+        CountTextLines = UBound(arr) - LBound(arr) + 1
+    Else
+        CountTextLines = 1
+    End If
 End Function
 
 Private Function ReplacePlaceholders(ByVal text As String, ByVal contextNode As Object, Optional ByRef anyTokenValue As Boolean = False) As String
@@ -1345,34 +1597,39 @@ Private Function ResolvePathPartNodes(ByVal currentNodes As Collection, ByVal ch
     For Each cur In currentNodes
         If cur Is Nothing Then GoTo NextNode
 
-        Dim child As Object
-        Set child = FindChildElementByName(cur, childName)
-        If child Is Nothing Then GoTo NextNode
+        Dim matches As Collection
+        Set matches = FindChildElementsByName(cur, childName)
+        If matches Is Nothing Or matches.Count = 0 Then GoTo NextNode
 
+        Dim matched As Variant
         If Not indices Is Nothing And indices.Count > 0 Then
-            Dim selected As Object
-            Set selected = child
+            For Each matched In matches
+                Dim selected As Object
+                Set selected = matched
 
-            Dim j As Long
-            For j = 1 To indices.Count
-                Set selected = NthElementChild(selected, CLng(indices(j)))
-                If selected Is Nothing Then Exit For
-            Next j
+                Dim j As Long
+                For j = 1 To indices.Count
+                    Set selected = NthElementChild(selected, CLng(indices(j)))
+                    If selected Is Nothing Then Exit For
+                Next j
 
-            If Not selected Is Nothing Then output.Add selected
+                If Not selected Is Nothing Then output.Add selected
+            Next matched
             GoTo NextNode
         End If
 
-        If IsArrayContainer(child) Then
-            Dim item As Object
-            For Each item In child.childNodes
-                If Not item Is Nothing Then
-                    If item.nodeType = 1 Then output.Add item
-                End If
-            Next item
-        Else
-            output.Add child
-        End If
+        For Each matched In matches
+            If IsArrayContainer(matched) Then
+                Dim item As Object
+                For Each item In matched.childNodes
+                    If Not item Is Nothing Then
+                        If item.nodeType = 1 Then output.Add item
+                    End If
+                Next item
+            Else
+                output.Add matched
+            End If
+        Next matched
 
 NextNode:
     Next cur
@@ -1455,22 +1712,27 @@ Private Function ParsePathPart(ByVal part As String, ByRef outName As String, By
     ParsePathPart = True
 End Function
 
-Private Function FindChildElementByName(ByVal parentNode As Object, ByVal childName As String) As Object
+Private Function FindChildElementsByName(ByVal parentNode As Object, ByVal childName As String) As Collection
+    Dim out As New Collection
     On Error Resume Next
 
     Dim want As String
     want = LCase$(Trim$(CStr(childName)))
-    If Len(want) = 0 Then Exit Function
+    If Len(want) = 0 Then
+        Set FindChildElementsByName = out
+        Exit Function
+    End If
 
     Dim child As Object
     For Each child In parentNode.childNodes
         If child.nodeType = 1 Then
             If LCase$(CStr(child.nodeName)) = want Then
-                Set FindChildElementByName = child
-                Exit Function
+                out.Add child
             End If
         End If
     Next child
+
+    Set FindChildElementsByName = out
 End Function
 
 Private Function NthElementChild(ByVal parentNode As Object, ByVal index0 As Long) As Object

@@ -1639,11 +1639,11 @@
       return normalizeDeclDescByTemplate(decl, overrideText);
     }
 
-    const source = getSourceDeclDesc(decl);
-    if (!source) {
+    const codeDesc = getDeclCodeDesc(decl);
+    if (!codeDesc) {
       return "";
     }
-    return normalizeDeclDescByTemplate(decl, source);
+    return normalizeDeclDescByTemplate(decl, codeDesc);
   }
 
   function buildStructDeclFromFieldDecl(decl) {
@@ -2775,6 +2775,27 @@
     return output;
   }
 
+  function getDeclListDisplayName(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+
+    const displayName = String(getDeclDisplayName(decl) || "").trim();
+    const descText = String(getEffectiveDeclDesc(decl) || "").trim();
+    if (
+      displayName &&
+      descText &&
+      displayName.localeCompare(descText, undefined, { sensitivity: "accent" }) === 0
+    ) {
+      const techName = String(getDeclTechName(decl) || "").trim();
+      if (techName) {
+        return techName;
+      }
+    }
+
+    return displayName || String(getDeclTechName(decl) || "").trim();
+  }
+
   function renderDeclListCells(decls, fallbackDecl) {
     const list = dedupeDecls(Array.isArray(decls) ? decls.filter(Boolean) : []);
     const effectiveList = list.length ? list : dedupeDecls(fallbackDecl ? [fallbackDecl] : []);
@@ -2790,7 +2811,7 @@
     const descWrap = el("div");
 
     for (const decl of effectiveList) {
-      const nameLine = el("div", { text: decl ? getDeclDisplayName(decl) : "" });
+      const nameLine = el("div", { text: getDeclListDisplayName(decl) });
       const title = buildDeclTitle(decl);
       if (title) {
         nameLine.title = title;
