@@ -17,6 +17,8 @@ Private Const MAX_HEADER_TEXT As Long = 240
 Private Const MAX_LIST_ORIGINAL As Long = 140
 
 Private Const STATUS_CELL As String = "C2"
+Private Const FINAL_DESC_PATH As String = "values.name.finalDesc"
+Private Const FINAL_DESC_PLACEHOLDER As String = "{values.name.finalDesc}"
 
 Private Const LIST_HEADER_ROW As Long = 4
 Private Const LIST_FIRST_ROW As Long = 5
@@ -122,6 +124,9 @@ Private Sub SetupTemplateConfigSheet(ByVal wsCfg As Worksheet)
         wsCfg.Cells.Clear
         SeedDefaultTemplateConfig wsCfg
     End If
+
+    ApplyTemplateConfigSheetDefaults wsCfg
+    EnsureTemplateConfigCompatibility wsCfg
 End Sub
 
 Public Sub LoadXmlFromFile()
@@ -1502,15 +1507,7 @@ Private Sub SeedDefaultTemplateConfig(ByVal wsCfg As Worksheet)
     startCol = 1
 
     Dim templateKeys As Variant
-    ' Avoid "Too many line continuations" (VBA limit per statement)
-    Dim keysCsv As String
-    keysCsv = "DEFAULT,DATA,CONSTANTS,PARAMETERS,SELECT-OPTIONS,RANGES,TYPES,STATICS,CLASS-DATA,FIELD-SYMBOLS"
-    keysCsv = keysCsv & ",FORM,PERFORM,CALL_FUNCTION,CALL_METHOD,CALL_TRANSACTION"
-    keysCsv = keysCsv & ",ASSIGNMENT,MOVE,MOVE-CORRESPONDING,CLEAR"
-    keysCsv = keysCsv & ",APPEND,INSERT_ITAB,MODIFY_ITAB,READ_TABLE,DELETE_ITAB,SORT_ITAB,LOOP_AT_ITAB"
-    keysCsv = keysCsv & ",IF,ELSEIF,ELSE,CASE,WHEN,DO,TRY,CATCH,CLEANUP,SELECT"
-    keysCsv = keysCsv & ",CLASS,METHODS,CLASS-METHODS,METHOD"
-    templateKeys = Split(keysCsv, ",")
+    templateKeys = GetBuiltInTemplateKeys()
 
     Dim key As Variant
     For Each key In templateKeys
@@ -1519,6 +1516,123 @@ Private Sub SeedDefaultTemplateConfig(ByVal wsCfg As Worksheet)
         SeedGenericTemplate inner
         startRow = startRow + 24 + 4
     Next key
+End Sub
+
+Private Function GetBuiltInTemplateKeys() As Variant
+    ' Avoid "Too many line continuations" (VBA limit per statement)
+    Dim keysCsv As String
+    keysCsv = "DEFAULT,DATA,CONSTANTS,PARAMETERS,SELECT-OPTIONS,RANGES,TYPES,STATICS,CLASS-DATA,FIELD-SYMBOLS"
+    keysCsv = keysCsv & ",FORM,PERFORM,CALL_FUNCTION,CALL_METHOD,CALL_TRANSACTION"
+    keysCsv = keysCsv & ",ASSIGNMENT,MOVE,MOVE-CORRESPONDING,CLEAR"
+    keysCsv = keysCsv & ",APPEND,INSERT_ITAB,MODIFY_ITAB,READ_TABLE,DELETE_ITAB,SORT_ITAB,LOOP_AT_ITAB"
+    keysCsv = keysCsv & ",IF,ELSEIF,ELSE,CASE,WHEN,DO,TRY,CATCH,CLEANUP,SELECT"
+    keysCsv = keysCsv & ",CLASS,METHODS,CLASS-METHODS,METHOD"
+    GetBuiltInTemplateKeys = Split(keysCsv, ",")
+End Function
+
+Private Sub EnsureTemplateConfigCompatibility(ByVal wsCfg As Worksheet)
+    If wsCfg Is Nothing Then Exit Sub
+
+    Dim templateKeys As Variant
+    templateKeys = GetBuiltInTemplateKeys()
+
+    Dim key As Variant
+    For Each key In templateKeys
+        Dim inner As Range
+        Set inner = GetTemplateSampleRange(wsCfg, CStr(key))
+        EnsureFinalDescPlaceholderInTemplate inner
+    Next key
+End Sub
+
+Private Sub EnsureFinalDescPlaceholderInTemplate(ByVal inner As Range)
+    If inner Is Nothing Then Exit Sub
+    If inner.Columns.Count < 2 Then Exit Sub
+    If inner.Rows.Count < 2 Then Exit Sub
+
+    Dim headerPath As String
+    headerPath = LCase$(Trim$(CStr(inner.Cells(1, 1).Value2)))
+    Dim headerValue As String
+    headerValue = LCase$(Trim$(CStr(inner.Cells(1, 2).Value2)))
+    If headerPath <> "path" Or headerValue <> "value" Then Exit Sub
+
+    Dim r As Long
+    Dim keyText As String
+    For r = 2 To inner.Rows.Count
+        keyText = LCase$(Trim$(CStr(inner.Cells(r, 1).Value2)))
+        If keyText = LCase$(FINAL_DESC_PATH) Then
+            If Len(Trim$(CStr(inner.Cells(r, 2).Value2))) = 0 Then
+                inner.Cells(r, 2).Value2 = FINAL_DESC_PLACEHOLDER
+            End If
+            Exit Sub
+        End If
+    Next r
+
+    Dim targetRow As Long
+    Dim dumpRow As Long
+    For r = 2 To inner.Rows.Count
+        keyText = LCase$(Trim$(CStr(inner.Cells(r, 1).Value2)))
+        If keyText = "__dump__" Then
+            dumpRow = r
+            Exit For
+        End If
+    Next r
+
+    If dumpRow > 0 And dumpRow < inner.Rows.Count Then
+        If IsTemplatePathValueRowEmpty(inner, dumpRow + 1) Then
+            targetRow = dumpRow + 1
+        End If
+    End If
+
+    If targetRow = 0 Then
+        For r = 2 To inner.Rows.Count
+            If IsTemplatePathValueRowEmpty(inner, r) Then
+                targetRow = r
+                Exit For
+            End If
+        Next r
+    End If
+
+    If targetRow > 0 Then
+        inner.Cells(targetRow, 1).Value2 = FINAL_DESC_PATH
+        inner.Cells(targetRow, 2).Value2 = FINAL_DESC_PLACEHOLDER
+        Exit Sub
+    End If
+
+    InsertFinalDescRowBeforeBottomMarker inner
+End Sub
+
+Private Function IsTemplatePathValueRowEmpty(ByVal inner As Range, ByVal rowIndex As Long) As Boolean
+    If inner Is Nothing Then Exit Function
+    If rowIndex < 1 Or rowIndex > inner.Rows.Count Then Exit Function
+
+    Dim leftText As String
+    leftText = Trim$(CStr(inner.Cells(rowIndex, 1).Value2))
+
+    Dim rightText As String
+    rightText = Trim$(CStr(inner.Cells(rowIndex, 2).Value2))
+
+    IsTemplatePathValueRowEmpty = (Len(leftText) = 0 And Len(rightText) = 0)
+End Function
+
+Private Sub InsertFinalDescRowBeforeBottomMarker(ByVal inner As Range)
+    If inner Is Nothing Then Exit Sub
+    If inner.Columns.Count < 2 Then Exit Sub
+
+    Dim ws As Worksheet
+    Set ws = inner.Worksheet
+    If ws Is Nothing Then Exit Sub
+
+    Dim insertRow As Long
+    insertRow = inner.Row + inner.Rows.Count
+    If insertRow <= 1 Then Exit Sub
+
+    ws.Rows(insertRow).Insert Shift:=xlDown
+    On Error Resume Next
+    ws.Rows(insertRow).RowHeight = ws.Rows(insertRow - 1).RowHeight
+    On Error GoTo 0
+
+    ws.Cells(insertRow, inner.Column).Value2 = FINAL_DESC_PATH
+    ws.Cells(insertRow, inner.Column + 1).Value2 = FINAL_DESC_PLACEHOLDER
 End Sub
 
 Private Sub SeedGenericTemplate(ByVal inner As Range)
