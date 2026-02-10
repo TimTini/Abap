@@ -154,6 +154,36 @@
     };
   }
 
+  function pickPreferredStatementComment(statementBuffer) {
+    if (!statementBuffer || typeof statementBuffer !== "object") {
+      return "";
+    }
+
+    const lineEntries = Array.isArray(statementBuffer.lineEntries) ? statementBuffer.lineEntries : [];
+    for (const entry of lineEntries) {
+      const inline = entry && typeof entry.comment === "string" ? entry.comment.trim() : "";
+      if (inline) {
+        return inline;
+      }
+    }
+
+    const leading = Array.isArray(statementBuffer.leadingCommentLines) ? statementBuffer.leadingCommentLines : [];
+    if (leading.length !== 1) {
+      return "";
+    }
+
+    const candidate = leading[0];
+    const text = candidate && typeof candidate.text === "string" ? candidate.text.trim() : "";
+    const line = candidate ? Number(candidate.line || 0) || 0 : 0;
+    const lineStart = Number(statementBuffer.lineStart || 0) || 0;
+
+    if (!text || !lineStart || line !== lineStart - 1) {
+      return "";
+    }
+
+    return text;
+  }
+
   function collectStatements(lines) {
     const statements = [];
     let current = null;
@@ -165,6 +195,9 @@
       const trimmed = rawLine.trim();
 
       if (!trimmed) {
+        if (!current) {
+          pendingComments = [];
+        }
         continue;
       }
 
@@ -173,7 +206,7 @@
         if (current) {
           current.comments.push(commentText);
         } else {
-          pendingComments.push(commentText);
+          pendingComments.push({ line: lineNumber, text: commentText });
         }
         continue;
       }
@@ -183,17 +216,23 @@
 
       if (!codeTrim) {
         if (comment) {
-          pendingComments.push(comment);
+          pendingComments.push({ line: lineNumber, text: comment });
         }
         continue;
       }
 
       if (!current) {
+        const leadingCommentLines = pendingComments.slice();
+        const leadingComments = leadingCommentLines
+          .map((entry) => (entry && typeof entry.text === "string" ? entry.text : ""))
+          .filter(Boolean);
+
         current = {
           lineStart: lineNumber,
           rawParts: [],
-          comments: pendingComments,
-          leadingComments: pendingComments.slice(),
+          comments: leadingComments.slice(),
+          leadingComments,
+          leadingCommentLines,
           lineEntries: []
         };
         pendingComments = [];
@@ -207,7 +246,7 @@
 
       if (codeTrim.endsWith(".")) {
         const raw = current.rawParts.join(" ").replace(/\s+/g, " ").trim();
-        const commentText = current.comments.filter(Boolean).join(" ").trim();
+        const commentText = pickPreferredStatementComment(current);
 
         statements.push({
           lineStart: current.lineStart,

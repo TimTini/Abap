@@ -41,6 +41,14 @@ function getValue(values, key) {
   return entry && typeof entry.value === "string" ? entry.value : "";
 }
 
+function getValueEntry(values, key) {
+  if (!values || typeof values !== "object") {
+    return null;
+  }
+  const entryOrList = values[key];
+  return Array.isArray(entryOrList) ? (entryOrList[0] || null) : (entryOrList || null);
+}
+
 function testInlineCommentInsideSingleQuote() {
   const result = parse("DATA lv TYPE string.\nlv = 'A\"B'.\n");
   const objects = flattenObjects(result.objects);
@@ -100,12 +108,92 @@ function testInlineDataReferenceInAssignment() {
   assert.strictEqual(importing[0].valueRef, "lv");
 }
 
+function testStatementCommentPrefersFirstInline() {
+  const code = [
+    "PERFORM main",
+    "  USING p_user \"first-inline",
+    "        p_flag \"second-inline",
+    "  CHANGING lv_text.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+  const perform = findObject(objects, "PERFORM");
+  assert(perform, "Expected PERFORM object.");
+  assert.strictEqual(perform.comment, "first-inline");
+
+  const formEntry = getValueEntry(perform.values, "form");
+  assert(formEntry, "Expected values.form entry.");
+  assert.strictEqual(formEntry.codeDesc, "first-inline");
+}
+
+function testStatementCommentFallsBackToSingleLeadingLine() {
+  const code = [
+    "\"leading-comment",
+    "PERFORM main USING p_user CHANGING lv_text.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+  const perform = findObject(objects, "PERFORM");
+  assert(perform, "Expected PERFORM object.");
+  assert.strictEqual(perform.comment, "leading-comment");
+
+  const formEntry = getValueEntry(perform.values, "form");
+  assert(formEntry, "Expected values.form entry.");
+  assert.strictEqual(formEntry.codeDesc, "leading-comment");
+}
+
+function testStatementCommentIgnoresLeadingCommentBlock() {
+  const code = [
+    "\"line-1",
+    "\"line-2",
+    "PERFORM main USING p_user CHANGING lv_text.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+  const perform = findObject(objects, "PERFORM");
+  assert(perform, "Expected PERFORM object.");
+  assert.strictEqual(perform.comment, "");
+
+  const formEntry = getValueEntry(perform.values, "form");
+  assert(formEntry, "Expected values.form entry.");
+  assert.strictEqual(formEntry.codeDesc, "");
+}
+
+function testStatementCommentIgnoresLeadingCommentWithBlankGap() {
+  const code = [
+    "\"leading-comment",
+    "",
+    "PERFORM main USING p_user CHANGING lv_text.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+  const perform = findObject(objects, "PERFORM");
+  assert(perform, "Expected PERFORM object.");
+  assert.strictEqual(perform.comment, "");
+
+  const formEntry = getValueEntry(perform.values, "form");
+  assert(formEntry, "Expected values.form entry.");
+  assert.strictEqual(formEntry.codeDesc, "");
+}
+
 function run() {
   testInlineCommentInsideSingleQuote();
   testInlineCommentInsideTemplate();
   testEscapedSingleQuoteTokenization();
   testAssignmentKeepsFullExpression();
   testInlineDataReferenceInAssignment();
+  testStatementCommentPrefersFirstInline();
+  testStatementCommentFallsBackToSingleLeadingLine();
+  testStatementCommentIgnoresLeadingCommentBlock();
+  testStatementCommentIgnoresLeadingCommentWithBlankGap();
   console.log("parser-regression: ok");
 }
 

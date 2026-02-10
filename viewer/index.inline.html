@@ -881,6 +881,36 @@
     };
   }
 
+  function pickPreferredStatementComment(statementBuffer) {
+    if (!statementBuffer || typeof statementBuffer !== "object") {
+      return "";
+    }
+
+    const lineEntries = Array.isArray(statementBuffer.lineEntries) ? statementBuffer.lineEntries : [];
+    for (const entry of lineEntries) {
+      const inline = entry && typeof entry.comment === "string" ? entry.comment.trim() : "";
+      if (inline) {
+        return inline;
+      }
+    }
+
+    const leading = Array.isArray(statementBuffer.leadingCommentLines) ? statementBuffer.leadingCommentLines : [];
+    if (leading.length !== 1) {
+      return "";
+    }
+
+    const candidate = leading[0];
+    const text = candidate && typeof candidate.text === "string" ? candidate.text.trim() : "";
+    const line = candidate ? Number(candidate.line || 0) || 0 : 0;
+    const lineStart = Number(statementBuffer.lineStart || 0) || 0;
+
+    if (!text || !lineStart || line !== lineStart - 1) {
+      return "";
+    }
+
+    return text;
+  }
+
   function collectStatements(lines) {
     const statements = [];
     let current = null;
@@ -892,6 +922,9 @@
       const trimmed = rawLine.trim();
 
       if (!trimmed) {
+        if (!current) {
+          pendingComments = [];
+        }
         continue;
       }
 
@@ -900,7 +933,7 @@
         if (current) {
           current.comments.push(commentText);
         } else {
-          pendingComments.push(commentText);
+          pendingComments.push({ line: lineNumber, text: commentText });
         }
         continue;
       }
@@ -910,17 +943,23 @@
 
       if (!codeTrim) {
         if (comment) {
-          pendingComments.push(comment);
+          pendingComments.push({ line: lineNumber, text: comment });
         }
         continue;
       }
 
       if (!current) {
+        const leadingCommentLines = pendingComments.slice();
+        const leadingComments = leadingCommentLines
+          .map((entry) => (entry && typeof entry.text === "string" ? entry.text : ""))
+          .filter(Boolean);
+
         current = {
           lineStart: lineNumber,
           rawParts: [],
-          comments: pendingComments,
-          leadingComments: pendingComments.slice(),
+          comments: leadingComments.slice(),
+          leadingComments,
+          leadingCommentLines,
           lineEntries: []
         };
         pendingComments = [];
@@ -934,7 +973,7 @@
 
       if (codeTrim.endsWith(".")) {
         const raw = current.rawParts.join(" ").replace(/\s+/g, " ").trim();
-        const commentText = current.comments.filter(Boolean).join(" ").trim();
+        const commentText = pickPreferredStatementComment(current);
 
         statements.push({
           lineStart: current.lineStart,
@@ -8440,6 +8479,55 @@
     );
   }
 
+  function hasValueLevelDescFields(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return false;
+    }
+    return (
+      Object.prototype.hasOwnProperty.call(value, "userDesc") ||
+      Object.prototype.hasOwnProperty.call(value, "codeDesc")
+    );
+  }
+
+  function resolveValueLevelTechId(value) {
+    if (!value || typeof value !== "object") {
+      return "";
+    }
+
+    if (isDeclLikeObject(value.decl)) {
+      const declTech = String(getDeclTechName(value.decl) || "").trim();
+      if (declTech) {
+        return declTech;
+      }
+    }
+
+    const rawValue = String(value.value || "").trim();
+    if (rawValue) {
+      return rawValue;
+    }
+
+    const fallbackName = String(value.name || "").trim();
+    return fallbackName;
+  }
+
+  function resolveValueLevelFinalDesc(value) {
+    if (!value || typeof value !== "object") {
+      return "";
+    }
+
+    const userDesc = String(value.userDesc || "").trim();
+    if (userDesc) {
+      return userDesc;
+    }
+
+    const codeDesc = String(value.codeDesc || "").trim();
+    if (codeDesc) {
+      return codeDesc;
+    }
+
+    return resolveValueLevelTechId(value);
+  }
+
   function appendXmlValue(lines, keyHint, tagName, value, indent) {
     const pad = " ".repeat(indent);
 
@@ -8470,7 +8558,10 @@
     if (typeof value === "object") {
       lines.push(`${pad}<${tagName}>`);
 
-      if (isDeclLikeObject(value)) {
+      const valueIsDecl = isDeclLikeObject(value);
+      let hasComputedFinalDesc = false;
+
+      if (valueIsDecl) {
         const declDesc = getEffectiveDeclDesc(value);
         if (declDesc) {
           lines.push(`${" ".repeat(indent + 2)}<desc>${escapeXmlText(declDesc)}</desc>`);
@@ -8482,12 +8573,24 @@
         lines.push(`${" ".repeat(indent + 2)}<name>${escapeXmlText(declName)}</name>`);
       }
 
-      if (!isDeclLikeObject(value) && isDeclLikeObject(value.decl)) {
-        const finalDesc = getFinalDeclDesc(value.decl);
-        if (finalDesc) {
-          lines.push(`${" ".repeat(indent + 2)}<finalDesc>${escapeXmlText(finalDesc)}</finalDesc>`);
-        } else {
-          lines.push(`${" ".repeat(indent + 2)}<finalDesc/>`);
+      if (!valueIsDecl) {
+        let shouldEmitFinalDesc = false;
+        let finalDesc = "";
+        if (hasValueLevelDescFields(value)) {
+          shouldEmitFinalDesc = true;
+          finalDesc = resolveValueLevelFinalDesc(value);
+        } else if (isDeclLikeObject(value.decl)) {
+          shouldEmitFinalDesc = true;
+          finalDesc = getFinalDeclDesc(value.decl);
+        }
+
+        if (shouldEmitFinalDesc) {
+          hasComputedFinalDesc = true;
+          if (finalDesc) {
+            lines.push(`${" ".repeat(indent + 2)}<finalDesc>${escapeXmlText(finalDesc)}</finalDesc>`);
+          } else {
+            lines.push(`${" ".repeat(indent + 2)}<finalDesc/>`);
+          }
         }
       }
 
@@ -8517,12 +8620,15 @@
       });
 
       for (const key of keys) {
-        if (key === "desc" && isDeclLikeObject(value)) {
+        if (key === "desc" && valueIsDecl) {
           // computed above
           continue;
         }
-        if (key === "name" && isDeclLikeObject(value)) {
+        if (key === "name" && valueIsDecl) {
           // computed above (normalized via settings)
+          continue;
+        }
+        if (key === "finalDesc" && hasComputedFinalDesc) {
           continue;
         }
         const childTag = toXmlTagName(key);
