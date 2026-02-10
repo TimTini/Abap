@@ -1302,12 +1302,13 @@ Private Function TryResolveXmlPath(ByVal baseNode As Object, ByVal path As Strin
     raw = Trim$(CStr(path))
     If Len(raw) = 0 Then Exit Function
 
-    Dim cur As Object
-    Set cur = baseNode
-    If cur Is Nothing Then Exit Function
+    If baseNode Is Nothing Then Exit Function
 
     Dim parts() As String
     parts = Split(raw, ".")
+
+    Dim curNodes As New Collection
+    curNodes.Add baseNode
 
     Dim i As Long
     For i = LBound(parts) To UBound(parts)
@@ -1319,22 +1320,92 @@ Private Function TryResolveXmlPath(ByVal baseNode As Object, ByVal path As Strin
         Dim idxs As Collection
         If Not ParsePathPart(part, name, idxs) Then GoTo Fail
 
-        Set cur = FindChildElementByName(cur, name)
-        If cur Is Nothing Then GoTo Fail
-
-        Dim j As Long
-        For j = 1 To idxs.Count
-            Set cur = NthElementChild(cur, CLng(idxs(j)))
-            If cur Is Nothing Then GoTo Fail
-        Next j
+        Dim nextNodes As Collection
+        Set nextNodes = ResolvePathPartNodes(curNodes, name, idxs)
+        If nextNodes Is Nothing Or nextNodes.Count = 0 Then GoTo Fail
+        Set curNodes = nextNodes
     Next i
 
-    outValue = CStr(cur.text)
+    outValue = JoinNodeTextValues(curNodes, vbCrLf)
     TryResolveXmlPath = True
     Exit Function
 
 Fail:
     TryResolveXmlPath = False
+End Function
+
+Private Function ResolvePathPartNodes(ByVal currentNodes As Collection, ByVal childName As String, ByVal indices As Collection) As Collection
+    Dim output As New Collection
+    If currentNodes Is Nothing Then
+        Set ResolvePathPartNodes = output
+        Exit Function
+    End If
+
+    Dim cur As Variant
+    For Each cur In currentNodes
+        If cur Is Nothing Then GoTo NextNode
+
+        Dim child As Object
+        Set child = FindChildElementByName(cur, childName)
+        If child Is Nothing Then GoTo NextNode
+
+        If Not indices Is Nothing And indices.Count > 0 Then
+            Dim selected As Object
+            Set selected = child
+
+            Dim j As Long
+            For j = 1 To indices.Count
+                Set selected = NthElementChild(selected, CLng(indices(j)))
+                If selected Is Nothing Then Exit For
+            Next j
+
+            If Not selected Is Nothing Then output.Add selected
+            GoTo NextNode
+        End If
+
+        If IsArrayContainer(child) Then
+            Dim item As Object
+            For Each item In child.childNodes
+                If Not item Is Nothing Then
+                    If item.nodeType = 1 Then output.Add item
+                End If
+            Next item
+        Else
+            output.Add child
+        End If
+
+NextNode:
+    Next cur
+
+    Set ResolvePathPartNodes = output
+End Function
+
+Private Function JoinNodeTextValues(ByVal nodes As Collection, ByVal separator As String) As String
+    If nodes Is Nothing Then Exit Function
+    If nodes.Count = 0 Then Exit Function
+
+    Dim parts() As String
+    ReDim parts(1 To nodes.Count) As String
+
+    Dim count As Long
+    count = 0
+
+    Dim n As Variant
+    For Each n In nodes
+        If n Is Nothing Then GoTo NextNodeText
+
+        Dim text As String
+        text = CStr(n.text)
+        count = count + 1
+        parts(count) = text
+
+NextNodeText:
+    Next n
+
+    If count = 0 Then Exit Function
+    ReDim Preserve parts(1 To count)
+
+    JoinNodeTextValues = Join(parts, separator)
 End Function
 
 Private Function ParsePathPart(ByVal part As String, ByRef outName As String, ByRef outIndices As Collection) As Boolean

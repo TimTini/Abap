@@ -1525,28 +1525,38 @@
     if (!settings.normalizeDeclDesc) {
       return String(text || "").trim();
     }
+    return normalizeDeclDescByTemplate(decl, text);
+  }
 
-    const descTrimmed = String(text || "").trim();
-    if (!descTrimmed) {
+  function stripDeclTemplateAffixes(text, template) {
+    const raw = String(text || "").trim();
+    if (!raw) {
       return "";
     }
 
-    const techName = getDeclTechName(decl);
-    const bare = stripAngleBrackets(techName);
-    if (bare.length < 3) {
-      return descTrimmed;
+    const tpl = String(template || "");
+    const marker = "{{desc}}";
+    const markerIndex = tpl.indexOf(marker);
+    if (markerIndex === -1) {
+      return raw;
     }
 
-    const code = bare.slice(1, 3).toUpperCase();
-    const templates = settings.nameTemplatesByCode || DEFAULT_SETTINGS.nameTemplatesByCode;
-    const template = templates && Object.prototype.hasOwnProperty.call(templates, code) ? String(templates[code] || "") : "";
-    if (!template.trim()) {
-      return descTrimmed;
+    const prefix = tpl.slice(0, markerIndex).trim();
+    const suffix = tpl.slice(markerIndex + marker.length).trim();
+
+    let next = raw;
+    if (prefix && next.toLowerCase().startsWith(prefix.toLowerCase())) {
+      next = next.slice(prefix.length).trim();
+    }
+    if (
+      suffix &&
+      next.length >= suffix.length &&
+      next.toLowerCase().endsWith(suffix.toLowerCase())
+    ) {
+      next = next.slice(0, next.length - suffix.length).trim();
     }
 
-    const normalizedDesc = stripDeclCategoryPrefix(descTrimmed);
-    const normalized = template.replace(/\{\{desc\}\}/g, normalizedDesc).trim();
-    return normalized || descTrimmed;
+    return next || raw;
   }
 
   function normalizeDeclDescByTemplate(decl, text) {
@@ -1569,7 +1579,8 @@
       return descTrimmed;
     }
 
-    const normalizedDesc = stripDeclCategoryPrefix(descTrimmed);
+    const strippedKnownPrefix = stripDeclCategoryPrefix(descTrimmed);
+    const normalizedDesc = stripDeclTemplateAffixes(strippedKnownPrefix, template);
     const normalized = template.replace(/\{\{desc\}\}/g, normalizedDesc).trim();
     return normalized || descTrimmed;
   }
@@ -2639,20 +2650,25 @@
       return techName;
     }
 
+    const settings = state.settings || DEFAULT_SETTINGS;
+    if (settings.normalizeDeclDesc) {
+      return descTrimmed;
+    }
+
     const bare = stripAngleBrackets(techName);
     if (bare.length < 3) {
       return techName;
     }
 
     const code = bare.slice(1, 3).toUpperCase();
-    const settings = state.settings || DEFAULT_SETTINGS;
     const templates = settings.nameTemplatesByCode || DEFAULT_SETTINGS.nameTemplatesByCode;
     const template = templates && Object.prototype.hasOwnProperty.call(templates, code) ? String(templates[code] || "") : "";
     if (!template.trim()) {
       return techName;
     }
 
-    const normalizedDesc = stripDeclCategoryPrefix(descTrimmed);
+    const strippedKnownPrefix = stripDeclCategoryPrefix(descTrimmed);
+    const normalizedDesc = stripDeclTemplateAffixes(strippedKnownPrefix, template);
     const displayName = template.replace(/\{\{desc\}\}/g, normalizedDesc).trim();
     return displayName || techName;
   }
@@ -2726,9 +2742,42 @@
     return cell;
   }
 
+  function getDeclRenderKey(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+    return (
+      getDeclKey(decl) ||
+      [
+        decl.objectType || "",
+        decl.scopeLabel || "",
+        decl.name || "",
+        decl.file || "",
+        decl.lineStart || ""
+      ].join("|")
+    );
+  }
+
+  function dedupeDecls(list) {
+    const output = [];
+    const seen = new Set();
+    for (const decl of list || []) {
+      if (!decl) {
+        continue;
+      }
+      const key = getDeclRenderKey(decl);
+      if (!key || seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      output.push(decl);
+    }
+    return output;
+  }
+
   function renderDeclListCells(decls, fallbackDecl) {
-    const list = Array.isArray(decls) ? decls.filter(Boolean) : [];
-    const effectiveList = list.length ? list : fallbackDecl ? [fallbackDecl] : [];
+    const list = dedupeDecls(Array.isArray(decls) ? decls.filter(Boolean) : []);
+    const effectiveList = list.length ? list : dedupeDecls(fallbackDecl ? [fallbackDecl] : []);
 
     const nameCell = el("td");
     const descCell = el("td");
