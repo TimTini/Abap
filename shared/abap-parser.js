@@ -1985,6 +1985,22 @@
     if (extras.performCall) {
       annotatePerformCallExtras(extras.performCall, context);
     }
+
+    if (extras.readTable) {
+      annotateReadTableExtras(extras.readTable, context);
+    }
+
+    if (extras.loopAtItab) {
+      annotateLoopAtItabExtras(extras.loopAtItab, context);
+    }
+
+    if (extras.modifyItab) {
+      annotateModifyItabExtras(extras.modifyItab, context);
+    }
+
+    if (extras.deleteItab) {
+      annotateDeleteItabExtras(extras.deleteItab, context);
+    }
   }
 
   function annotateCallFunctionExtras(callFunction, context) {
@@ -2036,6 +2052,55 @@
         entry.valueDecl = resolveDecl(ref, context);
       }
     }
+  }
+
+  function annotateConditionClausesWithDecls(conditions, context) {
+    const list = Array.isArray(conditions) ? conditions : [];
+    for (const clause of list) {
+      if (!clause || typeof clause !== "object") {
+        continue;
+      }
+
+      const leftRef = extractFirstIdentifierFromExpression(clause.leftOperand);
+      if (leftRef) {
+        clause.leftOperandRef = leftRef;
+        clause.leftOperandDecl = resolveDecl(leftRef, context);
+      }
+
+      const rightRef = extractFirstIdentifierFromExpression(clause.rightOperand);
+      if (rightRef) {
+        clause.rightOperandRef = rightRef;
+        clause.rightOperandDecl = resolveDecl(rightRef, context);
+      }
+    }
+  }
+
+  function annotateReadTableExtras(readTable, context) {
+    if (!readTable || typeof readTable !== "object") {
+      return;
+    }
+    annotateConditionClausesWithDecls(readTable.conditions, context);
+  }
+
+  function annotateLoopAtItabExtras(loopAtItab, context) {
+    if (!loopAtItab || typeof loopAtItab !== "object") {
+      return;
+    }
+    annotateConditionClausesWithDecls(loopAtItab.conditions, context);
+  }
+
+  function annotateModifyItabExtras(modifyItab, context) {
+    if (!modifyItab || typeof modifyItab !== "object") {
+      return;
+    }
+    annotateConditionClausesWithDecls(modifyItab.conditions, context);
+  }
+
+  function annotateDeleteItabExtras(deleteItab, context) {
+    if (!deleteItab || typeof deleteItab !== "object") {
+      return;
+    }
+    annotateConditionClausesWithDecls(deleteItab.conditions, context);
   }
 
   function resolveDecl(identifier, context) {

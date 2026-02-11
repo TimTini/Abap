@@ -185,7 +185,12 @@ function testStatementCommentIgnoresLeadingCommentWithBlankGap() {
 }
 
 function testReadTableWithKeyConditions() {
-  const code = "READ TABLE lt_user WITH KEY uname = p_user active = abap_true INTO ls_user.\n";
+  const code = [
+    "DATA p_user TYPE syuname.",
+    "DATA lv_active TYPE abap_bool.",
+    "READ TABLE lt_user WITH KEY uname = p_user active = lv_active INTO ls_user.",
+    ""
+  ].join("\n");
   const result = parse(code);
   const objects = flattenObjects(result.objects);
   const readTable = findObject(objects, "READ_TABLE");
@@ -193,22 +198,29 @@ function testReadTableWithKeyConditions() {
 
   const conditions = Array.isArray(readTable.extras.readTable.conditions) ? readTable.extras.readTable.conditions : [];
   assert.strictEqual(conditions.length, 2);
-  assert.deepStrictEqual(conditions[0], {
-    leftOperand: "uname",
-    rightOperand: "p_user",
-    comparisonOperator: "=",
-    logicalConnector: "AND"
-  });
-  assert.deepStrictEqual(conditions[1], {
-    leftOperand: "active",
-    rightOperand: "abap_true",
-    comparisonOperator: "=",
-    logicalConnector: ""
-  });
+  assert.strictEqual(conditions[0].leftOperand, "uname");
+  assert.strictEqual(conditions[0].rightOperand, "p_user");
+  assert.strictEqual(conditions[0].comparisonOperator, "=");
+  assert.strictEqual(conditions[0].logicalConnector, "AND");
+  assert.strictEqual(conditions[0].rightOperandRef, "p_user");
+  assert(conditions[0].rightOperandDecl, "Expected decl for right operand p_user.");
+  assert.strictEqual(conditions[0].rightOperandDecl.name, "p_user");
+
+  assert.strictEqual(conditions[1].leftOperand, "active");
+  assert.strictEqual(conditions[1].rightOperand, "lv_active");
+  assert.strictEqual(conditions[1].comparisonOperator, "=");
+  assert.strictEqual(conditions[1].logicalConnector, "");
+  assert.strictEqual(conditions[1].rightOperandRef, "lv_active");
+  assert(conditions[1].rightOperandDecl, "Expected decl for right operand lv_active.");
+  assert.strictEqual(conditions[1].rightOperandDecl.name, "lv_active");
 }
 
 function testReadTableWithTableKeyConditions() {
-  const code = "READ TABLE lt_user WITH TABLE KEY primary_key COMPONENTS uname = p_user OR active = abap_true INTO ls_user.\n";
+  const code = [
+    "DATA p_user TYPE syuname.",
+    "READ TABLE lt_user WITH TABLE KEY primary_key COMPONENTS uname = p_user OR active = abap_true INTO ls_user.",
+    ""
+  ].join("\n");
   const result = parse(code);
   const objects = flattenObjects(result.objects);
   const readTable = findObject(objects, "READ_TABLE");
@@ -219,22 +231,27 @@ function testReadTableWithTableKeyConditions() {
 
   const conditions = Array.isArray(extras.conditions) ? extras.conditions : [];
   assert.strictEqual(conditions.length, 2);
-  assert.deepStrictEqual(conditions[0], {
-    leftOperand: "uname",
-    rightOperand: "p_user",
-    comparisonOperator: "=",
-    logicalConnector: "OR"
-  });
-  assert.deepStrictEqual(conditions[1], {
-    leftOperand: "active",
-    rightOperand: "abap_true",
-    comparisonOperator: "=",
-    logicalConnector: ""
-  });
+  assert.strictEqual(conditions[0].leftOperand, "uname");
+  assert.strictEqual(conditions[0].rightOperand, "p_user");
+  assert.strictEqual(conditions[0].comparisonOperator, "=");
+  assert.strictEqual(conditions[0].logicalConnector, "OR");
+  assert.strictEqual(conditions[0].rightOperandRef, "p_user");
+  assert(conditions[0].rightOperandDecl, "Expected decl for right operand p_user.");
+  assert.strictEqual(conditions[0].rightOperandDecl.name, "p_user");
+
+  assert.strictEqual(conditions[1].leftOperand, "active");
+  assert.strictEqual(conditions[1].rightOperand, "abap_true");
+  assert.strictEqual(conditions[1].comparisonOperator, "=");
+  assert.strictEqual(conditions[1].logicalConnector, "");
+  assert.strictEqual(conditions[1].rightOperandRef, "abap_true");
+  assert(conditions[1].rightOperandDecl, "Expected system decl for right operand abap_true.");
+  assert.strictEqual(conditions[1].rightOperandDecl.objectType, "SYSTEM");
+  assert.strictEqual(conditions[1].rightOperandDecl.name, "ABAP_TRUE");
 }
 
 function testWhereConditionExtrasForSimilarStatements() {
   const code = [
+    "DATA p_user TYPE syuname.",
     "LOOP AT lt_user INTO ls_user WHERE uname = p_user AND active = abap_true.",
     "ENDLOOP.",
     "MODIFY lt_user FROM ls_user WHERE uname = p_user.",
@@ -247,42 +264,75 @@ function testWhereConditionExtrasForSimilarStatements() {
 
   const loopAt = findObject(objects, "LOOP_AT_ITAB");
   assert(loopAt && loopAt.extras && loopAt.extras.loopAtItab, "Expected LOOP_AT_ITAB extras.");
-  assert.deepStrictEqual(loopAt.extras.loopAtItab.conditions, [
-    {
-      leftOperand: "uname",
-      rightOperand: "p_user",
-      comparisonOperator: "=",
-      logicalConnector: "AND"
-    },
-    {
-      leftOperand: "active",
-      rightOperand: "abap_true",
-      comparisonOperator: "=",
-      logicalConnector: ""
-    }
-  ]);
+  assert.deepStrictEqual(
+    loopAt.extras.loopAtItab.conditions.map((cond) => ({
+      leftOperand: cond.leftOperand,
+      rightOperand: cond.rightOperand,
+      comparisonOperator: cond.comparisonOperator,
+      logicalConnector: cond.logicalConnector
+    })),
+    [
+      {
+        leftOperand: "uname",
+        rightOperand: "p_user",
+        comparisonOperator: "=",
+        logicalConnector: "AND"
+      },
+      {
+        leftOperand: "active",
+        rightOperand: "abap_true",
+        comparisonOperator: "=",
+        logicalConnector: ""
+      }
+    ]
+  );
+  assert.strictEqual(loopAt.extras.loopAtItab.conditions[0].rightOperandRef, "p_user");
+  assert(loopAt.extras.loopAtItab.conditions[0].rightOperandDecl, "Expected decl for LOOP condition right operand.");
+  assert.strictEqual(loopAt.extras.loopAtItab.conditions[0].rightOperandDecl.name, "p_user");
 
   const modify = findObject(objects, "MODIFY_ITAB");
   assert(modify && modify.extras && modify.extras.modifyItab, "Expected MODIFY_ITAB extras.");
-  assert.deepStrictEqual(modify.extras.modifyItab.conditions, [
-    {
-      leftOperand: "uname",
-      rightOperand: "p_user",
-      comparisonOperator: "=",
-      logicalConnector: ""
-    }
-  ]);
+  assert.deepStrictEqual(
+    modify.extras.modifyItab.conditions.map((cond) => ({
+      leftOperand: cond.leftOperand,
+      rightOperand: cond.rightOperand,
+      comparisonOperator: cond.comparisonOperator,
+      logicalConnector: cond.logicalConnector
+    })),
+    [
+      {
+        leftOperand: "uname",
+        rightOperand: "p_user",
+        comparisonOperator: "=",
+        logicalConnector: ""
+      }
+    ]
+  );
+  assert.strictEqual(modify.extras.modifyItab.conditions[0].rightOperandRef, "p_user");
+  assert(modify.extras.modifyItab.conditions[0].rightOperandDecl, "Expected decl for MODIFY condition right operand.");
+  assert.strictEqual(modify.extras.modifyItab.conditions[0].rightOperandDecl.name, "p_user");
 
   const del = findObject(objects, "DELETE_ITAB");
   assert(del && del.extras && del.extras.deleteItab, "Expected DELETE_ITAB extras.");
-  assert.deepStrictEqual(del.extras.deleteItab.conditions, [
-    {
-      leftOperand: "active",
-      rightOperand: "abap_false",
-      comparisonOperator: "=",
-      logicalConnector: ""
-    }
-  ]);
+  assert.deepStrictEqual(
+    del.extras.deleteItab.conditions.map((cond) => ({
+      leftOperand: cond.leftOperand,
+      rightOperand: cond.rightOperand,
+      comparisonOperator: cond.comparisonOperator,
+      logicalConnector: cond.logicalConnector
+    })),
+    [
+      {
+        leftOperand: "active",
+        rightOperand: "abap_false",
+        comparisonOperator: "=",
+        logicalConnector: ""
+      }
+    ]
+  );
+  assert.strictEqual(del.extras.deleteItab.conditions[0].rightOperandRef, "abap_false");
+  assert(del.extras.deleteItab.conditions[0].rightOperandDecl, "Expected system decl for DELETE condition right operand.");
+  assert.strictEqual(del.extras.deleteItab.conditions[0].rightOperandDecl.objectType, "SYSTEM");
 }
 
 function run() {
