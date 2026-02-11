@@ -22,6 +22,9 @@
     "match": {
       "startKeyword": "DELETE"
     },
+    "extras": {
+      "type": "deleteItab"
+    },
     "keywordLabels": {
       "DELETE": "stmt",
       "FROM": "from",

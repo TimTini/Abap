@@ -22,6 +22,9 @@
     "match": {
       "startPhrase": "READ TABLE"
     },
+    "extras": {
+      "type": "readTable"
+    },
     "keywordLabels": {
       "READ": "stmt",
       "TABLE": "table",
@@ -39,6 +42,7 @@
     },
     "keywordPhrases": {
       "READ TABLE": "read-table",
+      "WITH TABLE KEY": "with-table-key",
       "WITH KEY": "with-key",
       "TRANSPORTING NO FIELDS": "transporting-no-fields",
       "BINARY SEARCH": "binary-search",
@@ -54,6 +58,19 @@
         "after": "INDEX",
         "name": "index",
         "label": "index"
+      },
+      {
+        "after": "WITH TABLE KEY",
+        "name": "withTableKey",
+        "label": "with-table-key",
+        "capture": "rest",
+        "stopTokens": [
+          "INTO",
+          "ASSIGNING",
+          "REFERENCE",
+          "TRANSPORTING",
+          "BINARY"
+        ]
       },
       {
         "after": "WITH KEY",

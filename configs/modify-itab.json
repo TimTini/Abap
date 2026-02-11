@@ -1,6 +1,7 @@
 {
   "object": "MODIFY_ITAB",
   "match": { "startKeyword": "MODIFY" },
+  "extras": { "type": "modifyItab" },
   "keywordLabels": {
     "MODIFY": "stmt",
     "TABLE": "table",
@@ -21,4 +22,3 @@
     { "after": "WHERE", "name": "where", "label": "where", "capture": "rest" }
   ]
 }
-

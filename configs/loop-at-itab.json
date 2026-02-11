@@ -1,6 +1,7 @@
 {
   "object": "LOOP_AT_ITAB",
   "match": { "startPhrase": "LOOP AT" },
+  "extras": { "type": "loopAtItab" },
   "block": { "endKeyword": "ENDLOOP" },
   "keywordLabels": {
     "LOOP": "stmt",
@@ -26,4 +27,3 @@
     { "after": "WHERE", "name": "where", "label": "where", "capture": "rest" }
   ]
 }
-

@@ -142,3 +142,10 @@ Thì ở code sễ tự gentoàn bộ array nó ra chứ không cần phải [0]
 Ngoài ra valueDecl desc, valueDecl name bị trùng khi "Chuẩn hóa", kiểu nó bị chuẩn hóa 2 lần. Có lẽ là bị từ js. Có cách nào khác phục không?
 Tôi nghĩ xử lý này khá phức tạp, nên hãy trình bày nội dung bạn hiểu và confirm lại trước khi thực hiện.
 Nếu có câu hỏi thì hãy confirm trước khi thực hiện. Nếu không có thì hãy thực hiện.
+----------
+Dối với câu read và các câu có cấu trúc tương tự.
+Phần điều kiện, With key, with table key ,...
+Có thể tách nhỏ ra thêm không? Cái phần điều kiện tạch ra làm 4 phần. Phần so sánh A, phần so sánh B, điều kiện so sánh, association.
+4 thành phần trên, hãy đặt tên 4 phần trên lại cho hợp lý hơn .
+Tôi nghĩ xử lý này khá phức tạp, nên hãy trình bày nội dung bạn hiểu và confirm lại trước khi thực hiện.
+Nếu có câu hỏi thì hãy confirm trước khi thực hiện. Nếu không có thì hãy thực hiện.

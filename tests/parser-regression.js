@@ -184,6 +184,107 @@ function testStatementCommentIgnoresLeadingCommentWithBlankGap() {
   assert.strictEqual(formEntry.codeDesc, "");
 }
 
+function testReadTableWithKeyConditions() {
+  const code = "READ TABLE lt_user WITH KEY uname = p_user active = abap_true INTO ls_user.\n";
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+  const readTable = findObject(objects, "READ_TABLE");
+  assert(readTable && readTable.extras && readTable.extras.readTable, "Expected READ_TABLE extras.");
+
+  const conditions = Array.isArray(readTable.extras.readTable.conditions) ? readTable.extras.readTable.conditions : [];
+  assert.strictEqual(conditions.length, 2);
+  assert.deepStrictEqual(conditions[0], {
+    leftOperand: "uname",
+    rightOperand: "p_user",
+    comparisonOperator: "=",
+    logicalConnector: "AND"
+  });
+  assert.deepStrictEqual(conditions[1], {
+    leftOperand: "active",
+    rightOperand: "abap_true",
+    comparisonOperator: "=",
+    logicalConnector: ""
+  });
+}
+
+function testReadTableWithTableKeyConditions() {
+  const code = "READ TABLE lt_user WITH TABLE KEY primary_key COMPONENTS uname = p_user OR active = abap_true INTO ls_user.\n";
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+  const readTable = findObject(objects, "READ_TABLE");
+  assert(readTable && readTable.extras && readTable.extras.readTable, "Expected READ_TABLE extras.");
+
+  const extras = readTable.extras.readTable;
+  assert.strictEqual(extras.withTableKeyRaw, "primary_key COMPONENTS uname = p_user OR active = abap_true");
+
+  const conditions = Array.isArray(extras.conditions) ? extras.conditions : [];
+  assert.strictEqual(conditions.length, 2);
+  assert.deepStrictEqual(conditions[0], {
+    leftOperand: "uname",
+    rightOperand: "p_user",
+    comparisonOperator: "=",
+    logicalConnector: "OR"
+  });
+  assert.deepStrictEqual(conditions[1], {
+    leftOperand: "active",
+    rightOperand: "abap_true",
+    comparisonOperator: "=",
+    logicalConnector: ""
+  });
+}
+
+function testWhereConditionExtrasForSimilarStatements() {
+  const code = [
+    "LOOP AT lt_user INTO ls_user WHERE uname = p_user AND active = abap_true.",
+    "ENDLOOP.",
+    "MODIFY lt_user FROM ls_user WHERE uname = p_user.",
+    "DELETE lt_user WHERE active = abap_false.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+
+  const loopAt = findObject(objects, "LOOP_AT_ITAB");
+  assert(loopAt && loopAt.extras && loopAt.extras.loopAtItab, "Expected LOOP_AT_ITAB extras.");
+  assert.deepStrictEqual(loopAt.extras.loopAtItab.conditions, [
+    {
+      leftOperand: "uname",
+      rightOperand: "p_user",
+      comparisonOperator: "=",
+      logicalConnector: "AND"
+    },
+    {
+      leftOperand: "active",
+      rightOperand: "abap_true",
+      comparisonOperator: "=",
+      logicalConnector: ""
+    }
+  ]);
+
+  const modify = findObject(objects, "MODIFY_ITAB");
+  assert(modify && modify.extras && modify.extras.modifyItab, "Expected MODIFY_ITAB extras.");
+  assert.deepStrictEqual(modify.extras.modifyItab.conditions, [
+    {
+      leftOperand: "uname",
+      rightOperand: "p_user",
+      comparisonOperator: "=",
+      logicalConnector: ""
+    }
+  ]);
+
+  const del = findObject(objects, "DELETE_ITAB");
+  assert(del && del.extras && del.extras.deleteItab, "Expected DELETE_ITAB extras.");
+  assert.deepStrictEqual(del.extras.deleteItab.conditions, [
+    {
+      leftOperand: "active",
+      rightOperand: "abap_false",
+      comparisonOperator: "=",
+      logicalConnector: ""
+    }
+  ]);
+}
+
 function run() {
   testInlineCommentInsideSingleQuote();
   testInlineCommentInsideTemplate();
@@ -194,6 +295,9 @@ function run() {
   testStatementCommentFallsBackToSingleLeadingLine();
   testStatementCommentIgnoresLeadingCommentBlock();
   testStatementCommentIgnoresLeadingCommentWithBlankGap();
+  testReadTableWithKeyConditions();
+  testReadTableWithTableKeyConditions();
+  testWhereConditionExtrasForSimilarStatements();
   console.log("parser-regression: ok");
 }
 

@@ -22,6 +22,9 @@
     "match": {
       "startPhrase": "LOOP AT"
     },
+    "extras": {
+      "type": "loopAtItab"
+    },
     "block": {
       "endKeyword": "ENDLOOP"
     },

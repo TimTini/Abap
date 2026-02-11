@@ -22,6 +22,9 @@
     "match": {
       "startKeyword": "MODIFY"
     },
+    "extras": {
+      "type": "modifyItab"
+    },
     "keywordLabels": {
       "MODIFY": "stmt",
       "TABLE": "table",

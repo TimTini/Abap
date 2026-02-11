@@ -607,6 +607,22 @@
       return buildPerformCallExtras(context);
     }
 
+    if (extrasConfig.type === "readTable") {
+      return buildReadTableExtras(context);
+    }
+
+    if (extrasConfig.type === "loopAtItab") {
+      return buildLoopAtItabExtras(context);
+    }
+
+    if (extrasConfig.type === "modifyItab") {
+      return buildModifyItabExtras(context);
+    }
+
+    if (extrasConfig.type === "deleteItab") {
+      return buildDeleteItabExtras(context);
+    }
+
     return null;
   }
 
@@ -713,6 +729,77 @@
         using: parseArgumentTokens(map.usingRaw || "").map((value) => ({ value })),
         changing: parseArgumentTokens(map.changingRaw || "").map((value) => ({ value })),
         tables: parseArgumentTokens(map.tablesRaw || "").map((value) => ({ value }))
+      }
+    };
+  }
+
+  function buildReadTableExtras({ values }) {
+    const map = valuesToFirstValueMap(values);
+    const withKeyRaw = map.withKey || "";
+    const withTableKeyRaw = map.withTableKey || "";
+
+    const normalizedWithTableKey = normalizeReadTableKeyConditionSource(withTableKeyRaw);
+    const conditionSource = withTableKeyRaw ? normalizedWithTableKey : withKeyRaw;
+
+    return {
+      readTable: {
+        itab: map.itab || "",
+        index: map.index || "",
+        into: map.into || "",
+        assigning: map.assigning || "",
+        refInto: map.refInto || "",
+        withKeyRaw,
+        withTableKeyRaw,
+        conditions: parseConditionClauses(conditionSource)
+      }
+    };
+  }
+
+  function buildLoopAtItabExtras({ values }) {
+    const map = valuesToFirstValueMap(values);
+    const whereRaw = map.where || "";
+
+    return {
+      loopAtItab: {
+        itab: map.itab || "",
+        into: map.into || "",
+        assigning: map.assigning || "",
+        refInto: map.refInto || "",
+        from: map.from || "",
+        to: map.to || "",
+        whereRaw,
+        conditions: parseConditionClauses(whereRaw)
+      }
+    };
+  }
+
+  function buildModifyItabExtras({ values }) {
+    const map = valuesToFirstValueMap(values);
+    const whereRaw = map.where || "";
+
+    return {
+      modifyItab: {
+        itab: map.itab || map.itabOrDbtab || "",
+        from: map.from || "",
+        index: map.index || "",
+        transporting: map.transporting || "",
+        whereRaw,
+        conditions: parseConditionClauses(whereRaw)
+      }
+    };
+  }
+
+  function buildDeleteItabExtras({ values }) {
+    const map = valuesToFirstValueMap(values);
+    const whereRaw = map.where || "";
+
+    return {
+      deleteItab: {
+        target: map.target || "",
+        from: map.from || "",
+        index: map.index || "",
+        whereRaw,
+        conditions: parseConditionClauses(whereRaw)
       }
     };
   }
@@ -2092,6 +2179,162 @@
     }
 
     return best ? best.name : "";
+  }
+
+  const CONDITION_OPERATORS = new Set([
+    "=",
+    "<>",
+    "<",
+    ">",
+    "<=",
+    ">=",
+    "EQ",
+    "NE",
+    "LT",
+    "GT",
+    "LE",
+    "GE",
+    "CO",
+    "CN",
+    "CA",
+    "NA",
+    "CS",
+    "NS",
+    "CP",
+    "NP",
+    "BT",
+    "NB"
+  ]);
+
+  const CONDITION_CONNECTORS = new Set(["AND", "OR"]);
+
+  function isConditionOperator(tokenUpper) {
+    return CONDITION_OPERATORS.has(String(tokenUpper || "").toUpperCase());
+  }
+
+  function isConditionConnector(tokenUpper) {
+    return CONDITION_CONNECTORS.has(String(tokenUpper || "").toUpperCase());
+  }
+
+  function normalizeReadTableKeyConditionSource(segmentRaw) {
+    const raw = String(segmentRaw || "").trim();
+    if (!raw) {
+      return "";
+    }
+
+    const match = raw.match(/^(?:[A-Za-z_][A-Za-z0-9_]*\s+)?COMPONENTS\s+(.+)$/i);
+    if (!match) {
+      return raw;
+    }
+    return String(match[1] || "").trim();
+  }
+
+  function parseConditionClauses(segmentRaw) {
+    const raw = String(segmentRaw || "").trim();
+    if (!raw) {
+      return [];
+    }
+
+    const tokens = tokenize(`${raw}.`);
+    if (!tokens.length) {
+      return [];
+    }
+
+    const clauses = [];
+    let index = 0;
+
+    while (index < tokens.length) {
+      while (index < tokens.length && isConditionConnector(tokens[index].upper)) {
+        index += 1;
+      }
+      if (index >= tokens.length) {
+        break;
+      }
+
+      let opIndex = -1;
+      for (let i = index; i < tokens.length; i += 1) {
+        if (isConditionConnector(tokens[i].upper)) {
+          break;
+        }
+        if (isConditionOperator(tokens[i].upper)) {
+          opIndex = i;
+          break;
+        }
+      }
+      if (opIndex <= index) {
+        break;
+      }
+
+      const leftTokens = tokens.slice(index, opIndex);
+      if (!leftTokens.length) {
+        index = opIndex + 1;
+        continue;
+      }
+
+      const rightStart = opIndex + 1;
+      if (rightStart >= tokens.length) {
+        break;
+      }
+
+      let rightEnd = tokens.length - 1;
+      let explicitConnectorIndex = -1;
+      let implicitNextClauseIndex = -1;
+
+      for (let i = rightStart; i < tokens.length; i += 1) {
+        if (isConditionConnector(tokens[i].upper)) {
+          explicitConnectorIndex = i;
+          rightEnd = i - 1;
+          break;
+        }
+
+        const next = tokens[i + 1];
+        if (i > rightStart && next && isConditionOperator(next.upper)) {
+          implicitNextClauseIndex = i;
+          rightEnd = i - 1;
+          break;
+        }
+      }
+
+      const rightTokens = tokens.slice(rightStart, rightEnd + 1);
+      if (!rightTokens.length) {
+        if (explicitConnectorIndex >= 0) {
+          index = explicitConnectorIndex + 1;
+          continue;
+        }
+        break;
+      }
+
+      const leftOperand = leftTokens.map((token) => token.raw).join(" ").trim();
+      const rightOperand = rightTokens.map((token) => token.raw).join(" ").trim();
+      const comparisonOperator = String(tokens[opIndex].raw || "").trim();
+      if (!leftOperand || !rightOperand || !comparisonOperator) {
+        break;
+      }
+
+      let logicalConnector = "";
+      if (explicitConnectorIndex >= 0) {
+        logicalConnector = String(tokens[explicitConnectorIndex].upper || "").trim();
+      } else if (implicitNextClauseIndex >= 0) {
+        logicalConnector = "AND";
+      }
+
+      clauses.push({
+        leftOperand,
+        rightOperand,
+        comparisonOperator,
+        logicalConnector
+      });
+
+      if (explicitConnectorIndex >= 0) {
+        index = explicitConnectorIndex + 1;
+      } else if (implicitNextClauseIndex >= 0) {
+        index = implicitNextClauseIndex;
+      } else {
+        break;
+      }
+    }
+
+    return clauses;
   }
 
   function parseArgumentTokens(segmentRaw) {
