@@ -22,6 +22,9 @@
     "match": {
       "startKeyword": "SELECT"
     },
+    "extras": {
+      "type": "selectStatement"
+    },
     "keywordLabels": {
       "SELECT": "stmt",
       "SINGLE": "single",
@@ -84,7 +87,18 @@
         "stopTokens": [
           "ORDER",
           "GROUP",
-          "HAVING"
+          "HAVING",
+          "UP"
+        ]
+      },
+      {
+        "after": "HAVING",
+        "name": "having",
+        "label": "having",
+        "capture": "rest",
+        "stopTokens": [
+          "ORDER",
+          "UP"
         ]
       }
     ]

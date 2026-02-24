@@ -335,15 +335,15 @@ function testWhereConditionExtrasForSimilarStatements() {
   assert.strictEqual(del.extras.deleteItab.conditions[0].rightOperandDecl.objectType, "SYSTEM");
 }
 
-function testIfAndElseifConditionExtras() {
+function testConditionExtrasForIfElseifSelectAndPerform() {
   const code = [
-    "DATA lv_a TYPE i.",
-    "DATA lv_b TYPE i.",
-    "DATA lv_x TYPE i.",
-    "DATA lv_y TYPE i.",
-    "IF lv_a = lv_x AND lv_b = lv_y.",
-    "ELSEIF lv_a = lv_x OR lv_b = lv_y.",
+    "DATA p_user TYPE syuname.",
+    "DATA p_flag TYPE abap_bool.",
+    "IF p_user = p_user AND p_flag = abap_true.",
+    "ELSEIF p_user = p_user OR p_flag = abap_false.",
     "ENDIF.",
+    "SELECT bname FROM usr02 WHERE bname = p_user GROUP BY bname HAVING bname = p_user ORDER BY bname.",
+    "PERFORM main IF p_user = p_user AND p_flag = abap_true.",
     ""
   ].join("\n");
 
@@ -351,8 +351,84 @@ function testIfAndElseifConditionExtras() {
   const objects = flattenObjects(result.objects);
 
   const ifObj = findObject(objects, "IF");
-  assert(ifObj && ifObj.extras && ifObj.extras.ifCondition, "Expected IF extras.ifCondition.");
-  assert.strictEqual(ifObj.extras.ifCondition.conditionRaw, "lv_a = lv_x AND lv_b = lv_y");
+  assert(ifObj && ifObj.extras && ifObj.extras.ifCondition, "Expected IF condition extras.");
+  assert.strictEqual(ifObj.extras.ifCondition.conditionRaw, "p_user = p_user AND p_flag = abap_true");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions.length, 2);
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].leftOperand, "p_user");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].rightOperand, "p_user");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].comparisonOperator, "=");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].logicalConnector, "AND");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].rightOperandRef, "p_user");
+  assert(ifObj.extras.ifCondition.conditions[0].rightOperandDecl, "Expected decl for IF right operand.");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].rightOperandDecl.name, "p_user");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[1].leftOperand, "p_flag");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[1].rightOperand, "abap_true");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[1].logicalConnector, "");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[1].rightOperandRef, "abap_true");
+  assert(ifObj.extras.ifCondition.conditions[1].rightOperandDecl, "Expected system decl for IF right operand.");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[1].rightOperandDecl.objectType, "SYSTEM");
+
+  const ifValue = getValueEntry(ifObj.values, "condition");
+  assert(ifValue, "Expected IF values.condition.");
+  assert.strictEqual(ifValue.value, "p_user = p_user AND p_flag = abap_true");
+  assert.strictEqual(ifValue.declRef, "p_user");
+
+  const elseifObj = findObject(objects, "ELSEIF");
+  assert(elseifObj && elseifObj.extras && elseifObj.extras.ifCondition, "Expected ELSEIF condition extras.");
+  assert.strictEqual(elseifObj.extras.ifCondition.conditionRaw, "p_user = p_user OR p_flag = abap_false");
+  assert.strictEqual(elseifObj.extras.ifCondition.conditions.length, 2);
+  assert.strictEqual(elseifObj.extras.ifCondition.conditions[0].logicalConnector, "OR");
+  assert.strictEqual(elseifObj.extras.ifCondition.conditions[1].rightOperandRef, "abap_false");
+  assert(elseifObj.extras.ifCondition.conditions[1].rightOperandDecl, "Expected system decl for ELSEIF right operand.");
+  assert.strictEqual(elseifObj.extras.ifCondition.conditions[1].rightOperandDecl.objectType, "SYSTEM");
+
+  const selectObj = findObject(objects, "SELECT");
+  assert(selectObj && selectObj.extras && selectObj.extras.select, "Expected SELECT condition extras.");
+  assert.strictEqual(selectObj.extras.select.whereRaw, "bname = p_user");
+  assert.strictEqual(selectObj.extras.select.whereConditions.length, 1);
+  assert.strictEqual(selectObj.extras.select.whereConditions[0].leftOperand, "bname");
+  assert.strictEqual(selectObj.extras.select.whereConditions[0].rightOperand, "p_user");
+  assert.strictEqual(selectObj.extras.select.whereConditions[0].rightOperandRef, "p_user");
+  assert(selectObj.extras.select.whereConditions[0].rightOperandDecl, "Expected decl for SELECT WHERE right operand.");
+  assert.strictEqual(selectObj.extras.select.whereConditions[0].rightOperandDecl.name, "p_user");
+  assert.strictEqual(selectObj.extras.select.havingRaw, "bname = p_user");
+  assert.strictEqual(selectObj.extras.select.havingConditions.length, 1);
+  assert.strictEqual(selectObj.extras.select.havingConditions[0].rightOperandRef, "p_user");
+  assert(selectObj.extras.select.havingConditions[0].rightOperandDecl, "Expected decl for SELECT HAVING right operand.");
+  assert.strictEqual(selectObj.extras.select.havingConditions[0].rightOperandDecl.name, "p_user");
+
+  const performObj = findObject(objects, "PERFORM");
+  assert(performObj && performObj.extras && performObj.extras.performCall, "Expected PERFORM extras.");
+  assert.strictEqual(performObj.extras.performCall.ifCondition, "p_user = p_user AND p_flag = abap_true");
+  assert.strictEqual(performObj.extras.performCall.ifConditions.length, 2);
+  assert.strictEqual(performObj.extras.performCall.ifConditions[0].rightOperandRef, "p_user");
+  assert(performObj.extras.performCall.ifConditions[0].rightOperandDecl, "Expected decl for PERFORM IF right operand.");
+  assert.strictEqual(performObj.extras.performCall.ifConditions[0].rightOperandDecl.name, "p_user");
+  assert.strictEqual(performObj.extras.performCall.ifConditions[1].rightOperandRef, "abap_true");
+  assert(performObj.extras.performCall.ifConditions[1].rightOperandDecl, "Expected system decl for PERFORM IF right operand.");
+  assert.strictEqual(performObj.extras.performCall.ifConditions[1].rightOperandDecl.objectType, "SYSTEM");
+}
+
+function testConditionOperatorMatrix() {
+  const code = [
+    "DATA lv_a TYPE i.",
+    "DATA lv_b TYPE i.",
+    "DATA lv_low TYPE i.",
+    "DATA lv_high TYPE i.",
+    "DATA lv_text TYPE string.",
+    "DATA lv_mask TYPE string.",
+    "DATA lt_allowed TYPE RANGE OF i.",
+    "IF lv_a NE lv_b AND lv_a BT lv_low AND lv_high AND lv_text CP lv_mask AND lv_a IN lt_allowed.",
+    "ENDIF.",
+    "READ TABLE lt_data WITH KEY col_a NE lv_b col_b BT lv_low AND lv_high col_c CP lv_mask col_d IN lt_allowed INTO ls_data.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+
+  const ifObj = findObject(objects, "IF");
+  assert(ifObj && ifObj.extras && ifObj.extras.ifCondition, "Expected IF condition extras for operator matrix.");
   assert.deepStrictEqual(
     ifObj.extras.ifCondition.conditions.map((cond) => ({
       leftOperand: cond.leftOperand,
@@ -363,37 +439,47 @@ function testIfAndElseifConditionExtras() {
     [
       {
         leftOperand: "lv_a",
-        rightOperand: "lv_x",
-        comparisonOperator: "=",
+        rightOperand: "lv_b",
+        comparisonOperator: "NE",
         logicalConnector: "AND"
       },
       {
-        leftOperand: "lv_b",
-        rightOperand: "lv_y",
-        comparisonOperator: "=",
+        leftOperand: "lv_a",
+        rightOperand: "lv_low AND lv_high",
+        comparisonOperator: "BT",
+        logicalConnector: "AND"
+      },
+      {
+        leftOperand: "lv_text",
+        rightOperand: "lv_mask",
+        comparisonOperator: "CP",
+        logicalConnector: "AND"
+      },
+      {
+        leftOperand: "lv_a",
+        rightOperand: "lt_allowed",
+        comparisonOperator: "IN",
         logicalConnector: ""
       }
     ]
   );
-  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].rightOperandRef, "lv_x");
-  assert(ifObj.extras.ifCondition.conditions[0].rightOperandDecl, "Expected decl for IF clause right operand.");
-  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].rightOperandDecl.name, "lv_x");
-  assert.strictEqual(ifObj.extras.ifCondition.conditions[1].rightOperandRef, "lv_y");
-  assert(ifObj.extras.ifCondition.conditions[1].rightOperandDecl, "Expected decl for IF clause right operand.");
-  assert.strictEqual(ifObj.extras.ifCondition.conditions[1].rightOperandDecl.name, "lv_y");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].rightOperandRef, "lv_b");
+  assert(ifObj.extras.ifCondition.conditions[0].rightOperandDecl, "Expected decl for IF NE right operand.");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].rightOperandDecl.name, "lv_b");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[1].rightOperandRef, "lv_low");
+  assert(ifObj.extras.ifCondition.conditions[1].rightOperandDecl, "Expected decl for IF BT right operand.");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[1].rightOperandDecl.name, "lv_low");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[2].rightOperandRef, "lv_mask");
+  assert(ifObj.extras.ifCondition.conditions[2].rightOperandDecl, "Expected decl for IF CP right operand.");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[2].rightOperandDecl.name, "lv_mask");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[3].rightOperandRef, "lt_allowed");
+  assert(ifObj.extras.ifCondition.conditions[3].rightOperandDecl, "Expected decl for IF IN right operand.");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[3].rightOperandDecl.name, "lt_allowed");
 
-  const ifConditionValue = getValueEntry(ifObj.values, "condition");
-  assert(ifConditionValue, "Expected values.condition for IF.");
-  assert.strictEqual(ifConditionValue.value, "lv_a = lv_x AND lv_b = lv_y");
-  assert.strictEqual(ifConditionValue.declRef, "lv_a");
-  assert(ifConditionValue.decl, "Expected values.condition.decl for IF.");
-  assert.strictEqual(ifConditionValue.decl.name, "lv_a");
-
-  const elseifObj = findObject(objects, "ELSEIF");
-  assert(elseifObj && elseifObj.extras && elseifObj.extras.ifCondition, "Expected ELSEIF extras.ifCondition.");
-  assert.strictEqual(elseifObj.extras.ifCondition.conditionRaw, "lv_a = lv_x OR lv_b = lv_y");
+  const readObj = findObject(objects, "READ_TABLE");
+  assert(readObj && readObj.extras && readObj.extras.readTable, "Expected READ_TABLE condition extras for operator matrix.");
   assert.deepStrictEqual(
-    elseifObj.extras.ifCondition.conditions.map((cond) => ({
+    readObj.extras.readTable.conditions.map((cond) => ({
       leftOperand: cond.leftOperand,
       rightOperand: cond.rightOperand,
       comparisonOperator: cond.comparisonOperator,
@@ -401,29 +487,43 @@ function testIfAndElseifConditionExtras() {
     })),
     [
       {
-        leftOperand: "lv_a",
-        rightOperand: "lv_x",
-        comparisonOperator: "=",
-        logicalConnector: "OR"
+        leftOperand: "col_a",
+        rightOperand: "lv_b",
+        comparisonOperator: "NE",
+        logicalConnector: "AND"
       },
       {
-        leftOperand: "lv_b",
-        rightOperand: "lv_y",
-        comparisonOperator: "=",
+        leftOperand: "col_b",
+        rightOperand: "lv_low AND lv_high",
+        comparisonOperator: "BT",
+        logicalConnector: "AND"
+      },
+      {
+        leftOperand: "col_c",
+        rightOperand: "lv_mask",
+        comparisonOperator: "CP",
+        logicalConnector: "AND"
+      },
+      {
+        leftOperand: "col_d",
+        rightOperand: "lt_allowed",
+        comparisonOperator: "IN",
         logicalConnector: ""
       }
     ]
   );
-  assert.strictEqual(elseifObj.extras.ifCondition.conditions[0].rightOperandRef, "lv_x");
-  assert(elseifObj.extras.ifCondition.conditions[0].rightOperandDecl, "Expected decl for ELSEIF clause right operand.");
-  assert.strictEqual(elseifObj.extras.ifCondition.conditions[0].rightOperandDecl.name, "lv_x");
-
-  const elseifConditionValue = getValueEntry(elseifObj.values, "condition");
-  assert(elseifConditionValue, "Expected values.condition for ELSEIF.");
-  assert.strictEqual(elseifConditionValue.value, "lv_a = lv_x OR lv_b = lv_y");
-  assert.strictEqual(elseifConditionValue.declRef, "lv_a");
-  assert(elseifConditionValue.decl, "Expected values.condition.decl for ELSEIF.");
-  assert.strictEqual(elseifConditionValue.decl.name, "lv_a");
+  assert.strictEqual(readObj.extras.readTable.conditions[0].rightOperandRef, "lv_b");
+  assert(readObj.extras.readTable.conditions[0].rightOperandDecl, "Expected decl for READ NE right operand.");
+  assert.strictEqual(readObj.extras.readTable.conditions[0].rightOperandDecl.name, "lv_b");
+  assert.strictEqual(readObj.extras.readTable.conditions[1].rightOperandRef, "lv_low");
+  assert(readObj.extras.readTable.conditions[1].rightOperandDecl, "Expected decl for READ BT right operand.");
+  assert.strictEqual(readObj.extras.readTable.conditions[1].rightOperandDecl.name, "lv_low");
+  assert.strictEqual(readObj.extras.readTable.conditions[2].rightOperandRef, "lv_mask");
+  assert(readObj.extras.readTable.conditions[2].rightOperandDecl, "Expected decl for READ CP right operand.");
+  assert.strictEqual(readObj.extras.readTable.conditions[2].rightOperandDecl.name, "lv_mask");
+  assert.strictEqual(readObj.extras.readTable.conditions[3].rightOperandRef, "lt_allowed");
+  assert(readObj.extras.readTable.conditions[3].rightOperandDecl, "Expected decl for READ IN right operand.");
+  assert.strictEqual(readObj.extras.readTable.conditions[3].rightOperandDecl.name, "lt_allowed");
 }
 
 function run() {
@@ -439,7 +539,8 @@ function run() {
   testReadTableWithKeyConditions();
   testReadTableWithTableKeyConditions();
   testWhereConditionExtrasForSimilarStatements();
-  testIfAndElseifConditionExtras();
+  testConditionExtrasForIfElseifSelectAndPerform();
+  testConditionOperatorMatrix();
   console.log("parser-regression: ok");
 }
 

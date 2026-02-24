@@ -1,6 +1,7 @@
 {
   "object": "SELECT",
   "match": { "startKeyword": "SELECT" },
+  "extras": { "type": "selectStatement" },
   "keywordLabels": {
     "SELECT": "stmt",
     "SINGLE": "single",
@@ -31,7 +32,7 @@
     { "after": "INTO TABLE", "name": "intoTable", "label": "into-table" },
     { "after": "APPENDING TABLE", "name": "appendingTable", "label": "appending-table" },
     { "after": "INTO", "name": "into", "label": "into" },
-    { "after": "WHERE", "name": "where", "label": "where", "capture": "rest", "stopTokens": ["ORDER", "GROUP", "HAVING"] }
+    { "after": "WHERE", "name": "where", "label": "where", "capture": "rest", "stopTokens": ["ORDER", "GROUP", "HAVING", "UP"] },
+    { "after": "HAVING", "name": "having", "label": "having", "capture": "rest", "stopTokens": ["ORDER", "UP"] }
   ]
 }
-

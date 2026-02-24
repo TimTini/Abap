@@ -611,6 +611,10 @@
       return buildIfConditionExtras(context);
     }
 
+    if (extrasConfig.type === "selectStatement") {
+      return buildSelectExtras(context);
+    }
+
     if (extrasConfig.type === "readTable") {
       return buildReadTableExtras(context);
     }
@@ -724,12 +728,14 @@
 
   function buildPerformCallExtras({ values }) {
     const map = valuesToFirstValueMap(values);
+    const ifCondition = map.ifCondition || "";
 
     return {
       performCall: {
         form: map.form || "",
         program: map.program || "",
-        ifCondition: map.ifCondition || "",
+        ifCondition,
+        ifConditions: parseConditionClauses(ifCondition),
         using: parseArgumentTokens(map.usingRaw || "").map((value) => ({ value })),
         changing: parseArgumentTokens(map.changingRaw || "").map((value) => ({ value })),
         tables: parseArgumentTokens(map.tablesRaw || "").map((value) => ({ value }))
@@ -745,6 +751,21 @@
       ifCondition: {
         conditionRaw,
         conditions: parseConditionClauses(conditionRaw)
+      }
+    };
+  }
+
+  function buildSelectExtras({ values }) {
+    const map = valuesToFirstValueMap(values);
+    const whereRaw = map.where || "";
+    const havingRaw = map.having || "";
+
+    return {
+      select: {
+        whereRaw,
+        whereConditions: parseConditionClauses(whereRaw),
+        havingRaw,
+        havingConditions: parseConditionClauses(havingRaw)
       }
     };
   }
@@ -2006,6 +2027,10 @@
       annotateIfConditionExtras(extras.ifCondition, context);
     }
 
+    if (extras.select) {
+      annotateSelectExtras(extras.select, context);
+    }
+
     if (extras.readTable) {
       annotateReadTableExtras(extras.readTable, context);
     }
@@ -2072,6 +2097,8 @@
         entry.valueDecl = resolveDecl(ref, context);
       }
     }
+
+    annotateConditionClausesWithDecls(performCall ? performCall.ifConditions : null, context);
   }
 
   function annotateIfConditionExtras(ifCondition, context) {
@@ -2079,6 +2106,14 @@
       return;
     }
     annotateConditionClausesWithDecls(ifCondition.conditions, context);
+  }
+
+  function annotateSelectExtras(selectExtras, context) {
+    if (!selectExtras || typeof selectExtras !== "object") {
+      return;
+    }
+    annotateConditionClausesWithDecls(selectExtras.whereConditions, context);
+    annotateConditionClausesWithDecls(selectExtras.havingConditions, context);
   }
 
   function annotateConditionClausesWithDecls(conditions, context) {
@@ -2294,6 +2329,7 @@
     "NS",
     "CP",
     "NP",
+    "IN",
     "BT",
     "NB"
   ]);
@@ -2371,9 +2407,16 @@
       let rightEnd = tokens.length - 1;
       let explicitConnectorIndex = -1;
       let implicitNextClauseIndex = -1;
+      const operatorUpper = String(tokens[opIndex].upper || "").toUpperCase();
+      const expectsRangeBounds = operatorUpper === "BT" || operatorUpper === "NB";
+      let rangeConnectorConsumed = false;
 
       for (let i = rightStart; i < tokens.length; i += 1) {
         if (isConditionConnector(tokens[i].upper)) {
+          if (expectsRangeBounds && !rangeConnectorConsumed && String(tokens[i].upper || "").toUpperCase() === "AND") {
+            rangeConnectorConsumed = true;
+            continue;
+          }
           explicitConnectorIndex = i;
           rightEnd = i - 1;
           break;
