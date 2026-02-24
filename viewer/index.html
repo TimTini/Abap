@@ -87,6 +87,13 @@
       color: var(--muted);
     }
 
+    header .build-info {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      font-family: Consolas, "Courier New", monospace;
+    }
+
     .controls {
       display: flex;
       flex-wrap: wrap;
@@ -598,6 +605,7 @@
     <header>
       <h1>ABAP Parser Viewer</h1>
       <p>Paste ABAP code (or JSON output) and click Render.</p>
+      <p class="build-info" id="buildInfo">Updated: checking...</p>
     </header>
 
     <div class="controls">

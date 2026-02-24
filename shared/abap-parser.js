@@ -2129,12 +2129,22 @@
         clause.leftOperandDecl = resolveDecl(leftRef, context);
       }
 
-      const rightRef = extractFirstIdentifierFromExpression(clause.rightOperand);
+      const operatorUpper = String(clause.comparisonOperator || "").toUpperCase();
+      const skipRightAnnotation = operatorUpper === "IS" && isUnaryIsPredicate(clause.rightOperand);
+      const rightRef = skipRightAnnotation ? "" : extractFirstIdentifierFromExpression(clause.rightOperand);
       if (rightRef) {
         clause.rightOperandRef = rightRef;
         clause.rightOperandDecl = resolveDecl(rightRef, context);
       }
     }
+  }
+
+  function isUnaryIsPredicate(value) {
+    const text = String(value || "").trim();
+    if (!text) {
+      return false;
+    }
+    return /^(?:NOT\s+)?(?:INITIAL|ASSIGNED|BOUND|SUPPLIED|REQUESTED)$/i.test(text);
   }
 
   function annotateReadTableExtras(readTable, context) {
@@ -2330,6 +2340,7 @@
     "CP",
     "NP",
     "IN",
+    "IS",
     "BT",
     "NB"
   ]);

@@ -23,6 +23,7 @@
     mainLayout: document.getElementById("mainLayout"),
     panelSplitter: document.getElementById("panelSplitter"),
     output: document.getElementById("output"),
+    buildInfo: document.getElementById("buildInfo"),
     rightPanelTitle: document.getElementById("rightPanelTitle"),
     rightTabOutputBtn: document.getElementById("rightTabOutputBtn"),
     rightTabDescBtn: document.getElementById("rightTabDescBtn"),
@@ -194,6 +195,96 @@
     els.output.classList.add("muted");
     els.output.replaceChildren();
     els.output.textContent = message || "";
+  }
+
+  function parseDateCandidate(value) {
+    const raw = String(value || "").trim();
+    if (!raw) {
+      return null;
+    }
+    const date = new Date(raw);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  function formatDateTime(value) {
+    const date = value instanceof Date ? value : parseDateCandidate(value);
+    if (!date) {
+      return "";
+    }
+    try {
+      return new Intl.DateTimeFormat(undefined, {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+      }).format(date);
+    } catch {
+      return date.toLocaleString();
+    }
+  }
+
+  function normalizeBuildInfo(raw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      return {};
+    }
+    const info = {};
+    if (raw.builtAtUtc) {
+      info.builtAtUtc = String(raw.builtAtUtc);
+    }
+    if (raw.sourceMtimeUtc) {
+      info.sourceMtimeUtc = String(raw.sourceMtimeUtc);
+    }
+    if (raw.gitCommit) {
+      info.gitCommit = String(raw.gitCommit);
+    }
+    if (raw.gitCommitDateUtc) {
+      info.gitCommitDateUtc = String(raw.gitCommitDateUtc);
+    }
+    return info;
+  }
+
+  function renderBuildInfo() {
+    if (!els.buildInfo) {
+      return;
+    }
+
+    const info = normalizeBuildInfo(window.ABAP_VIEWER_BUILD_INFO);
+    const updatedAt = parseDateCandidate(info.builtAtUtc)
+      || parseDateCandidate(info.sourceMtimeUtc)
+      || parseDateCandidate(document.lastModified);
+
+    const parts = [];
+    if (updatedAt) {
+      parts.push(`Updated: ${formatDateTime(updatedAt)}`);
+    } else {
+      parts.push("Updated: unknown");
+    }
+    if (info.gitCommit) {
+      parts.push(`Commit: ${info.gitCommit}`);
+    } else {
+      parts.push("Commit: unknown");
+    }
+    els.buildInfo.textContent = parts.join(" | ");
+
+    const tooltipLines = [];
+    if (info.builtAtUtc) {
+      tooltipLines.push(`builtAtUtc: ${info.builtAtUtc}`);
+    }
+    if (info.sourceMtimeUtc) {
+      tooltipLines.push(`sourceMtimeUtc: ${info.sourceMtimeUtc}`);
+    }
+    if (info.gitCommit) {
+      tooltipLines.push(`gitCommit: ${info.gitCommit}`);
+    }
+    if (info.gitCommitDateUtc) {
+      tooltipLines.push(`gitCommitDateUtc: ${info.gitCommitDateUtc}`);
+    }
+    if (!tooltipLines.length) {
+      tooltipLines.push("using document.lastModified fallback");
+    }
+    els.buildInfo.title = tooltipLines.join("\n");
   }
 
   function normalizeId(id) {
@@ -3782,6 +3873,7 @@
   }
 
   function init() {
+    renderBuildInfo();
     state.descOverrides = loadDescOverrides();
     state.descOverridesLegacy = loadLegacyDescOverrides();
     state.customRules = loadCustomRules();

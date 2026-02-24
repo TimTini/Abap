@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
+import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -53,6 +56,57 @@ def _is_remote_url(url: str) -> bool:
 def _escape_inline_script(js: str) -> str:
     # Prevent accidentally terminating the <script> tag.
     return js.replace("</script>", "<\\/script>")
+
+
+def _iso_utc_from_timestamp(value: float) -> str:
+    return datetime.fromtimestamp(value, tz=timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _iso_utc_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _run_git(repo_root: Path, *args: str) -> str:
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(repo_root), *args],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return (completed.stdout or "").strip()
+    except Exception:
+        return ""
+
+
+def build_viewer_build_info(repo_root: Path, input_path: Path) -> dict[str, str]:
+    info: dict[str, str] = {
+        "builtAtUtc": _iso_utc_now(),
+        "sourceMtimeUtc": _iso_utc_from_timestamp(input_path.stat().st_mtime),
+    }
+    git_commit = _run_git(repo_root, "rev-parse", "--short", "HEAD")
+    if git_commit:
+        info["gitCommit"] = git_commit
+    git_commit_date = _run_git(repo_root, "show", "-s", "--format=%cI", "HEAD")
+    if git_commit_date:
+        info["gitCommitDateUtc"] = git_commit_date
+    return info
+
+
+def inject_build_info_script(html: str, build_info: dict[str, str]) -> str:
+    payload = json.dumps(build_info, ensure_ascii=True, separators=(",", ":"))
+    script = f"<script>window.ABAP_VIEWER_BUILD_INFO = {payload};</script>\n"
+
+    head_close = re.search(r"(?is)</head>", html)
+    if head_close:
+        return html[: head_close.start()] + script + html[head_close.start() :]
+
+    body_open = re.search(r"(?is)<body[^>]*>", html)
+    if body_open:
+        insert_at = body_open.end()
+        return html[:insert_at] + "\n" + script + html[insert_at:]
+
+    return script + html
 
 
 LINK_TAG_RE = re.compile(r"(?is)<link\b[^>]*>")
@@ -158,6 +212,8 @@ def main() -> int:
     warnings: list[str] = []
     html, css_count = inline_stylesheet_links(html, base_dir, warnings)
     html, js_count = inline_script_src(html, base_dir, warnings)
+    build_info = build_viewer_build_info(repo_root, input_path.resolve())
+    html = inject_build_info_script(html, build_info)
 
     banner = "\n".join(
         [
@@ -173,7 +229,11 @@ def main() -> int:
 
     _write_text(output_path, banner + html)
 
-    print(f"Generated: {output_path} (inlined {js_count} scripts, {css_count} stylesheets)")
+    print(
+        "Generated: "
+        f"{output_path} (inlined {js_count} scripts, {css_count} stylesheets, "
+        f"build {build_info.get('builtAtUtc', 'unknown')})"
+    )
     for w in warnings:
         print(f"WARNING: {w}", file=sys.stderr)
 
@@ -182,4 +242,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

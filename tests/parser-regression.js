@@ -526,6 +526,77 @@ function testConditionOperatorMatrix() {
   assert.strictEqual(readObj.extras.readTable.conditions[3].rightOperandDecl.name, "lt_allowed");
 }
 
+function testIsInitialAndIsNotInitialConditions() {
+  const code = [
+    "DATA lv_a TYPE string.",
+    "DATA lv_b TYPE string.",
+    "IF lv_a IS INITIAL OR lv_b IS NOT INITIAL.",
+    "ENDIF.",
+    "READ TABLE lt_data WITH KEY col_a IS INITIAL col_b IS NOT INITIAL INTO ls_data.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+
+  const ifObj = findObject(objects, "IF");
+  assert(ifObj && ifObj.extras && ifObj.extras.ifCondition, "Expected IF extras for IS INITIAL patterns.");
+  assert.deepStrictEqual(
+    ifObj.extras.ifCondition.conditions.map((cond) => ({
+      leftOperand: cond.leftOperand,
+      rightOperand: cond.rightOperand,
+      comparisonOperator: cond.comparisonOperator,
+      logicalConnector: cond.logicalConnector
+    })),
+    [
+      {
+        leftOperand: "lv_a",
+        rightOperand: "INITIAL",
+        comparisonOperator: "IS",
+        logicalConnector: "OR"
+      },
+      {
+        leftOperand: "lv_b",
+        rightOperand: "NOT INITIAL",
+        comparisonOperator: "IS",
+        logicalConnector: ""
+      }
+    ]
+  );
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].leftOperandRef, "lv_a");
+  assert(ifObj.extras.ifCondition.conditions[0].leftOperandDecl, "Expected decl for lv_a.");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].leftOperandDecl.name, "lv_a");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].rightOperandRef, undefined);
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[1].rightOperandRef, undefined);
+
+  const readObj = findObject(objects, "READ_TABLE");
+  assert(readObj && readObj.extras && readObj.extras.readTable, "Expected READ_TABLE extras for IS INITIAL patterns.");
+  assert.deepStrictEqual(
+    readObj.extras.readTable.conditions.map((cond) => ({
+      leftOperand: cond.leftOperand,
+      rightOperand: cond.rightOperand,
+      comparisonOperator: cond.comparisonOperator,
+      logicalConnector: cond.logicalConnector
+    })),
+    [
+      {
+        leftOperand: "col_a",
+        rightOperand: "INITIAL",
+        comparisonOperator: "IS",
+        logicalConnector: "AND"
+      },
+      {
+        leftOperand: "col_b",
+        rightOperand: "NOT INITIAL",
+        comparisonOperator: "IS",
+        logicalConnector: ""
+      }
+    ]
+  );
+  assert.strictEqual(readObj.extras.readTable.conditions[0].rightOperandRef, undefined);
+  assert.strictEqual(readObj.extras.readTable.conditions[1].rightOperandRef, undefined);
+}
+
 function run() {
   testInlineCommentInsideSingleQuote();
   testInlineCommentInsideTemplate();
@@ -541,6 +612,7 @@ function run() {
   testWhereConditionExtrasForSimilarStatements();
   testConditionExtrasForIfElseifSelectAndPerform();
   testConditionOperatorMatrix();
+  testIsInitialAndIsNotInitialConditions();
   console.log("parser-regression: ok");
 }
 
