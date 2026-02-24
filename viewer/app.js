@@ -2372,17 +2372,23 @@
       return out;
     };
 
-    const cloneNodeById = (nodeId, ancestorIds) => {
+    const cloneNodeById = (nodeId, ancestorIds, emittedIds) => {
       if (!nodeId || !nodeById.has(nodeId)) {
         return null;
       }
       if (ancestorIds.has(nodeId)) {
         return null;
       }
+      if (emittedIds && emittedIds.has(nodeId)) {
+        return null;
+      }
 
       const node = nodeById.get(nodeId);
       const nextAncestors = new Set(ancestorIds);
       nextAncestors.add(nodeId);
+      if (emittedIds) {
+        emittedIds.add(nodeId);
+      }
 
       const out = {};
       for (const key of Object.keys(node)) {
@@ -2411,7 +2417,7 @@
 
       const childIds = childIdsByParentId.get(nodeId) || [];
       for (const childId of childIds) {
-        const cloned = cloneNodeById(childId, nextAncestors);
+        const cloned = cloneNodeById(childId, nextAncestors, emittedIds);
         if (cloned) {
           outChildren.push(cloned);
         }
@@ -2482,6 +2488,7 @@
     }
 
     const roots = [];
+    const emittedIds = new Set();
     for (const node of topLevelNoIdNodes) {
       const cloned = cloneNodeNoId(node, new Set());
       if (cloned) {
@@ -2489,7 +2496,7 @@
       }
     }
     for (const rootId of rootIds) {
-      const cloned = cloneNodeById(rootId, new Set());
+      const cloned = cloneNodeById(rootId, new Set(), emittedIds);
       if (cloned) {
         roots.push(cloned);
       }
@@ -2506,6 +2513,29 @@
       typeof value.objectType === "string" &&
       typeof value.name === "string" &&
       typeof value.scopeLabel === "string"
+    );
+  }
+
+  function isDeclHintKey(keyHint) {
+    const key = String(keyHint || "").trim();
+    if (!key) {
+      return false;
+    }
+    return /decl$/i.test(key);
+  }
+
+  function isDeclObjectForXml(keyHint, value) {
+    if (isDeclLikeObject(value)) {
+      return true;
+    }
+    if (!isDeclHintKey(keyHint) || !value || typeof value !== "object" || Array.isArray(value)) {
+      return false;
+    }
+    return (
+      typeof value.name === "string" ||
+      typeof value.objectType === "string" ||
+      typeof value.scopeLabel === "string" ||
+      typeof value.comment === "string"
     );
   }
 
@@ -2588,7 +2618,7 @@
     if (typeof value === "object") {
       lines.push(`${pad}<${tagName}>`);
 
-      const valueIsDecl = isDeclLikeObject(value);
+      const valueIsDecl = isDeclObjectForXml(keyHint, value);
       let hasComputedFinalDesc = false;
 
       if (valueIsDecl) {
@@ -2597,6 +2627,14 @@
           lines.push(`${" ".repeat(indent + 2)}<desc>${escapeXmlText(declDesc)}</desc>`);
         } else {
           lines.push(`${" ".repeat(indent + 2)}<desc/>`);
+        }
+
+        const finalDeclDesc = getFinalDeclDesc(value);
+        hasComputedFinalDesc = true;
+        if (finalDeclDesc) {
+          lines.push(`${" ".repeat(indent + 2)}<finalDesc>${escapeXmlText(finalDeclDesc)}</finalDesc>`);
+        } else {
+          lines.push(`${" ".repeat(indent + 2)}<finalDesc/>`);
         }
 
         const declName = getDeclDisplayName(value) || getDeclTechName(value);
