@@ -2252,6 +2252,252 @@
     return "item";
   }
 
+  function normalizeXmlObjectId(value) {
+    if (value === null || value === undefined) {
+      return "";
+    }
+    return String(value);
+  }
+
+  function buildXmlExportRoots(objects) {
+    const input = Array.isArray(objects) ? objects : [];
+    if (!input.length) {
+      return [];
+    }
+
+    const nodeById = new Map();
+    const idOrder = [];
+    const childIdsByParentId = new Map();
+    const topLevelNoIdNodes = [];
+
+    const pushChildId = (parentId, childId) => {
+      if (!parentId || !childId) {
+        return;
+      }
+      if (!childIdsByParentId.has(parentId)) {
+        childIdsByParentId.set(parentId, []);
+      }
+      const list = childIdsByParentId.get(parentId);
+      if (!list.includes(childId)) {
+        list.push(childId);
+      }
+    };
+
+    const stack = input
+      .filter((node) => node && typeof node === "object")
+      .map((node) => ({ node, isTopLevel: true }));
+
+    while (stack.length) {
+      const item = stack.pop();
+      const node = item && item.node;
+      if (!node || typeof node !== "object") {
+        continue;
+      }
+
+      const nodeId = normalizeXmlObjectId(node.id);
+      if (!nodeId) {
+        if (item.isTopLevel) {
+          topLevelNoIdNodes.push(node);
+        }
+      } else if (!nodeById.has(nodeId)) {
+        nodeById.set(nodeId, node);
+        idOrder.push(nodeId);
+      }
+
+      const parentId = normalizeXmlObjectId(node.parent);
+      if (nodeId && parentId) {
+        pushChildId(parentId, nodeId);
+      }
+
+      const children = Array.isArray(node.children) ? node.children : [];
+      for (let index = children.length - 1; index >= 0; index -= 1) {
+        const child = children[index];
+        if (!child || typeof child !== "object") {
+          continue;
+        }
+        const childId = normalizeXmlObjectId(child.id);
+        if (nodeId && childId) {
+          pushChildId(nodeId, childId);
+        }
+        stack.push({ node: child, isTopLevel: false });
+      }
+    }
+
+    if (!nodeById.size) {
+      return input.slice();
+    }
+
+    const cloneNodeNoId = (node, seenNoId) => {
+      if (!node || typeof node !== "object") {
+        return node;
+      }
+      if (seenNoId.has(node)) {
+        return null;
+      }
+
+      const nextSeenNoId = new Set(seenNoId);
+      nextSeenNoId.add(node);
+
+      const out = {};
+      for (const key of Object.keys(node)) {
+        if (key === "children") {
+          continue;
+        }
+        out[key] = node[key];
+      }
+
+      const children = Array.isArray(node.children) ? node.children : [];
+      const outChildren = [];
+      for (const child of children) {
+        if (!child || typeof child !== "object") {
+          continue;
+        }
+        const childId = normalizeXmlObjectId(child.id);
+        if (childId) {
+          // ID-based children are wired later from parent map.
+          continue;
+        }
+        const cloned = cloneNodeNoId(child, nextSeenNoId);
+        if (cloned) {
+          outChildren.push(cloned);
+        }
+      }
+
+      if (outChildren.length) {
+        out.children = outChildren;
+      } else if (Array.isArray(node.children) && node.children.length === 0) {
+        out.children = [];
+      }
+
+      return out;
+    };
+
+    const cloneNodeById = (nodeId, ancestorIds) => {
+      if (!nodeId || !nodeById.has(nodeId)) {
+        return null;
+      }
+      if (ancestorIds.has(nodeId)) {
+        return null;
+      }
+
+      const node = nodeById.get(nodeId);
+      const nextAncestors = new Set(ancestorIds);
+      nextAncestors.add(nodeId);
+
+      const out = {};
+      for (const key of Object.keys(node)) {
+        if (key === "children") {
+          continue;
+        }
+        out[key] = node[key];
+      }
+
+      const outChildren = [];
+
+      const explicitChildren = Array.isArray(node.children) ? node.children : [];
+      for (const child of explicitChildren) {
+        if (!child || typeof child !== "object") {
+          continue;
+        }
+        const childId = normalizeXmlObjectId(child.id);
+        if (childId) {
+          continue;
+        }
+        const clonedNoId = cloneNodeNoId(child, new Set());
+        if (clonedNoId) {
+          outChildren.push(clonedNoId);
+        }
+      }
+
+      const childIds = childIdsByParentId.get(nodeId) || [];
+      for (const childId of childIds) {
+        const cloned = cloneNodeById(childId, nextAncestors);
+        if (cloned) {
+          outChildren.push(cloned);
+        }
+      }
+
+      if (outChildren.length) {
+        out.children = outChildren;
+      } else if (Array.isArray(node.children) && node.children.length === 0) {
+        out.children = [];
+      }
+
+      return out;
+    };
+
+    const isRootId = (nodeId) => {
+      const node = nodeById.get(nodeId);
+      if (!node) {
+        return false;
+      }
+      const parentId = normalizeXmlObjectId(node.parent);
+      return !parentId || !nodeById.has(parentId);
+    };
+
+    const rootIds = [];
+    const addedRootIds = new Set();
+    const addRootId = (nodeId) => {
+      if (!nodeId || addedRootIds.has(nodeId) || !nodeById.has(nodeId)) {
+        return;
+      }
+      addedRootIds.add(nodeId);
+      rootIds.push(nodeId);
+    };
+
+    for (const topNode of input) {
+      const topId = normalizeXmlObjectId(topNode && topNode.id);
+      if (topId && isRootId(topId)) {
+        addRootId(topId);
+      }
+    }
+
+    for (const nodeId of idOrder) {
+      if (isRootId(nodeId)) {
+        addRootId(nodeId);
+      }
+    }
+
+    const reachableIds = new Set();
+    const markReachable = (nodeId) => {
+      if (!nodeId || reachableIds.has(nodeId) || !nodeById.has(nodeId)) {
+        return;
+      }
+      reachableIds.add(nodeId);
+      const childIds = childIdsByParentId.get(nodeId) || [];
+      for (const childId of childIds) {
+        markReachable(childId);
+      }
+    };
+
+    for (const rootId of rootIds) {
+      markReachable(rootId);
+    }
+
+    for (const nodeId of idOrder) {
+      if (!reachableIds.has(nodeId)) {
+        addRootId(nodeId);
+        markReachable(nodeId);
+      }
+    }
+
+    const roots = [];
+    for (const node of topLevelNoIdNodes) {
+      const cloned = cloneNodeNoId(node, new Set());
+      if (cloned) {
+        roots.push(cloned);
+      }
+    }
+    for (const rootId of rootIds) {
+      const cloned = cloneNodeById(rootId, new Set());
+      if (cloned) {
+        roots.push(cloned);
+      }
+    }
+
+    return roots;
+  }
+
   function isDeclLikeObject(value) {
     if (!value || typeof value !== "object") {
       return false;
@@ -2429,13 +2675,14 @@
   function buildAbapFlowXml(data) {
     const fileName = data && typeof data === "object" ? String(data.file || "") : "";
     const objects = data && typeof data === "object" && Array.isArray(data.objects) ? data.objects : [];
+    const exportRoots = buildXmlExportRoots(objects);
 
     const lines = ['<?xml version="1.0" encoding="UTF-8"?>', "<abapflowObjects>"];
     if (fileName) {
       lines.push(`  <file>${escapeXmlText(fileName)}</file>`);
     }
     lines.push("  <objects>");
-    for (const obj of objects) {
+    for (const obj of exportRoots) {
       appendXmlValue(lines, "object", "object", obj, 4);
     }
     lines.push("  </objects>");
