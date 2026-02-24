@@ -20,6 +20,8 @@
     inputText: document.getElementById("inputText"),
     inputGutter: document.getElementById("inputGutter"),
     inputGutterContent: document.getElementById("inputGutterContent"),
+    mainLayout: document.getElementById("mainLayout"),
+    panelSplitter: document.getElementById("panelSplitter"),
     output: document.getElementById("output"),
     rightPanelTitle: document.getElementById("rightPanelTitle"),
     rightTabOutputBtn: document.getElementById("rightTabOutputBtn"),
@@ -94,7 +96,8 @@
     inputLineOffsets: [],
     customRules: [],
     activeRuleId: "",
-    settings: null
+    settings: null,
+    layoutLeftPane: 48
   };
 
   const DESC_STORAGE_KEY_V2 = "abap-parser-viewer.declDescOverrides.v2";
@@ -102,6 +105,11 @@
   const RULES_STORAGE_KEY_V1 = "abap-parser-viewer.customConfigs.v1";
   const SETTINGS_STORAGE_KEY_V1 = "abap-parser-viewer.settings.v1";
   const THEME_STORAGE_KEY_V1 = "abap-parser-viewer.theme.v1";
+  const LAYOUT_SPLIT_STORAGE_KEY_V1 = "abap-parser-viewer.layoutSplit.v1";
+  const LAYOUT_SPLIT_DEFAULT = 48;
+  const LAYOUT_SPLIT_MIN = 28;
+  const LAYOUT_SPLIT_MAX = 72;
+  const MOBILE_LAYOUT_QUERY = "(max-width: 980px)";
 
   const DECL_TYPE_OPTIONS = [
     "DATA",
@@ -384,6 +392,172 @@
     } catch {
       // ignore
     }
+  }
+
+  function clampNumber(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function normalizeLayoutSplit(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return LAYOUT_SPLIT_DEFAULT;
+    }
+    return clampNumber(numeric, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX);
+  }
+
+  function loadLayoutSplit() {
+    try {
+      return normalizeLayoutSplit(localStorage.getItem(LAYOUT_SPLIT_STORAGE_KEY_V1));
+    } catch {
+      return LAYOUT_SPLIT_DEFAULT;
+    }
+  }
+
+  function saveLayoutSplit(value) {
+    try {
+      localStorage.setItem(LAYOUT_SPLIT_STORAGE_KEY_V1, String(normalizeLayoutSplit(value)));
+    } catch {
+      // ignore
+    }
+  }
+
+  function updateSplitterAria(leftPercent) {
+    if (!els.panelSplitter) {
+      return;
+    }
+
+    const left = Math.round(leftPercent);
+    const right = Math.round(100 - leftPercent);
+    els.panelSplitter.setAttribute("aria-valuemin", String(LAYOUT_SPLIT_MIN));
+    els.panelSplitter.setAttribute("aria-valuemax", String(LAYOUT_SPLIT_MAX));
+    els.panelSplitter.setAttribute("aria-valuenow", String(left));
+    els.panelSplitter.setAttribute("aria-valuetext", `${left}% code, ${right}% output`);
+  }
+
+  function applyLayoutSplit(nextPercent, { save } = {}) {
+    const normalized = normalizeLayoutSplit(nextPercent);
+    state.layoutLeftPane = normalized;
+    document.documentElement.style.setProperty("--layout-left-pane", `${normalized}%`);
+    updateSplitterAria(normalized);
+
+    if (save === false) {
+      return;
+    }
+
+    saveLayoutSplit(normalized);
+  }
+
+  function isCompactLayout() {
+    if (typeof window.matchMedia === "function") {
+      return window.matchMedia(MOBILE_LAYOUT_QUERY).matches;
+    }
+    return window.innerWidth <= 980;
+  }
+
+  function setLayoutResizing(active) {
+    if (!els.mainLayout) {
+      return;
+    }
+    els.mainLayout.classList.toggle("is-resizing", Boolean(active));
+  }
+
+  function initLayoutSplitter() {
+    applyLayoutSplit(loadLayoutSplit(), { save: false });
+
+    if (!els.mainLayout || !els.panelSplitter) {
+      return;
+    }
+
+    let dragging = false;
+    let activePointerId = null;
+
+    function applySplitFromClientX(clientX) {
+      const layoutRect = els.mainLayout.getBoundingClientRect();
+      const splitterRect = els.panelSplitter.getBoundingClientRect();
+      const usableWidth = layoutRect.width - splitterRect.width;
+      if (usableWidth <= 0) {
+        return;
+      }
+
+      const leftWidth = clientX - layoutRect.left - (splitterRect.width / 2);
+      const leftPercent = (leftWidth / usableWidth) * 100;
+      applyLayoutSplit(leftPercent, { save: false });
+    }
+
+    function onPointerMove(ev) {
+      if (!dragging || isCompactLayout()) {
+        return;
+      }
+      applySplitFromClientX(ev.clientX);
+      ev.preventDefault();
+    }
+
+    function stopDragging() {
+      if (!dragging) {
+        return;
+      }
+      dragging = false;
+      setLayoutResizing(false);
+      if (activePointerId !== null && typeof els.panelSplitter.releasePointerCapture === "function") {
+        try {
+          els.panelSplitter.releasePointerCapture(activePointerId);
+        } catch {
+          // ignore
+        }
+      }
+      activePointerId = null;
+      saveLayoutSplit(state.layoutLeftPane);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", stopDragging);
+      window.removeEventListener("pointercancel", stopDragging);
+    }
+
+    els.panelSplitter.addEventListener("pointerdown", (ev) => {
+      if (ev.button !== 0 || isCompactLayout()) {
+        return;
+      }
+
+      dragging = true;
+      activePointerId = ev.pointerId;
+      setLayoutResizing(true);
+
+      if (typeof els.panelSplitter.setPointerCapture === "function") {
+        try {
+          els.panelSplitter.setPointerCapture(ev.pointerId);
+        } catch {
+          // ignore
+        }
+      }
+
+      applySplitFromClientX(ev.clientX);
+      window.addEventListener("pointermove", onPointerMove);
+      window.addEventListener("pointerup", stopDragging);
+      window.addEventListener("pointercancel", stopDragging);
+      ev.preventDefault();
+    });
+
+    els.panelSplitter.addEventListener("keydown", (ev) => {
+      if (isCompactLayout()) {
+        return;
+      }
+      if (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight") {
+        return;
+      }
+
+      const step = ev.shiftKey ? 5 : 2;
+      const delta = ev.key === "ArrowRight" ? step : -step;
+      applyLayoutSplit(state.layoutLeftPane + delta);
+      ev.preventDefault();
+    });
+
+    window.addEventListener("resize", () => {
+      if (isCompactLayout()) {
+        setLayoutResizing(false);
+        return;
+      }
+      applyLayoutSplit(state.layoutLeftPane, { save: false });
+    });
   }
 
   function validateRuleConfig(config) {
@@ -3613,6 +3787,7 @@
     state.customRules = loadCustomRules();
     state.settings = loadSettings();
     applyTheme(loadTheme(), { save: false });
+    initLayoutSplitter();
 
     if (els.inputText && !els.inputText.value.trim()) {
       els.inputText.value = SAMPLE_ABAP;
