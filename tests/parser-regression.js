@@ -335,6 +335,97 @@ function testWhereConditionExtrasForSimilarStatements() {
   assert.strictEqual(del.extras.deleteItab.conditions[0].rightOperandDecl.objectType, "SYSTEM");
 }
 
+function testIfAndElseifConditionExtras() {
+  const code = [
+    "DATA lv_a TYPE i.",
+    "DATA lv_b TYPE i.",
+    "DATA lv_x TYPE i.",
+    "DATA lv_y TYPE i.",
+    "IF lv_a = lv_x AND lv_b = lv_y.",
+    "ELSEIF lv_a = lv_x OR lv_b = lv_y.",
+    "ENDIF.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+
+  const ifObj = findObject(objects, "IF");
+  assert(ifObj && ifObj.extras && ifObj.extras.ifCondition, "Expected IF extras.ifCondition.");
+  assert.strictEqual(ifObj.extras.ifCondition.conditionRaw, "lv_a = lv_x AND lv_b = lv_y");
+  assert.deepStrictEqual(
+    ifObj.extras.ifCondition.conditions.map((cond) => ({
+      leftOperand: cond.leftOperand,
+      rightOperand: cond.rightOperand,
+      comparisonOperator: cond.comparisonOperator,
+      logicalConnector: cond.logicalConnector
+    })),
+    [
+      {
+        leftOperand: "lv_a",
+        rightOperand: "lv_x",
+        comparisonOperator: "=",
+        logicalConnector: "AND"
+      },
+      {
+        leftOperand: "lv_b",
+        rightOperand: "lv_y",
+        comparisonOperator: "=",
+        logicalConnector: ""
+      }
+    ]
+  );
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].rightOperandRef, "lv_x");
+  assert(ifObj.extras.ifCondition.conditions[0].rightOperandDecl, "Expected decl for IF clause right operand.");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].rightOperandDecl.name, "lv_x");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[1].rightOperandRef, "lv_y");
+  assert(ifObj.extras.ifCondition.conditions[1].rightOperandDecl, "Expected decl for IF clause right operand.");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[1].rightOperandDecl.name, "lv_y");
+
+  const ifConditionValue = getValueEntry(ifObj.values, "condition");
+  assert(ifConditionValue, "Expected values.condition for IF.");
+  assert.strictEqual(ifConditionValue.value, "lv_a = lv_x AND lv_b = lv_y");
+  assert.strictEqual(ifConditionValue.declRef, "lv_a");
+  assert(ifConditionValue.decl, "Expected values.condition.decl for IF.");
+  assert.strictEqual(ifConditionValue.decl.name, "lv_a");
+
+  const elseifObj = findObject(objects, "ELSEIF");
+  assert(elseifObj && elseifObj.extras && elseifObj.extras.ifCondition, "Expected ELSEIF extras.ifCondition.");
+  assert.strictEqual(elseifObj.extras.ifCondition.conditionRaw, "lv_a = lv_x OR lv_b = lv_y");
+  assert.deepStrictEqual(
+    elseifObj.extras.ifCondition.conditions.map((cond) => ({
+      leftOperand: cond.leftOperand,
+      rightOperand: cond.rightOperand,
+      comparisonOperator: cond.comparisonOperator,
+      logicalConnector: cond.logicalConnector
+    })),
+    [
+      {
+        leftOperand: "lv_a",
+        rightOperand: "lv_x",
+        comparisonOperator: "=",
+        logicalConnector: "OR"
+      },
+      {
+        leftOperand: "lv_b",
+        rightOperand: "lv_y",
+        comparisonOperator: "=",
+        logicalConnector: ""
+      }
+    ]
+  );
+  assert.strictEqual(elseifObj.extras.ifCondition.conditions[0].rightOperandRef, "lv_x");
+  assert(elseifObj.extras.ifCondition.conditions[0].rightOperandDecl, "Expected decl for ELSEIF clause right operand.");
+  assert.strictEqual(elseifObj.extras.ifCondition.conditions[0].rightOperandDecl.name, "lv_x");
+
+  const elseifConditionValue = getValueEntry(elseifObj.values, "condition");
+  assert(elseifConditionValue, "Expected values.condition for ELSEIF.");
+  assert.strictEqual(elseifConditionValue.value, "lv_a = lv_x OR lv_b = lv_y");
+  assert.strictEqual(elseifConditionValue.declRef, "lv_a");
+  assert(elseifConditionValue.decl, "Expected values.condition.decl for ELSEIF.");
+  assert.strictEqual(elseifConditionValue.decl.name, "lv_a");
+}
+
 function run() {
   testInlineCommentInsideSingleQuote();
   testInlineCommentInsideTemplate();
@@ -348,6 +439,7 @@ function run() {
   testReadTableWithKeyConditions();
   testReadTableWithTableKeyConditions();
   testWhereConditionExtrasForSimilarStatements();
+  testIfAndElseifConditionExtras();
   console.log("parser-regression: ok");
 }
 

@@ -22,6 +22,9 @@
     "match": {
       "startKeyword": "IF"
     },
+    "extras": {
+      "type": "ifCondition"
+    },
     "block": {
       "endKeyword": "ENDIF"
     },

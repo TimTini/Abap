@@ -607,6 +607,10 @@
       return buildPerformCallExtras(context);
     }
 
+    if (extrasConfig.type === "ifCondition") {
+      return buildIfConditionExtras(context);
+    }
+
     if (extrasConfig.type === "readTable") {
       return buildReadTableExtras(context);
     }
@@ -729,6 +733,18 @@
         using: parseArgumentTokens(map.usingRaw || "").map((value) => ({ value })),
         changing: parseArgumentTokens(map.changingRaw || "").map((value) => ({ value })),
         tables: parseArgumentTokens(map.tablesRaw || "").map((value) => ({ value }))
+      }
+    };
+  }
+
+  function buildIfConditionExtras({ values }) {
+    const map = valuesToFirstValueMap(values);
+    const conditionRaw = map.condition || "";
+
+    return {
+      ifCondition: {
+        conditionRaw,
+        conditions: parseConditionClauses(conditionRaw)
       }
     };
   }
@@ -1986,6 +2002,10 @@
       annotatePerformCallExtras(extras.performCall, context);
     }
 
+    if (extras.ifCondition) {
+      annotateIfConditionExtras(extras.ifCondition, context);
+    }
+
     if (extras.readTable) {
       annotateReadTableExtras(extras.readTable, context);
     }
@@ -2052,6 +2072,13 @@
         entry.valueDecl = resolveDecl(ref, context);
       }
     }
+  }
+
+  function annotateIfConditionExtras(ifCondition, context) {
+    if (!ifCondition || typeof ifCondition !== "object") {
+      return;
+    }
+    annotateConditionClausesWithDecls(ifCondition.conditions, context);
   }
 
   function annotateConditionClausesWithDecls(conditions, context) {

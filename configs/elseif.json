@@ -1,6 +1,7 @@
 {
   "object": "ELSEIF",
   "match": { "startKeyword": "ELSEIF" },
+  "extras": { "type": "ifCondition" },
   "keywordLabels": {
     "ELSEIF": "stmt",
     "AND": "and",
@@ -14,4 +15,3 @@
     { "after": "ELSEIF", "name": "condition", "label": "condition", "capture": "rest" }
   ]
 }
-

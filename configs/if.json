@@ -1,6 +1,7 @@
 {
   "object": "IF",
   "match": { "startKeyword": "IF" },
+  "extras": { "type": "ifCondition" },
   "block": { "endKeyword": "ENDIF" },
   "keywordLabels": {
     "IF": "stmt",
@@ -15,4 +16,3 @@
     { "after": "IF", "name": "condition", "label": "condition", "capture": "rest" }
   ]
 }
-

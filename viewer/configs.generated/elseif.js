@@ -22,6 +22,9 @@
     "match": {
       "startKeyword": "ELSEIF"
     },
+    "extras": {
+      "type": "ifCondition"
+    },
     "keywordLabels": {
       "ELSEIF": "stmt",
       "AND": "and",
