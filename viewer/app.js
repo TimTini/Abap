@@ -225,24 +225,16 @@
     }
   }
 
-  function normalizeBuildInfo(raw) {
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-      return {};
+  function getMetaContent(name) {
+    try {
+      const el = document.querySelector(`meta[name="${name}"]`);
+      if (!el) {
+        return "";
+      }
+      return String(el.getAttribute("content") || "").trim();
+    } catch {
+      return "";
     }
-    const info = {};
-    if (raw.builtAtUtc) {
-      info.builtAtUtc = String(raw.builtAtUtc);
-    }
-    if (raw.sourceMtimeUtc) {
-      info.sourceMtimeUtc = String(raw.sourceMtimeUtc);
-    }
-    if (raw.gitCommit) {
-      info.gitCommit = String(raw.gitCommit);
-    }
-    if (raw.gitCommitDateUtc) {
-      info.gitCommitDateUtc = String(raw.gitCommitDateUtc);
-    }
-    return info;
   }
 
   function renderBuildInfo() {
@@ -250,41 +242,26 @@
       return;
     }
 
-    const info = normalizeBuildInfo(window.ABAP_VIEWER_BUILD_INFO);
-    const updatedAt = parseDateCandidate(info.builtAtUtc)
-      || parseDateCandidate(info.sourceMtimeUtc)
-      || parseDateCandidate(document.lastModified);
+    const manualUpdatedAt = getMetaContent("abap-viewer-updated-at");
+    const manualNote = getMetaContent("abap-viewer-updated-note");
+    const parsedManualDate = parseDateCandidate(manualUpdatedAt);
+    const fallbackDate = parseDateCandidate(document.lastModified);
 
-    const parts = [];
-    if (updatedAt) {
-      parts.push(`Updated: ${formatDateTime(updatedAt)}`);
-    } else {
-      parts.push("Updated: unknown");
+    if (manualUpdatedAt) {
+      const display = parsedManualDate ? formatDateTime(parsedManualDate) : manualUpdatedAt;
+      els.buildInfo.textContent = `Updated: ${display} (manual)`;
+      els.buildInfo.title = manualNote || "Manual timestamp from <meta name=\"abap-viewer-updated-at\">.";
+      return;
     }
-    if (info.gitCommit) {
-      parts.push(`Commit: ${info.gitCommit}`);
-    } else {
-      parts.push("Commit: unknown");
-    }
-    els.buildInfo.textContent = parts.join(" | ");
 
-    const tooltipLines = [];
-    if (info.builtAtUtc) {
-      tooltipLines.push(`builtAtUtc: ${info.builtAtUtc}`);
+    if (fallbackDate) {
+      els.buildInfo.textContent = `Updated: ${formatDateTime(fallbackDate)} (from document.lastModified)`;
+      els.buildInfo.title = "No manual timestamp found. Showing document.lastModified.";
+      return;
     }
-    if (info.sourceMtimeUtc) {
-      tooltipLines.push(`sourceMtimeUtc: ${info.sourceMtimeUtc}`);
-    }
-    if (info.gitCommit) {
-      tooltipLines.push(`gitCommit: ${info.gitCommit}`);
-    }
-    if (info.gitCommitDateUtc) {
-      tooltipLines.push(`gitCommitDateUtc: ${info.gitCommitDateUtc}`);
-    }
-    if (!tooltipLines.length) {
-      tooltipLines.push("using document.lastModified fallback");
-    }
-    els.buildInfo.title = tooltipLines.join("\n");
+
+    els.buildInfo.textContent = "Updated: unknown";
+    els.buildInfo.title = "No manual timestamp and no document.lastModified available.";
   }
 
   function normalizeId(id) {
