@@ -85,7 +85,7 @@
     showRaw: true,
     showKeywords: true,
     showValues: true,
-    showExtras: true,
+    showExtras: false,
     rightTab: "output",
     collapsedIds: new Set(),
     selectedId: "",
@@ -3583,6 +3583,79 @@
     return section;
   }
 
+  function renderConditionTable(title, clauses) {
+    const items = Array.isArray(clauses) ? clauses : [];
+    if (!items.length) {
+      return null;
+    }
+
+    const section = el("div");
+    if (title) {
+      section.appendChild(el("div", { className: "muted", text: title }));
+    }
+
+    const table = el("table");
+    const thead = el("thead");
+    const headRow = el("tr");
+    for (const key of [
+      "leftOperand",
+      "operator",
+      "rightOperand",
+      "connector",
+      "leftRef",
+      "leftDeclName",
+      "leftDeclDesc",
+      "rightRef",
+      "rightDeclName",
+      "rightDeclDesc"
+    ]) {
+      headRow.appendChild(el("th", { text: key }));
+    }
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = el("tbody");
+    for (const clause of items) {
+      const row = el("tr");
+      row.appendChild(el("td", { text: clause && clause.leftOperand ? String(clause.leftOperand) : "" }));
+      row.appendChild(el("td", { text: clause && clause.comparisonOperator ? String(clause.comparisonOperator) : "" }));
+      row.appendChild(el("td", { text: clause && clause.rightOperand ? String(clause.rightOperand) : "" }));
+      row.appendChild(el("td", { text: clause && clause.logicalConnector ? String(clause.logicalConnector) : "" }));
+      row.appendChild(el("td", { text: clause && clause.leftOperandRef ? String(clause.leftOperandRef) : "" }));
+
+      const leftDeclCells = renderDeclListCells(null, clause && clause.leftOperandDecl ? clause.leftOperandDecl : null);
+      row.appendChild(leftDeclCells.nameCell);
+      row.appendChild(leftDeclCells.descCell);
+
+      row.appendChild(el("td", { text: clause && clause.rightOperandRef ? String(clause.rightOperandRef) : "" }));
+      const rightDeclCells = renderDeclListCells(null, clause && clause.rightOperandDecl ? clause.rightOperandDecl : null);
+      row.appendChild(rightDeclCells.nameCell);
+      row.appendChild(rightDeclCells.descCell);
+
+      tbody.appendChild(row);
+    }
+
+    table.appendChild(tbody);
+    section.appendChild(table);
+    return section;
+  }
+
+  function appendConditionSection(wrap, title, rawText, clauses) {
+    if (!wrap) {
+      return;
+    }
+
+    const raw = String(rawText || "").trim();
+    if (raw) {
+      wrap.appendChild(el("div", { className: "muted", text: raw }));
+    }
+
+    const table = renderConditionTable(title, clauses);
+    if (table) {
+      wrap.appendChild(table);
+    }
+  }
+
   function renderParamsTable(title, params) {
     const items = Array.isArray(params) ? params : [];
     if (!items.length) {
@@ -3762,9 +3835,7 @@
       if (call.program) {
         wrap.appendChild(el("div", { className: "muted", text: `IN PROGRAM ${call.program}` }));
       }
-      if (call.ifCondition) {
-        wrap.appendChild(el("div", { className: "muted", text: `IF ${call.ifCondition}` }));
-      }
+      appendConditionSection(wrap, "ifConditions", call.ifCondition ? `IF ${call.ifCondition}` : "", call.ifConditions);
 
       for (const sectionName of ["using", "changing", "tables"]) {
         const table = renderValueListTable(sectionName, call[sectionName]);
@@ -3773,6 +3844,46 @@
         }
       }
 
+      return wrap;
+    }
+
+    if (extras.ifCondition) {
+      const info = extras.ifCondition;
+      appendConditionSection(wrap, "conditions", info.conditionRaw ? `IF ${info.conditionRaw}` : "", info.conditions);
+      return wrap;
+    }
+
+    if (extras.select) {
+      const info = extras.select;
+      appendConditionSection(wrap, "whereConditions", info.whereRaw ? `WHERE ${info.whereRaw}` : "", info.whereConditions);
+      appendConditionSection(wrap, "havingConditions", info.havingRaw ? `HAVING ${info.havingRaw}` : "", info.havingConditions);
+      return wrap;
+    }
+
+    if (extras.readTable) {
+      const info = extras.readTable;
+      const raw = info.withTableKeyRaw
+        ? `WITH TABLE KEY ${info.withTableKeyRaw}`
+        : (info.withKeyRaw ? `WITH KEY ${info.withKeyRaw}` : "");
+      appendConditionSection(wrap, "conditions", raw, info.conditions);
+      return wrap;
+    }
+
+    if (extras.loopAtItab) {
+      const info = extras.loopAtItab;
+      appendConditionSection(wrap, "conditions", info.whereRaw ? `WHERE ${info.whereRaw}` : "", info.conditions);
+      return wrap;
+    }
+
+    if (extras.modifyItab) {
+      const info = extras.modifyItab;
+      appendConditionSection(wrap, "conditions", info.whereRaw ? `WHERE ${info.whereRaw}` : "", info.conditions);
+      return wrap;
+    }
+
+    if (extras.deleteItab) {
+      const info = extras.deleteItab;
+      appendConditionSection(wrap, "conditions", info.whereRaw ? `WHERE ${info.whereRaw}` : "", info.conditions);
       return wrap;
     }
 
@@ -4080,7 +4191,7 @@
     els.showRaw.checked = true;
     els.showKeywords.checked = true;
     els.showValues.checked = true;
-    els.showExtras.checked = true;
+    els.showExtras.checked = false;
     state.collapsedIds.clear();
     state.selectedId = "";
   }
