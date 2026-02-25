@@ -50,3 +50,21 @@ This file is the local source of truth for future AI/code agents working in this
 
 - Prefer minimal, compatible changes.
 - Do not silently change existing output contracts unless explicitly requested.
+
+## 7) Recent Implementation Decisions (Keep Consistent)
+
+- `PERFORM -> FORM` expansion in Viewer/Export:
+  - Expansion is recursive.
+  - Stop expanding when a FORM would repeat in the current call chain (cycle guard), e.g. `A -> B -> C -> A`.
+  - Treat this as Viewer-side/render/export behavior, not parser contract changes.
+
+- Method-call expression parsing support:
+  - In addition to `CALL METHOD ...`, parser also recognizes expression-style method calls:
+    - `lhs = class=>method( ... ).`
+    - `obj->method( ... ).`
+  - These are emitted as `CALL_METHOD` objects with `extras.callMethod`.
+
+- Output Values rendering policy for `*Raw` fields:
+  - In Output table, prefer parsed rows over raw text for `*Raw` entries (for editable decl-desc per argument).
+  - Keep raw fallback when parsed rows are empty/unavailable.
+  - Do not change XML contract for these `values.*Raw` fields unless explicitly requested.
