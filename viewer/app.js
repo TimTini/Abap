@@ -1856,6 +1856,12 @@
       return "";
     }
 
+    const objectType = normalizeKeyToken(decl.objectType);
+    const scopeType = normalizeKeyToken(decl.scopeType);
+    if (objectType === "PATH_DECL" || scopeType === "PATH") {
+      return "";
+    }
+
     const registry = window.AbapVarDescriptions && typeof window.AbapVarDescriptions === "object"
       ? window.AbapVarDescriptions
       : null;
@@ -1868,7 +1874,6 @@
       return "";
     }
 
-    const objectType = normalizeKeyToken(decl.objectType);
     const scopeLabel = normalizeKeyToken(decl.scopeLabel);
 
     if (objectType === "SYSTEM" || scopeLabel === "SYSTEM") {
@@ -2396,6 +2401,308 @@
     return "item";
   }
 
+  function isPlainObjectRecord(value) {
+    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function isAbapStatementObject(value) {
+    if (!isPlainObjectRecord(value)) {
+      return false;
+    }
+    const hasNodeShape = Object.prototype.hasOwnProperty.call(value, "values")
+      || Object.prototype.hasOwnProperty.call(value, "extras")
+      || Object.prototype.hasOwnProperty.call(value, "children");
+    if (!hasNodeShape) {
+      return false;
+    }
+    return (
+      Object.prototype.hasOwnProperty.call(value, "objectType")
+      && Object.prototype.hasOwnProperty.call(value, "raw")
+      && Object.prototype.hasOwnProperty.call(value, "lineStart")
+    );
+  }
+
+  function extractIdentifierCandidate(text) {
+    const raw = String(text || "").trim();
+    if (!raw) {
+      return "";
+    }
+    if (raw.startsWith("'") || raw.startsWith("|")) {
+      return "";
+    }
+    if (/^[+-]?\d/.test(raw)) {
+      return "";
+    }
+
+    const sysMatch = raw.match(/^SY-[A-Za-z_][A-Za-z0-9_]*/i);
+    if (sysMatch) {
+      return sysMatch[0].toUpperCase();
+    }
+
+    const fieldPathMatch = raw.match(
+      /^(<[^>]+>|[A-Za-z_][A-Za-z0-9_]*)(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)+/
+    );
+    if (fieldPathMatch) {
+      return String(fieldPathMatch[0] || "").trim();
+    }
+
+    const inlinePatterns = [
+      /@?DATA\s*\(\s*([^)]+)\s*\)/i,
+      /@?FINAL\s*\(\s*([^)]+)\s*\)/i,
+      /FIELD-SYMBOL\s*\(\s*(<[^>]+>)\s*\)/i
+    ];
+    for (const regex of inlinePatterns) {
+      const match = regex.exec(raw);
+      if (!match || !match[1]) {
+        continue;
+      }
+      const candidate = String(match[1] || "").trim();
+      if (candidate) {
+        return candidate;
+      }
+    }
+
+    const genericMatch = raw.match(
+      /<[^>]+>|[A-Za-z_][A-Za-z0-9_]*(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)*/
+    );
+    return genericMatch ? String(genericMatch[0] || "").trim() : "";
+  }
+
+  function resolveFallbackFieldId(entry) {
+    if (!isPlainObjectRecord(entry)) {
+      return "";
+    }
+
+    const fromDeclRef = String(entry.declRef || "").trim();
+    if (fromDeclRef) {
+      return fromDeclRef;
+    }
+
+    const valueText = String(entry.value || "").trim();
+    const identifier = extractIdentifierCandidate(valueText);
+    if (identifier) {
+      return identifier;
+    }
+
+    if (valueText) {
+      return valueText;
+    }
+
+    const fromName = String(entry.name || "").trim();
+    if (fromName) {
+      return fromName;
+    }
+
+    return "";
+  }
+
+  function buildPathKeyFromParts(parts) {
+    const tokens = Array.isArray(parts) ? parts : [];
+    const cleaned = [];
+    for (const part of tokens) {
+      const token = String(part || "").trim();
+      if (token) {
+        cleaned.push(token);
+      }
+    }
+    return cleaned.join("/");
+  }
+
+  function normalizeSyntheticPathKey(pathKey) {
+    const text = String(pathKey || "").trim();
+    if (!text) {
+      return "ROOT";
+    }
+    const normalized = text
+      .replace(/\s+/g, "_")
+      .replace(/[^A-Za-z0-9_:\-./[\]#]/g, "_")
+      .toUpperCase();
+    return normalized || "ROOT";
+  }
+
+  function buildSyntheticDeclForPath({ pathKey, fieldId, file, lineStart, raw, role }) {
+    const name = String(fieldId || "").trim();
+    if (!name) {
+      return null;
+    }
+
+    const numericLine = lineStart === null || lineStart === undefined || lineStart === ""
+      ? null
+      : (Number(lineStart) || null);
+
+    const normalizedPath = normalizeSyntheticPathKey(pathKey);
+    return {
+      id: null,
+      objectType: "PATH_DECL",
+      name,
+      file: String(file || ""),
+      lineStart: numericLine,
+      raw: String(raw || ""),
+      comment: "",
+      scopeId: 0,
+      scopeLabel: `PATH:${normalizedPath}`,
+      scopeType: "PATH",
+      scopeName: String(role || "")
+    };
+  }
+
+  function getDeclSourceContextFromObject(obj) {
+    if (!isPlainObjectRecord(obj)) {
+      return { file: "", lineStart: null, raw: "" };
+    }
+    return {
+      file: String(obj.file || ""),
+      lineStart: obj.lineStart === null || obj.lineStart === undefined
+        ? null
+        : (Number(obj.lineStart) || null),
+      raw: String(obj.raw || "")
+    };
+  }
+
+  function buildObjectPathBase(obj) {
+    const id = normalizeId(obj && obj.id);
+    if (id) {
+      return `OBJECT:${id}`;
+    }
+    const type = String(obj && obj.objectType ? obj.objectType : "OBJECT").trim() || "OBJECT";
+    const file = String(obj && obj.file ? obj.file : "").trim() || "NO_FILE";
+    const line = obj && obj.lineStart ? String(obj.lineStart) : "0";
+    return `OBJECT:${type}:${file}:${line}`;
+  }
+
+  function hasAnyDecls(list) {
+    if (!Array.isArray(list)) {
+      return false;
+    }
+    return list.some((item) => item && typeof item === "object");
+  }
+
+  function ensureEntryDeclWithSynthetic(entry, options) {
+    if (!isPlainObjectRecord(entry)) {
+      return entry;
+    }
+    if (isDeclLikeObject(entry.decl)) {
+      return entry;
+    }
+
+    const fieldId = resolveFallbackFieldId(entry);
+    const pathKey = buildPathKeyFromParts([options && options.pathKey ? options.pathKey : "", "decl"]);
+    const syntheticDecl = buildSyntheticDeclForPath({
+      pathKey,
+      fieldId,
+      file: options && options.file ? options.file : "",
+      lineStart: options ? options.lineStart : null,
+      raw: options && options.raw ? options.raw : "",
+      role: options && options.role ? options.role : "value"
+    });
+    if (!syntheticDecl) {
+      return entry;
+    }
+
+    const next = { ...entry, decl: syntheticDecl };
+    if (!String(next.declRef || "").trim()) {
+      next.declRef = fieldId;
+    }
+    return next;
+  }
+
+  function ensureValueDeclWithSynthetic(entry, options) {
+    if (!isPlainObjectRecord(entry)) {
+      return entry;
+    }
+    if (isDeclLikeObject(entry.valueDecl) || hasAnyDecls(entry.originDecls)) {
+      return entry;
+    }
+
+    const sourceForId = {
+      declRef: String(entry.valueRef || entry.declRef || "").trim(),
+      value: entry.value,
+      name: entry.name || (options && options.nameHint ? options.nameHint : "")
+    };
+    const fieldId = resolveFallbackFieldId(sourceForId);
+    const pathKey = buildPathKeyFromParts([options && options.pathKey ? options.pathKey : "", "valueDecl"]);
+    const syntheticDecl = buildSyntheticDeclForPath({
+      pathKey,
+      fieldId,
+      file: options && options.file ? options.file : "",
+      lineStart: options ? options.lineStart : null,
+      raw: options && options.raw ? options.raw : "",
+      role: options && options.role ? options.role : "value"
+    });
+    if (!syntheticDecl) {
+      return entry;
+    }
+
+    return {
+      ...entry,
+      valueDecl: syntheticDecl
+    };
+  }
+
+  function ensureConditionClauseDeclsWithSynthetic(clause, options) {
+    if (!isPlainObjectRecord(clause)) {
+      return clause;
+    }
+
+    let next = clause;
+    const file = options && options.file ? options.file : "";
+    const lineStart = options ? options.lineStart : null;
+    const raw = options && options.raw ? options.raw : "";
+    const basePath = options && options.pathKey ? options.pathKey : "";
+
+    if (!isDeclLikeObject(clause.leftOperandDecl)) {
+      const leftFieldId = resolveFallbackFieldId({
+        declRef: clause.leftOperandRef,
+        value: clause.leftOperand,
+        name: "leftOperand"
+      });
+      const leftDecl = buildSyntheticDeclForPath({
+        pathKey: buildPathKeyFromParts([basePath, "leftOperandDecl"]),
+        fieldId: leftFieldId,
+        file,
+        lineStart,
+        raw,
+        role: "leftOperand"
+      });
+      if (leftDecl) {
+        if (next === clause) {
+          next = { ...clause };
+        }
+        next.leftOperandDecl = leftDecl;
+        if (!String(next.leftOperandRef || "").trim()) {
+          next.leftOperandRef = leftFieldId;
+        }
+      }
+    }
+
+    if (!isDeclLikeObject(clause.rightOperandDecl)) {
+      const rightFieldId = resolveFallbackFieldId({
+        declRef: clause.rightOperandRef,
+        value: clause.rightOperand,
+        name: "rightOperand"
+      });
+      const rightDecl = buildSyntheticDeclForPath({
+        pathKey: buildPathKeyFromParts([basePath, "rightOperandDecl"]),
+        fieldId: rightFieldId,
+        file,
+        lineStart,
+        raw,
+        role: "rightOperand"
+      });
+      if (rightDecl) {
+        if (next === clause) {
+          next = { ...clause };
+        }
+        next.rightOperandDecl = rightDecl;
+        if (!String(next.rightOperandRef || "").trim()) {
+          next.rightOperandRef = rightFieldId;
+        }
+      }
+    }
+
+    return next;
+  }
+
   function normalizeXmlObjectId(value) {
     if (value === null || value === undefined) {
       return "";
@@ -2857,6 +3164,16 @@
       }
     }
 
+    const declRef = String(value.declRef || "").trim();
+    if (declRef) {
+      return declRef;
+    }
+
+    const identifier = extractIdentifierCandidate(value.value);
+    if (identifier) {
+      return identifier;
+    }
+
     const rawValue = String(value.value || "").trim();
     if (rawValue) {
       return rawValue;
@@ -2884,8 +3201,123 @@
     return resolveValueLevelTechId(value);
   }
 
-  function appendXmlValue(lines, keyHint, tagName, value, indent) {
+  function isValueLikeEntryObject(value) {
+    if (!isPlainObjectRecord(value)) {
+      return false;
+    }
+    if (isDeclLikeObject(value) || isAbapStatementObject(value)) {
+      return false;
+    }
+    return (
+      hasValueLevelDescFields(value)
+      || Object.prototype.hasOwnProperty.call(value, "declRef")
+      || Object.prototype.hasOwnProperty.call(value, "value")
+      || Object.prototype.hasOwnProperty.call(value, "name")
+      || Object.prototype.hasOwnProperty.call(value, "label")
+    );
+  }
+
+  function isAssignmentLikeEntryObject(value) {
+    if (!isPlainObjectRecord(value)) {
+      return false;
+    }
+    if (isDeclLikeObject(value) || isAbapStatementObject(value)) {
+      return false;
+    }
+    const hasValueSignals = (
+      Object.prototype.hasOwnProperty.call(value, "value")
+      || Object.prototype.hasOwnProperty.call(value, "valueRef")
+      || Object.prototype.hasOwnProperty.call(value, "valueDecl")
+      || Object.prototype.hasOwnProperty.call(value, "originDecls")
+    );
+    if (!hasValueSignals) {
+      return false;
+    }
+    return (
+      Object.prototype.hasOwnProperty.call(value, "name")
+      || Object.prototype.hasOwnProperty.call(value, "value")
+      || Object.prototype.hasOwnProperty.call(value, "valueRef")
+    );
+  }
+
+  function isConditionClauseLikeObject(value) {
+    if (!isPlainObjectRecord(value)) {
+      return false;
+    }
+    return (
+      Object.prototype.hasOwnProperty.call(value, "leftOperand")
+      || Object.prototype.hasOwnProperty.call(value, "rightOperand")
+      || Object.prototype.hasOwnProperty.call(value, "comparisonOperator")
+    );
+  }
+
+  function normalizeEntryObjectForXml(value, keyHint, pathParts, ownerContext) {
+    if (!isPlainObjectRecord(value)) {
+      return value;
+    }
+    if (isDeclLikeObject(value) || isAbapStatementObject(value)) {
+      return value;
+    }
+
+    const pathKey = buildPathKeyFromParts(pathParts);
+    const pathLower = pathKey.toLowerCase();
+    const inValuesPath = pathLower.includes("/values/");
+    const inExtrasPath = pathLower.includes("/extras/");
+    const keyHintLower = String(keyHint || "").trim().toLowerCase();
+    const extrasItemLike = keyHintLower === "item";
+    const source = getDeclSourceContextFromObject(ownerContext);
+
+    let next = value;
+
+    if (inValuesPath && isValueLikeEntryObject(next)) {
+      next = ensureEntryDeclWithSynthetic(next, {
+        pathKey,
+        file: source.file,
+        lineStart: source.lineStart,
+        raw: source.raw,
+        role: "xml:value"
+      });
+    }
+
+    if (inExtrasPath && extrasItemLike) {
+      if (isConditionClauseLikeObject(next)) {
+        next = ensureConditionClauseDeclsWithSynthetic(next, {
+          pathKey,
+          file: source.file,
+          lineStart: source.lineStart,
+          raw: source.raw
+        });
+      }
+
+      if (isAssignmentLikeEntryObject(next)) {
+        next = ensureValueDeclWithSynthetic(next, {
+          pathKey,
+          file: source.file,
+          lineStart: source.lineStart,
+          raw: source.raw,
+          role: "xml:extras:value",
+          nameHint: String(keyHint || "value")
+        });
+      }
+
+      if (isValueLikeEntryObject(next)) {
+        next = ensureEntryDeclWithSynthetic(next, {
+          pathKey,
+          file: source.file,
+          lineStart: source.lineStart,
+          raw: source.raw,
+          role: "xml:extras"
+        });
+      }
+    }
+
+    return next;
+  }
+
+  function appendXmlValue(lines, keyHint, tagName, value, indent, pathParts, ownerContext) {
     const pad = " ".repeat(indent);
+    const currentPathParts = Array.isArray(pathParts) ? pathParts : [];
+    const currentOwnerContext = ownerContext && typeof ownerContext === "object" ? ownerContext : null;
 
     if (value === undefined) {
       return;
@@ -2904,28 +3336,32 @@
     if (Array.isArray(value)) {
       const itemTag = getArrayItemTagName(keyHint);
       lines.push(`${pad}<${tagName}>`);
-      for (const item of value) {
-        appendXmlValue(lines, itemTag, itemTag, item, indent + 2);
+      for (let index = 0; index < value.length; index += 1) {
+        const item = value[index];
+        const itemPathParts = currentPathParts.concat(`${itemTag}[${index + 1}]`);
+        appendXmlValue(lines, itemTag, itemTag, item, indent + 2, itemPathParts, currentOwnerContext);
       }
       lines.push(`${pad}</${tagName}>`);
       return;
     }
 
     if (typeof value === "object") {
+      const nextOwnerContext = isAbapStatementObject(value) ? value : currentOwnerContext;
+      const normalizedValue = normalizeEntryObjectForXml(value, keyHint, currentPathParts, nextOwnerContext);
       lines.push(`${pad}<${tagName}>`);
 
-      const valueIsDecl = isDeclObjectForXml(keyHint, value);
+      const valueIsDecl = isDeclObjectForXml(keyHint, normalizedValue);
       let hasComputedFinalDesc = false;
 
       if (valueIsDecl) {
-        const declDesc = getEffectiveDeclDesc(value);
+        const declDesc = getEffectiveDeclDesc(normalizedValue);
         if (declDesc) {
           lines.push(`${" ".repeat(indent + 2)}<desc>${escapeXmlText(declDesc)}</desc>`);
         } else {
           lines.push(`${" ".repeat(indent + 2)}<desc/>`);
         }
 
-        const finalDeclDesc = getFinalDeclDesc(value);
+        const finalDeclDesc = getFinalDeclDesc(normalizedValue);
         hasComputedFinalDesc = true;
         if (finalDeclDesc) {
           lines.push(`${" ".repeat(indent + 2)}<finalDesc>${escapeXmlText(finalDeclDesc)}</finalDesc>`);
@@ -2933,19 +3369,19 @@
           lines.push(`${" ".repeat(indent + 2)}<finalDesc/>`);
         }
 
-        const declName = getDeclDisplayName(value) || getDeclTechName(value);
+        const declName = getDeclDisplayName(normalizedValue) || getDeclTechName(normalizedValue);
         lines.push(`${" ".repeat(indent + 2)}<name>${escapeXmlText(declName)}</name>`);
       }
 
       if (!valueIsDecl) {
         let shouldEmitFinalDesc = false;
         let finalDesc = "";
-        if (hasValueLevelDescFields(value)) {
+        if (hasValueLevelDescFields(normalizedValue)) {
           shouldEmitFinalDesc = true;
-          finalDesc = resolveValueLevelFinalDesc(value);
-        } else if (isDeclLikeObject(value.decl)) {
+          finalDesc = resolveValueLevelFinalDesc(normalizedValue);
+        } else if (isDeclLikeObject(normalizedValue.decl)) {
           shouldEmitFinalDesc = true;
-          finalDesc = getFinalDeclDesc(value.decl);
+          finalDesc = getFinalDeclDesc(normalizedValue.decl);
         }
 
         if (shouldEmitFinalDesc) {
@@ -2973,7 +3409,7 @@
         "children"
       ];
 
-      const keys = Object.keys(value);
+      const keys = Object.keys(normalizedValue);
       keys.sort((a, b) => {
         const ai = preferredOrder.indexOf(a);
         const bi = preferredOrder.indexOf(b);
@@ -2996,7 +3432,15 @@
           continue;
         }
         const childTag = toXmlTagName(key);
-        appendXmlValue(lines, key, childTag, value[key], indent + 2);
+        appendXmlValue(
+          lines,
+          key,
+          childTag,
+          normalizedValue[key],
+          indent + 2,
+          currentPathParts.concat(key),
+          nextOwnerContext
+        );
       }
 
       lines.push(`${pad}</${tagName}>`);
@@ -3017,8 +3461,9 @@
       lines.push(`  <file>${escapeXmlText(fileName)}</file>`);
     }
     lines.push("  <objects>");
-    for (const obj of exportRoots) {
-      appendXmlValue(lines, "object", "object", obj, 4);
+    for (let index = 0; index < exportRoots.length; index += 1) {
+      const obj = exportRoots[index];
+      appendXmlValue(lines, "object", "object", obj, 4, ["objects", `object[${index + 1}]`], obj);
     }
     lines.push("  </objects>");
     lines.push("</abapflowObjects>");
@@ -3831,10 +4276,12 @@
       }
     };
 
-    addDecl(entry && entry.decl);
-    addDecl(entry && entry.valueDecl);
-    if (entry && Array.isArray(entry.originDecls)) {
-      for (const originDecl of entry.originDecls) {
+    const normalizedEntry = ensureEntryDeclForOutput(obj, cloneValueEntryForOutput(entry));
+
+    addDecl(normalizedEntry && normalizedEntry.decl);
+    addDecl(normalizedEntry && normalizedEntry.valueDecl);
+    if (normalizedEntry && Array.isArray(normalizedEntry.originDecls)) {
+      for (const originDecl of normalizedEntry.originDecls) {
         addDecl(originDecl);
       }
     }
@@ -3844,7 +4291,7 @@
       return dedupeDecls(decls);
     }
 
-    const entryName = String(entry && entry.name ? entry.name : "").trim().toLowerCase();
+    const entryName = String(normalizedEntry && normalizedEntry.name ? normalizedEntry.name : "").trim().toLowerCase();
     if (!entryName) {
       return dedupeDecls(decls);
     }
@@ -4085,6 +4532,32 @@
     return [];
   }
 
+  function cloneValueEntryForOutput(entry) {
+    if (!entry || typeof entry !== "object") {
+      return entry;
+    }
+    const out = { ...entry };
+    if (Array.isArray(entry.originDecls)) {
+      out.originDecls = entry.originDecls.slice();
+    }
+    return out;
+  }
+
+  function ensureEntryDeclForOutput(obj, entry) {
+    if (!entry || typeof entry !== "object") {
+      return entry;
+    }
+    const source = getDeclSourceContextFromObject(obj);
+    const entryName = String(entry.name || "value").trim() || "value";
+    return ensureEntryDeclWithSynthetic(entry, {
+      pathKey: buildPathKeyFromParts([buildObjectPathBase(obj), "values", entryName]),
+      file: source.file,
+      lineStart: source.lineStart,
+      raw: source.raw,
+      role: "value"
+    });
+  }
+
   function buildRenderableValueEntries(obj) {
     const values = getValueEntries(obj);
     if (!values.length) {
@@ -4093,16 +4566,19 @@
 
     const rows = [];
     for (const entry of values) {
+      const rawRow = cloneValueEntryForOutput(entry);
       if (!isRawValueEntry(entry)) {
-        rows.push(entry);
+        rows.push(ensureEntryDeclForOutput(obj, rawRow));
         continue;
       }
 
       const parsedRows = buildParsedRowsForRawEntry(obj, entry);
       if (parsedRows.length) {
-        rows.push(...parsedRows);
+        for (const parsedRow of parsedRows) {
+          rows.push(ensureEntryDeclForOutput(obj, cloneValueEntryForOutput(parsedRow)));
+        }
       } else {
-        rows.push(entry);
+        rows.push(ensureEntryDeclForOutput(obj, rawRow));
       }
     }
 
@@ -4144,11 +4620,50 @@
     return table;
   }
 
-  function renderAssignmentTable(title, list) {
+  function buildExtrasEntryPathKey(obj, extrasScope, sectionName, indexOneBased, itemKind) {
+    return buildPathKeyFromParts([
+      buildObjectPathBase(obj),
+      "extras",
+      extrasScope || "extras",
+      sectionName || "section",
+      `${itemKind || "item"}[${indexOneBased}]`
+    ]);
+  }
+
+  function normalizeExtrasEntryForOutput(obj, extrasScope, sectionName, indexOneBased, entry) {
+    if (!entry || typeof entry !== "object") {
+      return entry;
+    }
+
+    const source = getDeclSourceContextFromObject(obj);
+    const basePath = buildExtrasEntryPathKey(obj, extrasScope, sectionName, indexOneBased, "item");
+    let next = cloneValueEntryForOutput(entry);
+    next = ensureEntryDeclWithSynthetic(next, {
+      pathKey: basePath,
+      file: source.file,
+      lineStart: source.lineStart,
+      raw: source.raw,
+      role: `${extrasScope || "extras"}:${sectionName || "entry"}`
+    });
+    next = ensureValueDeclWithSynthetic(next, {
+      pathKey: basePath,
+      file: source.file,
+      lineStart: source.lineStart,
+      raw: source.raw,
+      role: `${extrasScope || "extras"}:${sectionName || "entry"}:value`,
+      nameHint: sectionName || "value"
+    });
+    return next;
+  }
+
+  function renderAssignmentTable(title, list, context) {
     const items = Array.isArray(list) ? list : [];
     if (!items.length) {
       return null;
     }
+
+    const obj = context && context.obj ? context.obj : null;
+    const extrasScope = context && context.extrasScope ? String(context.extrasScope) : "extras";
 
     const section = el("div");
     section.appendChild(el("div", { className: "muted", text: title }));
@@ -4163,12 +4678,17 @@
     table.appendChild(thead);
 
     const tbody = el("tbody");
-    for (const entry of items) {
+    for (let index = 0; index < items.length; index += 1) {
+      const entry = items[index];
+      const normalizedEntry = normalizeExtrasEntryForOutput(obj, extrasScope, title, index + 1, entry);
       const row = el("tr");
-      row.appendChild(el("td", { text: entry && entry.name ? String(entry.name) : "" }));
-      row.appendChild(el("td", { text: entry && entry.value ? String(entry.value) : "" }));
-      row.appendChild(el("td", { text: entry && entry.valueRef ? String(entry.valueRef) : "" }));
-      const { nameCell, descCell } = renderDeclListCells(entry && entry.originDecls, entry && entry.valueDecl);
+      row.appendChild(el("td", { text: normalizedEntry && normalizedEntry.name ? String(normalizedEntry.name) : "" }));
+      row.appendChild(el("td", { text: normalizedEntry && normalizedEntry.value ? String(normalizedEntry.value) : "" }));
+      row.appendChild(el("td", { text: normalizedEntry && normalizedEntry.valueRef ? String(normalizedEntry.valueRef) : "" }));
+      const { nameCell, descCell } = renderDeclListCells(
+        normalizedEntry && normalizedEntry.originDecls,
+        normalizedEntry && normalizedEntry.valueDecl
+      );
       row.appendChild(nameCell);
       row.appendChild(descCell);
       tbody.appendChild(row);
@@ -4178,11 +4698,14 @@
     return section;
   }
 
-  function renderValueListTable(title, list) {
+  function renderValueListTable(title, list, context) {
     const items = Array.isArray(list) ? list : [];
     if (!items.length) {
       return null;
     }
+
+    const obj = context && context.obj ? context.obj : null;
+    const extrasScope = context && context.extrasScope ? String(context.extrasScope) : "extras";
 
     const section = el("div");
     section.appendChild(el("div", { className: "muted", text: title }));
@@ -4197,11 +4720,16 @@
     table.appendChild(thead);
 
     const tbody = el("tbody");
-    for (const entry of items) {
+    for (let index = 0; index < items.length; index += 1) {
+      const entry = items[index];
+      const normalizedEntry = normalizeExtrasEntryForOutput(obj, extrasScope, title, index + 1, entry);
       const row = el("tr");
-      row.appendChild(el("td", { text: entry && entry.value ? String(entry.value) : "" }));
-      row.appendChild(el("td", { text: entry && entry.valueRef ? String(entry.valueRef) : "" }));
-      const { nameCell, descCell } = renderDeclListCells(entry && entry.originDecls, entry && entry.valueDecl);
+      row.appendChild(el("td", { text: normalizedEntry && normalizedEntry.value ? String(normalizedEntry.value) : "" }));
+      row.appendChild(el("td", { text: normalizedEntry && normalizedEntry.valueRef ? String(normalizedEntry.valueRef) : "" }));
+      const { nameCell, descCell } = renderDeclListCells(
+        normalizedEntry && normalizedEntry.originDecls,
+        normalizedEntry && normalizedEntry.valueDecl
+      );
       row.appendChild(nameCell);
       row.appendChild(descCell);
       tbody.appendChild(row);
@@ -4252,11 +4780,15 @@
     return matched;
   }
 
-  function renderConditionTable(title, clauses) {
+  function renderConditionTable(title, clauses, context) {
     const items = Array.isArray(clauses) ? clauses : [];
     if (!items.length) {
       return null;
     }
+
+    const obj = context && context.obj ? context.obj : null;
+    const extrasScope = context && context.extrasScope ? String(context.extrasScope) : "extras";
+    const source = getDeclSourceContextFromObject(obj);
 
     const section = el("div");
     if (title) {
@@ -4284,10 +4816,13 @@
     table.appendChild(thead);
 
     const tbody = el("tbody");
-    for (const clause of items) {
+    for (let index = 0; index < items.length; index += 1) {
+      const clause = items[index];
+      const clausePath = buildExtrasEntryPathKey(obj, extrasScope, title || "conditions", index + 1, "clause");
+      let normalizedClause = clause;
+      let leftRef = clause && clause.leftOperandRef ? String(clause.leftOperandRef) : "";
+      let rightRef = clause && clause.rightOperandRef ? String(clause.rightOperandRef) : "";
       const row = el("tr");
-      const leftRef = clause && clause.leftOperandRef ? String(clause.leftOperandRef) : "";
-      const rightRef = clause && clause.rightOperandRef ? String(clause.rightOperandRef) : "";
       const leftDecl = resolveConditionDeclForViewer(
         clause && clause.leftOperandDecl ? clause.leftOperandDecl : null,
         leftRef || (clause && clause.leftOperand ? clause.leftOperand : "")
@@ -4296,19 +4831,42 @@
         clause && clause.rightOperandDecl ? clause.rightOperandDecl : null,
         rightRef || (clause && clause.rightOperand ? clause.rightOperand : "")
       );
+      let effectiveLeftDecl = leftDecl;
+      let effectiveRightDecl = rightDecl;
 
-      row.appendChild(el("td", { text: clause && clause.leftOperand ? String(clause.leftOperand) : "" }));
-      row.appendChild(el("td", { text: clause && clause.comparisonOperator ? String(clause.comparisonOperator) : "" }));
-      row.appendChild(el("td", { text: clause && clause.rightOperand ? String(clause.rightOperand) : "" }));
-      row.appendChild(el("td", { text: clause && clause.logicalConnector ? String(clause.logicalConnector) : "" }));
+      if (!effectiveLeftDecl || !effectiveRightDecl) {
+        normalizedClause = ensureConditionClauseDeclsWithSynthetic(clause, {
+          pathKey: clausePath,
+          file: source.file,
+          lineStart: source.lineStart,
+          raw: source.raw
+        });
+        leftRef = normalizedClause && normalizedClause.leftOperandRef ? String(normalizedClause.leftOperandRef) : leftRef;
+        rightRef = normalizedClause && normalizedClause.rightOperandRef ? String(normalizedClause.rightOperandRef) : rightRef;
+        if (!effectiveLeftDecl) {
+          effectiveLeftDecl = normalizedClause && normalizedClause.leftOperandDecl
+            ? normalizedClause.leftOperandDecl
+            : null;
+        }
+        if (!effectiveRightDecl) {
+          effectiveRightDecl = normalizedClause && normalizedClause.rightOperandDecl
+            ? normalizedClause.rightOperandDecl
+            : null;
+        }
+      }
+
+      row.appendChild(el("td", { text: normalizedClause && normalizedClause.leftOperand ? String(normalizedClause.leftOperand) : "" }));
+      row.appendChild(el("td", { text: normalizedClause && normalizedClause.comparisonOperator ? String(normalizedClause.comparisonOperator) : "" }));
+      row.appendChild(el("td", { text: normalizedClause && normalizedClause.rightOperand ? String(normalizedClause.rightOperand) : "" }));
+      row.appendChild(el("td", { text: normalizedClause && normalizedClause.logicalConnector ? String(normalizedClause.logicalConnector) : "" }));
       row.appendChild(el("td", { text: leftRef }));
 
-      const leftDeclCells = renderDeclListCells(null, leftDecl);
+      const leftDeclCells = renderDeclListCells(null, effectiveLeftDecl);
       row.appendChild(leftDeclCells.nameCell);
       row.appendChild(leftDeclCells.descCell);
 
       row.appendChild(el("td", { text: rightRef }));
-      const rightDeclCells = renderDeclListCells(null, rightDecl);
+      const rightDeclCells = renderDeclListCells(null, effectiveRightDecl);
       row.appendChild(rightDeclCells.nameCell);
       row.appendChild(rightDeclCells.descCell);
 
@@ -4320,7 +4878,7 @@
     return section;
   }
 
-  function appendConditionSection(wrap, title, rawText, clauses) {
+  function appendConditionSection(wrap, title, rawText, clauses, context) {
     if (!wrap) {
       return;
     }
@@ -4330,7 +4888,7 @@
       wrap.appendChild(el("div", { className: "muted", text: raw }));
     }
 
-    const table = renderConditionTable(title, clauses);
+    const table = renderConditionTable(title, clauses, context);
     if (table) {
       wrap.appendChild(table);
     }
@@ -4486,7 +5044,7 @@
       }
 
       for (const sectionName of ["exporting", "importing", "changing", "tables", "exceptions"]) {
-        const table = renderAssignmentTable(sectionName, call[sectionName]);
+        const table = renderAssignmentTable(sectionName, call[sectionName], { obj, extrasScope: "callFunction" });
         if (table) {
           wrap.appendChild(table);
         }
@@ -4500,7 +5058,7 @@
       wrap.appendChild(el("div", { className: "muted", text: call.target ? `CALL METHOD ${call.target}` : "CALL METHOD" }));
 
       for (const sectionName of ["exporting", "importing", "changing", "receiving", "exceptions"]) {
-        const table = renderAssignmentTable(sectionName, call[sectionName]);
+        const table = renderAssignmentTable(sectionName, call[sectionName], { obj, extrasScope: "callMethod" });
         if (table) {
           wrap.appendChild(table);
         }
@@ -4515,10 +5073,16 @@
       if (call.program) {
         wrap.appendChild(el("div", { className: "muted", text: `IN PROGRAM ${call.program}` }));
       }
-      appendConditionSection(wrap, "ifConditions", call.ifCondition ? `IF ${call.ifCondition}` : "", call.ifConditions);
+      appendConditionSection(
+        wrap,
+        "ifConditions",
+        call.ifCondition ? `IF ${call.ifCondition}` : "",
+        call.ifConditions,
+        { obj, extrasScope: "performCall" }
+      );
 
       for (const sectionName of ["using", "changing", "tables"]) {
-        const table = renderValueListTable(sectionName, call[sectionName]);
+        const table = renderValueListTable(sectionName, call[sectionName], { obj, extrasScope: "performCall" });
         if (table) {
           wrap.appendChild(table);
         }
@@ -4529,14 +5093,32 @@
 
     if (extras.ifCondition) {
       const info = extras.ifCondition;
-      appendConditionSection(wrap, "conditions", info.conditionRaw ? `IF ${info.conditionRaw}` : "", info.conditions);
+      appendConditionSection(
+        wrap,
+        "conditions",
+        info.conditionRaw ? `IF ${info.conditionRaw}` : "",
+        info.conditions,
+        { obj, extrasScope: "ifCondition" }
+      );
       return wrap;
     }
 
     if (extras.select) {
       const info = extras.select;
-      appendConditionSection(wrap, "whereConditions", info.whereRaw ? `WHERE ${info.whereRaw}` : "", info.whereConditions);
-      appendConditionSection(wrap, "havingConditions", info.havingRaw ? `HAVING ${info.havingRaw}` : "", info.havingConditions);
+      appendConditionSection(
+        wrap,
+        "whereConditions",
+        info.whereRaw ? `WHERE ${info.whereRaw}` : "",
+        info.whereConditions,
+        { obj, extrasScope: "select.where" }
+      );
+      appendConditionSection(
+        wrap,
+        "havingConditions",
+        info.havingRaw ? `HAVING ${info.havingRaw}` : "",
+        info.havingConditions,
+        { obj, extrasScope: "select.having" }
+      );
       return wrap;
     }
 
@@ -4545,25 +5127,43 @@
       const raw = info.withTableKeyRaw
         ? `WITH TABLE KEY ${info.withTableKeyRaw}`
         : (info.withKeyRaw ? `WITH KEY ${info.withKeyRaw}` : "");
-      appendConditionSection(wrap, "conditions", raw, info.conditions);
+      appendConditionSection(wrap, "conditions", raw, info.conditions, { obj, extrasScope: "readTable" });
       return wrap;
     }
 
     if (extras.loopAtItab) {
       const info = extras.loopAtItab;
-      appendConditionSection(wrap, "conditions", info.whereRaw ? `WHERE ${info.whereRaw}` : "", info.conditions);
+      appendConditionSection(
+        wrap,
+        "conditions",
+        info.whereRaw ? `WHERE ${info.whereRaw}` : "",
+        info.conditions,
+        { obj, extrasScope: "loopAtItab" }
+      );
       return wrap;
     }
 
     if (extras.modifyItab) {
       const info = extras.modifyItab;
-      appendConditionSection(wrap, "conditions", info.whereRaw ? `WHERE ${info.whereRaw}` : "", info.conditions);
+      appendConditionSection(
+        wrap,
+        "conditions",
+        info.whereRaw ? `WHERE ${info.whereRaw}` : "",
+        info.conditions,
+        { obj, extrasScope: "modifyItab" }
+      );
       return wrap;
     }
 
     if (extras.deleteItab) {
       const info = extras.deleteItab;
-      appendConditionSection(wrap, "conditions", info.whereRaw ? `WHERE ${info.whereRaw}` : "", info.conditions);
+      appendConditionSection(
+        wrap,
+        "conditions",
+        info.whereRaw ? `WHERE ${info.whereRaw}` : "",
+        info.conditions,
+        { obj, extrasScope: "deleteItab" }
+      );
       return wrap;
     }
 
