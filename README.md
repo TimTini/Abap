@@ -31,6 +31,13 @@ Workflow:
 - Parse ABAP file to JSON:
   - `node cli/parse.js <file.abap>`
 
+## AI / Agent notes
+- Local agent guide: `AGENTS.md`
+- Purpose: keep parser/output behavior consistent across different AI agents and avoid regressions.
+- Minimum check before finishing changes:
+  - `node tests/parser-regression.js`
+  - If viewer changed: `python scripts/build-inline-viewer.py`
+
 ## Examples
 - Full coverage sample: `examples/full.abap`
 - More samples: `examples/*.abap`

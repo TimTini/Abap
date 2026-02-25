@@ -568,6 +568,12 @@ function testIsInitialAndIsNotInitialConditions() {
   assert.strictEqual(ifObj.extras.ifCondition.conditions[0].leftOperandDecl.name, "lv_a");
   assert.strictEqual(ifObj.extras.ifCondition.conditions[0].rightOperandRef, undefined);
   assert.strictEqual(ifObj.extras.ifCondition.conditions[1].rightOperandRef, undefined);
+  assert(ifObj.extras.ifCondition.conditions[0].rightOperandDecl, "Expected synthetic decl for INITIAL.");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].rightOperandDecl.objectType, "SYSTEM");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].rightOperandDecl.name, "INITIAL");
+  assert(ifObj.extras.ifCondition.conditions[1].rightOperandDecl, "Expected synthetic decl for NOT INITIAL.");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[1].rightOperandDecl.objectType, "SYSTEM");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[1].rightOperandDecl.name, "NOT INITIAL");
 
   const readObj = findObject(objects, "READ_TABLE");
   assert(readObj && readObj.extras && readObj.extras.readTable, "Expected READ_TABLE extras for IS INITIAL patterns.");
@@ -595,6 +601,10 @@ function testIsInitialAndIsNotInitialConditions() {
   );
   assert.strictEqual(readObj.extras.readTable.conditions[0].rightOperandRef, undefined);
   assert.strictEqual(readObj.extras.readTable.conditions[1].rightOperandRef, undefined);
+  assert(readObj.extras.readTable.conditions[0].rightOperandDecl, "Expected synthetic decl for READ INITIAL.");
+  assert.strictEqual(readObj.extras.readTable.conditions[0].rightOperandDecl.name, "INITIAL");
+  assert(readObj.extras.readTable.conditions[1].rightOperandDecl, "Expected synthetic decl for READ NOT INITIAL.");
+  assert.strictEqual(readObj.extras.readTable.conditions[1].rightOperandDecl.name, "NOT INITIAL");
 }
 
 function testImplicitSplitOnlyForReadTable() {
@@ -631,6 +641,44 @@ function testImplicitSplitOnlyForReadTable() {
   assert.strictEqual(readObj.extras.readTable.conditions[2].rightOperand, "lv_other");
 }
 
+function testConditionOperandsAlwaysHaveDecl() {
+  const code = [
+    "DATA gv_cnt TYPE i.",
+    "IF gv_cnt > 0.",
+    "ENDIF.",
+    "READ TABLE lt_data WITH KEY col_a = 0 col_b = 'X' INTO ls_data.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+
+  const ifObj = findObject(objects, "IF");
+  assert(ifObj && ifObj.extras && ifObj.extras.ifCondition, "Expected IF extras for literal operand test.");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions.length, 1);
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].leftOperandRef, "gv_cnt");
+  assert(ifObj.extras.ifCondition.conditions[0].leftOperandDecl, "Expected left decl for IF gv_cnt.");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].leftOperandDecl.name, "gv_cnt");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].rightOperandRef, undefined);
+  assert(ifObj.extras.ifCondition.conditions[0].rightOperandDecl, "Expected synthetic right decl for IF literal.");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].rightOperandDecl.objectType, "CONDITION_VALUE");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].rightOperandDecl.name, "0");
+
+  const readObj = findObject(objects, "READ_TABLE");
+  assert(readObj && readObj.extras && readObj.extras.readTable, "Expected READ_TABLE extras for literal operand test.");
+  assert.strictEqual(readObj.extras.readTable.conditions.length, 2);
+  assert.strictEqual(readObj.extras.readTable.conditions[0].leftOperandRef, "col_a");
+  assert(readObj.extras.readTable.conditions[0].leftOperandDecl, "Expected synthetic left decl for READ field col_a.");
+  assert.strictEqual(readObj.extras.readTable.conditions[0].leftOperandDecl.objectType, "CONDITION_VALUE");
+  assert.strictEqual(readObj.extras.readTable.conditions[0].leftOperandDecl.name, "col_a");
+  assert.strictEqual(readObj.extras.readTable.conditions[0].rightOperandRef, undefined);
+  assert(readObj.extras.readTable.conditions[0].rightOperandDecl, "Expected synthetic right decl for READ literal 0.");
+  assert.strictEqual(readObj.extras.readTable.conditions[0].rightOperandDecl.name, "0");
+  assert.strictEqual(readObj.extras.readTable.conditions[1].rightOperandRef, undefined);
+  assert(readObj.extras.readTable.conditions[1].rightOperandDecl, "Expected synthetic right decl for READ literal 'X'.");
+  assert.strictEqual(readObj.extras.readTable.conditions[1].rightOperandDecl.name, "'X'");
+}
+
 function run() {
   testInlineCommentInsideSingleQuote();
   testInlineCommentInsideTemplate();
@@ -648,6 +696,7 @@ function run() {
   testConditionOperatorMatrix();
   testIsInitialAndIsNotInitialConditions();
   testImplicitSplitOnlyForReadTable();
+  testConditionOperandsAlwaysHaveDecl();
   console.log("parser-regression: ok");
 }
 

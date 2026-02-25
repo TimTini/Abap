@@ -2126,7 +2126,9 @@
       const leftRef = extractFirstIdentifierFromExpression(clause.leftOperand);
       if (leftRef) {
         clause.leftOperandRef = leftRef;
-        clause.leftOperandDecl = resolveDecl(leftRef, context);
+        clause.leftOperandDecl = resolveDecl(leftRef, context) || buildSyntheticConditionOperandDeclInfo(clause.leftOperand, leftRef);
+      } else {
+        clause.leftOperandDecl = buildSyntheticConditionOperandDeclInfo(clause.leftOperand, "");
       }
 
       const operatorUpper = String(clause.comparisonOperator || "").toUpperCase();
@@ -2134,7 +2136,11 @@
       const rightRef = skipRightAnnotation ? "" : extractFirstIdentifierFromExpression(clause.rightOperand);
       if (rightRef) {
         clause.rightOperandRef = rightRef;
-        clause.rightOperandDecl = resolveDecl(rightRef, context);
+        clause.rightOperandDecl = resolveDecl(rightRef, context) || buildSyntheticConditionOperandDeclInfo(clause.rightOperand, rightRef);
+      } else if (skipRightAnnotation) {
+        clause.rightOperandDecl = buildUnaryIsPredicateDeclInfo(clause.rightOperand);
+      } else {
+        clause.rightOperandDecl = buildSyntheticConditionOperandDeclInfo(clause.rightOperand, "");
       }
     }
   }
@@ -2145,6 +2151,48 @@
       return false;
     }
     return /^(?:NOT\s+)?(?:INITIAL|ASSIGNED|BOUND|SUPPLIED|REQUESTED)$/i.test(text);
+  }
+
+  function buildUnaryIsPredicateDeclInfo(value) {
+    const text = String(value || "").trim().toUpperCase().replace(/\s+/g, " ");
+    if (!text) {
+      return null;
+    }
+    return {
+      id: null,
+      objectType: "SYSTEM",
+      name: text,
+      file: "",
+      lineStart: null,
+      raw: "",
+      comment: "",
+      scopeId: 0,
+      scopeLabel: "SYSTEM",
+      scopeType: "SYSTEM",
+      scopeName: ""
+    };
+  }
+
+  function buildSyntheticConditionOperandDeclInfo(rawValue, preferredName) {
+    const rawText = String(rawValue || "").trim();
+    const preferredText = String(preferredName || "").trim();
+    const name = preferredText || rawText;
+    if (!name) {
+      return null;
+    }
+    return {
+      id: null,
+      objectType: "CONDITION_VALUE",
+      name,
+      file: "",
+      lineStart: null,
+      raw: rawText,
+      comment: "",
+      scopeId: 0,
+      scopeLabel: "CONDITION",
+      scopeType: "SYSTEM",
+      scopeName: ""
+    };
   }
 
   function annotateReadTableExtras(readTable, context) {

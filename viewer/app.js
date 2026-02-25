@@ -1944,7 +1944,11 @@
     }
 
     const base = getBaseDeclDesc(decl);
-    return normalizeEnabled ? normalizeDeclDescText(decl, base) : base;
+    if (base) {
+      return normalizeEnabled ? normalizeDeclDescText(decl, base) : base;
+    }
+
+    return String(getDeclTechName(decl) || "").trim();
   }
 
   function getFinalDeclAtomicDescNormalized(decl) {
@@ -1962,10 +1966,11 @@
     }
 
     const codeDesc = getDeclCodeDesc(decl);
-    if (!codeDesc) {
-      return "";
+    if (codeDesc) {
+      return normalizeDeclDescByTemplate(decl, codeDesc);
     }
-    return normalizeDeclDescByTemplate(decl, codeDesc);
+
+    return String(getDeclTechName(decl) || "").trim();
   }
 
   function buildStructDeclFromFieldDecl(decl) {
