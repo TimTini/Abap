@@ -242,14 +242,17 @@
       return;
     }
 
+    const manualVersion = getMetaContent("abap-viewer-version");
     const manualUpdatedAt = getMetaContent("abap-viewer-updated-at");
     const manualNote = getMetaContent("abap-viewer-updated-note");
     const parsedManualDate = parseDateCandidate(manualUpdatedAt);
     const fallbackDate = parseDateCandidate(document.lastModified);
+    const versionPrefix = manualVersion ? `${manualVersion} | ` : "";
 
-    if (manualUpdatedAt) {
+    if (manualUpdatedAt || manualVersion) {
       const display = parsedManualDate ? formatDateTime(parsedManualDate) : manualUpdatedAt;
-      els.buildInfo.textContent = `Updated: ${display} (manual)`;
+      const updatedText = display || "manual timestamp not set";
+      els.buildInfo.textContent = `Updated: ${versionPrefix}${updatedText} (manual)`;
       els.buildInfo.title = manualNote || "Manual timestamp from <meta name=\"abap-viewer-updated-at\">.";
       return;
     }
@@ -1128,6 +1131,42 @@
     els.settingsModal.hidden = true;
   }
 
+  function collectConditionDeclsFromClauses(clauses, addDecl) {
+    const list = Array.isArray(clauses) ? clauses : [];
+    for (const clause of list) {
+      if (!clause || typeof clause !== "object") {
+        continue;
+      }
+      addDecl(clause.leftOperandDecl);
+      addDecl(clause.rightOperandDecl);
+    }
+  }
+
+  function collectConditionDeclsFromExtras(extras, addDecl) {
+    if (!extras || typeof extras !== "object" || typeof addDecl !== "function") {
+      return;
+    }
+
+    if (extras.ifCondition) {
+      collectConditionDeclsFromClauses(extras.ifCondition.conditions, addDecl);
+    }
+
+    if (extras.performCall) {
+      collectConditionDeclsFromClauses(extras.performCall.ifConditions, addDecl);
+    }
+
+    if (extras.select) {
+      collectConditionDeclsFromClauses(extras.select.whereConditions, addDecl);
+      collectConditionDeclsFromClauses(extras.select.havingConditions, addDecl);
+    }
+
+    for (const key of ["readTable", "loopAtItab", "modifyItab", "deleteItab"]) {
+      if (extras[key]) {
+        collectConditionDeclsFromClauses(extras[key].conditions, addDecl);
+      }
+    }
+  }
+
   function getDeclsForDescriptionsModal() {
     if (state.data && typeof state.data === "object" && Array.isArray(state.data.decls)) {
       return state.data.decls;
@@ -1140,7 +1179,7 @@
       if (!decl || typeof decl !== "object") {
         return;
       }
-      const key = getDeclKey(decl) || stringifyDecl(decl);
+      const key = getDeclOverrideStorageKey(decl) || stringifyDecl(decl);
       if (!key || seen.has(key)) {
         return;
       }
@@ -1200,6 +1239,8 @@
           }
         }
       }
+
+      collectConditionDeclsFromExtras(extras, addDecl);
     });
 
     return decls;
@@ -1453,7 +1494,7 @@
     const tbody = document.createElement("tbody");
     for (const row of rows) {
       const tr = document.createElement("tr");
-      const declKey = getDeclKey(row.decl);
+      const declKey = getDeclOverrideStorageKey(row.decl);
       if (declKey) {
         tr.setAttribute("data-decl-key", declKey);
         if (declKey === state.selectedDeclKey) {
@@ -1640,6 +1681,22 @@
     return String(value || "").trim().toUpperCase();
   }
 
+  function getDeclFallbackKey(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+
+    const name = normalizeKeyToken(decl.name);
+    if (!name) {
+      return "";
+    }
+
+    const objectType = normalizeKeyToken(decl.objectType);
+    const file = String(decl.file || "").trim();
+    const line = decl.lineStart ? String(decl.lineStart) : "";
+    return `FALLBACK:${objectType}|${name}|${file}|${line}`;
+  }
+
   function getDeclKey(decl) {
     if (!decl || typeof decl !== "object") {
       return "";
@@ -1670,6 +1727,27 @@
     return `${type}:NAME:${name}`;
   }
 
+  function getDeclOverrideLookupKeys(decl) {
+    const keys = [];
+    const pushKey = (value) => {
+      const key = String(value || "").trim();
+      if (!key || keys.includes(key)) {
+        return;
+      }
+      keys.push(key);
+    };
+
+    pushKey(getDeclKey(decl));
+    pushKey(getLegacyDeclKey(decl));
+    pushKey(getDeclFallbackKey(decl));
+    return keys;
+  }
+
+  function getDeclOverrideStorageKey(decl) {
+    const keys = getDeclOverrideLookupKeys(decl);
+    return keys.length ? keys[0] : "";
+  }
+
   function normalizeDescOverrideEntry(value) {
     if (typeof value === "string") {
       return { text: String(value || ""), noNormalize: false };
@@ -1691,9 +1769,11 @@
   }
 
   function getDeclOverrideEntry(decl) {
-    const key = getDeclKey(decl);
-    if (key && Object.prototype.hasOwnProperty.call(state.descOverrides || {}, key)) {
-      return normalizeDescOverrideEntry(state.descOverrides[key]);
+    const keys = getDeclOverrideLookupKeys(decl);
+    for (const key of keys) {
+      if (key && Object.prototype.hasOwnProperty.call(state.descOverrides || {}, key)) {
+        return normalizeDescOverrideEntry(state.descOverrides[key]);
+      }
     }
 
     const legacyKey = getLegacyDeclKey(decl);
@@ -2117,13 +2197,13 @@
   }
 
   function editDeclDesc(decl) {
-    if (!decl || !decl.name || !decl.objectType) {
+    if (!decl || !decl.name) {
       return;
     }
 
     const isStructField = isStructFieldDecl(decl);
 
-    const key = getDeclKey(decl);
+    const key = getDeclOverrideStorageKey(decl);
     if (!key) {
       return;
     }
@@ -2164,7 +2244,7 @@
       openEditModal({
         mode: "single",
         key,
-        label: `${decl.objectType} ${getDeclTechName(decl)}`,
+        label: `${decl.objectType || "DECL"} ${getDeclTechName(decl)}`,
         hint: hintParts.join(" • "),
         initialValue: currentDisplay || effective,
         skipNormalize: Boolean(currentEntry.noNormalize)
@@ -2173,7 +2253,7 @@
     }
 
     const structDecl = buildStructDeclFromFieldDecl(decl);
-    const structKey = structDecl ? getDeclKey(structDecl) : "";
+    const structKey = structDecl ? getDeclOverrideStorageKey(structDecl) : "";
     if (!structKey) {
       return;
     }
@@ -2192,7 +2272,7 @@
       mode: "structField",
       structKey,
       itemKey: key,
-      label: `${decl.objectType} ${getDeclTechName(decl)}`,
+      label: `${decl.objectType || "DECL"} ${getDeclTechName(decl)}`,
       hint: hintParts.join(" • "),
       structValue: structCurrentDisplay || structEffective,
       itemValue: currentDisplay || getEffectiveDeclAtomicDescNormalized(decl),
@@ -2798,10 +2878,12 @@
       }
     }
 
+    collectConditionDeclsFromExtras(extras, addDecl);
+
     const seen = new Set();
     const parts = [];
     for (const decl of decls) {
-      const key = getDeclKey(decl) || stringifyDecl(decl);
+      const key = getDeclOverrideStorageKey(decl) || stringifyDecl(decl);
       if (!key || seen.has(key)) {
         continue;
       }
@@ -3314,7 +3396,7 @@
     const wrap = el("div", { className: "decl-desc" });
     wrap.appendChild(el("div", { className: "decl-desc-text", text: text || "" }));
 
-    if (decl && decl.name && decl.objectType) {
+    if (getDeclOverrideStorageKey(decl)) {
       const btn = el("button", {
         className: "icon-btn",
         text: "✎",
@@ -3431,7 +3513,7 @@
       }
       descLineWrap.appendChild(descLineText);
 
-      if (decl && decl.name && decl.objectType) {
+      if (getDeclOverrideStorageKey(decl)) {
         const btn = el("button", {
           className: "icon-btn",
           text: "✎",
@@ -3524,6 +3606,52 @@
     return wrap;
   }
 
+  function collectDeclsForValueEntry(obj, entry) {
+    const decls = [];
+    const addDecl = (decl) => {
+      if (decl && typeof decl === "object") {
+        decls.push(decl);
+      }
+    };
+
+    addDecl(entry && entry.decl);
+
+    const extras = obj && obj.extras && typeof obj.extras === "object" ? obj.extras : null;
+    if (!extras) {
+      return dedupeDecls(decls);
+    }
+
+    const entryName = String(entry && entry.name ? entry.name : "").trim().toLowerCase();
+    if (!entryName) {
+      return dedupeDecls(decls);
+    }
+
+    if (entryName === "condition" && extras.ifCondition) {
+      collectConditionDeclsFromClauses(extras.ifCondition.conditions, addDecl);
+    } else if (entryName === "ifcondition" && extras.performCall) {
+      collectConditionDeclsFromClauses(extras.performCall.ifConditions, addDecl);
+    } else if (entryName === "where") {
+      if (extras.select) {
+        collectConditionDeclsFromClauses(extras.select.whereConditions, addDecl);
+      }
+      if (extras.loopAtItab) {
+        collectConditionDeclsFromClauses(extras.loopAtItab.conditions, addDecl);
+      }
+      if (extras.modifyItab) {
+        collectConditionDeclsFromClauses(extras.modifyItab.conditions, addDecl);
+      }
+      if (extras.deleteItab) {
+        collectConditionDeclsFromClauses(extras.deleteItab.conditions, addDecl);
+      }
+    } else if (entryName === "having" && extras.select) {
+      collectConditionDeclsFromClauses(extras.select.havingConditions, addDecl);
+    } else if ((entryName === "withkey" || entryName === "withtablekey") && extras.readTable) {
+      collectConditionDeclsFromClauses(extras.readTable.conditions, addDecl);
+    }
+
+    return dedupeDecls(decls);
+  }
+
   function renderValues(obj) {
     const values = getValueEntries(obj);
     if (!values.length) {
@@ -3542,12 +3670,17 @@
     const tbody = el("tbody");
     for (const entry of values) {
       const row = el("tr");
+      const relatedDecls = collectDeclsForValueEntry(obj, entry);
+      const declListCells = renderDeclListCells(
+        relatedDecls.length ? relatedDecls : null,
+        relatedDecls.length ? null : entry && entry.decl
+      );
       row.appendChild(el("td", { text: entry && entry.name ? String(entry.name) : "" }));
       row.appendChild(el("td", { text: entry && entry.value ? String(entry.value) : "" }));
       row.appendChild(el("td", { text: entry && entry.label ? String(entry.label) : "" }));
       row.appendChild(el("td", { text: entry && entry.codeDesc ? String(entry.codeDesc) : "" }));
-      row.appendChild(renderDeclNameCell(entry && entry.decl));
-      row.appendChild(renderDeclDescCell(entry && entry.decl));
+      row.appendChild(declListCells.nameCell);
+      row.appendChild(declListCells.descCell);
       tbody.appendChild(row);
     }
     table.appendChild(tbody);
@@ -3621,6 +3754,47 @@
     return section;
   }
 
+  function resolveConditionDeclForViewer(decl, refCandidate) {
+    if (decl && typeof decl === "object") {
+      return decl;
+    }
+
+    const ref = String(refCandidate || "").trim();
+    if (!ref) {
+      return null;
+    }
+
+    const decls = state.data && typeof state.data === "object" && Array.isArray(state.data.decls)
+      ? state.data.decls
+      : [];
+    if (!decls.length) {
+      return null;
+    }
+
+    const upperRef = ref.toUpperCase();
+    let matched = null;
+    for (const candidate of decls) {
+      if (!candidate || typeof candidate !== "object") {
+        continue;
+      }
+      const nameUpper = String(candidate.name || "").trim().toUpperCase();
+      if (!nameUpper || nameUpper !== upperRef) {
+        continue;
+      }
+
+      if (!matched) {
+        matched = candidate;
+      }
+
+      const scopeUpper = String(candidate.scopeLabel || "").trim().toUpperCase();
+      if (scopeUpper === "GLOBAL") {
+        return candidate;
+      }
+    }
+
+    return matched;
+  }
+
   function renderConditionTable(title, clauses) {
     const items = Array.isArray(clauses) ? clauses : [];
     if (!items.length) {
@@ -3655,18 +3829,29 @@
     const tbody = el("tbody");
     for (const clause of items) {
       const row = el("tr");
+      const leftRef = clause && clause.leftOperandRef ? String(clause.leftOperandRef) : "";
+      const rightRef = clause && clause.rightOperandRef ? String(clause.rightOperandRef) : "";
+      const leftDecl = resolveConditionDeclForViewer(
+        clause && clause.leftOperandDecl ? clause.leftOperandDecl : null,
+        leftRef || (clause && clause.leftOperand ? clause.leftOperand : "")
+      );
+      const rightDecl = resolveConditionDeclForViewer(
+        clause && clause.rightOperandDecl ? clause.rightOperandDecl : null,
+        rightRef || (clause && clause.rightOperand ? clause.rightOperand : "")
+      );
+
       row.appendChild(el("td", { text: clause && clause.leftOperand ? String(clause.leftOperand) : "" }));
       row.appendChild(el("td", { text: clause && clause.comparisonOperator ? String(clause.comparisonOperator) : "" }));
       row.appendChild(el("td", { text: clause && clause.rightOperand ? String(clause.rightOperand) : "" }));
       row.appendChild(el("td", { text: clause && clause.logicalConnector ? String(clause.logicalConnector) : "" }));
-      row.appendChild(el("td", { text: clause && clause.leftOperandRef ? String(clause.leftOperandRef) : "" }));
+      row.appendChild(el("td", { text: leftRef }));
 
-      const leftDeclCells = renderDeclListCells(null, clause && clause.leftOperandDecl ? clause.leftOperandDecl : null);
+      const leftDeclCells = renderDeclListCells(null, leftDecl);
       row.appendChild(leftDeclCells.nameCell);
       row.appendChild(leftDeclCells.descCell);
 
-      row.appendChild(el("td", { text: clause && clause.rightOperandRef ? String(clause.rightOperandRef) : "" }));
-      const rightDeclCells = renderDeclListCells(null, clause && clause.rightOperandDecl ? clause.rightOperandDecl : null);
+      row.appendChild(el("td", { text: rightRef }));
+      const rightDeclCells = renderDeclListCells(null, rightDecl);
       row.appendChild(rightDeclCells.nameCell);
       row.appendChild(rightDeclCells.descCell);
 

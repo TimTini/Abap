@@ -597,6 +597,40 @@ function testIsInitialAndIsNotInitialConditions() {
   assert.strictEqual(readObj.extras.readTable.conditions[1].rightOperandRef, undefined);
 }
 
+function testImplicitSplitOnlyForReadTable() {
+  const code = [
+    "DATA gv_cnt TYPE i.",
+    "PARAMETERS p_flag TYPE abap_bool.",
+    "DATA lv_other TYPE abap_bool.",
+    "IF gv_cnt > 0 AND p_flag = abap_true lv_other = abap_false.",
+    "ENDIF.",
+    "READ TABLE lt_data WITH KEY col_a = gv_cnt col_b = p_flag col_c = lv_other INTO ls_data.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+
+  const ifObj = findObject(objects, "IF");
+  assert(ifObj && ifObj.extras && ifObj.extras.ifCondition, "Expected IF extras for implicit split test.");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions.length, 2);
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].leftOperand, "gv_cnt");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[0].rightOperand, "0");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[1].leftOperand, "p_flag");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[1].comparisonOperator, "=");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[1].rightOperand, "abap_true lv_other = abap_false");
+
+  const readObj = findObject(objects, "READ_TABLE");
+  assert(readObj && readObj.extras && readObj.extras.readTable, "Expected READ_TABLE extras for implicit split test.");
+  assert.strictEqual(readObj.extras.readTable.conditions.length, 3);
+  assert.strictEqual(readObj.extras.readTable.conditions[0].leftOperand, "col_a");
+  assert.strictEqual(readObj.extras.readTable.conditions[0].rightOperand, "gv_cnt");
+  assert.strictEqual(readObj.extras.readTable.conditions[1].leftOperand, "col_b");
+  assert.strictEqual(readObj.extras.readTable.conditions[1].rightOperand, "p_flag");
+  assert.strictEqual(readObj.extras.readTable.conditions[2].leftOperand, "col_c");
+  assert.strictEqual(readObj.extras.readTable.conditions[2].rightOperand, "lv_other");
+}
+
 function run() {
   testInlineCommentInsideSingleQuote();
   testInlineCommentInsideTemplate();
@@ -613,6 +647,7 @@ function run() {
   testConditionExtrasForIfElseifSelectAndPerform();
   testConditionOperatorMatrix();
   testIsInitialAndIsNotInitialConditions();
+  testImplicitSplitOnlyForReadTable();
   console.log("parser-regression: ok");
 }
 

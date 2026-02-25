@@ -735,7 +735,7 @@
         form: map.form || "",
         program: map.program || "",
         ifCondition,
-        ifConditions: parseConditionClauses(ifCondition),
+        ifConditions: parseConditionClauses(ifCondition, { allowImplicitAnd: false }),
         using: parseArgumentTokens(map.usingRaw || "").map((value) => ({ value })),
         changing: parseArgumentTokens(map.changingRaw || "").map((value) => ({ value })),
         tables: parseArgumentTokens(map.tablesRaw || "").map((value) => ({ value }))
@@ -750,7 +750,7 @@
     return {
       ifCondition: {
         conditionRaw,
-        conditions: parseConditionClauses(conditionRaw)
+        conditions: parseConditionClauses(conditionRaw, { allowImplicitAnd: false })
       }
     };
   }
@@ -763,9 +763,9 @@
     return {
       select: {
         whereRaw,
-        whereConditions: parseConditionClauses(whereRaw),
+        whereConditions: parseConditionClauses(whereRaw, { allowImplicitAnd: false }),
         havingRaw,
-        havingConditions: parseConditionClauses(havingRaw)
+        havingConditions: parseConditionClauses(havingRaw, { allowImplicitAnd: false })
       }
     };
   }
@@ -787,7 +787,7 @@
         refInto: map.refInto || "",
         withKeyRaw,
         withTableKeyRaw,
-        conditions: parseConditionClauses(conditionSource)
+        conditions: parseConditionClauses(conditionSource, { allowImplicitAnd: true })
       }
     };
   }
@@ -805,7 +805,7 @@
         from: map.from || "",
         to: map.to || "",
         whereRaw,
-        conditions: parseConditionClauses(whereRaw)
+        conditions: parseConditionClauses(whereRaw, { allowImplicitAnd: false })
       }
     };
   }
@@ -821,7 +821,7 @@
         index: map.index || "",
         transporting: map.transporting || "",
         whereRaw,
-        conditions: parseConditionClauses(whereRaw)
+        conditions: parseConditionClauses(whereRaw, { allowImplicitAnd: false })
       }
     };
   }
@@ -836,7 +836,7 @@
         from: map.from || "",
         index: map.index || "",
         whereRaw,
-        conditions: parseConditionClauses(whereRaw)
+        conditions: parseConditionClauses(whereRaw, { allowImplicitAnd: false })
       }
     };
   }
@@ -2368,12 +2368,13 @@
     return String(match[1] || "").trim();
   }
 
-  function parseConditionClauses(segmentRaw) {
+  function parseConditionClauses(segmentRaw, options) {
     const raw = String(segmentRaw || "").trim();
     if (!raw) {
       return [];
     }
 
+    const allowImplicitAnd = !options || options.allowImplicitAnd !== false;
     const tokens = tokenize(`${raw}.`);
     if (!tokens.length) {
       return [];
@@ -2434,7 +2435,7 @@
         }
 
         const next = tokens[i + 1];
-        if (i > rightStart && next && isConditionOperator(next.upper)) {
+        if (allowImplicitAnd && i > rightStart && next && isConditionOperator(next.upper)) {
           implicitNextClauseIndex = i;
           rightEnd = i - 1;
           break;
