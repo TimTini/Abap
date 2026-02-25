@@ -361,7 +361,7 @@
     }
 
     for (const config of configs) {
-      if (!matchesConfig(tokens, config)) {
+      if (!matchesConfig(tokens, config, statement.raw)) {
         continue;
       }
 
@@ -498,11 +498,14 @@
     };
   }
 
-  function matchesConfig(tokens, config) {
+  function matchesConfig(tokens, config, raw) {
     const match = config.match || {};
     const matchType = match.type ? String(match.type).trim().toLowerCase() : "";
     if (matchType === "assignment") {
-      return isAssignmentStatement(tokens);
+      return isAssignmentStatement(tokens) && !isMethodCallExpressionStatement(raw);
+    }
+    if (matchType === "methodcallexpr") {
+      return isMethodCallExpressionStatement(raw);
     }
     if (match.startTokens && match.startTokens.length) {
       return matchesTokens(tokens, 0, match.startTokens);
@@ -535,9 +538,14 @@
     const keywordEntries = detectKeywords(tokens, config);
     const match = config.match || {};
     const matchType = match.type ? String(match.type).trim().toLowerCase() : "";
-    const valueEntries = matchType === "assignment"
-      ? captureAssignmentValues(tokens, commentText)
-      : captureValues(tokens, config, commentText);
+    let valueEntries = [];
+    if (matchType === "assignment") {
+      valueEntries = captureAssignmentValues(tokens, commentText);
+    } else if (matchType === "methodcallexpr") {
+      valueEntries = captureMethodCallExpressionValues(raw, commentText);
+    } else {
+      valueEntries = captureValues(tokens, config, commentText);
+    }
 
     const keywords = groupEntriesByKey(keywordEntries, "label");
     const values = groupEntriesByKey(valueEntries, "name");
@@ -581,6 +589,10 @@
     return assignmentOps.has(op);
   }
 
+  function isMethodCallExpressionStatement(raw) {
+    return Boolean(parseMethodCallExpressionFromRaw(raw));
+  }
+
   function buildExtras(config, context) {
     const extrasConfig = config.extras || null;
     if (!extrasConfig || !extrasConfig.type) {
@@ -597,6 +609,10 @@
 
     if (extrasConfig.type === "callMethod") {
       return buildCallMethodExtras(context);
+    }
+
+    if (extrasConfig.type === "callMethodExpr") {
+      return buildCallMethodExprExtras(context);
     }
 
     if (extrasConfig.type === "methodSignature") {
@@ -699,6 +715,33 @@
         changing: parseAssignments(map.changingRaw || ""),
         receiving: parseAssignments(map.receivingRaw || ""),
         exceptions: parseAssignments(map.exceptionsRaw || "")
+      }
+    };
+  }
+
+  function buildCallMethodExprExtras({ raw, values }) {
+    const map = valuesToFirstValueMap(values);
+    const parsed = parseMethodCallExpressionFromRaw(raw);
+    const sections = parsed ? parsed.sectionRawByName : {
+      exportingRaw: "",
+      importingRaw: "",
+      changingRaw: "",
+      receivingRaw: "",
+      exceptionsRaw: ""
+    };
+
+    const receivingRaw = map.receivingRaw
+      || sections.receivingRaw
+      || (parsed && parsed.receivingTarget ? `result = ${parsed.receivingTarget}` : "");
+
+    return {
+      callMethod: {
+        target: map.target || (parsed ? parsed.callTarget : ""),
+        exporting: parseAssignments(map.exportingRaw || sections.exportingRaw || ""),
+        importing: parseAssignments(map.importingRaw || sections.importingRaw || ""),
+        changing: parseAssignments(map.changingRaw || sections.changingRaw || ""),
+        receiving: parseAssignments(receivingRaw),
+        exceptions: parseAssignments(map.exceptionsRaw || sections.exceptionsRaw || "")
       }
     };
   }
@@ -3257,6 +3300,152 @@
       { name: "op", value: op, label: "op", userDesc: "", codeDesc: statementDesc },
       { name: "expr", value: expr, label: "expr", userDesc: "", codeDesc: statementDesc }
     ];
+  }
+
+  function captureMethodCallExpressionValues(raw, commentText) {
+    const parsed = parseMethodCallExpressionFromRaw(raw);
+    if (!parsed) {
+      return [];
+    }
+
+    const statementDesc = commentText || "";
+    const values = [];
+    const addEntry = (name, value, label) => {
+      const text = String(value || "").trim();
+      if (!text) {
+        return;
+      }
+      values.push({
+        name,
+        value: text,
+        label: label || name,
+        userDesc: "",
+        codeDesc: statementDesc
+      });
+    };
+
+    addEntry("target", parsed.callTarget, "target");
+
+    if (parsed.receivingTarget && !parsed.sectionRawByName.receivingRaw) {
+      addEntry("receivingRaw", `result = ${parsed.receivingTarget}`, "receiving");
+    }
+
+    for (const sectionName of ["exporting", "importing", "changing", "receiving", "exceptions"]) {
+      const rawKey = `${sectionName}Raw`;
+      addEntry(rawKey, parsed.sectionRawByName[rawKey], sectionName);
+    }
+
+    return values;
+  }
+
+  function parseMethodCallExpressionFromRaw(raw) {
+    const textRaw = String(raw || "").trim();
+    if (!textRaw) {
+      return null;
+    }
+
+    const text = textRaw.endsWith(".")
+      ? textRaw.slice(0, -1).trim()
+      : textRaw;
+
+    if (!text || /^CALL\s+METHOD\b/i.test(text)) {
+      return null;
+    }
+
+    let receivingTarget = "";
+    let callExpr = text;
+
+    const assignmentMatch = text.match(
+      /^(<[^>]+>|[A-Za-z_][A-Za-z0-9_]*(?:-[A-Za-z_][A-Za-z0-9_]*)*)\s*=\s*(.+)$/i
+    );
+    if (assignmentMatch) {
+      receivingTarget = assignmentMatch[1].trim();
+      callExpr = assignmentMatch[2].trim();
+    }
+
+    const targetMatch = callExpr.match(
+      /^((?:<[^>]+>|[A-Za-z_][A-Za-z0-9_]*)(?:->|=>)(?:[A-Za-z_][A-Za-z0-9_]*~)?[A-Za-z_][A-Za-z0-9_]*)\s*\(/i
+    );
+    if (!targetMatch) {
+      return null;
+    }
+
+    const callTarget = targetMatch[1].trim();
+    const openIndex = callExpr.indexOf("(");
+    const closeIndex = callExpr.lastIndexOf(")");
+    if (openIndex < 0 || closeIndex <= openIndex || closeIndex !== callExpr.length - 1) {
+      return null;
+    }
+    const argsRaw = callExpr.slice(openIndex + 1, closeIndex).trim();
+
+    return {
+      receivingTarget,
+      callExpr,
+      callTarget,
+      argsRaw,
+      sectionRawByName: parseMethodCallExpressionSectionRaw(argsRaw)
+    };
+  }
+
+  function parseMethodCallExpressionSectionRaw(argsRaw) {
+    const output = {
+      exportingRaw: "",
+      importingRaw: "",
+      changingRaw: "",
+      receivingRaw: "",
+      exceptionsRaw: ""
+    };
+
+    const trimmed = String(argsRaw || "").trim();
+    if (!trimmed) {
+      return output;
+    }
+
+    const tokens = tokenize(`${trimmed}.`);
+    if (!tokens.length) {
+      return output;
+    }
+
+    const sectionByUpper = {
+      EXPORTING: "exportingRaw",
+      IMPORTING: "importingRaw",
+      CHANGING: "changingRaw",
+      RECEIVING: "receivingRaw",
+      EXCEPTIONS: "exceptionsRaw"
+    };
+    const sectionSet = new Set(Object.keys(sectionByUpper));
+    const markers = [];
+    for (let index = 0; index < tokens.length; index += 1) {
+      if (sectionSet.has(tokens[index].upper)) {
+        markers.push({ sectionUpper: tokens[index].upper, startIndex: index });
+      }
+    }
+
+    if (!markers.length) {
+      output.exportingRaw = trimmed;
+      return output;
+    }
+
+    for (let index = 0; index < markers.length; index += 1) {
+      const marker = markers[index];
+      const next = markers[index + 1];
+      const segmentStart = marker.startIndex + 1;
+      const segmentEnd = next ? next.startIndex : tokens.length;
+      const segmentRaw = tokens
+        .slice(segmentStart, segmentEnd)
+        .map((token) => token.raw)
+        .join(" ")
+        .trim();
+      const key = sectionByUpper[marker.sectionUpper];
+      if (!key || !segmentRaw) {
+        continue;
+      }
+      output[key] = output[key]
+        ? `${output[key]} ${segmentRaw}`
+        : segmentRaw;
+    }
+
+    return output;
   }
 
   function captureValue(tokens, startIndex, rule) {

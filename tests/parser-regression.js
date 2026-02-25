@@ -108,6 +108,64 @@ function testInlineDataReferenceInAssignment() {
   assert.strictEqual(importing[0].valueRef, "lv");
 }
 
+function testCallMethodExpressionWithAssignmentReceiver() {
+  const code = [
+    "DATA lv_result TYPE syuname.",
+    "DATA p_user TYPE syuname.",
+    "lv_result = lcl_demo=>get_default( EXPORTING iv_user = p_user ).",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+  const callMethod = findObject(objects, "CALL_METHOD");
+  assert(callMethod && callMethod.extras && callMethod.extras.callMethod, "Expected CALL_METHOD object for expression call.");
+  assert.strictEqual(getValue(callMethod.values, "target"), "lcl_demo=>get_default");
+  assert.strictEqual(getValue(callMethod.values, "receivingRaw"), "result = lv_result");
+
+  const extras = callMethod.extras.callMethod;
+  assert.strictEqual(extras.target, "lcl_demo=>get_default");
+  assert.strictEqual(extras.exporting.length, 1);
+  assert.strictEqual(extras.exporting[0].name, "iv_user");
+  assert.strictEqual(extras.exporting[0].value, "p_user");
+  assert.strictEqual(extras.exporting[0].valueRef, "p_user");
+  assert(extras.exporting[0].valueDecl, "Expected decl for expression EXPORTING argument.");
+  assert.strictEqual(extras.exporting[0].valueDecl.name, "p_user");
+
+  assert.strictEqual(extras.receiving.length, 1);
+  assert.strictEqual(extras.receiving[0].value, "lv_result");
+  assert.strictEqual(extras.receiving[0].valueRef, "lv_result");
+  assert(extras.receiving[0].valueDecl, "Expected decl for expression receiving target.");
+  assert.strictEqual(extras.receiving[0].valueDecl.name, "lv_result");
+}
+
+function testCallMethodExpressionStandalone() {
+  const code = [
+    "DATA lo_demo TYPE REF TO object.",
+    "DATA p_user TYPE syuname.",
+    "lo_demo->do_something( EXPORTING iv_user = p_user ).",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+  const callMethod = findObject(objects, "CALL_METHOD");
+  assert(callMethod && callMethod.extras && callMethod.extras.callMethod, "Expected CALL_METHOD object for standalone expression call.");
+  assert.strictEqual(getValue(callMethod.values, "target"), "lo_demo->do_something");
+  assert.strictEqual(getValue(callMethod.values, "exportingRaw"), "iv_user = p_user");
+  assert.strictEqual(getValue(callMethod.values, "receivingRaw"), "");
+
+  const extras = callMethod.extras.callMethod;
+  assert.strictEqual(extras.target, "lo_demo->do_something");
+  assert.strictEqual(extras.exporting.length, 1);
+  assert.strictEqual(extras.exporting[0].name, "iv_user");
+  assert.strictEqual(extras.exporting[0].value, "p_user");
+  assert.strictEqual(extras.exporting[0].valueRef, "p_user");
+  assert(extras.exporting[0].valueDecl, "Expected decl for standalone expression EXPORTING argument.");
+  assert.strictEqual(extras.exporting[0].valueDecl.name, "p_user");
+  assert.strictEqual(extras.receiving.length, 0);
+}
+
 function testStatementCommentPrefersFirstInline() {
   const code = [
     "PERFORM main",
@@ -685,6 +743,8 @@ function run() {
   testEscapedSingleQuoteTokenization();
   testAssignmentKeepsFullExpression();
   testInlineDataReferenceInAssignment();
+  testCallMethodExpressionWithAssignmentReceiver();
+  testCallMethodExpressionStandalone();
   testStatementCommentPrefersFirstInline();
   testStatementCommentFallsBackToSingleLeadingLine();
   testStatementCommentIgnoresLeadingCommentBlock();

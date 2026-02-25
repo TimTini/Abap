@@ -1,0 +1,14 @@
+{
+  "object": "CALL_METHOD",
+  "match": { "type": "methodCallExpr" },
+  "extras": { "type": "callMethodExpr" },
+  "keywordLabels": {
+    "EXPORTING": "exporting",
+    "IMPORTING": "importing",
+    "CHANGING": "changing",
+    "RECEIVING": "receiving",
+    "EXCEPTIONS": "exceptions"
+  },
+  "keywordPhrases": {},
+  "captureRules": []
+}

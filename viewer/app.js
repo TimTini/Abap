@@ -75,6 +75,7 @@
 
   const state = {
     data: null,
+    renderObjects: [],
     inputMode: "abap",
     inputLineCount: 0,
     inputGutterButtonsByLine: new Map(),
@@ -111,6 +112,11 @@
   const LAYOUT_SPLIT_MIN = 28;
   const LAYOUT_SPLIT_MAX = 72;
   const MOBILE_LAYOUT_QUERY = "(max-width: 980px)";
+  const RENDER_TREE_OPTIONS = Object.freeze({
+    expandPerformForms: true,
+    hideFormRoots: true,
+    maxExpandDepth: 1
+  });
 
   const DECL_TYPE_OPTIONS = [
     "DATA",
@@ -1665,7 +1671,7 @@
 
     state.settings = normalizeSettings(next);
     saveSettings(state.settings);
-    state.haystackById = buildSearchIndex(state.data ? state.data.objects : []);
+    state.haystackById = buildSearchIndex(state.renderObjects);
     renderOutput();
   }
 
@@ -1673,7 +1679,7 @@
     state.settings = normalizeSettings(DEFAULT_SETTINGS);
     saveSettings(state.settings);
     renderSettingsModalUi();
-    state.haystackById = buildSearchIndex(state.data ? state.data.objects : []);
+    state.haystackById = buildSearchIndex(state.renderObjects);
     renderOutput();
   }
 
@@ -2194,7 +2200,7 @@
     }
 
     saveDescOverrides();
-    state.haystackById = buildSearchIndex(state.data ? state.data.objects : []);
+    state.haystackById = buildSearchIndex(state.renderObjects);
     renderOutput();
     if (state.rightTab === "descriptions") {
       renderDeclDescPanelUi();
@@ -2342,6 +2348,155 @@
       return "";
     }
     return String(value);
+  }
+
+  function getFormNameFromNode(node) {
+    if (!node || typeof node !== "object") {
+      return "";
+    }
+    const valueName = getFirstValueFromValues(node.values, "name");
+    const extrasName = node.extras && node.extras.form && node.extras.form.name
+      ? String(node.extras.form.name)
+      : "";
+    return String(valueName || extrasName || "").trim();
+  }
+
+  function getPerformFormNameFromNode(node) {
+    if (!node || typeof node !== "object") {
+      return "";
+    }
+    const extrasName = node.extras && node.extras.performCall && node.extras.performCall.form
+      ? String(node.extras.performCall.form)
+      : "";
+    const valueName = getFirstValueFromValues(node.values, "form");
+    return String(extrasName || valueName || "").trim();
+  }
+
+  function getPerformProgramFromNode(node) {
+    if (!node || typeof node !== "object") {
+      return "";
+    }
+    const extrasProgram = node.extras && node.extras.performCall && node.extras.performCall.program
+      ? String(node.extras.performCall.program)
+      : "";
+    const valueProgram = getFirstValueFromValues(node.values, "program");
+    return String(extrasProgram || valueProgram || "").trim();
+  }
+
+  function buildFormsByNameUpperFromRoots(rawRoots) {
+    const map = new Map();
+    walkObjects(rawRoots, (obj) => {
+      if (!obj || obj.objectType !== "FORM") {
+        return;
+      }
+      const name = getFormNameFromNode(obj);
+      if (!name) {
+        return;
+      }
+      const upper = name.toUpperCase();
+      if (!map.has(upper)) {
+        map.set(upper, obj);
+      }
+    });
+    return map;
+  }
+
+  function buildRenderableObjects(rawRoots, options) {
+    const roots = Array.isArray(rawRoots) ? rawRoots : [];
+    if (!roots.length) {
+      return [];
+    }
+
+    const opts = {
+      expandPerformForms: true,
+      hideFormRoots: true,
+      maxExpandDepth: 1,
+      ...(options && typeof options === "object" ? options : {})
+    };
+    const maxExpandDepth = Math.max(0, Number(opts.maxExpandDepth) || 0);
+    const formsByNameUpper = opts.expandPerformForms ? buildFormsByNameUpperFromRoots(roots) : new Map();
+
+    const cloneNode = (sourceNode, parentId, expandDepth, pathToken, forceSyntheticId) => {
+      if (!sourceNode || typeof sourceNode !== "object") {
+        return null;
+      }
+
+      if (opts.hideFormRoots && sourceNode.objectType === "FORM" && !forceSyntheticId) {
+        return null;
+      }
+
+      const out = {};
+      for (const key of Object.keys(sourceNode)) {
+        if (key === "children") {
+          continue;
+        }
+        out[key] = sourceNode[key];
+      }
+
+      if (forceSyntheticId) {
+        out.id = `PERFORM_EXPANDED:${pathToken}`;
+      }
+
+      if (parentId !== undefined) {
+        out.parent = parentId;
+      }
+
+      const ownId = out.id !== null && out.id !== undefined && String(out.id).trim() ? out.id : undefined;
+      const outChildren = [];
+
+      const sourceChildren = Array.isArray(sourceNode.children) ? sourceNode.children : [];
+      for (let index = 0; index < sourceChildren.length; index += 1) {
+        const child = sourceChildren[index];
+        const childPath = `${pathToken}.C${index}`;
+        const clonedChild = cloneNode(child, ownId, expandDepth, childPath, forceSyntheticId);
+        if (clonedChild) {
+          outChildren.push(clonedChild);
+        }
+      }
+
+      if (
+        opts.expandPerformForms &&
+        sourceNode.objectType === "PERFORM" &&
+        expandDepth < maxExpandDepth &&
+        !forceSyntheticId
+      ) {
+        const formName = getPerformFormNameFromNode(sourceNode);
+        const programName = getPerformProgramFromNode(sourceNode);
+        const formNameUpper = formName ? formName.toUpperCase() : "";
+        const resolvedForm = !programName && formNameUpper ? formsByNameUpper.get(formNameUpper) : null;
+
+        if (resolvedForm) {
+          const formChildren = Array.isArray(resolvedForm.children) ? resolvedForm.children : [];
+          for (let index = 0; index < formChildren.length; index += 1) {
+            const formChild = formChildren[index];
+            const expandedPath = `${pathToken}.FORM:${formNameUpper}.C${index}`;
+            const clonedExpandedChild = cloneNode(formChild, ownId, expandDepth + 1, expandedPath, true);
+            if (clonedExpandedChild) {
+              outChildren.push(clonedExpandedChild);
+            }
+          }
+        }
+      }
+
+      if (outChildren.length) {
+        out.children = outChildren;
+      } else if (Array.isArray(sourceNode.children)) {
+        out.children = [];
+      }
+
+      return out;
+    };
+
+    const output = [];
+    for (let index = 0; index < roots.length; index += 1) {
+      const root = roots[index];
+      const clonedRoot = cloneNode(root, null, 0, `ROOT${index}`, false);
+      if (clonedRoot) {
+        output.push(clonedRoot);
+      }
+    }
+
+    return output;
   }
 
   function buildXmlExportRoots(objects) {
@@ -2798,7 +2953,8 @@
   function buildAbapFlowXml(data) {
     const fileName = data && typeof data === "object" ? String(data.file || "") : "";
     const objects = data && typeof data === "object" && Array.isArray(data.objects) ? data.objects : [];
-    const exportRoots = buildXmlExportRoots(objects);
+    const renderObjects = buildRenderableObjects(objects, RENDER_TREE_OPTIONS);
+    const exportRoots = buildXmlExportRoots(renderObjects);
 
     const lines = ['<?xml version="1.0" encoding="UTF-8"?>', "<abapflowObjects>"];
     if (fileName) {
@@ -3620,6 +3776,12 @@
     };
 
     addDecl(entry && entry.decl);
+    addDecl(entry && entry.valueDecl);
+    if (entry && Array.isArray(entry.originDecls)) {
+      for (const originDecl of entry.originDecls) {
+        addDecl(originDecl);
+      }
+    }
 
     const extras = obj && obj.extras && typeof obj.extras === "object" ? obj.extras : null;
     if (!extras) {
@@ -3657,8 +3819,242 @@
     return dedupeDecls(decls);
   }
 
-  function renderValues(obj) {
+  function isRawValueEntry(entry) {
+    const name = entry && entry.name ? String(entry.name).trim() : "";
+    return Boolean(name) && /raw$/i.test(name);
+  }
+
+  function makeSectionIndexName(sectionName, indexOneBased) {
+    return `${sectionName}[${indexOneBased}]`;
+  }
+
+  function makeParsedValueRow({
+    sectionName,
+    indexOneBased,
+    valueText,
+    baseEntry,
+    decl,
+    valueDecl,
+    originDecls,
+    valueRef
+  }) {
+    const row = {
+      name: makeSectionIndexName(sectionName, indexOneBased),
+      value: valueText ? String(valueText) : "",
+      label: baseEntry && baseEntry.label ? String(baseEntry.label) : sectionName,
+      userDesc: baseEntry && baseEntry.userDesc ? String(baseEntry.userDesc) : "",
+      codeDesc: baseEntry && baseEntry.codeDesc ? String(baseEntry.codeDesc) : ""
+    };
+
+    if (decl && typeof decl === "object") {
+      row.decl = decl;
+    }
+    if (valueDecl && typeof valueDecl === "object") {
+      row.valueDecl = valueDecl;
+    }
+    if (Array.isArray(originDecls) && originDecls.length) {
+      row.originDecls = originDecls.filter((item) => item && typeof item === "object");
+    }
+    if (valueRef) {
+      row.declRef = String(valueRef);
+    }
+
+    return row;
+  }
+
+  function buildParsedRowsFromPerformList(sectionName, list, baseEntry) {
+    const items = Array.isArray(list) ? list : [];
+    return items.map((item, index) => makeParsedValueRow({
+      sectionName,
+      indexOneBased: index + 1,
+      valueText: item && item.value ? String(item.value) : "",
+      baseEntry,
+      decl: item && item.valueDecl ? item.valueDecl : (baseEntry && baseEntry.decl ? baseEntry.decl : null),
+      valueDecl: item && item.valueDecl ? item.valueDecl : null,
+      originDecls: item && Array.isArray(item.originDecls) ? item.originDecls : [],
+      valueRef: item && item.valueRef ? String(item.valueRef) : ""
+    }));
+  }
+
+  function buildParsedRowsFromAssignments(sectionName, list, baseEntry) {
+    const items = Array.isArray(list) ? list : [];
+    return items.map((item, index) => {
+      const leftName = item && item.name ? String(item.name) : "";
+      const rightValue = item && item.value ? String(item.value) : "";
+      const valueText = leftName && rightValue
+        ? `${leftName} = ${rightValue}`
+        : (leftName || rightValue);
+      return makeParsedValueRow({
+        sectionName,
+        indexOneBased: index + 1,
+        valueText,
+        baseEntry,
+        decl: item && item.valueDecl ? item.valueDecl : (baseEntry && baseEntry.decl ? baseEntry.decl : null),
+        valueDecl: item && item.valueDecl ? item.valueDecl : null,
+        originDecls: item && Array.isArray(item.originDecls) ? item.originDecls : [],
+        valueRef: item && item.valueRef ? String(item.valueRef) : ""
+      });
+    });
+  }
+
+  function buildParsedRowsFromParams(sectionName, list, baseEntry) {
+    const items = Array.isArray(list) ? list : [];
+    return items.map((param, index) => {
+      const paramName = param && param.name ? String(param.name) : "";
+      const typingText = formatTyping(param && param.typing);
+      const valueText = [paramName, typingText].filter(Boolean).join(" ").trim();
+      const origins = param && Array.isArray(param.originDecls) ? param.originDecls : [];
+      return makeParsedValueRow({
+        sectionName,
+        indexOneBased: index + 1,
+        valueText,
+        baseEntry,
+        decl: origins.length ? origins[0] : (baseEntry && baseEntry.decl ? baseEntry.decl : null),
+        valueDecl: null,
+        originDecls: origins,
+        valueRef: ""
+      });
+    });
+  }
+
+  function buildParsedRowsFromExceptions(sectionName, list, baseEntry) {
+    const items = Array.isArray(list) ? list : [];
+    return items.map((item, index) => {
+      const name = item && item.name ? String(item.name) : "";
+      return makeParsedValueRow({
+        sectionName,
+        indexOneBased: index + 1,
+        valueText: name,
+        baseEntry,
+        decl: baseEntry && baseEntry.decl ? baseEntry.decl : null,
+        valueDecl: null,
+        originDecls: item && Array.isArray(item.originDecls) ? item.originDecls : [],
+        valueRef: ""
+      });
+    });
+  }
+
+  function buildParsedRowsForRawEntry(obj, baseEntry) {
+    if (!obj || !baseEntry) {
+      return [];
+    }
+
+    const extras = obj.extras && typeof obj.extras === "object" ? obj.extras : null;
+    if (!extras) {
+      return [];
+    }
+
+    const rawName = baseEntry.name ? String(baseEntry.name).trim().toLowerCase() : "";
+    if (!rawName) {
+      return [];
+    }
+
+    if (extras.performCall) {
+      const sectionMap = {
+        usingraw: "using",
+        changingraw: "changing",
+        tablesraw: "tables"
+      };
+      const sectionName = sectionMap[rawName];
+      if (sectionName) {
+        return buildParsedRowsFromPerformList(sectionName, extras.performCall[sectionName], baseEntry);
+      }
+    }
+
+    if (extras.callFunction) {
+      const sectionMap = {
+        exportingraw: "exporting",
+        importingraw: "importing",
+        changingraw: "changing",
+        tablesraw: "tables",
+        exceptionsraw: "exceptions"
+      };
+      const sectionName = sectionMap[rawName];
+      if (sectionName) {
+        return buildParsedRowsFromAssignments(sectionName, extras.callFunction[sectionName], baseEntry);
+      }
+    }
+
+    if (extras.callMethod) {
+      const sectionMap = {
+        exportingraw: "exporting",
+        importingraw: "importing",
+        changingraw: "changing",
+        receivingraw: "receiving",
+        exceptionsraw: "exceptions"
+      };
+      const sectionName = sectionMap[rawName];
+      if (sectionName) {
+        return buildParsedRowsFromAssignments(sectionName, extras.callMethod[sectionName], baseEntry);
+      }
+    }
+
+    if (extras.form) {
+      const paramsByRawName = {
+        usingraw: "USING",
+        changingraw: "CHANGING",
+        tablesraw: "TABLES"
+      };
+      if (Object.prototype.hasOwnProperty.call(paramsByRawName, rawName)) {
+        const sectionUpper = paramsByRawName[rawName];
+        const params = Array.isArray(extras.form.params)
+          ? extras.form.params.filter((param) => String(param && param.section ? param.section : "").toUpperCase() === sectionUpper)
+          : [];
+        return buildParsedRowsFromParams(sectionUpper.toLowerCase(), params, baseEntry);
+      }
+      if (rawName === "raisingraw") {
+        return buildParsedRowsFromExceptions("raising", extras.form.exceptions, baseEntry);
+      }
+    }
+
+    if (extras.methodSignature) {
+      const paramsByRawName = {
+        importingraw: "IMPORTING",
+        exportingraw: "EXPORTING",
+        changingraw: "CHANGING",
+        returningraw: "RETURNING"
+      };
+      if (Object.prototype.hasOwnProperty.call(paramsByRawName, rawName)) {
+        const sectionUpper = paramsByRawName[rawName];
+        const params = Array.isArray(extras.methodSignature.params)
+          ? extras.methodSignature.params.filter((param) => String(param && param.section ? param.section : "").toUpperCase() === sectionUpper)
+          : [];
+        return buildParsedRowsFromParams(sectionUpper.toLowerCase(), params, baseEntry);
+      }
+      if (rawName === "raisingraw") {
+        return buildParsedRowsFromExceptions("raising", extras.methodSignature.exceptions, baseEntry);
+      }
+    }
+
+    return [];
+  }
+
+  function buildRenderableValueEntries(obj) {
     const values = getValueEntries(obj);
+    if (!values.length) {
+      return [];
+    }
+
+    const rows = [];
+    for (const entry of values) {
+      if (!isRawValueEntry(entry)) {
+        rows.push(entry);
+        continue;
+      }
+
+      const parsedRows = buildParsedRowsForRawEntry(obj, entry);
+      if (parsedRows.length) {
+        rows.push(...parsedRows);
+      } else {
+        rows.push(entry);
+      }
+    }
+
+    return rows;
+  }
+
+  function renderValues(obj) {
+    const values = buildRenderableValueEntries(obj);
     if (!values.length) {
       return null;
     }
@@ -4304,7 +4700,7 @@
     const scrollTop = els.output.scrollTop;
     setError("");
 
-    if (!state.data || !Array.isArray(state.data.objects)) {
+    if (!state.data || !Array.isArray(state.renderObjects)) {
       setOutputMessage("No data loaded.");
       refreshInputGutterTargets();
       return;
@@ -4317,7 +4713,7 @@
     state.showValues = Boolean(els.showValues && els.showValues.checked);
     state.showExtras = Boolean(els.showExtras && els.showExtras.checked);
 
-    const filteredRoots = (state.data.objects || [])
+    const filteredRoots = (state.renderObjects || [])
       .map((obj) => filterTree(obj))
       .filter(Boolean);
 
@@ -4405,8 +4801,9 @@
 
     state.collapsedIds.clear();
     state.selectedId = "";
-    state.haystackById = buildSearchIndex(state.data.objects);
-    populateTypeFilter(state.data.objects);
+    state.renderObjects = buildRenderableObjects(state.data && state.data.objects, RENDER_TREE_OPTIONS);
+    state.haystackById = buildSearchIndex(state.renderObjects);
+    populateTypeFilter(state.renderObjects);
     renderOutput();
     if (state.rightTab === "descriptions") {
       renderDeclDescPanelUi();
@@ -4426,7 +4823,7 @@
 
   function collapseAll() {
     state.collapsedIds.clear();
-    walkObjects(state.data ? state.data.objects : [], (obj) => {
+    walkObjects(state.renderObjects, (obj) => {
       const id = normalizeId(obj && obj.id);
       const children = Array.isArray(obj && obj.children) ? obj.children : [];
       if (id && children.length) {
