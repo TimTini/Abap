@@ -115,7 +115,7 @@
   const RENDER_TREE_OPTIONS = Object.freeze({
     expandPerformForms: true,
     hideFormRoots: true,
-    maxExpandDepth: 1
+    maxExpandDepth: Number.POSITIVE_INFINITY
   });
 
   const DECL_TYPE_OPTIONS = [
@@ -156,41 +156,94 @@
   };
 
   const SAMPLE_ABAP = [
-    "* Demo: show decl source + comment (codeDesc/declDesc) in UI",
+    "* ABAP Parser Viewer - richer offline demo",
+    "REPORT zabap_parser_demo.",
     "",
-    "* Selection screen (PARAMETERS):",
-    "PARAMETERS p_user TYPE syuname DEFAULT sy-uname OBLIGATORY. \"User name (source for iv_user)",
-    "PARAMETERS p_flag TYPE abap_bool DEFAULT abap_true AS CHECKBOX. \"Enable demo (source for iv_flag)",
+    "* Selection screen",
+    "PARAMETERS p_user TYPE syuname DEFAULT sy-uname OBLIGATORY. \"User name input",
+    "PARAMETERS p_flag TYPE abap_bool DEFAULT abap_true AS CHECKBOX. \"Enable branch",
+    "SELECT-OPTIONS s_bukrs FOR t001-bukrs.",
     "",
-    "* Local data (DATA):",
-    "DATA lv_user TYPE syuname. \"Local copy of user (for demo decl)",
-    "DATA lv_flag TYPE abap_bool. \"Local copy of flag (for demo decl)",
-    "DATA lv_text TYPE string. \"Output text (target of ev_text)",
+    "* Types + declarations",
+    "TYPES: BEGIN OF ty_row,",
+    "         bukrs TYPE t001-bukrs,",
+    "         butxt TYPE t001-butxt,",
+    "       END OF ty_row.",
+    "TYPES ty_rows TYPE STANDARD TABLE OF ty_row.",
     "",
-    "*&--------------------------------------------------------------------*",
-    "*&    Form  MAIN",
-    "*&--------------------------------------------------------------------*",
-    "*  --> iv_user    User name",
-    "*  --> iv_flag    Enable flag",
-    "*  <-- cv_text    Output text",
-    "*&--------------------------------------------------------------------*",
+    "DATA: gt_rows TYPE ty_rows,",
+    "      gs_row  TYPE ty_row,",
+    "      gv_total TYPE i VALUE 0,",
+    "      lv_text TYPE string,",
+    "      lo_demo TYPE REF TO lcl_demo.",
+    "CONSTANTS gc_default_bukrs TYPE t001-bukrs VALUE '1000'.",
+    "FIELD-SYMBOLS <fs_row> TYPE ty_row.",
+    "",
+    "* Open SQL + table ops",
+    "SELECT bukrs butxt FROM t001 INTO TABLE gt_rows WHERE bukrs IN s_bukrs.",
+    "READ TABLE gt_rows WITH KEY bukrs = gc_default_bukrs INTO gs_row.",
+    "READ TABLE gt_rows WITH TABLE KEY primary_key COMPONENTS bukrs = gc_default_bukrs INTO gs_row.",
+    "MODIFY gt_rows FROM gs_row TRANSPORTING butxt WHERE bukrs = gc_default_bukrs.",
+    "DELETE gt_rows WHERE bukrs = gc_default_bukrs.",
+    "",
+    "LOOP AT gt_rows ASSIGNING <fs_row> WHERE bukrs = gc_default_bukrs.",
+    "  gv_total = gv_total + 1.",
+    "ENDLOOP.",
+    "",
+    "* Conditions",
+    "IF gv_total > 0 AND p_flag = abap_true.",
+    "  lv_text = p_user.",
+    "ELSEIF gv_total IS INITIAL.",
+    "  lv_text = 'EMPTY'.",
+    "ELSE.",
+    "  lv_text = 'OTHER'.",
+    "ENDIF.",
+    "",
+    "* Classic calls",
+    "CALL FUNCTION 'Z_DEMO_FM'",
+    "  EXPORTING",
+    "    iv_user = p_user",
+    "  IMPORTING",
+    "    ev_text = lv_text",
+    "  EXCEPTIONS",
+    "    OTHERS = 1.",
+    "",
+    "CALL METHOD lo_demo->do_something",
+    "  EXPORTING",
+    "    iv_user = p_user",
+    "  IMPORTING",
+    "    ev_text = lv_text.",
+    "",
+    "* New method-call expressions (=> and ->)",
+    "lv_text = lcl_demo=>get_default( ).",
+    "lo_demo->do_something( EXPORTING iv_user = p_user IMPORTING ev_text = lv_text ).",
+    "",
+    "* PERFORM + FORM",
+    "PERFORM main USING p_user p_flag CHANGING lv_text IF p_flag = abap_true.",
+    "",
     "FORM main",
     "  USING iv_user TYPE syuname",
     "        iv_flag TYPE abap_bool",
     "  CHANGING cv_text TYPE string.",
-    "",
-    "  CLEAR lv_text. \"Reset output",
-    "",
-    "  CALL FUNCTION 'Z_DEMO_FM' \"Demo call",
-    "    EXPORTING",
-    "      iv_user = lv_user",
-    "      iv_flag = lv_flag",
-    "    IMPORTING",
-    "      ev_text = lv_text.",
-    "",
+    "  cv_text = iv_user.",
     "ENDFORM.",
     "",
-    "PERFORM main USING p_user p_flag CHANGING lv_text. \"PERFORM -> source decl + jump"
+    "* Local class",
+    "CLASS lcl_demo DEFINITION.",
+    "  PUBLIC SECTION.",
+    "    METHODS do_something IMPORTING iv_user TYPE syuname EXPORTING ev_text TYPE string.",
+    "    CLASS-METHODS get_default RETURNING VALUE(rv_text) TYPE string.",
+    "ENDCLASS.",
+    "",
+    "CLASS lcl_demo IMPLEMENTATION.",
+    "  METHOD do_something.",
+    "    ev_text = iv_user.",
+    "  ENDMETHOD.",
+    "",
+    "  METHOD get_default.",
+    "    rv_text = 'DEFAULT'.",
+    "  ENDMETHOD.",
+    "ENDCLASS."
   ].join("\n");
 
   function setError(message) {
@@ -2410,13 +2463,13 @@
     const opts = {
       expandPerformForms: true,
       hideFormRoots: true,
-      maxExpandDepth: 1,
+      maxExpandDepth: Number.POSITIVE_INFINITY,
       ...(options && typeof options === "object" ? options : {})
     };
     const maxExpandDepth = Math.max(0, Number(opts.maxExpandDepth) || 0);
     const formsByNameUpper = opts.expandPerformForms ? buildFormsByNameUpperFromRoots(roots) : new Map();
 
-    const cloneNode = (sourceNode, parentId, expandDepth, pathToken, forceSyntheticId) => {
+    const cloneNode = (sourceNode, parentId, expandDepth, pathToken, forceSyntheticId, formCallStack) => {
       if (!sourceNode || typeof sourceNode !== "object") {
         return null;
       }
@@ -2448,7 +2501,7 @@
       for (let index = 0; index < sourceChildren.length; index += 1) {
         const child = sourceChildren[index];
         const childPath = `${pathToken}.C${index}`;
-        const clonedChild = cloneNode(child, ownId, expandDepth, childPath, forceSyntheticId);
+        const clonedChild = cloneNode(child, ownId, expandDepth, childPath, forceSyntheticId, formCallStack);
         if (clonedChild) {
           outChildren.push(clonedChild);
         }
@@ -2457,20 +2510,23 @@
       if (
         opts.expandPerformForms &&
         sourceNode.objectType === "PERFORM" &&
-        expandDepth < maxExpandDepth &&
-        !forceSyntheticId
+        expandDepth < maxExpandDepth
       ) {
         const formName = getPerformFormNameFromNode(sourceNode);
         const programName = getPerformProgramFromNode(sourceNode);
         const formNameUpper = formName ? formName.toUpperCase() : "";
         const resolvedForm = !programName && formNameUpper ? formsByNameUpper.get(formNameUpper) : null;
+        const isRecursiveCall = Boolean(formNameUpper) && Array.isArray(formCallStack) && formCallStack.includes(formNameUpper);
 
-        if (resolvedForm) {
+        if (resolvedForm && !isRecursiveCall) {
+          const nextFormCallStack = formNameUpper
+            ? [...(Array.isArray(formCallStack) ? formCallStack : []), formNameUpper]
+            : (Array.isArray(formCallStack) ? formCallStack.slice() : []);
           const formChildren = Array.isArray(resolvedForm.children) ? resolvedForm.children : [];
           for (let index = 0; index < formChildren.length; index += 1) {
             const formChild = formChildren[index];
             const expandedPath = `${pathToken}.FORM:${formNameUpper}.C${index}`;
-            const clonedExpandedChild = cloneNode(formChild, ownId, expandDepth + 1, expandedPath, true);
+            const clonedExpandedChild = cloneNode(formChild, ownId, expandDepth + 1, expandedPath, true, nextFormCallStack);
             if (clonedExpandedChild) {
               outChildren.push(clonedExpandedChild);
             }
@@ -2490,7 +2546,7 @@
     const output = [];
     for (let index = 0; index < roots.length; index += 1) {
       const root = roots[index];
-      const clonedRoot = cloneNode(root, null, 0, `ROOT${index}`, false);
+      const clonedRoot = cloneNode(root, null, 0, `ROOT${index}`, false, []);
       if (clonedRoot) {
         output.push(clonedRoot);
       }
