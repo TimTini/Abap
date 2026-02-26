@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="abap-viewer-version" content="v2026.02.26-r1">
-  <meta name="abap-viewer-updated-at" content="2026-02-26 00:36:50">
+  <meta name="abap-viewer-updated-at" content="2026-02-26 19:12:34">
   <meta name="abap-viewer-updated-note" content="AI note: Added PATH_DECL synthetic fallback for Viewer/XML values and extras; finalDesc tech-id fallback order is declRef > identifier > value > name. Manual metadata only. Offline only.">
   <title>ABAP Parser Viewer</title>
   <style>
@@ -376,6 +376,148 @@
       padding-right: 6px;
     }
 
+    #templatePreviewPanel {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding-right: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    #output[hidden],
+    #templatePreviewPanel[hidden],
+    #declDescPanel[hidden] {
+      display: none !important;
+    }
+
+    .template-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .template-key-mode {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      margin-right: auto;
+    }
+
+    .template-key-badge {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 2px 8px;
+      background: var(--pill-bg);
+      color: var(--pill-text);
+      font-family: Consolas, monospace;
+      font-size: 11px;
+    }
+
+    .template-config-json {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      resize: vertical;
+      min-height: 180px;
+      max-height: 42vh;
+      background: var(--panel);
+      color: var(--text);
+    }
+
+    .template-preview-output {
+      flex: 1;
+      min-height: 220px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      background: var(--code-bg);
+    }
+
+    .template-block {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: var(--panel);
+    }
+
+    .template-block.selected {
+      border-color: var(--accent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 38%, transparent);
+    }
+
+    .template-block:last-child {
+      margin-bottom: 0;
+    }
+
+    .template-block-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .template-block-title {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.3;
+    }
+
+    .template-block-meta {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .template-block-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .template-preview-table {
+      width: max-content;
+      min-width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      border: 1px solid #c8c8c8;
+      background: #ffffff;
+      color: #111111;
+    }
+
+    .template-preview-table td {
+      min-width: 56px;
+      max-width: 360px;
+      border: 1px solid #d3d3d3;
+      padding: 4px 6px;
+      vertical-align: top;
+      white-space: pre-wrap;
+      font-size: 10pt;
+      font-family: "MS PGothic", "MS UI Gothic", Meiryo, sans-serif;
+      color: #111111;
+      background: #ffffff;
+    }
+
+    .template-empty {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .template-error {
+      color: var(--danger);
+      font-size: 13px;
+      white-space: pre-wrap;
+    }
+
     .card {
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -657,11 +799,29 @@
           <h2 id="rightPanelTitle">Output</h2>
           <div class="panel-tabs">
             <button type="button" id="rightTabOutputBtn" class="secondary tab-btn active">Output</button>
+            <button type="button" id="rightTabTemplateBtn" class="secondary tab-btn">Template</button>
             <button type="button" id="rightTabDescBtn" class="secondary tab-btn">Descriptions</button>
             <button type="button" id="declDescJsonBtn" class="secondary" hidden>Storage JSON</button>
           </div>
         </div>
         <div id="output" class="muted">No data loaded.</div>
+        <div id="templatePreviewPanel" hidden>
+          <div class="template-controls">
+            <span class="template-key-mode">
+              Template key mode
+              <span id="templateKeyMode" class="template-key-badge">AUTO: objectType -&gt; DEFAULT</span>
+            </span>
+            <button type="button" id="templateCopyAllBtn" class="secondary">Copy All</button>
+            <button type="button" id="templateResetBtn" class="secondary">Reset default</button>
+            <button type="button" id="templateExportBtn" class="secondary">Export config</button>
+            <button type="button" id="templateImportBtn" class="secondary">Import config</button>
+            <button type="button" id="templateApplyBtn" class="secondary">Apply JSON</button>
+            <input type="file" id="templateImportInput" accept=".json,application/json,text/plain" hidden>
+          </div>
+          <div id="templateConfigError" class="template-error"></div>
+          <textarea id="templateConfigJson" class="template-config-json" spellcheck="false" placeholder="Template config JSON..."></textarea>
+          <div id="templatePreviewOutput" class="template-preview-output muted">No data loaded.</div>
+        </div>
         <div id="declDescPanel" hidden>
           <div class="controls" style="margin-bottom:8px">
             <input type="search" id="declDescSearch" placeholder="Search (type/scope/id/desc)…">
@@ -838,6 +998,12 @@
   <script src="./configs.generated/when.js" defer></script>
   <!-- abap-parser-configs:end -->
   <script src="./variable-descriptions.js" defer></script>
+  <script src="./app/01-core.js" defer></script>
+  <script src="./app/02-descriptions.js" defer></script>
+  <script src="./app/03-template-preview.js" defer></script>
+  <script src="./app/04-output-render.js" defer></script>
+  <script src="./app/05-main.js" defer></script>
   <script src="./app.js" defer></script>
 </body>
 </html>
+

@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="abap-viewer-version" content="v2026.02.26-r1">
-  <meta name="abap-viewer-updated-at" content="2026-02-26 00:36:50">
+  <meta name="abap-viewer-updated-at" content="2026-02-26 19:12:34">
   <meta name="abap-viewer-updated-note" content="AI note: Added PATH_DECL synthetic fallback for Viewer/XML values and extras; finalDesc tech-id fallback order is declRef > identifier > value > name. Manual metadata only. Offline only.">
   <title>ABAP Parser Viewer</title>
   <style>
@@ -382,6 +382,148 @@
       padding-right: 6px;
     }
 
+    #templatePreviewPanel {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding-right: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    #output[hidden],
+    #templatePreviewPanel[hidden],
+    #declDescPanel[hidden] {
+      display: none !important;
+    }
+
+    .template-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .template-key-mode {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      margin-right: auto;
+    }
+
+    .template-key-badge {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 2px 8px;
+      background: var(--pill-bg);
+      color: var(--pill-text);
+      font-family: Consolas, monospace;
+      font-size: 11px;
+    }
+
+    .template-config-json {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      resize: vertical;
+      min-height: 180px;
+      max-height: 42vh;
+      background: var(--panel);
+      color: var(--text);
+    }
+
+    .template-preview-output {
+      flex: 1;
+      min-height: 220px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      background: var(--code-bg);
+    }
+
+    .template-block {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: var(--panel);
+    }
+
+    .template-block.selected {
+      border-color: var(--accent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 38%, transparent);
+    }
+
+    .template-block:last-child {
+      margin-bottom: 0;
+    }
+
+    .template-block-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .template-block-title {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.3;
+    }
+
+    .template-block-meta {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .template-block-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .template-preview-table {
+      width: max-content;
+      min-width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      border: 1px solid #c8c8c8;
+      background: #ffffff;
+      color: #111111;
+    }
+
+    .template-preview-table td {
+      min-width: 56px;
+      max-width: 360px;
+      border: 1px solid #d3d3d3;
+      padding: 4px 6px;
+      vertical-align: top;
+      white-space: pre-wrap;
+      font-size: 10pt;
+      font-family: "MS PGothic", "MS UI Gothic", Meiryo, sans-serif;
+      color: #111111;
+      background: #ffffff;
+    }
+
+    .template-empty {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .template-error {
+      color: var(--danger);
+      font-size: 13px;
+      white-space: pre-wrap;
+    }
+
     .card {
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -663,11 +805,29 @@
           <h2 id="rightPanelTitle">Output</h2>
           <div class="panel-tabs">
             <button type="button" id="rightTabOutputBtn" class="secondary tab-btn active">Output</button>
+            <button type="button" id="rightTabTemplateBtn" class="secondary tab-btn">Template</button>
             <button type="button" id="rightTabDescBtn" class="secondary tab-btn">Descriptions</button>
             <button type="button" id="declDescJsonBtn" class="secondary" hidden>Storage JSON</button>
           </div>
         </div>
         <div id="output" class="muted">No data loaded.</div>
+        <div id="templatePreviewPanel" hidden>
+          <div class="template-controls">
+            <span class="template-key-mode">
+              Template key mode
+              <span id="templateKeyMode" class="template-key-badge">AUTO: objectType -&gt; DEFAULT</span>
+            </span>
+            <button type="button" id="templateCopyAllBtn" class="secondary">Copy All</button>
+            <button type="button" id="templateResetBtn" class="secondary">Reset default</button>
+            <button type="button" id="templateExportBtn" class="secondary">Export config</button>
+            <button type="button" id="templateImportBtn" class="secondary">Import config</button>
+            <button type="button" id="templateApplyBtn" class="secondary">Apply JSON</button>
+            <input type="file" id="templateImportInput" accept=".json,application/json,text/plain" hidden>
+          </div>
+          <div id="templateConfigError" class="template-error"></div>
+          <textarea id="templateConfigJson" class="template-config-json" spellcheck="false" placeholder="Template config JSON..."></textarea>
+          <div id="templatePreviewOutput" class="template-preview-output muted">No data loaded.</div>
+        </div>
         <div id="declDescPanel" hidden>
           <div class="controls" style="margin-bottom:8px">
             <input type="search" id="declDescSearch" placeholder="Search (type/scope/id/desc)…">
@@ -1007,10 +1167,15 @@
 
       if (isCommentLine(trimmed)) {
         const commentText = normalizeComment(trimmed);
-        if (current) {
-          current.comments.push(commentText);
-        } else {
-          pendingComments.push({ line: lineNumber, text: commentText });
+        if (commentText) {
+          if (current) {
+            current.comments.push(commentText);
+          } else {
+            pendingComments.push({ line: lineNumber, text: commentText });
+          }
+        } else if (!current) {
+          // Decorative comment-only lines behave like blank separators.
+          pendingComments = [];
         }
         continue;
       }
@@ -1021,6 +1186,9 @@
       if (!codeTrim) {
         if (comment) {
           pendingComments.push({ line: lineNumber, text: comment });
+        } else if (!current) {
+          // Decorative inline-only comment (e.g. `"----"`) is treated as blank.
+          pendingComments = [];
         }
         continue;
       }
@@ -1073,10 +1241,27 @@
   }
 
   function normalizeComment(trimmedLine) {
+    const normalizeText = (text) => {
+      const trimmed = String(text || "").trim();
+      if (!trimmed) {
+        return "";
+      }
+
+      // Treat separator-only comment content as empty.
+      if (
+        !/[A-Za-z0-9\u00C0-\u024F\u1E00-\u1EFF]/.test(trimmed) &&
+        /^[\s*&\-_=~#|\\/.:;,+(){}\[\]<>]+$/.test(trimmed)
+      ) {
+        return "";
+      }
+
+      return trimmed;
+    };
+
     if (trimmedLine.startsWith("*") || trimmedLine.startsWith('"')) {
-      return trimmedLine.slice(1).trim();
+      return normalizeText(trimmedLine.slice(1));
     }
-    return trimmedLine.trim();
+    return normalizeText(trimmedLine);
   }
 
   function splitCodeAndInlineComment(line) {
@@ -1108,7 +1293,7 @@
 
       if (char === '"' && !inSingleQuote && !inPipe) {
         const code = text.slice(0, index);
-        const comment = text.slice(index + 1).trim();
+        const comment = normalizeComment(text.slice(index + 1));
         return { code, comment };
       }
     }
@@ -7247,9 +7432,13 @@
 })();
 </script>
   <script>
-// inlined from: ./app.js
-(function () {
-  "use strict";
+// inlined from: ./app/01-core.js
+"use strict";
+
+window.AbapViewerModules = window.AbapViewerModules || {};
+window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
+window.AbapViewerRuntime = window.AbapViewerRuntime || {};
+window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
 
   const els = {
     fileInput: document.getElementById("fileInput"),
@@ -7276,7 +7465,19 @@
     buildInfo: document.getElementById("buildInfo"),
     rightPanelTitle: document.getElementById("rightPanelTitle"),
     rightTabOutputBtn: document.getElementById("rightTabOutputBtn"),
+    rightTabTemplateBtn: document.getElementById("rightTabTemplateBtn"),
     rightTabDescBtn: document.getElementById("rightTabDescBtn"),
+    templatePreviewPanel: document.getElementById("templatePreviewPanel"),
+    templateKeyMode: document.getElementById("templateKeyMode"),
+    templateCopyAllBtn: document.getElementById("templateCopyAllBtn"),
+    templateResetBtn: document.getElementById("templateResetBtn"),
+    templateExportBtn: document.getElementById("templateExportBtn"),
+    templateImportBtn: document.getElementById("templateImportBtn"),
+    templateApplyBtn: document.getElementById("templateApplyBtn"),
+    templateImportInput: document.getElementById("templateImportInput"),
+    templateConfigError: document.getElementById("templateConfigError"),
+    templateConfigJson: document.getElementById("templateConfigJson"),
+    templatePreviewOutput: document.getElementById("templatePreviewOutput"),
     declDescJsonBtn: document.getElementById("declDescJsonBtn"),
     declDescPanel: document.getElementById("declDescPanel"),
     error: document.getElementById("error"),
@@ -7338,8 +7539,12 @@
     showValues: true,
     showExtras: false,
     rightTab: "output",
+    templateConfig: null,
+    templateConfigDraft: "",
+    templatePreviewCache: null,
     collapsedIds: new Set(),
     selectedId: "",
+    selectedTemplateIndex: "",
     selectedDeclKey: "",
     descOverrides: {},
     descOverridesLegacy: {},
@@ -7356,6 +7561,7 @@
   const DESC_STORAGE_KEY_LEGACY_V1 = "abap-parser-viewer.descOverrides.v1";
   const RULES_STORAGE_KEY_V1 = "abap-parser-viewer.customConfigs.v1";
   const SETTINGS_STORAGE_KEY_V1 = "abap-parser-viewer.settings.v1";
+  const TEMPLATE_CONFIG_STORAGE_KEY_V1 = "abap-parser-viewer.templateConfig.v1";
   const THEME_STORAGE_KEY_V1 = "abap-parser-viewer.theme.v1";
   const LAYOUT_SPLIT_STORAGE_KEY_V1 = "abap-parser-viewer.layoutSplit.v1";
   const LAYOUT_SPLIT_DEFAULT = 48;
@@ -7419,11 +7625,21 @@
     "         bukrs TYPE t001-bukrs,",
     "         butxt TYPE t001-butxt,",
     "       END OF ty_row.",
+    "TYPES: BEGIN OF ty_user,",
+    "         uname TYPE syuname,",
+    "         active TYPE abap_bool,",
+    "         role TYPE string,",
+    "       END OF ty_user.",
     "TYPES ty_rows TYPE STANDARD TABLE OF ty_row.",
+    "TYPES ty_users TYPE STANDARD TABLE OF ty_user.",
     "",
     "DATA: gt_rows TYPE ty_rows,",
     "      gs_row  TYPE ty_row,",
+    "      lt_users TYPE ty_users,",
+    "      ls_user TYPE ty_user,",
     "      gv_total TYPE i VALUE 0,",
+    "      lv_active TYPE abap_bool VALUE abap_true,",
+    "      lv_role TYPE string VALUE 'ADMIN',",
     "      lv_text TYPE string,",
     "      lo_demo TYPE REF TO lcl_demo.",
     "CONSTANTS gc_default_bukrs TYPE t001-bukrs VALUE '1000'.",
@@ -7433,6 +7649,8 @@
     "SELECT bukrs butxt FROM t001 INTO TABLE gt_rows WHERE bukrs IN s_bukrs.",
     "READ TABLE gt_rows WITH KEY bukrs = gc_default_bukrs INTO gs_row.",
     "READ TABLE gt_rows WITH TABLE KEY primary_key COMPONENTS bukrs = gc_default_bukrs INTO gs_row.",
+    "READ TABLE lt_users WITH KEY uname = p_user active = lv_active INTO ls_user.",
+    "READ TABLE lt_users WITH KEY uname = p_user active = lv_active role = lv_role INTO ls_user.",
     "MODIFY gt_rows FROM gs_row TRANSPORTING butxt WHERE bukrs = gc_default_bukrs.",
     "DELETE gt_rows WHERE bukrs = gc_default_bukrs.",
     "",
@@ -7495,6 +7713,1310 @@
     "  ENDMETHOD.",
     "ENDCLASS."
   ].join("\n");
+
+  function createTemplateBaseStyle(background) {
+    return {
+      background: background || "default",
+      border: "outside-thin",
+      font: "MS PGothic",
+      "font color": "#111111",
+      "font size": 10,
+      "font family": "default",
+      bold: false,
+      italic: false,
+      underline: false,
+      merge: false,
+      align: "left",
+      valign: "top",
+      wrap: false
+    };
+  }
+
+  function createGenericStatementTemplate(templateKey) {
+    const keyText = String(templateKey || "").trim();
+    return {
+      _options: {
+        hideEmptyRows: true,
+        hideRowsWithoutValues: true,
+        expandMultilineRows: true
+      },
+      "A1:G1": createTemplateBaseStyle("#dbeef4"),
+      A1: {
+        text: "Câu lệnh"
+      },
+      "H1:AY1": createTemplateBaseStyle("default"),
+      H1: {
+        text: "{keywords.stmt.text}{objectType}"
+      },
+      "A2:G2": createTemplateBaseStyle("#dbeef4"),
+      A2: {
+        text: "Đối tượng"
+      },
+      "H2:AY2": createTemplateBaseStyle("default"),
+      H2: {
+        text: "{values.name.finalDesc}{values.target.finalDesc}{values.form.finalDesc}{values.itab.finalDesc}{values.itabOrDbtab.finalDesc}"
+      },
+      "A3:G3": createTemplateBaseStyle("#dbeef4"),
+      A3: {
+        text: "Nguồn / Đích"
+      },
+      "H3:AY3": createTemplateBaseStyle("default"),
+      H3: {
+        text: "{values.into.finalDesc}{values.from.finalDesc}{values.index.value}"
+      },
+      "A4:G4": createTemplateBaseStyle("#dbeef4"),
+      A4: {
+        text: "Điều kiện"
+      },
+      "H4:AY4": createTemplateBaseStyle("default"),
+      H4: {
+        text: "{values.condition.finalDesc}{values.where.finalDesc}{values.withKey.finalDesc}{values.withTableKey.finalDesc}"
+      },
+      "A5:G5": createTemplateBaseStyle("#dbeef4"),
+      A5: {
+        text: "Chi tiết"
+      },
+      "H5:AY5": createTemplateBaseStyle("default"),
+      H5: {
+        text: "{extras}"
+      },
+      "A6:G6": createTemplateBaseStyle("#dbeef4"),
+      A6: {
+        text: "Template key"
+      },
+      "H6:AY6": createTemplateBaseStyle("default"),
+      H6: {
+        text: keyText
+      }
+    };
+  }
+
+  const TEMPLATE_DEFAULT_CONFIG_V1 = {
+    version: 1,
+    templates: {
+      DEFAULT: {
+        _options: {
+          hideEmptyRows: true,
+          hideRowsWithoutValues: true,
+          expandMultilineRows: false
+        },
+        "A1:F1": {
+          background: "mau xanh nhat",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A1: {
+          text: "{keywords.stmt.text}"
+        },
+        "G1:W1": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        G1: {
+          text: "{values.name.finalDesc}"
+        }
+      },
+      ASSIGNMENT: {
+        "A1:F1": {
+          background: "mau xanh nhat",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A1: {
+          text: "Đích"
+        },
+        "A2:F2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A2: {
+          text: "{values.target.decl.finalDesc}"
+        },
+        "G1:W1": {
+          background: "mau xanh nhat",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        G1: {
+          text: "Nguồn"
+        },
+        "G2:W2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        G2: {
+          text: "{values.expr.decl.finalDesc}"
+        }
+      },
+      APPEND: {
+        "A1:G1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A1: {
+          text: "Append"
+        },
+        "H1:Y1": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        H1: {
+          text: "{values.what.decl.finalDesc}"
+        },
+        "Z1:AD1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        Z1: {
+          text: "To"
+        },
+        "AE1:AY1": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        AE1: {
+          text: "{values.to.decl.finalDesc}"
+        },
+        "A2:G2": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A2: {
+          text: "{labels.sortedBy}"
+        },
+        "H2:AB2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        H2: {
+          text: "{extras}"
+        }
+      },
+      READ_TABLE: {
+        _options: {
+          hideEmptyRows: true,
+          hideRowsWithoutValues: true,
+          expandMultilineRows: true
+        },
+        "A1:G1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A1: {
+          text: "ReadTable"
+        },
+        "H1:AB1": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        H1: {
+          text: "{values.itab.decl.finalDesc}"
+        },
+        "A2:G2": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A2: {
+          text: "To"
+        },
+        "H2:AB2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        H2: {
+          text: "{values.into.decl.finalDesc}"
+        },
+        "A3:G3": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A3: {
+          text: "Điều kiện"
+        },
+        "H3:T3": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        H3: {
+          text: "{extras.readTable.conditions.leftOperand}"
+        },
+        "U3:W3": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        U3: {
+          text: "{extras.readTable.conditions.comparisonOperator}"
+        },
+        "X3:AR3": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        X3: {
+          text: "{extras.readTable.conditions.rightOperandDecl.finalDesc}"
+        },
+        "A4:U4": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A4: {
+          text: "{keywords.binary-search.text}"
+        }
+      },
+      MODIFY_ITAB: {
+        _options: {
+          hideEmptyRows: true,
+          hideRowsWithoutValues: true,
+          expandMultilineRows: true
+        },
+        "A1:G1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A1: {
+          text: "Modify Table"
+        },
+        "H1:AB1": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        H1: {
+          text: "{values.itab.finalDesc}{values.itabOrDbtab.finalDesc}"
+        },
+        "A2:G2": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A2: {
+          text: "From"
+        },
+        "H2:AB2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        H2: {
+          text: "{values.from.finalDesc}"
+        },
+        "A3:G3": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A3: {
+          text: "Transporting / Index"
+        },
+        "H3:AB3": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        H3: {
+          text: "{extras.modifyItab.transporting}{values.index.value}"
+        },
+        "A4:T4": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A4: {
+          text: "Điều kiện trái"
+        },
+        "U4:W4": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        U4: {
+          text: "Điều kiện"
+        },
+        "X4:AD4": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        X4: {
+          text: "Điều kiện phải"
+        },
+        "AE4:AY4": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        AE4: {
+          text: "Logic connector"
+        },
+        "A5:T5": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A5: {
+          text: "{extras.modifyItab.conditions.leftOperandDecl.finalDesc}"
+        },
+        "U5:W5": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        U5: {
+          text: "{extras.modifyItab.conditions.comparisonOperator}"
+        },
+        "X5:AD5": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        X5: {
+          text: "{extras.modifyItab.conditions.rightOperandDecl.finalDesc}"
+        },
+        "AE5:AY5": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        AE5: {
+          text: "{extras.modifyItab.conditions.logicalConnector}"
+        }
+      },
+      DELETE_ITAB: {
+        _options: {
+          hideEmptyRows: true,
+          hideRowsWithoutValues: true,
+          expandMultilineRows: true
+        },
+        "A1:G1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A1: {
+          text: "Delete Table"
+        },
+        "H1:AB1": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        H1: {
+          text: "{values.target.finalDesc}"
+        },
+        "A2:G2": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A2: {
+          text: "From / Index"
+        },
+        "H2:AB2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        H2: {
+          text: "{values.from.finalDesc}{values.index.value}"
+        },
+        "A3:T3": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A3: {
+          text: "Điều kiện trái"
+        },
+        "U3:W3": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        U3: {
+          text: "Điều kiện"
+        },
+        "X3:AD3": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        X3: {
+          text: "Điều kiện phải"
+        },
+        "AE3:AY3": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        AE3: {
+          text: "Logic connector"
+        },
+        "A4:T4": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A4: {
+          text: "{extras.deleteItab.conditions.leftOperandDecl.finalDesc}"
+        },
+        "U4:W4": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        U4: {
+          text: "{extras.deleteItab.conditions.comparisonOperator}"
+        },
+        "X4:AD4": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        X4: {
+          text: "{extras.deleteItab.conditions.rightOperandDecl.finalDesc}"
+        },
+        "AE4:AY4": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        AE4: {
+          text: "{extras.deleteItab.conditions.logicalConnector}"
+        }
+      },
+      IF: {
+        _options: {
+          hideEmptyRows: true,
+          hideRowsWithoutValues: true,
+          expandMultilineRows: true
+        },
+        "A1:T1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A1: {
+          text: "Điều kiện trái"
+        },
+        "U1:W1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        U1: {
+          text: "Điều kiện"
+        },
+        "X1:AD1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        X1: {
+          text: "Điều kiện phải"
+        },
+        "AE1:AY1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        AE1: {
+          text: "Logic connector"
+        },
+        "A2:T2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A2: {
+          text: "{extras.ifCondition.conditions.leftOperandDecl.finalDesc}"
+        },
+        "U2:W2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        U2: {
+          text: "{extras.ifCondition.conditions.comparisonOperator}"
+        },
+        "X2:AD2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        X2: {
+          text: "{extras.ifCondition.conditions.rightOperandDecl.finalDesc}"
+        },
+        "AE2:AY2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        AE2: {
+          text: "{extras.ifCondition.conditions.logicalConnector}"
+        }
+      },
+      ELSEIF: {
+        _options: {
+          hideEmptyRows: true,
+          hideRowsWithoutValues: true,
+          expandMultilineRows: true
+        },
+        "A1:T1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A1: {
+          text: "Điều kiện trái"
+        },
+        "U1:W1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        U1: {
+          text: "Điều kiện"
+        },
+        "X1:AD1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        X1: {
+          text: "Điều kiện phải"
+        },
+        "AE1:AY1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        AE1: {
+          text: "Logic connector"
+        },
+        "A2:T2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A2: {
+          text: "{extras.ifCondition.conditions.leftOperandDecl.finalDesc}"
+        },
+        "U2:W2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        U2: {
+          text: "{extras.ifCondition.conditions.comparisonOperator}"
+        },
+        "X2:AD2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        X2: {
+          text: "{extras.ifCondition.conditions.rightOperandDecl.finalDesc}"
+        },
+        "AE2:AY2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        AE2: {
+          text: "{extras.ifCondition.conditions.logicalConnector}"
+        }
+      }
+    }
+  };
+
+  const TEMPLATE_GENERIC_KEYS = [
+    "CALL_FUNCTION",
+    "CALL_METHOD",
+    "CALL_TRANSACTION",
+    "CASE",
+    "CATCH",
+    "CLASS",
+    "CLASS-DATA",
+    "CLASS-METHODS",
+    "CLEANUP",
+    "CLEAR",
+    "CONSTANTS",
+    "DATA",
+    "DO",
+    "ELSE",
+    "FIELD-SYMBOLS",
+    "FORM",
+    "INSERT_ITAB",
+    "LOOP_AT_ITAB",
+    "METHOD",
+    "METHODS",
+    "MOVE",
+    "MOVE-CORRESPONDING",
+    "PARAMETERS",
+    "PERFORM",
+    "RANGES",
+    "SELECT",
+    "SELECT-OPTIONS",
+    "SORT_ITAB",
+    "STATICS",
+    "TRY",
+    "TYPES",
+    "WHEN"
+  ];
+
+  for (const key of TEMPLATE_GENERIC_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(TEMPLATE_DEFAULT_CONFIG_V1.templates, key)) {
+      TEMPLATE_DEFAULT_CONFIG_V1.templates[key] = createGenericStatementTemplate(key);
+    }
+  }
 
   function setError(message) {
     els.error.textContent = message ? String(message) : "";
@@ -7737,6 +9259,202 @@
   function saveSettings(settings) {
     try {
       localStorage.setItem(SETTINGS_STORAGE_KEY_V1, JSON.stringify(settings || {}));
+    } catch {
+      // ignore
+    }
+  }
+
+  function setTemplateConfigError(message) {
+    if (!els.templateConfigError) {
+      return;
+    }
+    els.templateConfigError.textContent = message ? String(message) : "";
+  }
+
+  function setTemplatePreviewMessage(message) {
+    if (!els.templatePreviewOutput) {
+      return;
+    }
+    els.templatePreviewOutput.classList.add("muted");
+    els.templatePreviewOutput.replaceChildren();
+    els.templatePreviewOutput.textContent = message || "";
+  }
+
+  function cloneJsonValue(value) {
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch {
+      return null;
+    }
+  }
+
+  function getDefaultTemplateConfig() {
+    const cloned = cloneJsonValue(TEMPLATE_DEFAULT_CONFIG_V1);
+    return cloned && typeof cloned === "object" ? cloned : { version: 1, templates: {} };
+  }
+
+  function normalizeTemplateAliasToken(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ");
+  }
+
+  function parseCellRef(cellRef) {
+    const raw = String(cellRef || "").trim().toUpperCase();
+    const match = /^([A-Z]+)([1-9][0-9]*)$/.exec(raw);
+    if (!match) {
+      throw new Error(`Invalid cell ref "${cellRef}". Expected format like A1.`);
+    }
+
+    const letters = match[1];
+    const row = Number(match[2]) || 0;
+    let col = 0;
+    for (let i = 0; i < letters.length; i += 1) {
+      col = (col * 26) + (letters.charCodeAt(i) - 64);
+    }
+
+    if (!row || !col) {
+      throw new Error(`Invalid cell ref "${cellRef}".`);
+    }
+
+    return { row, col, raw };
+  }
+
+  function parseRangeKey(rangeKey) {
+    const raw = String(rangeKey || "").trim().toUpperCase();
+    if (!raw) {
+      throw new Error("Range key is empty.");
+    }
+
+    const parts = raw.split(":").map((item) => item.trim()).filter(Boolean);
+    if (!parts.length || parts.length > 2) {
+      throw new Error(`Invalid range "${rangeKey}". Expected A1 or A1:B2.`);
+    }
+
+    const start = parseCellRef(parts[0]);
+    const end = parseCellRef(parts.length > 1 ? parts[1] : parts[0]);
+
+    return {
+      key: raw,
+      r1: Math.min(start.row, end.row),
+      c1: Math.min(start.col, end.col),
+      r2: Math.max(start.row, end.row),
+      c2: Math.max(start.col, end.col)
+    };
+  }
+
+  function isTemplateOptionConfigKey(rawKey) {
+    const key = String(rawKey || "").trim().toLowerCase();
+    if (!key) {
+      return false;
+    }
+    return (
+      key === "_options"
+      || key === "options"
+      || key === "ranges"
+      || key === "compact"
+      || key === "hideemptyrows"
+      || key === "hiderowswithoutvalues"
+      || key === "expandmultilinerows"
+      || key === "removeemptyrows"
+      || key === "removeemptyrowsadvanced"
+      || key === "removeemptyrowsadv"
+      || key === "expandarrayrows"
+      || key === "arraytorows"
+    );
+  }
+
+  function validateTemplateConfig(config) {
+    const errors = [];
+    if (!config || typeof config !== "object" || Array.isArray(config)) {
+      return { valid: false, errors: ["Config must be a JSON object."] };
+    }
+
+    const version = Number(config.version);
+    if (version !== 1) {
+      errors.push("Config.version must be 1.");
+    }
+
+    const templates = config.templates;
+    if (!templates || typeof templates !== "object" || Array.isArray(templates)) {
+      errors.push("Config.templates must be an object.");
+      return { valid: false, errors };
+    }
+
+    const templateKeys = Object.keys(templates);
+    if (!templateKeys.length) {
+      errors.push("Config.templates must contain at least one template key.");
+      return { valid: false, errors };
+    }
+
+    for (const templateKey of templateKeys) {
+      const templateDef = templates[templateKey];
+      if (!templateDef || typeof templateDef !== "object" || Array.isArray(templateDef)) {
+        errors.push(`templates.${templateKey} must be an object of range -> style.`);
+        continue;
+      }
+
+      const hasRangesObject = Object.prototype.hasOwnProperty.call(templateDef, "ranges");
+      const ranges = hasRangesObject ? templateDef.ranges : templateDef;
+      if (!ranges || typeof ranges !== "object" || Array.isArray(ranges)) {
+        errors.push(`templates.${templateKey}.ranges must be an object of range -> style.`);
+        continue;
+      }
+
+      const optionCandidates = ["_options", "options"];
+      for (const optKey of optionCandidates) {
+        if (!Object.prototype.hasOwnProperty.call(templateDef, optKey)) {
+          continue;
+        }
+        const optValue = templateDef[optKey];
+        if (!optValue || typeof optValue !== "object" || Array.isArray(optValue)) {
+          errors.push(`templates.${templateKey}.${optKey} must be an object.`);
+        }
+      }
+
+      for (const rangeKey of Object.keys(ranges)) {
+        if (isTemplateOptionConfigKey(rangeKey)) {
+          continue;
+        }
+        try {
+          parseRangeKey(rangeKey);
+        } catch (err) {
+          errors.push(`templates.${templateKey}.${rangeKey}: ${err && err.message ? err.message : err}`);
+        }
+
+        const cellConfig = ranges[rangeKey];
+        if (!cellConfig || typeof cellConfig !== "object" || Array.isArray(cellConfig)) {
+          errors.push(`templates.${templateKey}.${rangeKey} must be an object.`);
+        }
+      }
+    }
+
+    return { valid: errors.length === 0, errors };
+  }
+
+  function loadTemplateConfig() {
+    try {
+      const raw = localStorage.getItem(TEMPLATE_CONFIG_STORAGE_KEY_V1);
+      if (!raw) {
+        return getDefaultTemplateConfig();
+      }
+      const parsed = JSON.parse(raw);
+      const check = validateTemplateConfig(parsed);
+      if (!check.valid) {
+        return getDefaultTemplateConfig();
+      }
+      return parsed;
+    } catch {
+      return getDefaultTemplateConfig();
+    }
+  }
+
+  function saveTemplateConfig(config) {
+    try {
+      localStorage.setItem(TEMPLATE_CONFIG_STORAGE_KEY_V1, JSON.stringify(config || {}));
     } catch {
       // ignore
     }
@@ -8440,6 +10158,42 @@
     els.settingsModal.hidden = true;
   }
 
+window.AbapViewerModules.factories = window.AbapViewerModules.factories || {};
+window.AbapViewerModules.factories["01-core"] = function registerCore(runtime) {
+  const targetRuntime = runtime || (window.AbapViewerRuntime = window.AbapViewerRuntime || {});
+  targetRuntime.api = targetRuntime.api || {};
+  targetRuntime.els = els;
+  targetRuntime.state = state;
+  targetRuntime.constants = {
+    DESC_STORAGE_KEY_V2,
+    DESC_STORAGE_KEY_LEGACY_V1,
+    RULES_STORAGE_KEY_V1,
+    SETTINGS_STORAGE_KEY_V1,
+    TEMPLATE_CONFIG_STORAGE_KEY_V1,
+    THEME_STORAGE_KEY_V1,
+    LAYOUT_SPLIT_STORAGE_KEY_V1,
+    LAYOUT_SPLIT_DEFAULT,
+    LAYOUT_SPLIT_MIN,
+    LAYOUT_SPLIT_MAX,
+    MOBILE_LAYOUT_QUERY,
+    RENDER_TREE_OPTIONS,
+    DECL_TYPE_OPTIONS,
+    NAME_CODE_OPTIONS,
+    DEFAULT_SETTINGS,
+    TEMPLATE_DEFAULT_CONFIG_V1,
+    SAMPLE_ABAP
+  };
+  window.AbapViewerModules.parts["01-core"] = true;
+};
+window.AbapViewerModules.factories["01-core"](window.AbapViewerRuntime);
+</script>
+  <script>
+// inlined from: ./app/02-descriptions.js
+"use strict";
+
+window.AbapViewerModules = window.AbapViewerModules || {};
+window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
+
   function collectConditionDeclsFromClauses(clauses, addDecl) {
     const list = Array.isArray(clauses) ? clauses : [];
     for (const clause of list) {
@@ -8898,24 +10652,37 @@
   }
 
   function setRightTab(nextTab) {
-    const tab = nextTab === "descriptions" ? "descriptions" : "output";
+    const tab = nextTab === "descriptions"
+      ? "descriptions"
+      : (nextTab === "template" ? "template" : "output");
     state.rightTab = tab;
 
     const showDescriptions = tab === "descriptions";
+    const showTemplate = tab === "template";
+    const showOutput = tab === "output";
     if (els.output) {
-      els.output.hidden = showDescriptions;
+      els.output.hidden = !showOutput;
+    }
+    if (els.templatePreviewPanel) {
+      els.templatePreviewPanel.hidden = !showTemplate;
     }
     if (els.declDescPanel) {
       els.declDescPanel.hidden = !showDescriptions;
     }
 
     if (els.rightPanelTitle) {
-      els.rightPanelTitle.textContent = showDescriptions ? "Descriptions" : "Output";
+      els.rightPanelTitle.textContent = showDescriptions
+        ? "Descriptions"
+        : (showTemplate ? "Template Preview" : "Output");
     }
 
     if (els.rightTabOutputBtn) {
-      els.rightTabOutputBtn.classList.toggle("active", !showDescriptions);
-      els.rightTabOutputBtn.setAttribute("aria-selected", String(!showDescriptions));
+      els.rightTabOutputBtn.classList.toggle("active", showOutput);
+      els.rightTabOutputBtn.setAttribute("aria-selected", String(showOutput));
+    }
+    if (els.rightTabTemplateBtn) {
+      els.rightTabTemplateBtn.classList.toggle("active", showTemplate);
+      els.rightTabTemplateBtn.setAttribute("aria-selected", String(showTemplate));
     }
     if (els.rightTabDescBtn) {
       els.rightTabDescBtn.classList.toggle("active", showDescriptions);
@@ -8932,6 +10699,8 @@
           els.declDescSearch.focus();
         }
       }, 0);
+    } else if (showTemplate) {
+      renderTemplatePreview();
     }
 
     refreshInputGutterTargets();
@@ -10451,6 +12220,1501 @@
     return resolveValueLevelTechId(value);
   }
 
+window.AbapViewerModules.factories = window.AbapViewerModules.factories || {};
+window.AbapViewerModules.factories["02-descriptions"] = function registerDescriptions(runtime) {
+  const targetRuntime = runtime || (window.AbapViewerRuntime = window.AbapViewerRuntime || {});
+  targetRuntime.api = targetRuntime.api || {};
+  targetRuntime.api.renderDeclDescPanelUi = renderDeclDescPanelUi;
+  targetRuntime.api.getFinalDeclDesc = getFinalDeclDesc;
+  targetRuntime.api.getEffectiveDeclDesc = getEffectiveDeclDesc;
+  targetRuntime.api.resolveValueLevelFinalDesc = resolveValueLevelFinalDesc;
+  window.AbapViewerModules.parts["02-descriptions"] = true;
+};
+window.AbapViewerModules.factories["02-descriptions"](window.AbapViewerRuntime);
+</script>
+  <script>
+// inlined from: ./app/03-template-preview.js
+"use strict";
+
+window.AbapViewerModules = window.AbapViewerModules || {};
+window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
+
+  function toInlineCssText(styleMap) {
+    if (!styleMap || typeof styleMap !== "object") {
+      return "";
+    }
+    const entries = [];
+    for (const [key, value] of Object.entries(styleMap)) {
+      const cssKey = String(key || "").trim();
+      const cssValue = String(value || "").trim();
+      if (!cssKey || !cssValue) {
+        continue;
+      }
+      entries.push(`${cssKey}:${cssValue}`);
+    }
+    return entries.join(";");
+  }
+
+  function normalizeTemplateColorValue(value) {
+    const raw = String(value || "").trim();
+    if (!raw) {
+      return "";
+    }
+
+    const alias = normalizeTemplateAliasToken(raw);
+    if (!alias || alias === "default") {
+      return "";
+    }
+    if (alias === "mau xanh nhat") {
+      return "#dbeef4";
+    }
+    if (alias === "den") {
+      return "#000000";
+    }
+    return raw;
+  }
+
+  function normalizeTemplateBorderValue(value) {
+    const raw = String(value || "").trim();
+    if (!raw) {
+      return "";
+    }
+
+    const alias = normalizeTemplateAliasToken(raw);
+    if (!alias || alias === "default") {
+      return "";
+    }
+    if (alias === "outside line mong") {
+      return "outside-thin";
+    }
+    return raw;
+  }
+
+  function normalizeTemplateAlignValue(value) {
+    const alias = normalizeTemplateAliasToken(value);
+    if (!alias || alias === "default") {
+      return "";
+    }
+    if (alias === "left" || alias === "center" || alias === "right") {
+      return alias;
+    }
+    return "";
+  }
+
+  function normalizeTemplateVAlignValue(value) {
+    const alias = normalizeTemplateAliasToken(value);
+    if (!alias || alias === "default") {
+      return "";
+    }
+    if (alias === "top") {
+      return "top";
+    }
+    if (alias === "middle" || alias === "center") {
+      return "middle";
+    }
+    if (alias === "bottom") {
+      return "bottom";
+    }
+    return "";
+  }
+
+  function parseTemplatePathSegments(pathExpression) {
+    const raw = String(pathExpression || "").trim();
+    if (!raw) {
+      return [];
+    }
+
+    const segments = [];
+    let token = "";
+    let index = 0;
+
+    const pushToken = () => {
+      const trimmed = token.trim();
+      if (trimmed) {
+        segments.push(trimmed);
+      }
+      token = "";
+    };
+
+    while (index < raw.length) {
+      const ch = raw[index];
+      if (ch === ".") {
+        pushToken();
+        index += 1;
+        continue;
+      }
+
+      if (ch === "[") {
+        pushToken();
+        const close = raw.indexOf("]", index + 1);
+        if (close === -1) {
+          return null;
+        }
+        const inside = raw.slice(index + 1, close).trim();
+        if (!/^\d+$/.test(inside)) {
+          return null;
+        }
+        segments.push(Number(inside));
+        index = close + 1;
+        continue;
+      }
+
+      token += ch;
+      index += 1;
+    }
+
+    pushToken();
+    return segments;
+  }
+
+  function resolveTemplatePathValue(root, pathExpression) {
+    const segments = parseTemplatePathSegments(pathExpression);
+    if (!segments) {
+      return undefined;
+    }
+
+    let current = root;
+    for (const segment of segments) {
+      if (typeof segment === "number") {
+        if (!Array.isArray(current)) {
+          return undefined;
+        }
+        current = current[segment];
+        continue;
+      }
+
+      const key = String(segment || "").trim();
+      if (!key) {
+        continue;
+      }
+
+      if (Array.isArray(current)) {
+        const projected = [];
+        for (const item of current) {
+          if (!item || typeof item !== "object") {
+            continue;
+          }
+
+          const keyLower = key.toLowerCase();
+          if (keyLower === "desc" && isDeclLikeObject(item)) {
+            projected.push(getEffectiveDeclDesc(item));
+            continue;
+          }
+
+          if (keyLower === "finaldesc") {
+            if (isDeclLikeObject(item)) {
+              projected.push(getFinalDeclDesc(item));
+              continue;
+            }
+            if (hasValueLevelDescFields(item) || isDeclLikeObject(item.decl)) {
+              projected.push(resolveValueLevelFinalDesc(item));
+              continue;
+            }
+          }
+
+          if (Object.prototype.hasOwnProperty.call(item, key)) {
+            projected.push(item[key]);
+          }
+        }
+        if (!projected.length) {
+          return undefined;
+        }
+        current = projected;
+        continue;
+      }
+
+      if (!current || typeof current !== "object") {
+        return undefined;
+      }
+
+      const keyLower = key.toLowerCase();
+      if (keyLower === "desc" && isDeclLikeObject(current)) {
+        return getEffectiveDeclDesc(current);
+      }
+
+      if (keyLower === "finaldesc") {
+        if (isDeclLikeObject(current)) {
+          return getFinalDeclDesc(current);
+        }
+        if (hasValueLevelDescFields(current) || isDeclLikeObject(current.decl)) {
+          return resolveValueLevelFinalDesc(current);
+        }
+      }
+
+      if (!Object.prototype.hasOwnProperty.call(current, key)) {
+        return undefined;
+      }
+      current = current[key];
+    }
+
+    return current;
+  }
+
+  function buildTemplatePathCandidates(tokenExpression) {
+    const raw = String(tokenExpression || "").trim();
+    if (!raw) {
+      return [];
+    }
+
+    const candidates = new Set();
+    candidates.add(raw);
+
+    if (/^keyword\./i.test(raw)) {
+      candidates.add(`keywords.${raw.slice("keyword.".length)}`);
+    }
+
+    return Array.from(candidates);
+  }
+
+  function getTemplateArrayItemTagName(keyHint) {
+    if (typeof getArrayItemTagName === "function") {
+      return getArrayItemTagName(keyHint);
+    }
+    const key = String(keyHint || "").trim().toLowerCase();
+    if (key === "objects" || key === "children") {
+      return "object";
+    }
+    return "item";
+  }
+
+  function normalizeTemplateEntryForPath(value, keyHint, pathParts, ownerContext) {
+    if (typeof normalizeEntryObjectForXml !== "function") {
+      return value;
+    }
+    try {
+      return normalizeEntryObjectForXml(value, keyHint, pathParts, ownerContext);
+    } catch {
+      return value;
+    }
+  }
+
+  function buildTemplateContextObject(obj, objectIndexOneBased) {
+    const objectIndex = Number(objectIndexOneBased) || 1;
+    const basePathParts = ["objects", `object[${objectIndex}]`];
+
+    const cloneRecursive = (value, keyHint, pathParts, ownerContext) => {
+      if (value === null || value === undefined) {
+        return value;
+      }
+      if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+        return value;
+      }
+
+      if (Array.isArray(value)) {
+        const itemTag = getTemplateArrayItemTagName(keyHint);
+        return value.map((item, index) => cloneRecursive(
+          item,
+          itemTag,
+          pathParts.concat(`${itemTag}[${index + 1}]`),
+          ownerContext
+        ));
+      }
+
+      if (typeof value !== "object") {
+        return value;
+      }
+
+      const nextOwnerContext = (typeof isAbapStatementObject === "function" && isAbapStatementObject(value))
+        ? value
+        : ownerContext;
+      const normalized = normalizeTemplateEntryForPath(value, keyHint, pathParts, nextOwnerContext);
+      if (!normalized || typeof normalized !== "object") {
+        return normalized;
+      }
+
+      const out = {};
+      for (const key of Object.keys(normalized)) {
+        out[key] = cloneRecursive(
+          normalized[key],
+          key,
+          pathParts.concat(key),
+          nextOwnerContext
+        );
+      }
+      return out;
+    };
+
+    return cloneRecursive(obj, "object", basePathParts, obj);
+  }
+
+  function stringifyTemplateResolvedValue(value) {
+    if (value === undefined || value === null) {
+      return "";
+    }
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      return String(value);
+    }
+    if (Array.isArray(value)) {
+      return value
+        .map((item) => stringifyTemplateResolvedValue(item))
+        .filter((text) => text !== "")
+        .join("\n");
+    }
+    if (isDeclLikeObject(value)) {
+      return getDeclDisplayName(value) || getDeclTechName(value);
+    }
+    if (typeof value === "object") {
+      if (hasValueLevelDescFields(value) || isDeclLikeObject(value.decl)) {
+        const finalDesc = resolveValueLevelFinalDesc(value);
+        if (finalDesc) {
+          return finalDesc;
+        }
+      }
+      return safeJson(value, false);
+    }
+    return String(value);
+  }
+
+  function collectTemplateDumpPaths(root) {
+    const out = new Set();
+
+    const walk = (value, path) => {
+      if (path) {
+        out.add(path);
+      }
+      if (value === null || value === undefined) {
+        return;
+      }
+
+      if (Array.isArray(value)) {
+        for (let i = 0; i < value.length; i += 1) {
+          const nextPath = path ? `${path}[${i}]` : `[${i}]`;
+          walk(value[i], nextPath);
+        }
+        return;
+      }
+
+      if (typeof value !== "object") {
+        return;
+      }
+
+      if (path && isDeclLikeObject(value)) {
+        out.add(`${path}.desc`);
+        out.add(`${path}.finalDesc`);
+      }
+      if (path && (hasValueLevelDescFields(value) || isDeclLikeObject(value.decl))) {
+        out.add(`${path}.finalDesc`);
+      }
+
+      for (const key of Object.keys(value)) {
+        const nextPath = path ? `${path}.${key}` : key;
+        walk(value[key], nextPath);
+      }
+    };
+
+    walk(root, "");
+    return Array.from(out).sort((a, b) => a.localeCompare(b));
+  }
+
+  function formatTemplateDumpValue(value) {
+    if (value === undefined || value === null) {
+      return "";
+    }
+    const text = String(value);
+    return text
+      .replace(/\r\n/g, "\\n")
+      .replace(/\r/g, "\\n")
+      .replace(/\n/g, "\\n");
+  }
+
+  function collectTemplateDumpPathValues(root) {
+    const out = new Map();
+
+    const addEntry = (path, value) => {
+      const key = String(path || "").trim();
+      if (!key || out.has(key)) {
+        return;
+      }
+      out.set(key, formatTemplateDumpValue(value));
+    };
+
+    const walk = (value, path) => {
+      const currentPath = String(path || "");
+      if (value === undefined) {
+        return;
+      }
+
+      if (value === null) {
+        if (currentPath) {
+          addEntry(currentPath, "");
+        }
+        return;
+      }
+
+      if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+        if (currentPath) {
+          addEntry(currentPath, value);
+        }
+        return;
+      }
+
+      if (Array.isArray(value)) {
+        for (let i = 0; i < value.length; i += 1) {
+          const nextPath = currentPath ? `${currentPath}[${i}]` : `[${i}]`;
+          walk(value[i], nextPath);
+        }
+        return;
+      }
+
+      if (typeof value !== "object") {
+        if (currentPath) {
+          addEntry(currentPath, String(value));
+        }
+        return;
+      }
+
+      if (currentPath && isDeclLikeObject(value)) {
+        addEntry(`${currentPath}.desc`, getEffectiveDeclDesc(value));
+        addEntry(`${currentPath}.finalDesc`, getFinalDeclDesc(value));
+      }
+      if (currentPath && (hasValueLevelDescFields(value) || isDeclLikeObject(value.decl))) {
+        addEntry(`${currentPath}.finalDesc`, resolveValueLevelFinalDesc(value));
+      }
+
+      const keys = Object.keys(value);
+      keys.sort((a, b) => a.localeCompare(b));
+      for (const key of keys) {
+        const nextPath = currentPath ? `${currentPath}.${key}` : key;
+        walk(value[key], nextPath);
+      }
+    };
+
+    walk(root, "");
+    return Array.from(out.entries()).map(([path, value]) => `${path} = ${value}`);
+  }
+
+  function openTemplatePathDump(contextObj, index, obj) {
+    const lines = collectTemplateDumpPathValues(contextObj);
+    const fallback = collectTemplateDumpPaths(contextObj).map((path) => `${path} =`);
+    const dumpText = (lines.length ? lines : fallback).join("\n");
+    const objectType = obj && obj.objectType ? String(obj.objectType) : "OBJECT";
+    const title = `Template Paths #${Number(index) + 1} ${objectType}`;
+
+    if (typeof openTextModal === "function") {
+      openTextModal(title, dumpText || "[No paths]");
+      return;
+    }
+
+    if (typeof setError === "function") {
+      setError("Path viewer is unavailable.");
+    }
+  }
+
+  function resolveTemplatePlaceholderValue(obj, tokenExpression) {
+    const token = String(tokenExpression || "").trim();
+    if (!token) {
+      return "";
+    }
+
+    if (token === "__DUMP__") {
+      return collectTemplateDumpPaths(obj).join("\n");
+    }
+    if (token === "__DUMP_VALUES__" || token === "__DUMP_WITH_VALUES__") {
+      return collectTemplateDumpPathValues(obj).join("\n");
+    }
+
+    const candidates = buildTemplatePathCandidates(token);
+
+    for (const candidate of candidates) {
+      const value = resolveTemplatePathValue(obj, candidate);
+      if (value !== undefined) {
+        return value;
+      }
+    }
+
+    return "";
+  }
+
+  function resolveTemplateText(rawText, obj) {
+    const templateText = String(rawText === undefined || rawText === null ? "" : rawText);
+    if (!templateText.includes("{")) {
+      return {
+        text: templateText,
+        hasPlaceholder: false,
+        hasTokenValue: false
+      };
+    }
+
+    let hasPlaceholder = false;
+    let hasTokenValue = false;
+    const text = templateText.replace(/\{([^{}]+)\}/g, (full, token) => {
+      hasPlaceholder = true;
+      const resolved = resolveTemplatePlaceholderValue(obj, token);
+      const resolvedText = stringifyTemplateResolvedValue(resolved);
+      if (resolvedText !== "") {
+        hasTokenValue = true;
+      }
+      return resolvedText;
+    });
+
+    return {
+      text,
+      hasPlaceholder,
+      hasTokenValue
+    };
+  }
+
+  function createTemplateCellModel() {
+    return {
+      text: "",
+      style: {},
+      hidden: false,
+      rowspan: 1,
+      colspan: 1,
+      hasPlaceholder: false,
+      hasTokenValue: false
+    };
+  }
+
+  function buildTemplateCellStyle(rangeConfig, position) {
+    const cfg = rangeConfig && typeof rangeConfig === "object" ? rangeConfig : {};
+    const style = {};
+
+    const background = normalizeTemplateColorValue(cfg.background);
+    if (background) {
+      style["background-color"] = background;
+    }
+
+    const fontColor = normalizeTemplateColorValue(cfg["font color"]);
+    if (fontColor) {
+      style.color = fontColor;
+    }
+
+    const fontSize = Number(cfg["font size"]);
+    if (Number.isFinite(fontSize) && fontSize > 0) {
+      style["font-size"] = `${fontSize}pt`;
+    }
+
+    const fontFamilyRaw = String(cfg["font family"] || "").trim();
+    if (fontFamilyRaw && normalizeTemplateAliasToken(fontFamilyRaw) !== "default") {
+      style["font-family"] = fontFamilyRaw;
+    }
+
+    if (cfg.bold === true) {
+      style["font-weight"] = "700";
+    }
+    if (cfg.italic === true) {
+      style["font-style"] = "italic";
+    }
+    if (cfg.underline === true) {
+      style["text-decoration"] = "underline";
+    }
+
+    const align = normalizeTemplateAlignValue(cfg.align);
+    if (align) {
+      style["text-align"] = align;
+    }
+
+    const valign = normalizeTemplateVAlignValue(cfg.valign);
+    if (valign) {
+      style["vertical-align"] = valign;
+    }
+
+    if (cfg.wrap === true) {
+      style["white-space"] = "pre-wrap";
+    } else if (cfg.wrap === false) {
+      style["white-space"] = "nowrap";
+    }
+
+    const border = normalizeTemplateBorderValue(cfg.border);
+    if (border === "outside-thin") {
+      const borderLine = "1px solid #c8c8c8";
+      if (position && position.isMergeAnchor) {
+        style.border = borderLine;
+      } else {
+        style["border-top"] = position && position.isTop ? borderLine : "none";
+        style["border-right"] = position && position.isRight ? borderLine : "none";
+        style["border-bottom"] = position && position.isBottom ? borderLine : "none";
+        style["border-left"] = position && position.isLeft ? borderLine : "none";
+      }
+    } else if (border) {
+      style.border = border;
+    }
+
+    return style;
+  }
+
+  function parseTemplateOptionBoolean(value, fallback) {
+    if (typeof value === "boolean") {
+      return value;
+    }
+    if (typeof value === "number") {
+      if (value === 1) {
+        return true;
+      }
+      if (value === 0) {
+        return false;
+      }
+      return fallback;
+    }
+    const token = String(value || "").trim().toLowerCase();
+    if (!token) {
+      return fallback;
+    }
+    if (token === "1" || token === "true" || token === "yes" || token === "y" || token === "on") {
+      return true;
+    }
+    if (token === "0" || token === "false" || token === "no" || token === "n" || token === "off") {
+      return false;
+    }
+    return fallback;
+  }
+
+  function getTemplateOptionByPath(source, path) {
+    if (!source || typeof source !== "object" || Array.isArray(source)) {
+      return undefined;
+    }
+    const parts = String(path || "").split(".").map((item) => String(item || "").trim()).filter(Boolean);
+    if (!parts.length) {
+      return undefined;
+    }
+
+    let current = source;
+    for (const part of parts) {
+      if (!current || typeof current !== "object" || Array.isArray(current)) {
+        return undefined;
+      }
+      if (!Object.prototype.hasOwnProperty.call(current, part)) {
+        return undefined;
+      }
+      current = current[part];
+    }
+    return current;
+  }
+
+  function readTemplateOptionValue(sources, paths) {
+    const sourceList = Array.isArray(sources) ? sources : [];
+    const pathList = Array.isArray(paths) ? paths : [];
+    for (const source of sourceList) {
+      for (const path of pathList) {
+        const value = getTemplateOptionByPath(source, path);
+        if (value !== undefined) {
+          return value;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  function normalizeTemplatePreviewOptions(optionSource, templateDef, rangeSource) {
+    const sources = [optionSource, templateDef, rangeSource];
+    const hideEmptyRows = parseTemplateOptionBoolean(readTemplateOptionValue(sources, [
+      "hideEmptyRows",
+      "removeEmptyRows",
+      "compact.removeEmptyRows"
+    ]), true);
+    const hideRowsWithoutValues = parseTemplateOptionBoolean(readTemplateOptionValue(sources, [
+      "hideRowsWithoutValues",
+      "removeEmptyRowsAdvanced",
+      "removeEmptyRowsAdv",
+      "compact.removeEmptyRowsAdvanced",
+      "compact.removeEmptyRowsAdv"
+    ]), true);
+    const expandMultilineRows = parseTemplateOptionBoolean(readTemplateOptionValue(sources, [
+      "expandMultilineRows",
+      "expandArrayRows",
+      "arrayToRows"
+    ]), false);
+
+    return {
+      hideEmptyRows,
+      hideRowsWithoutValues,
+      expandMultilineRows
+    };
+  }
+
+  function isTemplateRangeMetaKey(rawKey) {
+    const key = String(rawKey || "").trim().toLowerCase();
+    if (!key) {
+      return false;
+    }
+    return (
+      key === "_options"
+      || key === "options"
+      || key === "ranges"
+      || key === "compact"
+      || key === "hideemptyrows"
+      || key === "hiderowswithoutvalues"
+      || key === "expandmultilinerows"
+      || key === "removeemptyrows"
+      || key === "removeemptyrowsadvanced"
+      || key === "removeemptyrowsadv"
+      || key === "expandarrayrows"
+      || key === "arraytorows"
+    );
+  }
+
+  function resolveTemplateDefinitionForPreview(definition) {
+    if (!definition || typeof definition !== "object" || Array.isArray(definition)) {
+      return {
+        map: null,
+        options: normalizeTemplatePreviewOptions(null, null, null)
+      };
+    }
+
+    const hasRanges = definition.ranges && typeof definition.ranges === "object" && !Array.isArray(definition.ranges);
+    const rangeSource = hasRanges ? definition.ranges : definition;
+    const optionSource = (definition._options && typeof definition._options === "object" && !Array.isArray(definition._options))
+      ? definition._options
+      : ((definition.options && typeof definition.options === "object" && !Array.isArray(definition.options))
+        ? definition.options
+        : null);
+    const options = normalizeTemplatePreviewOptions(optionSource, definition, rangeSource);
+
+    const map = {};
+    for (const [key, value] of Object.entries(rangeSource)) {
+      if (isTemplateRangeMetaKey(key)) {
+        continue;
+      }
+      map[key] = value;
+    }
+
+    return { map, options };
+  }
+
+  function splitTemplateTextLines(text) {
+    const normalized = String(text === undefined || text === null ? "" : text)
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n");
+    if (normalized === "") {
+      return [""];
+    }
+    return normalized.split("\n");
+  }
+
+  function getTemplateTextLine(lines, index) {
+    const list = Array.isArray(lines) && lines.length ? lines : [""];
+    const idx = Number(index) || 0;
+    if (idx < list.length) {
+      return String(list[idx] || "");
+    }
+    return String(list[list.length - 1] || "");
+  }
+
+  function cloneTemplateMatrixCell(cell) {
+    if (!cell || typeof cell !== "object") {
+      return createTemplateCellModel();
+    }
+    return {
+      text: String(cell.text || ""),
+      style: { ...(cell.style && typeof cell.style === "object" ? cell.style : {}) },
+      hidden: Boolean(cell.hidden),
+      rowspan: Number(cell.rowspan) || 1,
+      colspan: Number(cell.colspan) || 1,
+      hasPlaceholder: Boolean(cell.hasPlaceholder),
+      hasTokenValue: Boolean(cell.hasTokenValue)
+    };
+  }
+
+  function expandTemplateMatrixRows(matrix) {
+    const rows = Array.isArray(matrix)
+      ? matrix.map((row) => (Array.isArray(row) ? row.map((cell) => cloneTemplateMatrixCell(cell)) : []))
+      : [];
+    if (!rows.length) {
+      return rows;
+    }
+
+    for (let rowIndex = rows.length - 1; rowIndex >= 0; rowIndex -= 1) {
+      const row = rows[rowIndex];
+      if (!Array.isArray(row) || !row.length) {
+        continue;
+      }
+
+      const hasMergedCells = row.some((cell) => cell && (cell.hidden || cell.rowspan > 1 || cell.colspan > 1));
+      if (hasMergedCells) {
+        continue;
+      }
+
+      const lineByCol = new Map();
+      let maxLines = 1;
+      for (let colIndex = 0; colIndex < row.length; colIndex += 1) {
+        const cell = row[colIndex];
+        if (!cell || cell.hidden) {
+          continue;
+        }
+        const lines = splitTemplateTextLines(cell.text);
+        lineByCol.set(colIndex, lines);
+        maxLines = Math.max(maxLines, lines.length);
+      }
+
+      if (maxLines <= 1) {
+        continue;
+      }
+
+      for (let colIndex = 0; colIndex < row.length; colIndex += 1) {
+        const cell = row[colIndex];
+        if (!cell || cell.hidden) {
+          continue;
+        }
+        const lines = lineByCol.get(colIndex) || [String(cell.text || "")];
+        cell.text = getTemplateTextLine(lines, 0);
+      }
+
+      const extraRows = [];
+      for (let lineIndex = 1; lineIndex < maxLines; lineIndex += 1) {
+        const extraRow = row.map((cell) => cloneTemplateMatrixCell(cell));
+        for (let colIndex = 0; colIndex < extraRow.length; colIndex += 1) {
+          const cell = extraRow[colIndex];
+          if (!cell || cell.hidden) {
+            continue;
+          }
+          const lines = lineByCol.get(colIndex) || [String(cell.text || "")];
+          cell.text = getTemplateTextLine(lines, lineIndex);
+        }
+        extraRows.push(extraRow);
+      }
+
+      if (extraRows.length) {
+        rows.splice(rowIndex + 1, 0, ...extraRows);
+      }
+    }
+
+    return rows;
+  }
+
+  function isTemplateRowBlank(row) {
+    const list = Array.isArray(row) ? row : [];
+    for (const cell of list) {
+      if (!cell || cell.hidden) {
+        continue;
+      }
+      if (String(cell.text || "").trim() !== "") {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function getTemplateRowPlaceholderState(row) {
+    const list = Array.isArray(row) ? row : [];
+    let hasPlaceholder = false;
+    let hasTokenValue = false;
+    for (const cell of list) {
+      if (!cell || cell.hidden) {
+        continue;
+      }
+      if (cell.hasPlaceholder) {
+        hasPlaceholder = true;
+      }
+      if (cell.hasTokenValue) {
+        hasTokenValue = true;
+      }
+    }
+    return { hasPlaceholder, hasTokenValue };
+  }
+
+  function compactTemplateMatrixRows(matrix, options) {
+    const rows = Array.isArray(matrix) ? matrix : [];
+    if (!rows.length) {
+      return rows;
+    }
+
+    const removeAdvanced = options && options.hideRowsWithoutValues === true;
+    const removeEmpty = removeAdvanced || (options && options.hideEmptyRows === true);
+    if (!removeAdvanced && !removeEmpty) {
+      return rows;
+    }
+
+    const out = [];
+    for (const row of rows) {
+      const rowBlank = isTemplateRowBlank(row);
+      if (removeAdvanced) {
+        const stateRow = getTemplateRowPlaceholderState(row);
+        if (rowBlank || (stateRow.hasPlaceholder && !stateRow.hasTokenValue)) {
+          continue;
+        }
+        out.push(row);
+        continue;
+      }
+
+      if (removeEmpty && rowBlank) {
+        continue;
+      }
+      out.push(row);
+    }
+
+    return out;
+  }
+
+  function applyTemplatePreviewOptions(matrix, options) {
+    let next = Array.isArray(matrix) ? matrix : [];
+    if (!next.length) {
+      return next;
+    }
+    if (options && options.expandMultilineRows === true) {
+      next = expandTemplateMatrixRows(next);
+    }
+    return compactTemplateMatrixRows(next, options);
+  }
+
+  function buildTemplateGridModel(obj, templateMap, templateOptions) {
+    const map = templateMap && typeof templateMap === "object" ? templateMap : {};
+    const options = templateOptions && typeof templateOptions === "object"
+      ? templateOptions
+      : normalizeTemplatePreviewOptions(null, null, null);
+    const entries = [];
+    const errors = [];
+    let maxRow = 0;
+    let maxCol = 0;
+
+    for (const rangeKey of Object.keys(map)) {
+      if (isTemplateRangeMetaKey(rangeKey)) {
+        continue;
+      }
+      try {
+        const parsedRange = parseRangeKey(rangeKey);
+        entries.push({
+          rangeKey,
+          parsedRange,
+          config: map[rangeKey] && typeof map[rangeKey] === "object" ? map[rangeKey] : {}
+        });
+        maxRow = Math.max(maxRow, parsedRange.r2);
+        maxCol = Math.max(maxCol, parsedRange.c2);
+      } catch (err) {
+        errors.push(`${rangeKey}: ${err && err.message ? err.message : err}`);
+      }
+    }
+
+    if (!entries.length) {
+      return {
+        matrix: [],
+        maxRow: 0,
+        maxCol: 0,
+        errors
+      };
+    }
+
+    const matrix = Array.from({ length: maxRow }, () =>
+      Array.from({ length: maxCol }, () => createTemplateCellModel())
+    );
+
+    for (const entry of entries) {
+      const cfg = entry.config;
+      const range = entry.parsedRange;
+      const hasText = Object.prototype.hasOwnProperty.call(cfg, "text");
+      const textMeta = hasText ? resolveTemplateText(cfg.text, obj) : null;
+      const merge = cfg && cfg.merge === true;
+
+      if (merge) {
+        for (let row = range.r1; row <= range.r2; row += 1) {
+          for (let col = range.c1; col <= range.c2; col += 1) {
+            const cell = matrix[row - 1][col - 1];
+            if (!cell) {
+              continue;
+            }
+            const isAnchor = row === range.r1 && col === range.c1;
+            if (isAnchor) {
+              cell.hidden = false;
+              cell.rowspan = range.r2 - range.r1 + 1;
+              cell.colspan = range.c2 - range.c1 + 1;
+              if (hasText) {
+                cell.text = String(textMeta && textMeta.text ? textMeta.text : "");
+                cell.hasPlaceholder = cell.hasPlaceholder || Boolean(textMeta && textMeta.hasPlaceholder);
+                cell.hasTokenValue = cell.hasTokenValue || Boolean(textMeta && textMeta.hasTokenValue);
+              }
+              const cellStyle = buildTemplateCellStyle(cfg, {
+                isTop: true,
+                isRight: true,
+                isBottom: true,
+                isLeft: true,
+                isMergeAnchor: true
+              });
+              cell.style = { ...cell.style, ...cellStyle };
+            } else {
+              cell.hidden = true;
+              cell.rowspan = 1;
+              cell.colspan = 1;
+            }
+          }
+        }
+        continue;
+      }
+
+      for (let row = range.r1; row <= range.r2; row += 1) {
+        for (let col = range.c1; col <= range.c2; col += 1) {
+          const cell = matrix[row - 1][col - 1];
+          if (!cell) {
+            continue;
+          }
+          cell.hidden = false;
+          cell.rowspan = 1;
+          cell.colspan = 1;
+          if (hasText) {
+            cell.text = String(textMeta && textMeta.text ? textMeta.text : "");
+            cell.hasPlaceholder = cell.hasPlaceholder || Boolean(textMeta && textMeta.hasPlaceholder);
+            cell.hasTokenValue = cell.hasTokenValue || Boolean(textMeta && textMeta.hasTokenValue);
+          }
+          const cellStyle = buildTemplateCellStyle(cfg, {
+            isTop: row === range.r1,
+            isRight: col === range.c2,
+            isBottom: row === range.r2,
+            isLeft: col === range.c1,
+            isMergeAnchor: false
+          });
+          cell.style = { ...cell.style, ...cellStyle };
+        }
+      }
+    }
+
+    const compactedMatrix = applyTemplatePreviewOptions(matrix, options);
+    return {
+      matrix: compactedMatrix,
+      maxRow: compactedMatrix.length,
+      maxCol,
+      errors
+    };
+  }
+
+  function renderTemplateTable(model) {
+    const matrix = model && Array.isArray(model.matrix) ? model.matrix : [];
+    if (!matrix.length) {
+      return null;
+    }
+
+    const table = el("table", {
+      className: "template-preview-table",
+      attrs: {
+        style: "border-collapse:collapse;table-layout:fixed;width:max-content;min-width:100%;"
+      }
+    });
+    const tbody = el("tbody");
+
+    for (let rowIndex = 0; rowIndex < matrix.length; rowIndex += 1) {
+      const row = matrix[rowIndex];
+      const tr = el("tr");
+      for (let colIndex = 0; colIndex < row.length; colIndex += 1) {
+        const cell = row[colIndex];
+        if (!cell || cell.hidden) {
+          continue;
+        }
+
+        const td = document.createElement("td");
+        if (cell.rowspan > 1) {
+          td.rowSpan = cell.rowspan;
+        }
+        if (cell.colspan > 1) {
+          td.colSpan = cell.colspan;
+        }
+
+        td.textContent = String(cell.text || "");
+        const cssText = toInlineCssText({
+          "min-width": "56px",
+          "max-width": "360px",
+          padding: "4px 6px",
+          border: "1px solid #d3d3d3",
+          "vertical-align": "top",
+          "white-space": "pre-wrap",
+          "font-size": "10pt",
+          "font-family": "\"MS PGothic\", \"MS UI Gothic\", Meiryo, sans-serif",
+          color: "#111111",
+          "background-color": "#ffffff",
+          ...cell.style
+        });
+        if (cssText) {
+          td.setAttribute("style", cssText);
+        }
+
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+
+    table.appendChild(tbody);
+    return table;
+  }
+
+  async function copyHtmlWithFallback(html, plainText) {
+    const safeHtml = String(html || "");
+    const safeText = String(plainText || "");
+
+    if (
+      safeHtml
+      && navigator.clipboard
+      && typeof navigator.clipboard.write === "function"
+      && typeof window.ClipboardItem === "function"
+    ) {
+      const item = new window.ClipboardItem({
+        "text/html": new Blob([safeHtml], { type: "text/html" }),
+        "text/plain": new Blob([safeText], { type: "text/plain" })
+      });
+      await navigator.clipboard.write([item]);
+      return;
+    }
+
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      await navigator.clipboard.writeText(safeText);
+      return;
+    }
+
+    const temp = document.createElement("div");
+    temp.style.position = "fixed";
+    temp.style.left = "-99999px";
+    temp.style.top = "0";
+    temp.setAttribute("contenteditable", "true");
+    temp.innerHTML = safeHtml || safeText.replace(/\n/g, "<br>");
+    document.body.appendChild(temp);
+
+    const selection = window.getSelection();
+    if (!selection) {
+      document.body.removeChild(temp);
+      throw new Error("Clipboard selection is unavailable.");
+    }
+
+    selection.removeAllRanges();
+    const range = document.createRange();
+    range.selectNodeContents(temp);
+    selection.addRange(range);
+    const copied = document.execCommand("copy");
+    selection.removeAllRanges();
+    document.body.removeChild(temp);
+
+    if (!copied) {
+      throw new Error("Copy failed in this browser.");
+    }
+  }
+
+  function resolveTemplateMapForObject(obj, config) {
+    const templates = config && typeof config === "object" && config.templates && typeof config.templates === "object"
+      ? config.templates
+      : {};
+    const objectType = obj && obj.objectType ? String(obj.objectType) : "";
+    if (objectType && Object.prototype.hasOwnProperty.call(templates, objectType)) {
+      const resolved = resolveTemplateDefinitionForPreview(templates[objectType]);
+      return { key: objectType, map: resolved.map, options: resolved.options };
+    }
+    if (Object.prototype.hasOwnProperty.call(templates, "DEFAULT")) {
+      const resolved = resolveTemplateDefinitionForPreview(templates.DEFAULT);
+      return { key: "DEFAULT", map: resolved.map, options: resolved.options };
+    }
+    const resolved = resolveTemplateDefinitionForPreview(null);
+    return { key: "", map: null, options: resolved.options };
+  }
+
+  function buildTemplatePlainTextFromBlock(block) {
+    if (!block) {
+      return "";
+    }
+    return String(block.innerText || block.textContent || "").trim();
+  }
+
+  function getRenderableObjectListForTemplate() {
+    const out = [];
+    const roots = Array.isArray(state.renderObjects) ? state.renderObjects : [];
+
+    const appendNode = (obj, depth) => {
+      if (!obj || typeof obj !== "object") {
+        return;
+      }
+      out.push({ obj, depth: Math.max(0, Number(depth) || 0) });
+
+      const children = Array.isArray(obj.children) ? obj.children : [];
+      for (const child of children) {
+        appendNode(child, (Number(depth) || 0) + 1);
+      }
+    };
+
+    for (const root of roots) {
+      appendNode(root, 0);
+    }
+
+    return out;
+  }
+
+  function renderTemplatePreview() {
+    if (!els.templatePreviewOutput) {
+      return;
+    }
+
+    if (!state.data || !Array.isArray(state.renderObjects)) {
+      setTemplatePreviewMessage("No data loaded.");
+      return;
+    }
+
+    const config = state.templateConfig && typeof state.templateConfig === "object"
+      ? state.templateConfig
+      : getDefaultTemplateConfig();
+
+    const check = validateTemplateConfig(config);
+    if (!check.valid) {
+      setTemplatePreviewMessage("Template config is invalid.");
+      setTemplateConfigError(check.errors.join("\n"));
+      return;
+    }
+
+    const items = getRenderableObjectListForTemplate();
+    if (!items.length) {
+      setTemplatePreviewMessage("No renderable objects.");
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    for (let index = 0; index < items.length; index += 1) {
+      const item = items[index];
+      const obj = item.obj;
+      const depth = Math.max(0, Number(item.depth) || 0);
+      const templateContextObj = buildTemplateContextObject(obj, index + 1);
+      const resolved = resolveTemplateMapForObject(obj, config);
+
+      const blockAttrs = { "data-template-index": String(index), "data-depth": String(depth) };
+      const lineStart = Number(obj && obj.lineStart) || 0;
+      if (lineStart > 0) {
+        blockAttrs["data-line-start"] = String(lineStart);
+      }
+      const block = el("div", { className: "template-block", attrs: blockAttrs });
+      const indentPx = Math.min(120, depth * 12);
+      if (indentPx > 0) {
+        block.style.marginLeft = `${indentPx}px`;
+      } else {
+        block.style.marginLeft = "";
+      }
+      const header = el("div", { className: "template-block-header" });
+
+      const left = el("div");
+      const label = getObjectLabel(obj);
+      const titleText = `${index + 1}. ${String(obj.objectType || "OBJECT")}${label ? ` ${label}` : ""}`;
+      left.appendChild(el("h4", { className: "template-block-title", text: titleText }));
+      const meta = renderMeta(obj);
+      const keyText = resolved.key ? `template=${resolved.key}` : "template=missing";
+      left.appendChild(el("div", { className: "template-block-meta", text: [meta, keyText].filter(Boolean).join(" • ") }));
+      header.appendChild(left);
+
+      const actions = el("div", { className: "template-block-actions" });
+      const codeBtn = el("button", {
+        className: "secondary",
+        text: "Code",
+        attrs: { type: "button", "data-template-action": "code" }
+      });
+      codeBtn.addEventListener("click", () => {
+        const selectedIndex = String(index);
+        if (typeof setSelectedTemplateBlock === "function") {
+          setSelectedTemplateBlock(selectedIndex);
+        } else {
+          state.selectedTemplateIndex = selectedIndex;
+        }
+        if (lineStart > 0 && typeof selectCodeLines === "function") {
+          const lineEnd = Number(obj && obj.block && obj.block.lineEnd) || lineStart;
+          selectCodeLines(lineStart, lineEnd);
+        }
+      });
+      actions.appendChild(codeBtn);
+
+      const pathsBtn = el("button", {
+        className: "secondary",
+        text: "Paths",
+        attrs: { type: "button", "data-template-action": "paths" }
+      });
+      pathsBtn.addEventListener("click", (ev) => {
+        if (ev && typeof ev.stopPropagation === "function") {
+          ev.stopPropagation();
+        }
+        openTemplatePathDump(templateContextObj, index, obj);
+      });
+      actions.appendChild(pathsBtn);
+
+      const copyBtn = el("button", {
+        className: "secondary",
+        text: "Copy",
+        attrs: { type: "button", "data-template-action": "copy" }
+      });
+      copyBtn.addEventListener("click", async () => {
+        try {
+          const clone = block.cloneNode(true);
+          const actionButtons = clone.querySelectorAll("[data-template-action]");
+          for (const actionBtn of Array.from(actionButtons)) {
+            actionBtn.remove();
+          }
+          await copyHtmlWithFallback(clone.outerHTML, buildTemplatePlainTextFromBlock(clone));
+          setError("");
+        } catch (err) {
+          setError(`Copy failed: ${err && err.message ? err.message : err}`);
+        }
+      });
+      actions.appendChild(copyBtn);
+      header.appendChild(actions);
+      block.appendChild(header);
+      block.addEventListener("click", () => {
+        const selectedIndex = String(index);
+        if (typeof setSelectedTemplateBlock === "function") {
+          setSelectedTemplateBlock(selectedIndex, { scroll: false });
+        } else {
+          state.selectedTemplateIndex = selectedIndex;
+        }
+      });
+
+      if (!resolved.map || typeof resolved.map !== "object") {
+        block.appendChild(el("div", { className: "template-empty", text: "[Missing template]" }));
+        fragment.appendChild(block);
+        continue;
+      }
+
+      const model = buildTemplateGridModel(templateContextObj, resolved.map, resolved.options);
+      if (model.errors.length) {
+        block.appendChild(el("div", { className: "template-error", text: model.errors.join("\n") }));
+      }
+
+      const table = renderTemplateTable(model);
+      if (table) {
+        block.appendChild(table);
+      } else {
+        block.appendChild(el("div", { className: "template-empty", text: "[Missing template]" }));
+      }
+
+      fragment.appendChild(block);
+    }
+
+    els.templatePreviewOutput.classList.remove("muted");
+    els.templatePreviewOutput.replaceChildren(fragment);
+    state.templatePreviewCache = { count: items.length };
+    if (state.selectedTemplateIndex !== "" && typeof setSelectedTemplateBlock === "function") {
+      setSelectedTemplateBlock(state.selectedTemplateIndex, { scroll: false });
+    }
+    if (typeof refreshInputGutterTargets === "function") {
+      refreshInputGutterTargets();
+    }
+  }
+
+  function syncTemplateEditorFromState() {
+    if (!els.templateConfigJson) {
+      return;
+    }
+    const pretty = safeJson(state.templateConfig || getDefaultTemplateConfig(), true);
+    state.templateConfigDraft = pretty;
+    els.templateConfigJson.value = pretty;
+  }
+
+  function applyTemplateConfigObject(config, options) {
+    const opts = options && typeof options === "object" ? options : {};
+    const check = validateTemplateConfig(config);
+    if (!check.valid) {
+      setTemplateConfigError(check.errors.join("\n"));
+      return false;
+    }
+
+    const next = cloneJsonValue(config);
+    if (!next || typeof next !== "object") {
+      setTemplateConfigError("Cannot clone template config.");
+      return false;
+    }
+
+    state.templateConfig = next;
+    if (opts.save !== false) {
+      saveTemplateConfig(next);
+    }
+    setTemplateConfigError("");
+    syncTemplateEditorFromState();
+    renderTemplatePreview();
+    return true;
+  }
+
+  function applyTemplateConfigFromEditor() {
+    const raw = els.templateConfigJson ? String(els.templateConfigJson.value || "").trim() : "";
+    if (!raw) {
+      setTemplateConfigError("Template config JSON is empty.");
+      return;
+    }
+
+    let parsed = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err) {
+      setTemplateConfigError(`JSON parse error: ${err && err.message ? err.message : err}`);
+      return;
+    }
+
+    applyTemplateConfigObject(parsed, { save: true });
+  }
+
+  function resetTemplateConfig() {
+    applyTemplateConfigObject(getDefaultTemplateConfig(), { save: true });
+  }
+
+  function exportTemplateConfig() {
+    const config = state.templateConfig || getDefaultTemplateConfig();
+    const content = safeJson(config, true);
+    const fileName = "abap-template-config.json";
+
+    try {
+      const blob = new Blob([content], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setError("");
+    } catch (err) {
+      setError(`Export failed: ${err && err.message ? err.message : err}`);
+    }
+  }
+
+  async function importTemplateConfigFromFile(file) {
+    if (!file) {
+      return;
+    }
+
+    let text = "";
+    try {
+      text = await file.text();
+    } catch (err) {
+      setTemplateConfigError(`Import failed: ${err && err.message ? err.message : err}`);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(text);
+      const applied = applyTemplateConfigObject(parsed, { save: true });
+      if (applied) {
+        setError("");
+      }
+    } catch (err) {
+      setTemplateConfigError(`Import JSON parse error: ${err && err.message ? err.message : err}`);
+    }
+  }
+
+  async function copyAllTemplateBlocks() {
+    if (!els.templatePreviewOutput) {
+      return;
+    }
+    const blocks = Array.from(els.templatePreviewOutput.querySelectorAll(".template-block"));
+    if (!blocks.length) {
+      setError("Nothing to copy.");
+      return;
+    }
+
+    const wrapper = document.createElement("div");
+    const plainLines = [];
+    for (const block of blocks) {
+      const clone = block.cloneNode(true);
+      const actionButtons = clone.querySelectorAll("[data-template-action]");
+      for (const actionBtn of Array.from(actionButtons)) {
+        actionBtn.remove();
+      }
+      wrapper.appendChild(clone);
+      plainLines.push(buildTemplatePlainTextFromBlock(clone));
+    }
+
+    await copyHtmlWithFallback(wrapper.innerHTML, plainLines.filter(Boolean).join("\n\n"));
+  }
+
+window.AbapViewerModules.factories = window.AbapViewerModules.factories || {};
+window.AbapViewerModules.factories["03-template-preview"] = function registerTemplatePreview(runtime) {
+  const targetRuntime = runtime || (window.AbapViewerRuntime = window.AbapViewerRuntime || {});
+  targetRuntime.api = targetRuntime.api || {};
+  targetRuntime.api.renderTemplatePreview = renderTemplatePreview;
+  targetRuntime.api.applyTemplateConfigFromEditor = applyTemplateConfigFromEditor;
+  window.AbapViewerModules.parts["03-template-preview"] = true;
+};
+window.AbapViewerModules.factories["03-template-preview"](window.AbapViewerRuntime);
+</script>
+  <script>
+// inlined from: ./app/04-output-render.js
+"use strict";
+
+window.AbapViewerModules = window.AbapViewerModules || {};
+window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
+
   function isValueLikeEntryObject(value) {
     if (!isPlainObjectRecord(value)) {
       return false;
@@ -10918,6 +14182,39 @@
     }
   }
 
+  function setSelectedTemplateBlock(index, options) {
+    if (!els.templatePreviewOutput) {
+      return;
+    }
+
+    const opts = options && typeof options === "object" ? options : {};
+    const shouldScroll = opts.scroll !== false;
+    const normalized = String(index === undefined || index === null ? "" : index).trim();
+    if (!normalized) {
+      return;
+    }
+
+    if (state.selectedTemplateIndex !== "") {
+      const prev = els.templatePreviewOutput.querySelector(
+        `.template-block[data-template-index="${escapeSelectorValue(state.selectedTemplateIndex)}"]`
+      );
+      if (prev) {
+        prev.classList.remove("selected");
+      }
+    }
+
+    state.selectedTemplateIndex = normalized;
+    const next = els.templatePreviewOutput.querySelector(
+      `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`
+    );
+    if (next) {
+      next.classList.add("selected");
+      if (shouldScroll) {
+        next.scrollIntoView({ block: "nearest" });
+      }
+    }
+  }
+
   function setSelectedDeclRow(declKey) {
     const key = String(declKey || "").trim();
     if (!key || !els.declDescTable) {
@@ -11040,6 +14337,25 @@
     return targets;
   }
 
+  function computeInputGutterTargetsForTemplate() {
+    const targets = new Map();
+    if (!els.templatePreviewOutput) {
+      return targets;
+    }
+
+    const blocks = els.templatePreviewOutput.querySelectorAll(".template-block[data-template-index][data-line-start]");
+    for (const block of Array.from(blocks)) {
+      const line = Number(block.getAttribute("data-line-start")) || 0;
+      const index = String(block.getAttribute("data-template-index") || "");
+      if (!line || !index || targets.has(line)) {
+        continue;
+      }
+      targets.set(line, { kind: "template", index });
+    }
+
+    return targets;
+  }
+
   function refreshInputGutterTargets() {
     if (!els.inputGutterContent || !state.inputGutterButtonsByLine.size) {
       return;
@@ -11053,12 +14369,21 @@
       return;
     }
 
-    const targets = state.rightTab === "descriptions"
-      ? computeInputGutterTargetsForDescriptions()
-      : computeInputGutterTargetsForOutput();
+    let targets = new Map();
+    if (state.rightTab === "descriptions") {
+      targets = computeInputGutterTargetsForDescriptions();
+    } else if (state.rightTab === "output") {
+      targets = computeInputGutterTargetsForOutput();
+    } else if (state.rightTab === "template") {
+      targets = computeInputGutterTargetsForTemplate();
+    }
 
     state.inputGutterTargetsByLine = targets;
-    const title = state.rightTab === "descriptions" ? "Jump to Descriptions" : "Jump to Output";
+    const title = state.rightTab === "descriptions"
+      ? "Jump to Descriptions"
+      : (state.rightTab === "output"
+        ? "Jump to Output"
+        : (state.rightTab === "template" ? "Jump to Template" : ""));
     for (const [line, btn] of state.inputGutterButtonsByLine.entries()) {
       const target = targets.get(line);
       btn.hidden = !target;
@@ -11089,6 +14414,11 @@
 
     if (state.rightTab === "output" && jumpTarget.kind === "output") {
       setSelectedCard(jumpTarget.id);
+      return;
+    }
+
+    if (state.rightTab === "template" && jumpTarget.kind === "template") {
+      setSelectedTemplateBlock(jumpTarget.index);
       return;
     }
 
@@ -12659,6 +15989,24 @@
     return null;
   }
 
+window.AbapViewerModules.factories = window.AbapViewerModules.factories || {};
+window.AbapViewerModules.factories["04-output-render"] = function registerOutputRender(runtime) {
+  const targetRuntime = runtime || (window.AbapViewerRuntime = window.AbapViewerRuntime || {});
+  targetRuntime.api = targetRuntime.api || {};
+  targetRuntime.api.renderOutput = renderOutput;
+  targetRuntime.api.buildAbapFlowXml = buildAbapFlowXml;
+  targetRuntime.api.setRightTab = setRightTab;
+  window.AbapViewerModules.parts["04-output-render"] = true;
+};
+window.AbapViewerModules.factories["04-output-render"](window.AbapViewerRuntime);
+</script>
+  <script>
+// inlined from: ./app/05-main.js
+"use strict";
+
+window.AbapViewerModules = window.AbapViewerModules || {};
+window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
+
   function parseFromTextarea(fileName) {
     const content = els.inputText.value || "";
     const trimmed = content.trim();
@@ -12707,12 +16055,15 @@
 
     state.collapsedIds.clear();
     state.selectedId = "";
+    state.selectedTemplateIndex = "";
     state.renderObjects = buildRenderableObjects(state.data && state.data.objects, RENDER_TREE_OPTIONS);
     state.haystackById = buildSearchIndex(state.renderObjects);
     populateTypeFilter(state.renderObjects);
     renderOutput();
     if (state.rightTab === "descriptions") {
       renderDeclDescPanelUi();
+    } else if (state.rightTab === "template") {
+      renderTemplatePreview();
     }
   }
 
@@ -12744,8 +16095,16 @@
     state.descOverridesLegacy = loadLegacyDescOverrides();
     state.customRules = loadCustomRules();
     state.settings = loadSettings();
+    state.templateConfig = loadTemplateConfig();
+    state.templatePreviewCache = null;
     applyTheme(loadTheme(), { save: false });
     initLayoutSplitter();
+
+    if (els.templateKeyMode) {
+      els.templateKeyMode.textContent = "AUTO: objectType -> DEFAULT";
+    }
+    syncTemplateEditorFromState();
+    setTemplateConfigError("");
 
     if (els.inputText && !els.inputText.value.trim()) {
       els.inputText.value = SAMPLE_ABAP;
@@ -12810,8 +16169,58 @@
       els.rightTabOutputBtn.addEventListener("click", () => setRightTab("output"));
     }
 
+    if (els.rightTabTemplateBtn) {
+      els.rightTabTemplateBtn.addEventListener("click", () => setRightTab("template"));
+    }
+
     if (els.rightTabDescBtn) {
       els.rightTabDescBtn.addEventListener("click", () => setRightTab("descriptions"));
+    }
+
+    if (els.templateCopyAllBtn) {
+      els.templateCopyAllBtn.addEventListener("click", () => {
+        copyAllTemplateBlocks()
+          .then(() => setError(""))
+          .catch((err) => setError(`Copy failed: ${err && err.message ? err.message : err}`));
+      });
+    }
+
+    if (els.templateResetBtn) {
+      els.templateResetBtn.addEventListener("click", resetTemplateConfig);
+    }
+
+    if (els.templateExportBtn) {
+      els.templateExportBtn.addEventListener("click", exportTemplateConfig);
+    }
+
+    if (els.templateImportBtn && els.templateImportInput) {
+      els.templateImportBtn.addEventListener("click", () => {
+        els.templateImportInput.click();
+      });
+    }
+
+    if (els.templateImportInput) {
+      els.templateImportInput.addEventListener("change", async (ev) => {
+        const file = ev && ev.target && ev.target.files ? ev.target.files[0] : null;
+        if (!file) {
+          return;
+        }
+        await importTemplateConfigFromFile(file);
+        els.templateImportInput.value = "";
+      });
+    }
+
+    if (els.templateApplyBtn) {
+      els.templateApplyBtn.addEventListener("click", applyTemplateConfigFromEditor);
+    }
+
+    if (els.templateConfigJson) {
+      els.templateConfigJson.addEventListener("keydown", (ev) => {
+        if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
+          ev.preventDefault();
+          applyTemplateConfigFromEditor();
+        }
+      });
     }
 
     if (els.declDescJsonBtn) {
@@ -12992,7 +16401,7 @@
         return;
       }
 
-      if (state.rightTab === "descriptions") {
+      if (state.rightTab === "descriptions" || state.rightTab === "template") {
         setRightTab("output");
         return;
       }
@@ -13002,12 +16411,80 @@
     parseFromTextarea("sample.abap");
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
-    init();
+window.AbapViewerModules.factories = window.AbapViewerModules.factories || {};
+window.AbapViewerModules.factories["05-main"] = function registerMain(runtime) {
+  const targetRuntime = runtime || (window.AbapViewerRuntime = window.AbapViewerRuntime || {});
+  targetRuntime.api = targetRuntime.api || {};
+  targetRuntime.api.parseFromTextarea = parseFromTextarea;
+  targetRuntime.api.init = init;
+
+  window.AbapViewerModules.start = function startAbapViewer() {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", init, { once: true });
+    } else {
+      init();
+    }
+  };
+  window.AbapViewerModules.parts["05-main"] = true;
+};
+window.AbapViewerModules.factories["05-main"](window.AbapViewerRuntime);
+</script>
+  <script>
+// inlined from: ./app.js
+"use strict";
+
+(function () {
+  window.AbapViewerModules = window.AbapViewerModules || {};
+  window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
+  window.AbapViewerRuntime = window.AbapViewerRuntime || {};
+  window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
+
+  const requiredParts = [
+    "01-core",
+    "02-descriptions",
+    "03-template-preview",
+    "04-output-render",
+    "05-main"
+  ];
+
+  const missing = requiredParts.filter((name) => !window.AbapViewerModules.parts[name]);
+  if (missing.length) {
+    const message = `Viewer modules missing: ${missing.join(", ")}. Check script order in viewer/index.html.`;
+    const errorEl = document.getElementById("error");
+    if (errorEl) {
+      errorEl.textContent = message;
+    }
+    try {
+      console.error(message);
+    } catch {
+      // ignore
+    }
+    return;
   }
+
+  const runtime = window.AbapViewerRuntime;
+  runtime.els = runtime.els || null;
+  runtime.state = runtime.state || null;
+  runtime.constants = runtime.constants || {};
+  runtime.api = runtime.api || {};
+
+  if (typeof window.AbapViewerModules.start !== "function") {
+    const message = "Viewer start function not found (window.AbapViewerModules.start).";
+    const errorEl = document.getElementById("error");
+    if (errorEl) {
+      errorEl.textContent = message;
+    }
+    try {
+      console.error(message);
+    } catch {
+      // ignore
+    }
+    return;
+  }
+
+  window.AbapViewerModules.start(runtime);
 })();
 </script>
 </body>
 </html>
+

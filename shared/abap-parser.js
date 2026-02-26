@@ -203,10 +203,15 @@
 
       if (isCommentLine(trimmed)) {
         const commentText = normalizeComment(trimmed);
-        if (current) {
-          current.comments.push(commentText);
-        } else {
-          pendingComments.push({ line: lineNumber, text: commentText });
+        if (commentText) {
+          if (current) {
+            current.comments.push(commentText);
+          } else {
+            pendingComments.push({ line: lineNumber, text: commentText });
+          }
+        } else if (!current) {
+          // Decorative comment-only lines behave like blank separators.
+          pendingComments = [];
         }
         continue;
       }
@@ -217,6 +222,9 @@
       if (!codeTrim) {
         if (comment) {
           pendingComments.push({ line: lineNumber, text: comment });
+        } else if (!current) {
+          // Decorative inline-only comment (e.g. `"----"`) is treated as blank.
+          pendingComments = [];
         }
         continue;
       }
@@ -269,10 +277,27 @@
   }
 
   function normalizeComment(trimmedLine) {
+    const normalizeText = (text) => {
+      const trimmed = String(text || "").trim();
+      if (!trimmed) {
+        return "";
+      }
+
+      // Treat separator-only comment content as empty.
+      if (
+        !/[A-Za-z0-9\u00C0-\u024F\u1E00-\u1EFF]/.test(trimmed) &&
+        /^[\s*&\-_=~#|\\/.:;,+(){}\[\]<>]+$/.test(trimmed)
+      ) {
+        return "";
+      }
+
+      return trimmed;
+    };
+
     if (trimmedLine.startsWith("*") || trimmedLine.startsWith('"')) {
-      return trimmedLine.slice(1).trim();
+      return normalizeText(trimmedLine.slice(1));
     }
-    return trimmedLine.trim();
+    return normalizeText(trimmedLine);
   }
 
   function splitCodeAndInlineComment(line) {
@@ -304,7 +329,7 @@
 
       if (char === '"' && !inSingleQuote && !inPipe) {
         const code = text.slice(0, index);
-        const comment = text.slice(index + 1).trim();
+        const comment = normalizeComment(text.slice(index + 1));
         return { code, comment };
       }
     }

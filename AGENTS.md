@@ -68,3 +68,33 @@ This file is the local source of truth for future AI/code agents working in this
   - In Output table, prefer parsed rows over raw text for `*Raw` entries (for editable decl-desc per argument).
   - Keep raw fallback when parsed rows are empty/unavailable.
   - Do not change XML contract for these `values.*Raw` fields unless explicitly requested.
+
+- Template shorthand compiler is AI-side/CLI:
+  - Use `node scripts/template-tool.js` to compile shorthand template lines into JSON.
+  - Do not add user-facing shorthand tooling in Viewer UI unless explicitly requested.
+
+- Template path strictness (Viewer Template tab):
+  - Keep placeholder paths strict/canonical to real parse schema.
+  - Do not add typo/autocorrect aliases for template paths in runtime resolver.
+  - If a path is wrong, fix the template path itself.
+  - Use `Paths` button (or `__DUMP_VALUES__`) to inspect available `path = value` pairs before editing templates.
+
+- Template style token policy:
+  - Keep committed default templates in technical style tokens, not natural-language aliases.
+  - Preferred defaults:
+    - `background`: hex colors (`#ffffff`, `#dbeef4`, ...)
+    - `border`: `outside-thin`
+    - `font`: explicit family (`MS PGothic`)
+    - `font color`: hex (`#111111`)
+
+- Template options naming policy:
+  - Canonical web keys:
+    - `hideEmptyRows`
+    - `hideRowsWithoutValues`
+    - `expandMultilineRows`
+  - Backward aliases from VBA naming remain compatibility-only and should not be preferred in new committed defaults.
+
+- Template coverage policy:
+  - Keep explicit custom templates for high-priority statement types (currently includes `ASSIGNMENT`, `APPEND`, `READ_TABLE`, `MODIFY_ITAB`, `DELETE_ITAB`, `IF`, `ELSEIF`).
+  - Missing statement types should be filled by generic schema-safe templates rather than left undefined.
+
