@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="abap-viewer-version" content="v2026.02.26-r1">
-  <meta name="abap-viewer-updated-at" content="2026-02-26 19:12:34">
+  <meta name="abap-viewer-updated-at" content="2026-02-26 23:02:10">
   <meta name="abap-viewer-updated-note" content="AI note: Added PATH_DECL synthetic fallback for Viewer/XML values and extras; finalDesc tech-id fallback order is declRef > identifier > value > name. Manual metadata only. Offline only.">
   <title>ABAP Parser Viewer</title>
   <style>
@@ -7657,6 +7657,12 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     "LOOP AT gt_rows ASSIGNING <fs_row> WHERE bukrs = gc_default_bukrs.",
     "  gv_total = gv_total + 1.",
     "ENDLOOP.",
+    "LOOP AT lt_users INTO ls_user",
+    "  WHERE uname = p_user",
+    "    AND active = lv_active",
+    "    AND role = lv_role.",
+    "  gv_total = gv_total + 1.",
+    "ENDLOOP.",
     "",
     "* Conditions",
     "IF gv_total > 0 AND p_flag = abap_true.",
@@ -7673,7 +7679,13 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     "    iv_user = p_user",
     "  IMPORTING",
     "    ev_text = lv_text",
+    "  CHANGING",
+    "    cv_cnt = gv_total",
+    "  TABLES",
+    "    et_rows = gt_rows",
     "  EXCEPTIONS",
+    "    text_error = 2",
+    "    error_message = 3",
     "    OTHERS = 1.",
     "",
     "CALL METHOD lo_demo->do_something",
@@ -7686,8 +7698,12 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     "lv_text = lcl_demo=>get_default( ).",
     "lo_demo->do_something( EXPORTING iv_user = p_user IMPORTING ev_text = lv_text ).",
     "",
+    "* MESSAGE demo (class/number/type/display like/with/into)",
+    "MESSAGE ID '00' TYPE 'S' NUMBER '001' WITH p_user lv_role gv_total lv_text DISPLAY LIKE 'I' INTO lv_text.",
+    "",
     "* PERFORM + FORM",
     "PERFORM main USING p_user p_flag CHANGING lv_text IF p_flag = abap_true.",
+    "PERFORM main IN PROGRAM sy-repid USING p_user p_flag CHANGING lv_text IF p_flag = abap_true.",
     "",
     "FORM main",
     "  USING iv_user TYPE syuname",
@@ -7909,6 +7925,101 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
         },
         G2: {
           text: "{values.expr.decl.finalDesc}"
+        }
+      },
+      CALL_FUNCTION: {
+        _options: {
+          hideEmptyRows: true,
+          hideRowsWithoutValues: true,
+          expandMultilineRows: true
+        },
+        "A1:H1": createTemplateBaseStyle("#dbeef4"),
+        A1: {
+          text: "Function Module"
+        },
+        "I1:BG1": createTemplateBaseStyle("#ffffff"),
+        I1: {
+          text: "{values.name.finalDesc}"
+        },
+        "A2:H2": createTemplateBaseStyle("#dbeef4"),
+        A2: {
+          text: "Exporting"
+        },
+        "I2:P2": createTemplateBaseStyle("#ffffff"),
+        I2: {
+          text: "{extras.callFunction.exporting.name}"
+        },
+        "Q2:X2": createTemplateBaseStyle("#ffffff"),
+        Q2: {
+          text: "="
+        },
+        "Y2:BG2": createTemplateBaseStyle("#ffffff"),
+        Y2: {
+          text: "{extras.callFunction.exporting.valueDecl.finalDesc}"
+        },
+        "A3:H3": createTemplateBaseStyle("#dbeef4"),
+        A3: {
+          text: "Importing"
+        },
+        "I3:P3": createTemplateBaseStyle("#ffffff"),
+        I3: {
+          text: "{extras.callFunction.importing.name}"
+        },
+        "Q3:X3": createTemplateBaseStyle("#ffffff"),
+        Q3: {
+          text: "="
+        },
+        "Y3:BG3": createTemplateBaseStyle("#ffffff"),
+        Y3: {
+          text: "{extras.callFunction.importing.valueDecl.finalDesc}"
+        },
+        "A4:H4": createTemplateBaseStyle("#dbeef4"),
+        A4: {
+          text: "Tables"
+        },
+        "I4:P4": createTemplateBaseStyle("#ffffff"),
+        I4: {
+          text: "{extras.callFunction.tables.name}"
+        },
+        "Q4:X4": createTemplateBaseStyle("#ffffff"),
+        Q4: {
+          text: "="
+        },
+        "Y4:BG4": createTemplateBaseStyle("#ffffff"),
+        Y4: {
+          text: "{extras.callFunction.tables.valueDecl.finalDesc}"
+        },
+        "A5:H5": createTemplateBaseStyle("#dbeef4"),
+        A5: {
+          text: "Changing"
+        },
+        "I5:P5": createTemplateBaseStyle("#ffffff"),
+        I5: {
+          text: "{extras.callFunction.changing.name}"
+        },
+        "Q5:X5": createTemplateBaseStyle("#ffffff"),
+        Q5: {
+          text: "="
+        },
+        "Y5:BG5": createTemplateBaseStyle("#ffffff"),
+        Y5: {
+          text: "{extras.callFunction.changing.valueDecl.finalDesc}"
+        },
+        "A6:H6": createTemplateBaseStyle("#dbeef4"),
+        A6: {
+          text: "Exceptions"
+        },
+        "I6:P6": createTemplateBaseStyle("#ffffff"),
+        I6: {
+          text: "{extras.callFunction.exceptions.name}"
+        },
+        "Q6:X6": createTemplateBaseStyle("#ffffff"),
+        Q6: {
+          text: "="
+        },
+        "Y6:BG6": createTemplateBaseStyle("#ffffff"),
+        Y6: {
+          text: "{extras.callFunction.exceptions.valueDecl.finalDesc}"
         }
       },
       APPEND: {
@@ -8672,6 +8783,45 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
           text: "{extras.deleteItab.conditions.logicalConnector}"
         }
       },
+      LOOP_AT_ITAB: {
+        _options: {
+          hideEmptyRows: true,
+          hideRowsWithoutValues: true,
+          expandMultilineRows: true
+        },
+        "A1:X1": createTemplateBaseStyle("#dbeef4"),
+        A1: {
+          text: "Loop At"
+        },
+        "Y1:BA1": createTemplateBaseStyle("#dbeef4"),
+        Y1: {
+          text: "Into"
+        },
+        "BB1:BG1": createTemplateBaseStyle("#dbeef4"),
+        BB1: {
+          text: "Connection"
+        },
+        "A2:H2": createTemplateBaseStyle("#dbeef4"),
+        A2: {
+          text: "Điều kiện"
+        },
+        "I2:V2": createTemplateBaseStyle("#ffffff"),
+        I2: {
+          text: "{extras.loopAtItab.conditions.leftOperandDecl.finalDesc}"
+        },
+        "W2:X2": createTemplateBaseStyle("#dbeef4"),
+        W2: {
+          text: "{extras.loopAtItab.conditions.comparisonOperator}"
+        },
+        "Y2:BA2": createTemplateBaseStyle("#ffffff"),
+        Y2: {
+          text: "{extras.loopAtItab.conditions.rightOperandDecl.finalDesc}"
+        },
+        "BB2:BG2": createTemplateBaseStyle("#ffffff"),
+        BB2: {
+          text: "{extras.loopAtItab.conditions.logicalConnector}"
+        }
+      },
       IF: {
         _options: {
           hideEmptyRows: true,
@@ -8972,6 +9122,180 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
         },
         AE2: {
           text: "{extras.ifCondition.conditions.logicalConnector}"
+        }
+      },
+      PERFORM: {
+        _options: {
+          hideEmptyRows: true,
+          hideRowsWithoutValues: true,
+          expandMultilineRows: true
+        },
+        "J1:X1": createTemplateBaseStyle("#dbeef4"),
+        J1: {
+          text: "ID"
+        },
+        "Y1:BG1": createTemplateBaseStyle("#dbeef4"),
+        Y1: {
+          text: "Text"
+        },
+        "A2:I2": createTemplateBaseStyle("#dbeef4"),
+        A2: {
+          text: "Subroutine"
+        },
+        "J2:X2": createTemplateBaseStyle("#ffffff"),
+        J2: {
+          text: "{values.form.decl.name}"
+        },
+        "Y2:BG2": createTemplateBaseStyle("#ffffff"),
+        Y2: {
+          text: "{values.form.finalDesc}"
+        },
+        "A3:I3": createTemplateBaseStyle("#dbeef4"),
+        A3: {
+          text: "Using"
+        },
+        "J3:X3": createTemplateBaseStyle("#ffffff"),
+        J3: {
+          text: "{extras.performCall.using.valueDecl.name}"
+        },
+        "Y3:BG3": createTemplateBaseStyle("#ffffff"),
+        Y3: {
+          text: "{extras.performCall.using.valueDecl.finalDesc}"
+        },
+        "A4:I4": createTemplateBaseStyle("#dbeef4"),
+        A4: {
+          text: "Changing"
+        },
+        "J4:X4": createTemplateBaseStyle("#ffffff"),
+        J4: {
+          text: "{extras.performCall.changing.valueDecl.name}"
+        },
+        "Y4:BG4": createTemplateBaseStyle("#ffffff"),
+        Y4: {
+          text: "{extras.performCall.changing.valueDecl.finalDesc}"
+        },
+        "A5:I5": createTemplateBaseStyle("#dbeef4"),
+        A5: {
+          text: "Tables"
+        },
+        "J5:X5": createTemplateBaseStyle("#ffffff"),
+        J5: {
+          text: "{extras.performCall.tables.valueDecl.name}"
+        },
+        "Y5:BG5": createTemplateBaseStyle("#ffffff"),
+        Y5: {
+          text: "{extras.performCall.tables.valueDecl.finalDesc}"
+        },
+        "A6:I6": createTemplateBaseStyle("#dbeef4"),
+        A6: {
+          text: "Raising"
+        },
+        "J6:X6": createTemplateBaseStyle("#ffffff"),
+        J6: {
+          text: "{extras.performCall.raising.name}"
+        },
+        "Y6:BG6": createTemplateBaseStyle("#ffffff"),
+        Y6: {
+          text: "{extras.performCall.raising.valueDecl.finalDesc}"
+        },
+        "A7:I7": createTemplateBaseStyle("#dbeef4"),
+        A7: {
+          text: "In Program"
+        },
+        "J7:X7": createTemplateBaseStyle("#ffffff"),
+        J7: {
+          text: "{values.program.decl.name}"
+        },
+        "Y7:BG7": createTemplateBaseStyle("#ffffff"),
+        Y7: {
+          text: "{values.program.finalDesc}"
+        }
+      },
+      MESSAGE: {
+        _options: {
+          hideEmptyRows: true,
+          hideRowsWithoutValues: true,
+          expandMultilineRows: true
+        },
+        "A1:I1": createTemplateBaseStyle("#dbeef4"),
+        A1: {
+          text: "Message Class"
+        },
+        "J1:V1": createTemplateBaseStyle("#ffffff"),
+        J1: {
+          text: "{values.messageClass.finalDesc}"
+        },
+        "W1:AB1": createTemplateBaseStyle("#dbeef4"),
+        W1: {
+          text: "Message Number"
+        },
+        "AC1:AJ1": createTemplateBaseStyle("#ffffff"),
+        AC1: {
+          text: "{values.messageNumber.finalDesc}"
+        },
+        "AK1:AQ1": createTemplateBaseStyle("#dbeef4"),
+        AK1: {
+          text: "Message Type"
+        },
+        "AR1:AX1": createTemplateBaseStyle("#ffffff"),
+        AR1: {
+          text: "{values.messageType.finalDesc}"
+        },
+        "AY1:BG1": createTemplateBaseStyle("#dbeef4"),
+        AY1: {
+          text: "Display Like"
+        },
+        "BH1:BZ1": createTemplateBaseStyle("#ffffff"),
+        BH1: {
+          text: "{values.displayLike.finalDesc}"
+        },
+        "A2:I2": createTemplateBaseStyle("#dbeef4"),
+        A2: {
+          text: "Message Text &1"
+        },
+        "J2:BZ2": createTemplateBaseStyle("#ffffff"),
+        J2: {
+          text: "{values.messageText1.finalDesc}"
+        },
+        "A3:I3": createTemplateBaseStyle("#dbeef4"),
+        A3: {
+          text: "Message Text &2"
+        },
+        "J3:BZ3": createTemplateBaseStyle("#ffffff"),
+        J3: {
+          text: "{values.messageText2.finalDesc}"
+        },
+        "A4:I4": createTemplateBaseStyle("#dbeef4"),
+        A4: {
+          text: "Message Text &3"
+        },
+        "J4:BZ4": createTemplateBaseStyle("#ffffff"),
+        J4: {
+          text: "{values.messageText3.finalDesc}"
+        },
+        "A5:I5": createTemplateBaseStyle("#dbeef4"),
+        A5: {
+          text: "Message Text &4"
+        },
+        "J5:BZ5": createTemplateBaseStyle("#ffffff"),
+        J5: {
+          text: "{values.messageText4.finalDesc}"
+        },
+        "A6:I6": createTemplateBaseStyle("#dbeef4"),
+        A6: {
+          text: "Message Display"
+        },
+        "J6:BZ6": createTemplateBaseStyle("#ffffff"),
+        J6: {
+          text: "{values.messageDisplay.finalDesc}"
+        },
+        "A7:I7": createTemplateBaseStyle("#dbeef4"),
+        A7: {
+          text: "Đích lưu"
+        },
+        "J7:BZ7": createTemplateBaseStyle("#ffffff"),
+        J7: {
+          text: "{values.messageDestination.finalDesc}"
         }
       }
     }
