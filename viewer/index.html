@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.02.27-r2">
-  <meta name="abap-viewer-updated-at" content="2026-02-27 08:12:21">
-  <meta name="abap-viewer-updated-note" content="AI note: Expression finalDesc now preserves operators/literals (replace identifier tokens only); template path *.decl.finalDesc for value entries resolves via value-level finalDesc; gutter jump scroll and selected highlight improved. Manual metadata only. Offline only.">
+  <meta name="abap-viewer-version" content="v2026.02.27-r5">
+  <meta name="abap-viewer-updated-at" content="2026-02-27 14:26:57">
+  <meta name="abap-viewer-updated-note" content="AI note: Added runtime hotfix for struct-field desc/finalDesc normalization to avoid duplicated STRUCT prefixes in composed struct-item text. Split runtime wrappers and prior finalDesc/template/gutter fixes preserved. Manual metadata only. Offline only.">
   <title>ABAP Parser Viewer</title>
   <style>
     :root {
@@ -975,6 +975,15 @@
     </div>
   </div>
 
+  <script src="../shared/abap-parser/01-context.js" defer></script>
+  <script src="../shared/abap-parser/02-config.js" defer></script>
+  <script src="../shared/abap-parser/03-statements.js" defer></script>
+  <script src="../shared/abap-parser/04-parse-core.js" defer></script>
+  <script src="../shared/abap-parser/05-extras.js" defer></script>
+  <script src="../shared/abap-parser/06-conditions.js" defer></script>
+  <script src="../shared/abap-parser/07-declarations.js" defer></script>
+  <script src="../shared/abap-parser/08-helpers.js" defer></script>
+  <script src="../shared/abap-parser/09-public-api.js" defer></script>
   <script src="../shared/abap-parser.js" defer></script>
   <!-- abap-parser-configs:start -->
   <script src="./configs.generated/append.js" defer></script>
@@ -1019,9 +1028,31 @@
   <script src="./configs.generated/when.js" defer></script>
   <!-- abap-parser-configs:end -->
   <script src="./variable-descriptions.js" defer></script>
+  <script src="./app/core/01-runtime-state.js" defer></script>
+  <script src="./app/core/02-build-info.js" defer></script>
+  <script src="./app/core/03-storage.js" defer></script>
+  <script src="./app/core/04-template-config.js" defer></script>
+  <script src="./app/core/05-theme-layout.js" defer></script>
+  <script src="./app/core/06-rules.js" defer></script>
+  <script src="./app/core/07-settings-modal.js" defer></script>
   <script src="./app/01-core.js" defer></script>
+  <script src="./app/descriptions/01-normalize-and-desc.js" defer></script>
+  <script src="./app/descriptions/02-overrides-and-edit.js" defer></script>
+  <script src="./app/descriptions/03-value-finaldesc.js" defer></script>
+  <script src="./app/descriptions/04-panel-render.js" defer></script>
   <script src="./app/02-descriptions.js" defer></script>
+  <script src="./app/template/01-path-resolver.js" defer></script>
+  <script src="./app/template/02-grid-and-style.js" defer></script>
+  <script src="./app/template/03-preview-render.js" defer></script>
+  <script src="./app/template/04-copy-import-export.js" defer></script>
   <script src="./app/03-template-preview.js" defer></script>
+  <script src="./app/output/01-xml-export.js" defer></script>
+  <script src="./app/output/02-search-index.js" defer></script>
+  <script src="./app/output/03-selection-gutter.js" defer></script>
+  <script src="./app/output/04-render-shared.js" defer></script>
+  <script src="./app/output/05-render-values.js" defer></script>
+  <script src="./app/output/06-render-extras.js" defer></script>
+  <script src="./app/output/07-render-tree.js" defer></script>
   <script src="./app/04-output-render.js" defer></script>
   <script src="./app/05-main.js" defer></script>
   <script src="./app.js" defer></script>
