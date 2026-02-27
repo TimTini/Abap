@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="abap-viewer-version" content="v2026.02.27-r5">
-  <meta name="abap-viewer-updated-at" content="2026-02-27 14:26:57">
+  <meta name="abap-viewer-updated-at" content="2026-02-27 15:10:13">
   <meta name="abap-viewer-updated-note" content="AI note: Added runtime hotfix for struct-field desc/finalDesc normalization to avoid duplicated STRUCT prefixes in composed struct-item text. Split runtime wrappers and prior finalDesc/template/gutter fixes preserved. Manual metadata only. Offline only.">
   <title>ABAP Parser Viewer</title>
   <style>
@@ -813,23 +813,23 @@
 
       <div class="panel">
         <div class="panel-header">
-          <h2 id="rightPanelTitle">Output</h2>
+          <h2 id="rightPanelTitle">Template Preview</h2>
           <div class="panel-tabs">
-            <button type="button" id="rightTabOutputBtn" class="secondary tab-btn active">Output</button>
-            <button type="button" id="rightTabTemplateBtn" class="secondary tab-btn">Template</button>
+            <button type="button" id="rightTabOutputBtn" class="secondary tab-btn">Output</button>
+            <button type="button" id="rightTabTemplateBtn" class="secondary tab-btn active">Template</button>
             <button type="button" id="rightTabDescBtn" class="secondary tab-btn">Descriptions</button>
             <button type="button" id="declDescJsonBtn" class="secondary" hidden>Storage JSON</button>
           </div>
         </div>
-        <div id="output" class="muted">No data loaded.</div>
-        <div id="templatePreviewPanel" hidden>
+        <div id="output" class="muted" hidden>No data loaded.</div>
+        <div id="templatePreviewPanel">
           <div class="template-controls">
             <span class="template-key-mode">
               Template key mode
               <span id="templateKeyMode" class="template-key-badge">AUTO: objectType -&gt; DEFAULT</span>
             </span>
             <label class="template-copy-mode">
-              <input type="checkbox" id="templateCopyTableOnly">
+              <input type="checkbox" id="templateCopyTableOnly" checked>
               Copy table only
             </label>
             <button type="button" id="templateCopyAllBtn" class="secondary">Copy All</button>
