@@ -449,11 +449,65 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     syncInputGutterScroll();
   }
 
-  function setSelectedCard(id) {
+  function scrollElementInContainer(container, element, options) {
+    if (!container || !element || typeof container.scrollTop !== "number") {
+      return;
+    }
+
+    const opts = options && typeof options === "object" ? options : {};
+    const mode = String(opts.mode || "nearest").toLowerCase();
+    const padTop = Math.max(0, Number(opts.padTop) || 0);
+    const padBottom = Math.max(0, Number(opts.padBottom) || 0);
+    const behavior = opts.behavior === "smooth" ? "smooth" : "auto";
+
+    const containerRect = container.getBoundingClientRect();
+    const elementRect = element.getBoundingClientRect();
+    if (!containerRect || !elementRect || !Number.isFinite(containerRect.top) || !Number.isFinite(elementRect.top)) {
+      return;
+    }
+
+    const currentTop = Number(container.scrollTop || 0) || 0;
+    let nextTop = currentTop;
+
+    if (mode === "start") {
+      nextTop = currentTop + (elementRect.top - containerRect.top) - padTop;
+    } else if (mode === "center") {
+      nextTop = currentTop
+        + (elementRect.top + (elementRect.height / 2))
+        - (containerRect.top + (containerRect.height / 2));
+    } else {
+      const topLimit = containerRect.top + padTop;
+      const bottomLimit = containerRect.bottom - padBottom;
+      if (elementRect.top < topLimit) {
+        nextTop = currentTop + (elementRect.top - topLimit);
+      } else if (elementRect.bottom > bottomLimit) {
+        nextTop = currentTop + (elementRect.bottom - bottomLimit);
+      } else {
+        return;
+      }
+    }
+
+    const maxTop = Math.max(0, Number(container.scrollHeight || 0) - Number(container.clientHeight || 0));
+    const clampedTop = Math.max(0, Math.min(maxTop, Math.round(nextTop)));
+    if (Math.abs(clampedTop - currentTop) < 1) {
+      return;
+    }
+
+    if (typeof container.scrollTo === "function") {
+      container.scrollTo({ top: clampedTop, behavior });
+    } else {
+      container.scrollTop = clampedTop;
+    }
+  }
+
+  function setSelectedCard(id, options) {
     const normalized = normalizeId(id);
     if (!normalized) {
       return;
     }
+    const opts = options && typeof options === "object" ? options : {};
+    const shouldScroll = opts.scroll !== false;
+    const scrollMode = String(opts.scrollMode || "start").toLowerCase();
 
     if (state.selectedId) {
       const prev = els.output.querySelector(`[data-id="${escapeSelectorValue(state.selectedId)}"]`);
@@ -466,7 +520,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const next = els.output.querySelector(`[data-id="${escapeSelectorValue(normalized)}"]`);
     if (next) {
       next.classList.add("selected");
-      next.scrollIntoView({ block: "nearest" });
+      if (shouldScroll) {
+        scrollElementInContainer(els.output, next, { mode: scrollMode, padTop: 10, padBottom: 10 });
+      }
     }
   }
 
@@ -477,6 +533,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     const opts = options && typeof options === "object" ? options : {};
     const shouldScroll = opts.scroll !== false;
+    const scrollMode = String(opts.scrollMode || "start").toLowerCase();
     const normalized = String(index === undefined || index === null ? "" : index).trim();
     if (!normalized) {
       return;
@@ -498,7 +555,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (next) {
       next.classList.add("selected");
       if (shouldScroll) {
-        next.scrollIntoView({ block: "nearest" });
+        scrollElementInContainer(els.templatePreviewOutput, next, { mode: scrollMode, padTop: 10, padBottom: 10 });
       }
     }
   }
@@ -520,7 +577,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const next = els.declDescTable.querySelector(`tr[data-decl-key="${escapeSelectorValue(key)}"]`);
     if (next) {
       next.classList.add("desc-selected");
-      next.scrollIntoView({ block: "nearest" });
+      scrollElementInContainer(els.declDescPanel, next, { mode: "nearest", padTop: 8, padBottom: 8 });
     }
   }
 
@@ -701,12 +758,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     if (state.rightTab === "output" && jumpTarget.kind === "output") {
-      setSelectedCard(jumpTarget.id);
+      setSelectedCard(jumpTarget.id, { scroll: true, scrollMode: "start" });
       return;
     }
 
     if (state.rightTab === "template" && jumpTarget.kind === "template") {
-      setSelectedTemplateBlock(jumpTarget.index);
+      setSelectedTemplateBlock(jumpTarget.index, { scroll: true, scrollMode: "start" });
       return;
     }
 
@@ -2257,7 +2314,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     els.output.scrollTop = scrollTop;
 
     if (state.selectedId) {
-      setSelectedCard(state.selectedId);
+      setSelectedCard(state.selectedId, { scroll: false });
     }
 
     refreshInputGutterTargets();

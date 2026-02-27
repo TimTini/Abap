@@ -69,6 +69,15 @@ This file is the local source of truth for future AI/code agents working in this
   - Keep raw fallback when parsed rows are empty/unavailable.
   - Do not change XML contract for these `values.*Raw` fields unless explicitly requested.
 
+- Value-level `finalDesc` for expression-like entries:
+  - Preserve expression shape and operators/literals.
+  - Replace only matched identifier tokens by resolved decl final description.
+  - Example target behavior: `gv_total + 1` -> `<desc(gv_total)> + 1` (not collapsing to only decl text).
+
+- Template resolver rule for value entries:
+  - For paths like `values.expr.decl.finalDesc`, when `decl` belongs to a value-entry object, resolve using value-level `finalDesc` (expression-aware), not plain decl-only `finalDesc`.
+  - This prevents loss of expression tails in template output.
+
 - Template shorthand compiler is AI-side/CLI:
   - Use `node scripts/template-tool.js` to compile shorthand template lines into JSON.
   - Do not add user-facing shorthand tooling in Viewer UI unless explicitly requested.
@@ -97,4 +106,7 @@ This file is the local source of truth for future AI/code agents working in this
 - Template coverage policy:
   - Keep explicit custom templates for high-priority statement types (currently includes `ASSIGNMENT`, `APPEND`, `READ_TABLE`, `MODIFY_ITAB`, `DELETE_ITAB`, `IF`, `ELSEIF`).
   - Missing statement types should be filled by generic schema-safe templates rather than left undefined.
+
+- Gutter jump behavior:
+  - For long Output/Template blocks, prefer container-based scroll targeting (panel scroll with offsets) instead of raw `scrollIntoView` defaults to avoid under/over-jump.
 

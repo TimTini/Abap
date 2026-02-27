@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.02.26-r1">
-  <meta name="abap-viewer-updated-at" content="2026-02-26 23:02:10">
-  <meta name="abap-viewer-updated-note" content="AI note: Added PATH_DECL synthetic fallback for Viewer/XML values and extras; finalDesc tech-id fallback order is declRef > identifier > value > name. Manual metadata only. Offline only.">
+  <meta name="abap-viewer-version" content="v2026.02.27-r2">
+  <meta name="abap-viewer-updated-at" content="2026-02-27 08:12:21">
+  <meta name="abap-viewer-updated-note" content="AI note: Expression finalDesc now preserves operators/literals (replace identifier tokens only); template path *.decl.finalDesc for value entries resolves via value-level finalDesc; gutter jump scroll and selected highlight improved. Manual metadata only. Offline only.">
   <title>ABAP Parser Viewer</title>
   <style>
     :root {
@@ -27,6 +27,8 @@
       --tab-active-text: #bfdbfe;
       --danger: #fca5a5;
       --overlay: rgba(0, 0, 0, 0.55);
+      --selected-focus-ring: #f59e0b;
+      --selected-focus-fill: rgba(245, 158, 11, 0.14);
       --layout-left-pane: 48%;
       --layout-splitter-size: 12px;
     }
@@ -50,6 +52,8 @@
       --tab-active-text: #3730a3;
       --danger: #b42318;
       --overlay: rgba(15, 23, 42, 0.5);
+      --selected-focus-ring: #d97706;
+      --selected-focus-fill: rgba(217, 119, 6, 0.12);
     }
 
     * {
@@ -408,6 +412,15 @@
       margin-right: auto;
     }
 
+    .template-copy-mode {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      user-select: none;
+    }
+
     .template-key-badge {
       border: 1px solid var(--border);
       border-radius: 999px;
@@ -451,8 +464,9 @@
     }
 
     .template-block.selected {
-      border-color: var(--accent);
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 38%, transparent);
+      border-color: var(--selected-focus-ring);
+      background: linear-gradient(var(--selected-focus-fill), var(--selected-focus-fill)), var(--panel);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--selected-focus-ring) 45%, transparent);
     }
 
     .template-block:last-child {
@@ -489,7 +503,7 @@
       min-width: 100%;
       border-collapse: collapse;
       table-layout: fixed;
-      border: 1px solid #c8c8c8;
+      border: 1px solid #000000;
       background: #ffffff;
       color: #111111;
     }
@@ -497,7 +511,7 @@
     .template-preview-table td {
       min-width: 56px;
       max-width: 360px;
-      border: 1px solid #d3d3d3;
+      border: none;
       padding: 4px 6px;
       vertical-align: top;
       white-space: pre-wrap;
@@ -530,8 +544,11 @@
     }
 
     .card.selected {
-      outline: 2px solid var(--accent);
+      border-color: var(--selected-focus-ring);
+      background: linear-gradient(var(--selected-focus-fill), var(--selected-focus-fill)), var(--panel);
+      outline: 2px solid var(--selected-focus-ring);
       outline-offset: 1px;
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--selected-focus-ring) 45%, transparent);
     }
 
     .card-header {
@@ -811,6 +828,10 @@
               Template key mode
               <span id="templateKeyMode" class="template-key-badge">AUTO: objectType -&gt; DEFAULT</span>
             </span>
+            <label class="template-copy-mode">
+              <input type="checkbox" id="templateCopyTableOnly">
+              Copy table only
+            </label>
             <button type="button" id="templateCopyAllBtn" class="secondary">Copy All</button>
             <button type="button" id="templateResetBtn" class="secondary">Reset default</button>
             <button type="button" id="templateExportBtn" class="secondary">Export config</button>

@@ -889,6 +889,25 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     };
   }
 
+  function stripStructNamePrefixFromItemText(itemText, structName) {
+    const raw = String(itemText || "").trim();
+    if (!raw) {
+      return "";
+    }
+
+    const struct = String(structName || "").trim();
+    if (!struct) {
+      return raw;
+    }
+
+    const prefix = `${struct.toUpperCase()}-`;
+    if (raw.toUpperCase().startsWith(prefix)) {
+      return raw.slice(struct.length + 1).trim();
+    }
+
+    return raw;
+  }
+
   function formatStructFieldDesc(decl) {
     if (!isStructFieldDecl(decl)) {
       return getEffectiveDeclAtomicDesc(decl);
@@ -911,8 +930,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const structDescRaw = structDecl ? getEffectiveDeclAtomicDescNormalized(structDecl) : "";
     const itemDescRaw = getEffectiveDeclAtomicDescNormalized(decl);
 
-    const structText = String(structDescRaw || "").trim() || structTech;
-    const itemText = String(itemDescRaw || "").trim() || itemTech;
+    const structText = stripDeclCategoryPrefix(String(structDescRaw || "").trim()) || structTech;
+    const itemTextRaw = stripDeclCategoryPrefix(String(itemDescRaw || "").trim()) || itemTech;
+    const itemText = stripStructNamePrefixFromItemText(itemTextRaw, String(decl.structName || "").trim() || structTech);
 
     return String(template || DEFAULT_SETTINGS.structDescTemplate)
       .replace(/\{\{struct\}\}/g, structText)
@@ -933,8 +953,11 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     const structDecl = buildStructDeclFromFieldDecl(decl);
-    const structText = structDecl ? String(getFinalDeclAtomicDescNormalized(structDecl) || "").trim() : "";
-    const itemText = String(getFinalDeclAtomicDescNormalized(decl) || "").trim();
+    const structTextRaw = structDecl ? String(getFinalDeclAtomicDescNormalized(structDecl) || "").trim() : "";
+    const itemTextRaw = String(getFinalDeclAtomicDescNormalized(decl) || "").trim();
+    const structText = stripDeclCategoryPrefix(structTextRaw);
+    const itemTextNormalized = stripDeclCategoryPrefix(itemTextRaw);
+    const itemText = stripStructNamePrefixFromItemText(itemTextNormalized, String(decl.structName || "").trim());
 
     if (!structText && !itemText) {
       return "";
@@ -2011,6 +2034,90 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return fallbackName;
   }
 
+  const VALUE_LEVEL_IDENTIFIER_REGEX =
+    /<[^>]+>(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)*|SY-[A-Za-z_][A-Za-z0-9_]*|[A-Za-z_][A-Za-z0-9_]*(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)*/g;
+
+  function normalizeValueIdentifierKey(text) {
+    return String(text || "").trim().toUpperCase();
+  }
+
+  function buildValueLevelDeclReplacementMap(value, rawValueText) {
+    if (!value || typeof value !== "object" || !isDeclLikeObject(value.decl)) {
+      return null;
+    }
+
+    const replacement = String(getFinalDeclDesc(value.decl) || getDeclTechName(value.decl) || "").trim();
+    if (!replacement) {
+      return null;
+    }
+
+    const map = Object.create(null);
+    const register = (token) => {
+      const key = normalizeValueIdentifierKey(token);
+      if (!key) {
+        return;
+      }
+      map[key] = replacement;
+    };
+
+    register(value.declRef);
+    register(value.decl && value.decl.name);
+    register(extractIdentifierCandidate(rawValueText));
+
+    return Object.keys(map).length ? map : null;
+  }
+
+  function replaceIdentifiersOutsideLiterals(rawText, replacementMap) {
+    const text = String(rawText || "");
+    if (!text || !replacementMap || typeof replacementMap !== "object") {
+      return "";
+    }
+
+    let out = "";
+    let i = 0;
+    const length = text.length;
+
+    const replaceSegment = (segment) => segment.replace(VALUE_LEVEL_IDENTIFIER_REGEX, (token) => {
+      const key = normalizeValueIdentifierKey(token);
+      if (key && Object.prototype.hasOwnProperty.call(replacementMap, key)) {
+        return replacementMap[key];
+      }
+      return token;
+    });
+
+    while (i < length) {
+      const ch = text[i];
+
+      if (ch === "'" || ch === "|") {
+        const quote = ch;
+        const start = i;
+        i += 1;
+        while (i < length) {
+          if (text[i] !== quote) {
+            i += 1;
+            continue;
+          }
+          if (quote === "'" && i + 1 < length && text[i + 1] === "'") {
+            i += 2;
+            continue;
+          }
+          i += 1;
+          break;
+        }
+        out += text.slice(start, i);
+        continue;
+      }
+
+      const start = i;
+      while (i < length && text[i] !== "'" && text[i] !== "|") {
+        i += 1;
+      }
+      out += replaceSegment(text.slice(start, i));
+    }
+
+    return out;
+  }
+
   function resolveValueLevelFinalDesc(value) {
     if (!value || typeof value !== "object") {
       return "";
@@ -2024,6 +2131,17 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const codeDesc = String(value.codeDesc || "").trim();
     if (codeDesc) {
       return codeDesc;
+    }
+
+    const rawValueText = String(value.value || "");
+    if (rawValueText.trim()) {
+      const replacementMap = buildValueLevelDeclReplacementMap(value, rawValueText);
+      if (replacementMap) {
+        const replaced = replaceIdentifiersOutsideLiterals(rawValueText, replacementMap).trim();
+        if (replaced) {
+          return replaced;
+        }
+      }
     }
 
     return resolveValueLevelTechId(value);

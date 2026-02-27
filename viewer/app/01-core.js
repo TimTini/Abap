@@ -34,6 +34,7 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     rightTabDescBtn: document.getElementById("rightTabDescBtn"),
     templatePreviewPanel: document.getElementById("templatePreviewPanel"),
     templateKeyMode: document.getElementById("templateKeyMode"),
+    templateCopyTableOnly: document.getElementById("templateCopyTableOnly"),
     templateCopyAllBtn: document.getElementById("templateCopyAllBtn"),
     templateResetBtn: document.getElementById("templateResetBtn"),
     templateExportBtn: document.getElementById("templateExportBtn"),
@@ -195,6 +196,10 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     "         active TYPE abap_bool,",
     "         role TYPE string,",
     "       END OF ty_user.",
+    "TYPES: BEGIN OF ty_pair,",
+    "         a TYPE string,",
+    "         b TYPE string,",
+    "       END OF ty_pair.",
     "TYPES ty_rows TYPE STANDARD TABLE OF ty_row.",
     "TYPES ty_users TYPE STANDARD TABLE OF ty_user.",
     "",
@@ -202,6 +207,7 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     "      gs_row  TYPE ty_row,",
     "      lt_users TYPE ty_users,",
     "      ls_user TYPE ty_user,",
+    "      ls_pair TYPE ty_pair,",
     "      gv_total TYPE i VALUE 0,",
     "      lv_active TYPE abap_bool VALUE abap_true,",
     "      lv_role TYPE string VALUE 'ADMIN',",
@@ -252,6 +258,11 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     "    text_error = 2",
     "    error_message = 3",
     "    OTHERS = 1.",
+    "",
+    "* Struct field normalization check (a-b)",
+    "ls_pair-a = p_user.",
+    "ls_pair-b = lv_role.",
+    "lv_text = ls_pair-a.",
     "",
     "CALL METHOD lo_demo->do_something",
     "  EXPORTING",
@@ -313,14 +324,18 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     };
   }
 
+  const TEMPLATE_PREVIEW_DEFAULT_OPTIONS = {
+    hideEmptyRows: true,
+    hideRowsWithoutValues: true,
+    expandMultilineRows: true,
+    squareCells: true,
+    squareCellSize: 18
+  };
+
   function createGenericStatementTemplate(templateKey) {
     const keyText = String(templateKey || "").trim();
     return {
-      _options: {
-        hideEmptyRows: true,
-        hideRowsWithoutValues: true,
-        expandMultilineRows: true
-      },
+      _options: { ...TEMPLATE_PREVIEW_DEFAULT_OPTIONS },
       "A1:G1": createTemplateBaseStyle("#dbeef4"),
       A1: {
         text: "Câu lệnh"
@@ -1905,6 +1920,16 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     if (!Object.prototype.hasOwnProperty.call(TEMPLATE_DEFAULT_CONFIG_V1.templates, key)) {
       TEMPLATE_DEFAULT_CONFIG_V1.templates[key] = createGenericStatementTemplate(key);
     }
+  }
+
+  for (const templateDef of Object.values(TEMPLATE_DEFAULT_CONFIG_V1.templates)) {
+    if (!templateDef || typeof templateDef !== "object" || Array.isArray(templateDef)) {
+      continue;
+    }
+    const currentOptions = templateDef._options && typeof templateDef._options === "object" && !Array.isArray(templateDef._options)
+      ? templateDef._options
+      : {};
+    templateDef._options = { ...TEMPLATE_PREVIEW_DEFAULT_OPTIONS, ...currentOptions };
   }
 
   function setError(message) {

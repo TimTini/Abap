@@ -9,9 +9,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.02.26-r1">
-  <meta name="abap-viewer-updated-at" content="2026-02-26 23:02:10">
-  <meta name="abap-viewer-updated-note" content="AI note: Added PATH_DECL synthetic fallback for Viewer/XML values and extras; finalDesc tech-id fallback order is declRef > identifier > value > name. Manual metadata only. Offline only.">
+  <meta name="abap-viewer-version" content="v2026.02.27-r2">
+  <meta name="abap-viewer-updated-at" content="2026-02-27 08:12:21">
+  <meta name="abap-viewer-updated-note" content="AI note: Expression finalDesc now preserves operators/literals (replace identifier tokens only); template path *.decl.finalDesc for value entries resolves via value-level finalDesc; gutter jump scroll and selected highlight improved. Manual metadata only. Offline only.">
   <title>ABAP Parser Viewer</title>
   <style>
     :root {
@@ -33,6 +33,8 @@
       --tab-active-text: #bfdbfe;
       --danger: #fca5a5;
       --overlay: rgba(0, 0, 0, 0.55);
+      --selected-focus-ring: #f59e0b;
+      --selected-focus-fill: rgba(245, 158, 11, 0.14);
       --layout-left-pane: 48%;
       --layout-splitter-size: 12px;
     }
@@ -56,6 +58,8 @@
       --tab-active-text: #3730a3;
       --danger: #b42318;
       --overlay: rgba(15, 23, 42, 0.5);
+      --selected-focus-ring: #d97706;
+      --selected-focus-fill: rgba(217, 119, 6, 0.12);
     }
 
     * {
@@ -414,6 +418,15 @@
       margin-right: auto;
     }
 
+    .template-copy-mode {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      user-select: none;
+    }
+
     .template-key-badge {
       border: 1px solid var(--border);
       border-radius: 999px;
@@ -457,8 +470,9 @@
     }
 
     .template-block.selected {
-      border-color: var(--accent);
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 38%, transparent);
+      border-color: var(--selected-focus-ring);
+      background: linear-gradient(var(--selected-focus-fill), var(--selected-focus-fill)), var(--panel);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--selected-focus-ring) 45%, transparent);
     }
 
     .template-block:last-child {
@@ -495,7 +509,7 @@
       min-width: 100%;
       border-collapse: collapse;
       table-layout: fixed;
-      border: 1px solid #c8c8c8;
+      border: 1px solid #000000;
       background: #ffffff;
       color: #111111;
     }
@@ -503,7 +517,7 @@
     .template-preview-table td {
       min-width: 56px;
       max-width: 360px;
-      border: 1px solid #d3d3d3;
+      border: none;
       padding: 4px 6px;
       vertical-align: top;
       white-space: pre-wrap;
@@ -536,8 +550,11 @@
     }
 
     .card.selected {
-      outline: 2px solid var(--accent);
+      border-color: var(--selected-focus-ring);
+      background: linear-gradient(var(--selected-focus-fill), var(--selected-focus-fill)), var(--panel);
+      outline: 2px solid var(--selected-focus-ring);
       outline-offset: 1px;
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--selected-focus-ring) 45%, transparent);
     }
 
     .card-header {
@@ -817,6 +834,10 @@
               Template key mode
               <span id="templateKeyMode" class="template-key-badge">AUTO: objectType -&gt; DEFAULT</span>
             </span>
+            <label class="template-copy-mode">
+              <input type="checkbox" id="templateCopyTableOnly">
+              Copy table only
+            </label>
             <button type="button" id="templateCopyAllBtn" class="secondary">Copy All</button>
             <button type="button" id="templateResetBtn" class="secondary">Reset default</button>
             <button type="button" id="templateExportBtn" class="secondary">Export config</button>
@@ -7469,6 +7490,7 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     rightTabDescBtn: document.getElementById("rightTabDescBtn"),
     templatePreviewPanel: document.getElementById("templatePreviewPanel"),
     templateKeyMode: document.getElementById("templateKeyMode"),
+    templateCopyTableOnly: document.getElementById("templateCopyTableOnly"),
     templateCopyAllBtn: document.getElementById("templateCopyAllBtn"),
     templateResetBtn: document.getElementById("templateResetBtn"),
     templateExportBtn: document.getElementById("templateExportBtn"),
@@ -7630,6 +7652,10 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     "         active TYPE abap_bool,",
     "         role TYPE string,",
     "       END OF ty_user.",
+    "TYPES: BEGIN OF ty_pair,",
+    "         a TYPE string,",
+    "         b TYPE string,",
+    "       END OF ty_pair.",
     "TYPES ty_rows TYPE STANDARD TABLE OF ty_row.",
     "TYPES ty_users TYPE STANDARD TABLE OF ty_user.",
     "",
@@ -7637,6 +7663,7 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     "      gs_row  TYPE ty_row,",
     "      lt_users TYPE ty_users,",
     "      ls_user TYPE ty_user,",
+    "      ls_pair TYPE ty_pair,",
     "      gv_total TYPE i VALUE 0,",
     "      lv_active TYPE abap_bool VALUE abap_true,",
     "      lv_role TYPE string VALUE 'ADMIN',",
@@ -7687,6 +7714,11 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     "    text_error = 2",
     "    error_message = 3",
     "    OTHERS = 1.",
+    "",
+    "* Struct field normalization check (a-b)",
+    "ls_pair-a = p_user.",
+    "ls_pair-b = lv_role.",
+    "lv_text = ls_pair-a.",
     "",
     "CALL METHOD lo_demo->do_something",
     "  EXPORTING",
@@ -7748,14 +7780,18 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     };
   }
 
+  const TEMPLATE_PREVIEW_DEFAULT_OPTIONS = {
+    hideEmptyRows: true,
+    hideRowsWithoutValues: true,
+    expandMultilineRows: true,
+    squareCells: true,
+    squareCellSize: 18
+  };
+
   function createGenericStatementTemplate(templateKey) {
     const keyText = String(templateKey || "").trim();
     return {
-      _options: {
-        hideEmptyRows: true,
-        hideRowsWithoutValues: true,
-        expandMultilineRows: true
-      },
+      _options: { ...TEMPLATE_PREVIEW_DEFAULT_OPTIONS },
       "A1:G1": createTemplateBaseStyle("#dbeef4"),
       A1: {
         text: "Câu lệnh"
@@ -9340,6 +9376,16 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     if (!Object.prototype.hasOwnProperty.call(TEMPLATE_DEFAULT_CONFIG_V1.templates, key)) {
       TEMPLATE_DEFAULT_CONFIG_V1.templates[key] = createGenericStatementTemplate(key);
     }
+  }
+
+  for (const templateDef of Object.values(TEMPLATE_DEFAULT_CONFIG_V1.templates)) {
+    if (!templateDef || typeof templateDef !== "object" || Array.isArray(templateDef)) {
+      continue;
+    }
+    const currentOptions = templateDef._options && typeof templateDef._options === "object" && !Array.isArray(templateDef._options)
+      ? templateDef._options
+      : {};
+    templateDef._options = { ...TEMPLATE_PREVIEW_DEFAULT_OPTIONS, ...currentOptions };
   }
 
   function setError(message) {
@@ -11404,6 +11450,25 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     };
   }
 
+  function stripStructNamePrefixFromItemText(itemText, structName) {
+    const raw = String(itemText || "").trim();
+    if (!raw) {
+      return "";
+    }
+
+    const struct = String(structName || "").trim();
+    if (!struct) {
+      return raw;
+    }
+
+    const prefix = `${struct.toUpperCase()}-`;
+    if (raw.toUpperCase().startsWith(prefix)) {
+      return raw.slice(struct.length + 1).trim();
+    }
+
+    return raw;
+  }
+
   function formatStructFieldDesc(decl) {
     if (!isStructFieldDecl(decl)) {
       return getEffectiveDeclAtomicDesc(decl);
@@ -11426,8 +11491,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const structDescRaw = structDecl ? getEffectiveDeclAtomicDescNormalized(structDecl) : "";
     const itemDescRaw = getEffectiveDeclAtomicDescNormalized(decl);
 
-    const structText = String(structDescRaw || "").trim() || structTech;
-    const itemText = String(itemDescRaw || "").trim() || itemTech;
+    const structText = stripDeclCategoryPrefix(String(structDescRaw || "").trim()) || structTech;
+    const itemTextRaw = stripDeclCategoryPrefix(String(itemDescRaw || "").trim()) || itemTech;
+    const itemText = stripStructNamePrefixFromItemText(itemTextRaw, String(decl.structName || "").trim() || structTech);
 
     return String(template || DEFAULT_SETTINGS.structDescTemplate)
       .replace(/\{\{struct\}\}/g, structText)
@@ -11448,8 +11514,11 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     const structDecl = buildStructDeclFromFieldDecl(decl);
-    const structText = structDecl ? String(getFinalDeclAtomicDescNormalized(structDecl) || "").trim() : "";
-    const itemText = String(getFinalDeclAtomicDescNormalized(decl) || "").trim();
+    const structTextRaw = structDecl ? String(getFinalDeclAtomicDescNormalized(structDecl) || "").trim() : "";
+    const itemTextRaw = String(getFinalDeclAtomicDescNormalized(decl) || "").trim();
+    const structText = stripDeclCategoryPrefix(structTextRaw);
+    const itemTextNormalized = stripDeclCategoryPrefix(itemTextRaw);
+    const itemText = stripStructNamePrefixFromItemText(itemTextNormalized, String(decl.structName || "").trim());
 
     if (!structText && !itemText) {
       return "";
@@ -12526,6 +12595,90 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return fallbackName;
   }
 
+  const VALUE_LEVEL_IDENTIFIER_REGEX =
+    /<[^>]+>(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)*|SY-[A-Za-z_][A-Za-z0-9_]*|[A-Za-z_][A-Za-z0-9_]*(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)*/g;
+
+  function normalizeValueIdentifierKey(text) {
+    return String(text || "").trim().toUpperCase();
+  }
+
+  function buildValueLevelDeclReplacementMap(value, rawValueText) {
+    if (!value || typeof value !== "object" || !isDeclLikeObject(value.decl)) {
+      return null;
+    }
+
+    const replacement = String(getFinalDeclDesc(value.decl) || getDeclTechName(value.decl) || "").trim();
+    if (!replacement) {
+      return null;
+    }
+
+    const map = Object.create(null);
+    const register = (token) => {
+      const key = normalizeValueIdentifierKey(token);
+      if (!key) {
+        return;
+      }
+      map[key] = replacement;
+    };
+
+    register(value.declRef);
+    register(value.decl && value.decl.name);
+    register(extractIdentifierCandidate(rawValueText));
+
+    return Object.keys(map).length ? map : null;
+  }
+
+  function replaceIdentifiersOutsideLiterals(rawText, replacementMap) {
+    const text = String(rawText || "");
+    if (!text || !replacementMap || typeof replacementMap !== "object") {
+      return "";
+    }
+
+    let out = "";
+    let i = 0;
+    const length = text.length;
+
+    const replaceSegment = (segment) => segment.replace(VALUE_LEVEL_IDENTIFIER_REGEX, (token) => {
+      const key = normalizeValueIdentifierKey(token);
+      if (key && Object.prototype.hasOwnProperty.call(replacementMap, key)) {
+        return replacementMap[key];
+      }
+      return token;
+    });
+
+    while (i < length) {
+      const ch = text[i];
+
+      if (ch === "'" || ch === "|") {
+        const quote = ch;
+        const start = i;
+        i += 1;
+        while (i < length) {
+          if (text[i] !== quote) {
+            i += 1;
+            continue;
+          }
+          if (quote === "'" && i + 1 < length && text[i + 1] === "'") {
+            i += 2;
+            continue;
+          }
+          i += 1;
+          break;
+        }
+        out += text.slice(start, i);
+        continue;
+      }
+
+      const start = i;
+      while (i < length && text[i] !== "'" && text[i] !== "|") {
+        i += 1;
+      }
+      out += replaceSegment(text.slice(start, i));
+    }
+
+    return out;
+  }
+
   function resolveValueLevelFinalDesc(value) {
     if (!value || typeof value !== "object") {
       return "";
@@ -12539,6 +12692,17 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const codeDesc = String(value.codeDesc || "").trim();
     if (codeDesc) {
       return codeDesc;
+    }
+
+    const rawValueText = String(value.value || "");
+    if (rawValueText.trim()) {
+      const replacementMap = buildValueLevelDeclReplacementMap(value, rawValueText);
+      if (replacementMap) {
+        const replaced = replaceIdentifiersOutsideLiterals(rawValueText, replacementMap).trim();
+        if (replaced) {
+          return replaced;
+        }
+      }
     }
 
     return resolveValueLevelTechId(value);
@@ -12698,11 +12862,15 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     let current = root;
+    let parent = null;
+    let parentAccessKey = "";
     for (const segment of segments) {
       if (typeof segment === "number") {
         if (!Array.isArray(current)) {
           return undefined;
         }
+        parent = current;
+        parentAccessKey = `[${segment}]`;
         current = current[segment];
         continue;
       }
@@ -12743,6 +12911,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         if (!projected.length) {
           return undefined;
         }
+        parent = null;
+        parentAccessKey = "";
         current = projected;
         continue;
       }
@@ -12758,6 +12928,16 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
       if (keyLower === "finaldesc") {
         if (isDeclLikeObject(current)) {
+          const parentKey = String(parentAccessKey || "").trim().toLowerCase();
+          if (
+            parentKey === "decl"
+            && parent
+            && typeof parent === "object"
+            && !Array.isArray(parent)
+            && (hasValueLevelDescFields(parent) || isDeclLikeObject(parent.decl))
+          ) {
+            return resolveValueLevelFinalDesc(parent);
+          }
           return getFinalDeclDesc(current);
         }
         if (hasValueLevelDescFields(current) || isDeclLikeObject(current.decl)) {
@@ -12768,6 +12948,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       if (!Object.prototype.hasOwnProperty.call(current, key)) {
         return undefined;
       }
+      parent = current;
+      parentAccessKey = key;
       current = current[key];
     }
 
@@ -13142,7 +13324,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     const border = normalizeTemplateBorderValue(cfg.border);
     if (border === "outside-thin") {
-      const borderLine = "1px solid #c8c8c8";
+      const borderLine = "0.5pt solid #000000";
       if (position && position.isMergeAnchor) {
         style.border = borderLine;
       } else {
@@ -13182,6 +13364,29 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       return false;
     }
     return fallback;
+  }
+
+  function parseTemplateOptionNumber(value, fallback, min, max) {
+    const fallbackValue = Number.isFinite(Number(fallback)) ? Number(fallback) : 0;
+    const minValue = Number.isFinite(Number(min)) ? Number(min) : fallbackValue;
+    const maxValue = Number.isFinite(Number(max)) ? Number(max) : fallbackValue;
+
+    let numeric = NaN;
+    if (typeof value === "number") {
+      numeric = value;
+    } else if (typeof value === "string") {
+      const token = value.trim();
+      if (token) {
+        numeric = Number(token);
+      }
+    }
+
+    if (!Number.isFinite(numeric)) {
+      return fallbackValue;
+    }
+
+    const normalized = Math.round(numeric);
+    return Math.max(minValue, Math.min(maxValue, normalized));
   }
 
   function getTemplateOptionByPath(source, path) {
@@ -13239,11 +13444,24 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       "expandArrayRows",
       "arrayToRows"
     ]), false);
+    const squareCells = parseTemplateOptionBoolean(readTemplateOptionValue(sources, [
+      "squareCells",
+      "squareCellsEnabled",
+      "fixedSquareCells"
+    ]), true);
+    const squareCellSize = parseTemplateOptionNumber(readTemplateOptionValue(sources, [
+      "squareCellSize",
+      "squareCellSizePx",
+      "cellSize",
+      "cellSizePx"
+    ]), 18, 16, 240);
 
     return {
       hideEmptyRows,
       hideRowsWithoutValues,
-      expandMultilineRows
+      expandMultilineRows,
+      squareCells,
+      squareCellSize
     };
   }
 
@@ -13265,6 +13483,13 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       || key === "removeemptyrowsadv"
       || key === "expandarrayrows"
       || key === "arraytorows"
+      || key === "squarecells"
+      || key === "squarecellsenabled"
+      || key === "fixedsquarecells"
+      || key === "squarecellsize"
+      || key === "squarecellsizepx"
+      || key === "cellsize"
+      || key === "cellsizepx"
     );
   }
 
@@ -13585,7 +13810,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       matrix: compactedMatrix,
       maxRow: compactedMatrix.length,
       maxCol,
-      errors
+      errors,
+      options
     };
   }
 
@@ -13594,6 +13820,11 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (!matrix.length) {
       return null;
     }
+    const options = model && model.options && typeof model.options === "object"
+      ? model.options
+      : normalizeTemplatePreviewOptions(null, null, null);
+    const squareCells = options.squareCells === true;
+    const squareCellSize = parseTemplateOptionNumber(options.squareCellSize, 18, 16, 240);
 
     const table = el("table", {
       className: "template-preview-table",
@@ -13621,13 +13852,26 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         }
 
         td.textContent = String(cell.text || "");
+        const colSpan = Math.max(1, Number(td.colSpan) || 1);
+        const rowSpan = Math.max(1, Number(td.rowSpan) || 1);
+        const baseMinWidth = squareCells ? `${squareCellSize}px` : "56px";
+        const baseMaxWidth = squareCells ? `${squareCellSize}px` : "360px";
+        const baseWidth = squareCells ? `${squareCellSize * colSpan}px` : "";
+        const baseMinHeight = squareCells ? `${squareCellSize}px` : "";
+        const baseHeight = squareCells ? `${squareCellSize * rowSpan}px` : "";
+        const baseTextOverflow = squareCells ? "ellipsis" : "";
         const cssText = toInlineCssText({
-          "min-width": "56px",
-          "max-width": "360px",
+          "min-width": baseMinWidth,
+          "max-width": baseMaxWidth,
+          width: baseWidth,
+          "min-height": baseMinHeight,
+          height: baseHeight,
           padding: "4px 6px",
-          border: "1px solid #d3d3d3",
+          border: "none",
           "vertical-align": "top",
           "white-space": "pre-wrap",
+          "text-overflow": baseTextOverflow,
+          "box-sizing": "border-box",
           "font-size": "10pt",
           "font-family": "\"MS PGothic\", \"MS UI Gothic\", Meiryo, sans-serif",
           color: "#111111",
@@ -13719,6 +13963,37 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       return "";
     }
     return String(block.innerText || block.textContent || "").trim();
+  }
+
+  function isTemplateCopyTableOnlyEnabled() {
+    return Boolean(els.templateCopyTableOnly && els.templateCopyTableOnly.checked);
+  }
+
+  function buildTemplateCopyPayloadFromBlock(block) {
+    if (!block || typeof block.cloneNode !== "function") {
+      return { node: null, text: "" };
+    }
+
+    const clone = block.cloneNode(true);
+    const actionButtons = clone.querySelectorAll("[data-template-action]");
+    for (const actionBtn of Array.from(actionButtons)) {
+      actionBtn.remove();
+    }
+
+    if (isTemplateCopyTableOnlyEnabled()) {
+      const table = clone.querySelector(".template-preview-table");
+      if (table) {
+        return {
+          node: table.cloneNode(true),
+          text: buildTemplatePlainTextFromBlock(table)
+        };
+      }
+    }
+
+    return {
+      node: clone,
+      text: buildTemplatePlainTextFromBlock(clone)
+    };
   }
 
   function getRenderableObjectListForTemplate() {
@@ -13842,12 +14117,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       });
       copyBtn.addEventListener("click", async () => {
         try {
-          const clone = block.cloneNode(true);
-          const actionButtons = clone.querySelectorAll("[data-template-action]");
-          for (const actionBtn of Array.from(actionButtons)) {
-            actionBtn.remove();
+          const payload = buildTemplateCopyPayloadFromBlock(block);
+          if (!payload.node) {
+            setError("Nothing to copy.");
+            return;
           }
-          await copyHtmlWithFallback(clone.outerHTML, buildTemplatePlainTextFromBlock(clone));
+          await copyHtmlWithFallback(payload.node.outerHTML, payload.text);
           setError("");
         } catch (err) {
           setError(`Copy failed: ${err && err.message ? err.message : err}`);
@@ -14009,14 +14284,22 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     const wrapper = document.createElement("div");
     const plainLines = [];
+    const tableOnly = isTemplateCopyTableOnlyEnabled();
     for (const block of blocks) {
-      const clone = block.cloneNode(true);
-      const actionButtons = clone.querySelectorAll("[data-template-action]");
-      for (const actionBtn of Array.from(actionButtons)) {
-        actionBtn.remove();
+      const payload = buildTemplateCopyPayloadFromBlock(block);
+      if (!payload.node) {
+        continue;
       }
-      wrapper.appendChild(clone);
-      plainLines.push(buildTemplatePlainTextFromBlock(clone));
+      wrapper.appendChild(payload.node);
+      if (tableOnly) {
+        wrapper.appendChild(document.createElement("br"));
+      }
+      plainLines.push(payload.text);
+    }
+
+    if (!wrapper.childNodes.length) {
+      setError("Nothing to copy.");
+      return;
     }
 
     await copyHtmlWithFallback(wrapper.innerHTML, plainLines.filter(Boolean).join("\n\n"));
@@ -14485,11 +14768,65 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     syncInputGutterScroll();
   }
 
-  function setSelectedCard(id) {
+  function scrollElementInContainer(container, element, options) {
+    if (!container || !element || typeof container.scrollTop !== "number") {
+      return;
+    }
+
+    const opts = options && typeof options === "object" ? options : {};
+    const mode = String(opts.mode || "nearest").toLowerCase();
+    const padTop = Math.max(0, Number(opts.padTop) || 0);
+    const padBottom = Math.max(0, Number(opts.padBottom) || 0);
+    const behavior = opts.behavior === "smooth" ? "smooth" : "auto";
+
+    const containerRect = container.getBoundingClientRect();
+    const elementRect = element.getBoundingClientRect();
+    if (!containerRect || !elementRect || !Number.isFinite(containerRect.top) || !Number.isFinite(elementRect.top)) {
+      return;
+    }
+
+    const currentTop = Number(container.scrollTop || 0) || 0;
+    let nextTop = currentTop;
+
+    if (mode === "start") {
+      nextTop = currentTop + (elementRect.top - containerRect.top) - padTop;
+    } else if (mode === "center") {
+      nextTop = currentTop
+        + (elementRect.top + (elementRect.height / 2))
+        - (containerRect.top + (containerRect.height / 2));
+    } else {
+      const topLimit = containerRect.top + padTop;
+      const bottomLimit = containerRect.bottom - padBottom;
+      if (elementRect.top < topLimit) {
+        nextTop = currentTop + (elementRect.top - topLimit);
+      } else if (elementRect.bottom > bottomLimit) {
+        nextTop = currentTop + (elementRect.bottom - bottomLimit);
+      } else {
+        return;
+      }
+    }
+
+    const maxTop = Math.max(0, Number(container.scrollHeight || 0) - Number(container.clientHeight || 0));
+    const clampedTop = Math.max(0, Math.min(maxTop, Math.round(nextTop)));
+    if (Math.abs(clampedTop - currentTop) < 1) {
+      return;
+    }
+
+    if (typeof container.scrollTo === "function") {
+      container.scrollTo({ top: clampedTop, behavior });
+    } else {
+      container.scrollTop = clampedTop;
+    }
+  }
+
+  function setSelectedCard(id, options) {
     const normalized = normalizeId(id);
     if (!normalized) {
       return;
     }
+    const opts = options && typeof options === "object" ? options : {};
+    const shouldScroll = opts.scroll !== false;
+    const scrollMode = String(opts.scrollMode || "start").toLowerCase();
 
     if (state.selectedId) {
       const prev = els.output.querySelector(`[data-id="${escapeSelectorValue(state.selectedId)}"]`);
@@ -14502,7 +14839,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const next = els.output.querySelector(`[data-id="${escapeSelectorValue(normalized)}"]`);
     if (next) {
       next.classList.add("selected");
-      next.scrollIntoView({ block: "nearest" });
+      if (shouldScroll) {
+        scrollElementInContainer(els.output, next, { mode: scrollMode, padTop: 10, padBottom: 10 });
+      }
     }
   }
 
@@ -14513,6 +14852,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     const opts = options && typeof options === "object" ? options : {};
     const shouldScroll = opts.scroll !== false;
+    const scrollMode = String(opts.scrollMode || "start").toLowerCase();
     const normalized = String(index === undefined || index === null ? "" : index).trim();
     if (!normalized) {
       return;
@@ -14534,7 +14874,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (next) {
       next.classList.add("selected");
       if (shouldScroll) {
-        next.scrollIntoView({ block: "nearest" });
+        scrollElementInContainer(els.templatePreviewOutput, next, { mode: scrollMode, padTop: 10, padBottom: 10 });
       }
     }
   }
@@ -14556,7 +14896,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const next = els.declDescTable.querySelector(`tr[data-decl-key="${escapeSelectorValue(key)}"]`);
     if (next) {
       next.classList.add("desc-selected");
-      next.scrollIntoView({ block: "nearest" });
+      scrollElementInContainer(els.declDescPanel, next, { mode: "nearest", padTop: 8, padBottom: 8 });
     }
   }
 
@@ -14737,12 +15077,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     if (state.rightTab === "output" && jumpTarget.kind === "output") {
-      setSelectedCard(jumpTarget.id);
+      setSelectedCard(jumpTarget.id, { scroll: true, scrollMode: "start" });
       return;
     }
 
     if (state.rightTab === "template" && jumpTarget.kind === "template") {
-      setSelectedTemplateBlock(jumpTarget.index);
+      setSelectedTemplateBlock(jumpTarget.index, { scroll: true, scrollMode: "start" });
       return;
     }
 
@@ -16293,7 +16633,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     els.output.scrollTop = scrollTop;
 
     if (state.selectedId) {
-      setSelectedCard(state.selectedId);
+      setSelectedCard(state.selectedId, { scroll: false });
     }
 
     refreshInputGutterTargets();

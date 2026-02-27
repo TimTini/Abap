@@ -138,11 +138,15 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     let current = root;
+    let parent = null;
+    let parentAccessKey = "";
     for (const segment of segments) {
       if (typeof segment === "number") {
         if (!Array.isArray(current)) {
           return undefined;
         }
+        parent = current;
+        parentAccessKey = `[${segment}]`;
         current = current[segment];
         continue;
       }
@@ -183,6 +187,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         if (!projected.length) {
           return undefined;
         }
+        parent = null;
+        parentAccessKey = "";
         current = projected;
         continue;
       }
@@ -198,6 +204,16 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
       if (keyLower === "finaldesc") {
         if (isDeclLikeObject(current)) {
+          const parentKey = String(parentAccessKey || "").trim().toLowerCase();
+          if (
+            parentKey === "decl"
+            && parent
+            && typeof parent === "object"
+            && !Array.isArray(parent)
+            && (hasValueLevelDescFields(parent) || isDeclLikeObject(parent.decl))
+          ) {
+            return resolveValueLevelFinalDesc(parent);
+          }
           return getFinalDeclDesc(current);
         }
         if (hasValueLevelDescFields(current) || isDeclLikeObject(current.decl)) {
@@ -208,6 +224,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       if (!Object.prototype.hasOwnProperty.call(current, key)) {
         return undefined;
       }
+      parent = current;
+      parentAccessKey = key;
       current = current[key];
     }
 
@@ -582,7 +600,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     const border = normalizeTemplateBorderValue(cfg.border);
     if (border === "outside-thin") {
-      const borderLine = "1px solid #c8c8c8";
+      const borderLine = "0.5pt solid #000000";
       if (position && position.isMergeAnchor) {
         style.border = borderLine;
       } else {
@@ -622,6 +640,29 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       return false;
     }
     return fallback;
+  }
+
+  function parseTemplateOptionNumber(value, fallback, min, max) {
+    const fallbackValue = Number.isFinite(Number(fallback)) ? Number(fallback) : 0;
+    const minValue = Number.isFinite(Number(min)) ? Number(min) : fallbackValue;
+    const maxValue = Number.isFinite(Number(max)) ? Number(max) : fallbackValue;
+
+    let numeric = NaN;
+    if (typeof value === "number") {
+      numeric = value;
+    } else if (typeof value === "string") {
+      const token = value.trim();
+      if (token) {
+        numeric = Number(token);
+      }
+    }
+
+    if (!Number.isFinite(numeric)) {
+      return fallbackValue;
+    }
+
+    const normalized = Math.round(numeric);
+    return Math.max(minValue, Math.min(maxValue, normalized));
   }
 
   function getTemplateOptionByPath(source, path) {
@@ -679,11 +720,24 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       "expandArrayRows",
       "arrayToRows"
     ]), false);
+    const squareCells = parseTemplateOptionBoolean(readTemplateOptionValue(sources, [
+      "squareCells",
+      "squareCellsEnabled",
+      "fixedSquareCells"
+    ]), true);
+    const squareCellSize = parseTemplateOptionNumber(readTemplateOptionValue(sources, [
+      "squareCellSize",
+      "squareCellSizePx",
+      "cellSize",
+      "cellSizePx"
+    ]), 18, 16, 240);
 
     return {
       hideEmptyRows,
       hideRowsWithoutValues,
-      expandMultilineRows
+      expandMultilineRows,
+      squareCells,
+      squareCellSize
     };
   }
 
@@ -705,6 +759,13 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       || key === "removeemptyrowsadv"
       || key === "expandarrayrows"
       || key === "arraytorows"
+      || key === "squarecells"
+      || key === "squarecellsenabled"
+      || key === "fixedsquarecells"
+      || key === "squarecellsize"
+      || key === "squarecellsizepx"
+      || key === "cellsize"
+      || key === "cellsizepx"
     );
   }
 
@@ -1025,7 +1086,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       matrix: compactedMatrix,
       maxRow: compactedMatrix.length,
       maxCol,
-      errors
+      errors,
+      options
     };
   }
 
@@ -1034,6 +1096,11 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (!matrix.length) {
       return null;
     }
+    const options = model && model.options && typeof model.options === "object"
+      ? model.options
+      : normalizeTemplatePreviewOptions(null, null, null);
+    const squareCells = options.squareCells === true;
+    const squareCellSize = parseTemplateOptionNumber(options.squareCellSize, 18, 16, 240);
 
     const table = el("table", {
       className: "template-preview-table",
@@ -1061,13 +1128,26 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         }
 
         td.textContent = String(cell.text || "");
+        const colSpan = Math.max(1, Number(td.colSpan) || 1);
+        const rowSpan = Math.max(1, Number(td.rowSpan) || 1);
+        const baseMinWidth = squareCells ? `${squareCellSize}px` : "56px";
+        const baseMaxWidth = squareCells ? `${squareCellSize}px` : "360px";
+        const baseWidth = squareCells ? `${squareCellSize * colSpan}px` : "";
+        const baseMinHeight = squareCells ? `${squareCellSize}px` : "";
+        const baseHeight = squareCells ? `${squareCellSize * rowSpan}px` : "";
+        const baseTextOverflow = squareCells ? "ellipsis" : "";
         const cssText = toInlineCssText({
-          "min-width": "56px",
-          "max-width": "360px",
+          "min-width": baseMinWidth,
+          "max-width": baseMaxWidth,
+          width: baseWidth,
+          "min-height": baseMinHeight,
+          height: baseHeight,
           padding: "4px 6px",
-          border: "1px solid #d3d3d3",
+          border: "none",
           "vertical-align": "top",
           "white-space": "pre-wrap",
+          "text-overflow": baseTextOverflow,
+          "box-sizing": "border-box",
           "font-size": "10pt",
           "font-family": "\"MS PGothic\", \"MS UI Gothic\", Meiryo, sans-serif",
           color: "#111111",
@@ -1159,6 +1239,37 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       return "";
     }
     return String(block.innerText || block.textContent || "").trim();
+  }
+
+  function isTemplateCopyTableOnlyEnabled() {
+    return Boolean(els.templateCopyTableOnly && els.templateCopyTableOnly.checked);
+  }
+
+  function buildTemplateCopyPayloadFromBlock(block) {
+    if (!block || typeof block.cloneNode !== "function") {
+      return { node: null, text: "" };
+    }
+
+    const clone = block.cloneNode(true);
+    const actionButtons = clone.querySelectorAll("[data-template-action]");
+    for (const actionBtn of Array.from(actionButtons)) {
+      actionBtn.remove();
+    }
+
+    if (isTemplateCopyTableOnlyEnabled()) {
+      const table = clone.querySelector(".template-preview-table");
+      if (table) {
+        return {
+          node: table.cloneNode(true),
+          text: buildTemplatePlainTextFromBlock(table)
+        };
+      }
+    }
+
+    return {
+      node: clone,
+      text: buildTemplatePlainTextFromBlock(clone)
+    };
   }
 
   function getRenderableObjectListForTemplate() {
@@ -1282,12 +1393,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       });
       copyBtn.addEventListener("click", async () => {
         try {
-          const clone = block.cloneNode(true);
-          const actionButtons = clone.querySelectorAll("[data-template-action]");
-          for (const actionBtn of Array.from(actionButtons)) {
-            actionBtn.remove();
+          const payload = buildTemplateCopyPayloadFromBlock(block);
+          if (!payload.node) {
+            setError("Nothing to copy.");
+            return;
           }
-          await copyHtmlWithFallback(clone.outerHTML, buildTemplatePlainTextFromBlock(clone));
+          await copyHtmlWithFallback(payload.node.outerHTML, payload.text);
           setError("");
         } catch (err) {
           setError(`Copy failed: ${err && err.message ? err.message : err}`);
@@ -1449,14 +1560,22 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     const wrapper = document.createElement("div");
     const plainLines = [];
+    const tableOnly = isTemplateCopyTableOnlyEnabled();
     for (const block of blocks) {
-      const clone = block.cloneNode(true);
-      const actionButtons = clone.querySelectorAll("[data-template-action]");
-      for (const actionBtn of Array.from(actionButtons)) {
-        actionBtn.remove();
+      const payload = buildTemplateCopyPayloadFromBlock(block);
+      if (!payload.node) {
+        continue;
       }
-      wrapper.appendChild(clone);
-      plainLines.push(buildTemplatePlainTextFromBlock(clone));
+      wrapper.appendChild(payload.node);
+      if (tableOnly) {
+        wrapper.appendChild(document.createElement("br"));
+      }
+      plainLines.push(payload.text);
+    }
+
+    if (!wrapper.childNodes.length) {
+      setError("Nothing to copy.");
+      return;
     }
 
     await copyHtmlWithFallback(wrapper.innerHTML, plainLines.filter(Boolean).join("\n\n"));

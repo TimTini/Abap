@@ -17,12 +17,17 @@ TYPES: BEGIN OF ty_row,
          bukrs TYPE t001-bukrs,
          butxt TYPE t001-butxt,
        END OF ty_row.
+TYPES: BEGIN OF ty_pair,
+         a TYPE string,
+         b TYPE string,
+       END OF ty_pair.
 TYPES ty_rows TYPE STANDARD TABLE OF ty_row.
 
 * DATA / CONSTANTS / RANGES / FIELD-SYMBOLS / STATICS
 DATA gv_user TYPE syuname. "Global user
 DATA: gt_rows TYPE ty_rows,
       gs_row  TYPE ty_row,
+      ls_pair TYPE ty_pair,
       gv_cnt  TYPE i VALUE 0,
       lo_demo TYPE REF TO lcl_demo,
       lv_text TYPE string.
@@ -36,6 +41,9 @@ STATICS sv_once TYPE abap_bool VALUE abap_true.
 gv_cnt = 1.
 gv_cnt += 2.
 DATA(lv_inline) = gv_cnt.
+ls_pair-a = p_user.
+ls_pair-b = p_mem.
+lv_text = ls_pair-a.
 
 * CLEAR / MOVE / MOVE-CORRESPONDING
 CLEAR gs_row WITH 'X'.
@@ -171,4 +179,3 @@ CLASS lcl_demo IMPLEMENTATION.
     rv_bukrs = gc_default_bukrs.
   ENDMETHOD.
 ENDCLASS.
-
