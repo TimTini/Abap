@@ -1,0 +1,1061 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="abap-viewer-version" content="v2026.02.27-r5">
+  <meta name="abap-viewer-updated-at" content="2026-02-27 15:10:13">
+  <meta name="abap-viewer-updated-note" content="AI note: Added runtime hotfix for struct-field desc/finalDesc normalization to avoid duplicated STRUCT prefixes in composed struct-item text. Split runtime wrappers and prior finalDesc/template/gutter fixes preserved. Manual metadata only. Offline only.">
+  <title>ABAP Parser Viewer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1220;
+      --panel: #0f172a;
+      --border: #22324a;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #60a5fa;
+      --hover: #1e293b;
+      --gutter-bg: #0b1526;
+      --code-bg: #0b1526;
+      --pill-bg: #1e293b;
+      --pill-text: #bfdbfe;
+      --selected-row-bg: #1e293b;
+      --tab-active-bg: #1e293b;
+      --tab-active-border: #334155;
+      --tab-active-text: #bfdbfe;
+      --danger: #fca5a5;
+      --overlay: rgba(0, 0, 0, 0.55);
+      --selected-focus-ring: #f59e0b;
+      --selected-focus-fill: rgba(245, 158, 11, 0.14);
+      --layout-left-pane: 48%;
+      --layout-splitter-size: 12px;
+    }
+
+    :root[data-theme="light"] {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --border: #d8dde6;
+      --text: #222b3a;
+      --muted: #6b7280;
+      --accent: #1f7ae0;
+      --hover: #f3f4f6;
+      --gutter-bg: #f8fafc;
+      --code-bg: #f8fafc;
+      --pill-bg: #eef2ff;
+      --pill-text: #3730a3;
+      --selected-row-bg: #eef2ff;
+      --tab-active-bg: #eef2ff;
+      --tab-active-border: #c7d2fe;
+      --tab-active-text: #3730a3;
+      --danger: #b42318;
+      --overlay: rgba(15, 23, 42, 0.5);
+      --selected-focus-ring: #d97706;
+      --selected-focus-fill: rgba(217, 119, 6, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .container {
+      width: 100%;
+      max-width: none;
+      margin: 0;
+      padding: 16px clamp(12px, 2vw, 24px);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    header {
+      margin-bottom: 20px;
+    }
+
+    header h1 {
+      margin: 0 0 6px 0;
+      font-size: 22px;
+    }
+
+    header p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    header .build-info {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      font-family: Consolas, "Courier New", monospace;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .controls input[type="file"] {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      padding: 6px;
+      border-radius: 6px;
+    }
+
+    .controls button {
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .controls input[type="search"],
+    .controls select {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      min-width: 220px;
+    }
+
+    .controls .toggle {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 13px;
+      user-select: none;
+    }
+
+    .controls .secondary {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .controls .secondary:hover {
+      background: var(--hover);
+    }
+
+    .secondary {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .secondary:hover {
+      background: var(--hover);
+    }
+
+    .controls .hint {
+      flex-basis: 100%;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(320px, var(--layout-left-pane)) var(--layout-splitter-size) minmax(320px, 1fr);
+      gap: 0;
+      flex: 1;
+      min-height: 0;
+      align-items: stretch;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      min-height: 300px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      min-width: 0;
+    }
+
+    .splitter {
+      position: relative;
+      touch-action: none;
+      cursor: col-resize;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      background-clip: padding-box;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .splitter::before {
+      content: "";
+      width: 3px;
+      height: min(72px, 40%);
+      border-radius: 999px;
+      background: var(--border);
+      transition: background 0.15s ease;
+    }
+
+    .splitter:hover::before,
+    .splitter:focus-visible::before,
+    .layout.is-resizing .splitter::before {
+      background: var(--accent);
+    }
+
+    .splitter:focus-visible {
+      outline: none;
+    }
+
+    .layout.is-resizing,
+    .layout.is-resizing * {
+      cursor: col-resize !important;
+      user-select: none;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .panel-header h2 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .panel-tabs {
+      display: inline-flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .tab-btn.active {
+      background: var(--tab-active-bg);
+      border-color: var(--tab-active-border);
+      color: var(--tab-active-text);
+    }
+
+    .panel > h2 {
+      margin: 0 0 10px 0;
+      font-size: 18px;
+    }
+
+    #inputText {
+      width: 100%;
+      min-height: 360px;
+      padding: 10px;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      line-height: 18px;
+      resize: none;
+      flex: 1;
+      min-height: 0;
+      border: none;
+      outline: none;
+      white-space: pre;
+      overflow-wrap: normal;
+      background: transparent;
+      color: var(--text);
+    }
+
+    .input-editor {
+      width: 100%;
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--panel);
+    }
+
+    #inputGutter {
+      width: 68px;
+      flex: none;
+      border-right: 1px solid var(--border);
+      background: var(--gutter-bg);
+      color: var(--muted);
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      line-height: 18px;
+      position: relative;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    #inputGutterContent {
+      padding: 10px 6px;
+      will-change: transform;
+    }
+
+    .gutter-line {
+      height: 18px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .gutter-num {
+      flex: 1;
+      text-align: right;
+    }
+
+    .gutter-jump {
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      padding: 0 4px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      line-height: 1.2;
+    }
+
+    .gutter-jump:hover {
+      background: var(--hover);
+      border-color: var(--border);
+      color: var(--text);
+    }
+
+    .gutter-jump:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+
+    .modal textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      resize: vertical;
+      min-height: 140px;
+      max-height: 40vh;
+      background: var(--panel);
+      color: var(--text);
+    }
+
+    .error {
+      color: var(--danger);
+      font-size: 13px;
+      margin-top: 8px;
+      white-space: pre-wrap;
+    }
+
+    #output {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding-right: 6px;
+    }
+
+    #declDescPanel {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding-right: 6px;
+    }
+
+    #templatePreviewPanel {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding-right: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    #output[hidden],
+    #templatePreviewPanel[hidden],
+    #declDescPanel[hidden] {
+      display: none !important;
+    }
+
+    .template-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .template-key-mode {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      margin-right: auto;
+    }
+
+    .template-copy-mode {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      user-select: none;
+    }
+
+    .template-key-badge {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 2px 8px;
+      background: var(--pill-bg);
+      color: var(--pill-text);
+      font-family: Consolas, monospace;
+      font-size: 11px;
+    }
+
+    .template-config-json {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      resize: vertical;
+      min-height: 180px;
+      max-height: 42vh;
+      background: var(--panel);
+      color: var(--text);
+    }
+
+    .template-preview-output {
+      flex: 1;
+      min-height: 220px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      background: var(--code-bg);
+    }
+
+    .template-block {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: var(--panel);
+    }
+
+    .template-block.selected {
+      border-color: var(--selected-focus-ring);
+      background: linear-gradient(var(--selected-focus-fill), var(--selected-focus-fill)), var(--panel);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--selected-focus-ring) 45%, transparent);
+    }
+
+    .template-block:last-child {
+      margin-bottom: 0;
+    }
+
+    .template-block-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .template-block-title {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.3;
+    }
+
+    .template-block-meta {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .template-block-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .template-preview-table {
+      width: max-content;
+      min-width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      border: 1px solid #000000;
+      background: #ffffff;
+      color: #111111;
+    }
+
+    .template-preview-table td {
+      min-width: 56px;
+      max-width: 360px;
+      border: none;
+      padding: 4px 6px;
+      vertical-align: top;
+      white-space: pre-wrap;
+      font-size: 10pt;
+      font-family: "MS PGothic", "MS UI Gothic", Meiryo, sans-serif;
+      color: #111111;
+      background: #ffffff;
+    }
+
+    .template-empty {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .template-error {
+      color: var(--danger);
+      font-size: 13px;
+      white-space: pre-wrap;
+    }
+
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .card.block {
+      border-left: 4px solid var(--accent);
+    }
+
+    .card.selected {
+      border-color: var(--selected-focus-ring);
+      background: linear-gradient(var(--selected-focus-fill), var(--selected-focus-fill)), var(--panel);
+      outline: 2px solid var(--selected-focus-ring);
+      outline-offset: 1px;
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--selected-focus-ring) 45%, transparent);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .card-title {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.2;
+    }
+
+    .card-actions {
+      display: inline-flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .btn-ghost {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      padding: 4px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .btn-ghost:hover {
+      background: var(--hover);
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .raw {
+      margin-top: 8px;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--code-bg);
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--pill-bg);
+      color: var(--pill-text);
+      font-size: 12px;
+      margin: 2px 4px 2px 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 13px;
+    }
+
+    th, td {
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      padding: 6px 4px;
+      vertical-align: top;
+    }
+
+    tr.desc-selected td {
+      background: var(--selected-row-bg);
+    }
+
+    .decl-desc,
+    .decl-desc-line {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .decl-desc-text {
+      flex: 1;
+      min-width: 0;
+      white-space: pre-wrap;
+    }
+
+    .icon-btn {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      padding: 2px 6px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      line-height: 1.1;
+    }
+
+    .icon-btn:hover {
+      background: var(--hover);
+      color: var(--text);
+    }
+
+    .icon-btn:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .children {
+      margin-top: 12px;
+      padding-left: 12px;
+      border-left: 2px solid var(--border);
+    }
+
+    .extras {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--border);
+    }
+
+    pre {
+      white-space: pre-wrap;
+      margin: 6px 0 0 0;
+    }
+
+    .modal[hidden] {
+      display: none;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: var(--overlay);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 1000;
+    }
+
+    .modal-content {
+      width: min(1000px, 100%);
+      max-height: 85vh;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      gap: 10px;
+    }
+
+    .modal-header .modal-actions {
+      display: inline-flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .modal-body {
+      padding: 12px;
+      overflow: auto;
+      min-height: 0;
+    }
+
+    .modal-body pre {
+      white-space: pre;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+    }
+
+    #editModal,
+    #jsonModal {
+      z-index: 1100;
+    }
+
+    @media (max-width: 980px) {
+      .container {
+        padding: 12px;
+      }
+
+      .layout {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      .splitter {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>ABAP Parser Viewer</h1>
+      <p>Paste ABAP code (or JSON output) and click Render.</p>
+      <p class="build-info" id="buildInfo">Updated: manual timestamp not set.</p>
+    </header>
+
+    <div class="controls">
+      <input type="file" id="fileInput" accept=".abap,.txt,.json,application/json,text/plain">
+      <button type="button" id="parseBtn">Render</button>
+      <input type="search" id="searchInput" placeholder="Search (raw/comment/value/decl)…">
+      <select id="typeFilter">
+        <option value="">All types</option>
+      </select>
+      <label class="toggle"><input type="checkbox" id="showRaw" checked>raw</label>
+      <label class="toggle"><input type="checkbox" id="showKeywords" checked>keywords</label>
+      <label class="toggle"><input type="checkbox" id="showValues" checked>values</label>
+      <label class="toggle"><input type="checkbox" id="showExtras">extras</label>
+      <label class="toggle"><input type="checkbox" id="themeToggle" checked>dark</label>
+      <button type="button" id="expandAllBtn" class="secondary">Expand all</button>
+      <button type="button" id="collapseAllBtn" class="secondary">Collapse all</button>
+      <button type="button" id="clearFiltersBtn" class="secondary">Clear</button>
+      <button type="button" id="descBtn" class="secondary">Descriptions</button>
+      <button type="button" id="rulesBtn" class="secondary">Rules</button>
+      <button type="button" id="settingsBtn" class="secondary">Settings</button>
+      <button type="button" id="exportXmlBtn" class="secondary">Export XML</button>
+      <span class="muted hint">Tip: click “Code” on a card to select the corresponding lines in the input; click “JSON” to inspect the raw object.</span>
+    </div>
+
+    <div class="layout" id="mainLayout">
+      <div class="panel">
+        <h2>Input (ABAP / JSON)</h2>
+        <div class="input-editor" id="inputEditor">
+          <div id="inputGutter"><div id="inputGutterContent"></div></div>
+          <textarea id="inputText" placeholder="Paste ABAP code here" wrap="off"></textarea>
+        </div>
+        <div class="error" id="error"></div>
+      </div>
+
+      <div
+        class="splitter"
+        id="panelSplitter"
+        role="separator"
+        aria-label="Resize code and output panels"
+        aria-orientation="vertical"
+        tabindex="0"
+      ></div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2 id="rightPanelTitle">Template Preview</h2>
+          <div class="panel-tabs">
+            <button type="button" id="rightTabOutputBtn" class="secondary tab-btn">Output</button>
+            <button type="button" id="rightTabTemplateBtn" class="secondary tab-btn active">Template</button>
+            <button type="button" id="rightTabDescBtn" class="secondary tab-btn">Descriptions</button>
+            <button type="button" id="declDescJsonBtn" class="secondary" hidden>Storage JSON</button>
+          </div>
+        </div>
+        <div id="output" class="muted" hidden>No data loaded.</div>
+        <div id="templatePreviewPanel">
+          <div class="template-controls">
+            <span class="template-key-mode">
+              Template key mode
+              <span id="templateKeyMode" class="template-key-badge">AUTO: objectType -&gt; DEFAULT</span>
+            </span>
+            <label class="template-copy-mode">
+              <input type="checkbox" id="templateCopyTableOnly" checked>
+              Copy table only
+            </label>
+            <button type="button" id="templateCopyAllBtn" class="secondary">Copy All</button>
+            <button type="button" id="templateResetBtn" class="secondary">Reset default</button>
+            <button type="button" id="templateExportBtn" class="secondary">Export config</button>
+            <button type="button" id="templateImportBtn" class="secondary">Import config</button>
+            <button type="button" id="templateApplyBtn" class="secondary">Apply JSON</button>
+            <input type="file" id="templateImportInput" accept=".json,application/json,text/plain" hidden>
+          </div>
+          <div id="templateConfigError" class="template-error"></div>
+          <textarea id="templateConfigJson" class="template-config-json" spellcheck="false" placeholder="Template config JSON..."></textarea>
+          <div id="templatePreviewOutput" class="template-preview-output muted">No data loaded.</div>
+        </div>
+        <div id="declDescPanel" hidden>
+          <div class="controls" style="margin-bottom:8px">
+            <input type="search" id="declDescSearch" placeholder="Search (type/scope/id/desc)…">
+            <label class="toggle"><input type="checkbox" id="declDescMissingOnly" checked>missing only</label>
+          </div>
+          <div class="muted" style="margin-bottom:6px">Declaration types</div>
+          <div id="declDescTypes" class="controls" style="margin-bottom:8px"></div>
+          <div class="muted" id="declDescSummary" style="margin-bottom:8px"></div>
+          <div id="declDescTable"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="jsonModal" hidden>
+    <div class="modal-content">
+      <div class="modal-header">
+        <strong id="jsonTitle">Object JSON</strong>
+        <div class="modal-actions">
+          <button type="button" id="jsonCopyBtn" class="secondary">Copy</button>
+          <button type="button" id="jsonCloseBtn" class="secondary">Close</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <pre id="jsonPre"></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="editModal" hidden>
+    <div class="modal-content">
+      <div class="modal-header">
+        <strong>Edit description</strong>
+        <div class="modal-actions">
+          <button type="button" id="editSaveBtn" class="secondary">Save</button>
+          <button type="button" id="editClearBtn" class="secondary">Clear</button>
+          <button type="button" id="editCancelBtn" class="secondary">Close</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="muted" id="editLabel" style="margin-bottom:8px"></div>
+        <div class="muted" id="editHint" style="margin-bottom:8px"></div>
+        <div id="editSingleWrap">
+          <textarea id="editDesc" placeholder="Enter description…"></textarea>
+        </div>
+        <div id="editStructWrap" hidden>
+          <div class="muted" style="margin-bottom:6px">Struct description</div>
+          <textarea id="editStructDesc" placeholder="Enter struct description…"></textarea>
+          <div class="muted" style="margin:8px 0 6px">Item description</div>
+          <textarea id="editItemDesc" placeholder="Enter item description…"></textarea>
+        </div>
+        <div style="margin-top:8px">
+          <label class="toggle"><input type="checkbox" id="editSkipNormalize">Skip normalization for this user description</label>
+        </div>
+        <div class="muted" style="margin-top:8px">Tip: Ctrl+Enter to save, Esc to close.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="rulesModal" hidden>
+    <div class="modal-content">
+      <div class="modal-header">
+        <strong>Rules</strong>
+        <div class="modal-actions">
+          <button type="button" id="rulesNewBtn" class="secondary">New</button>
+          <button type="button" id="rulesSaveBtn" class="secondary">Save</button>
+          <button type="button" id="rulesDeleteBtn" class="secondary">Delete</button>
+          <button type="button" id="rulesDownloadBtn" class="secondary">Download</button>
+          <button type="button" id="rulesCloseBtn" class="secondary">Close</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="controls" style="margin-bottom:8px">
+          <select id="rulesSelect" style="min-width:320px">
+            <option value="">(New rule)</option>
+          </select>
+          <select id="rulesTemplate" style="min-width:220px">
+            <option value="startKeyword">Template: startKeyword</option>
+            <option value="startPhrase">Template: startPhrase</option>
+            <option value="assignment">Template: assignment</option>
+          </select>
+          <span class="muted">Saved in browser (localStorage). Custom rules take priority when parsing.</span>
+        </div>
+        <div class="error" id="rulesError"></div>
+        <textarea id="rulesJson" placeholder="Paste or edit config JSON here…"></textarea>
+        <div class="muted" style="margin-top:8px">Tip: click Save, then Render to test; Download creates a .json you can add into /configs.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="settingsModal" hidden>
+    <div class="modal-content">
+      <div class="modal-header">
+        <strong>Settings</strong>
+        <div class="modal-actions">
+          <button type="button" id="settingsSaveBtn" class="secondary">Save</button>
+          <button type="button" id="settingsResetBtn" class="secondary">Reset</button>
+          <button type="button" id="settingsCloseBtn" class="secondary">Close</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="muted" style="margin-bottom:8px">
+          Placeholders:
+          <code>{{struct}}</code>, <code>{{item}}</code>, <code>{{desc}}</code>
+        </div>
+
+        <div style="margin-bottom:16px">
+          <label class="toggle"><input type="checkbox" id="settingsNormalizeDesc">Normalize decl <code>desc</code> (apply templates)</label>
+        </div>
+
+        <div style="margin-bottom:16px">
+          <div class="muted" style="margin-bottom:6px">Declaration types shown in Descriptions modal</div>
+          <div id="settingsDeclTypes" class="controls" style="margin-bottom:0"></div>
+        </div>
+
+        <div style="margin-bottom:16px">
+          <div class="muted" style="margin-bottom:6px">Struct desc template (used for struct fields)</div>
+          <input type="text" id="settingsStructTemplate" placeholder="{{struct}}-{{item}}" style="width:100%">
+        </div>
+
+        <div style="margin-bottom:8px">
+          <div class="muted" style="margin-bottom:6px">Name normalization templates (use {{desc}})</div>
+          <div id="settingsNameTemplates"></div>
+        </div>
+
+        <div class="muted" style="margin-top:8px">
+          Prefix match: 1 char + CODE (e.g. <code>GCN_TOTAL</code>). If no description, keep technical ID.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../shared/abap-parser/01-context.js" defer></script>
+  <script src="../shared/abap-parser/02-config.js" defer></script>
+  <script src="../shared/abap-parser/03-statements.js" defer></script>
+  <script src="../shared/abap-parser/04-parse-core.js" defer></script>
+  <script src="../shared/abap-parser/05-extras.js" defer></script>
+  <script src="../shared/abap-parser/06-conditions.js" defer></script>
+  <script src="../shared/abap-parser/07-declarations.js" defer></script>
+  <script src="../shared/abap-parser/08-helpers.js" defer></script>
+  <script src="../shared/abap-parser/09-public-api.js" defer></script>
+  <script src="../shared/abap-parser.js" defer></script>
+  <!-- abap-parser-configs:start -->
+  <script src="./configs.generated/append.js" defer></script>
+  <script src="./configs.generated/assignment.js" defer></script>
+  <script src="./configs.generated/call-function.js" defer></script>
+  <script src="./configs.generated/call-method-expression.js" defer></script>
+  <script src="./configs.generated/call-method.js" defer></script>
+  <script src="./configs.generated/call-transaction.js" defer></script>
+  <script src="./configs.generated/case.js" defer></script>
+  <script src="./configs.generated/catch.js" defer></script>
+  <script src="./configs.generated/class-data.js" defer></script>
+  <script src="./configs.generated/class-methods.js" defer></script>
+  <script src="./configs.generated/class.js" defer></script>
+  <script src="./configs.generated/cleanup.js" defer></script>
+  <script src="./configs.generated/clear.js" defer></script>
+  <script src="./configs.generated/constants.js" defer></script>
+  <script src="./configs.generated/data.js" defer></script>
+  <script src="./configs.generated/delete-itab.js" defer></script>
+  <script src="./configs.generated/do.js" defer></script>
+  <script src="./configs.generated/else.js" defer></script>
+  <script src="./configs.generated/elseif.js" defer></script>
+  <script src="./configs.generated/field-symbols.js" defer></script>
+  <script src="./configs.generated/form.js" defer></script>
+  <script src="./configs.generated/if.js" defer></script>
+  <script src="./configs.generated/insert-itab.js" defer></script>
+  <script src="./configs.generated/loop-at-itab.js" defer></script>
+  <script src="./configs.generated/method.js" defer></script>
+  <script src="./configs.generated/methods.js" defer></script>
+  <script src="./configs.generated/modify-itab.js" defer></script>
+  <script src="./configs.generated/move-corresponding.js" defer></script>
+  <script src="./configs.generated/move.js" defer></script>
+  <script src="./configs.generated/parameters.js" defer></script>
+  <script src="./configs.generated/perform.js" defer></script>
+  <script src="./configs.generated/ranges.js" defer></script>
+  <script src="./configs.generated/read-table.js" defer></script>
+  <script src="./configs.generated/select-options.js" defer></script>
+  <script src="./configs.generated/select.js" defer></script>
+  <script src="./configs.generated/sort-itab.js" defer></script>
+  <script src="./configs.generated/statics.js" defer></script>
+  <script src="./configs.generated/try.js" defer></script>
+  <script src="./configs.generated/types.js" defer></script>
+  <script src="./configs.generated/when.js" defer></script>
+  <!-- abap-parser-configs:end -->
+  <script src="./variable-descriptions.js" defer></script>
+  <script src="./app/core/01-runtime-state.js" defer></script>
+  <script src="./app/core/02-build-info.js" defer></script>
+  <script src="./app/core/03-storage.js" defer></script>
+  <script src="./app/core/04-template-config.js" defer></script>
+  <script src="./app/core/05-theme-layout.js" defer></script>
+  <script src="./app/core/06-rules.js" defer></script>
+  <script src="./app/core/07-settings-modal.js" defer></script>
+  <script src="./app/01-core.js" defer></script>
+  <script src="./app/descriptions/01-normalize-and-desc.js" defer></script>
+  <script src="./app/descriptions/02-overrides-and-edit.js" defer></script>
+  <script src="./app/descriptions/03-value-finaldesc.js" defer></script>
+  <script src="./app/descriptions/04-panel-render.js" defer></script>
+  <script src="./app/02-descriptions.js" defer></script>
+  <script src="./app/template/01-path-resolver.js" defer></script>
+  <script src="./app/template/02-grid-and-style.js" defer></script>
+  <script src="./app/template/03-preview-render.js" defer></script>
+  <script src="./app/template/04-copy-import-export.js" defer></script>
+  <script src="./app/03-template-preview.js" defer></script>
+  <script src="./app/output/01-xml-export.js" defer></script>
+  <script src="./app/output/02-search-index.js" defer></script>
+  <script src="./app/output/03-selection-gutter.js" defer></script>
+  <script src="./app/output/04-render-shared.js" defer></script>
+  <script src="./app/output/05-render-values.js" defer></script>
+  <script src="./app/output/06-render-extras.js" defer></script>
+  <script src="./app/output/07-render-tree.js" defer></script>
+  <script src="./app/04-output-render.js" defer></script>
+  <script src="./app/05-main.js" defer></script>
+  <script src="./app.js" defer></script>
+</body>
+</html>
+

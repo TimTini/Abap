@@ -1,0 +1,3 @@
+NEW VERSION (OPTIMIZED / UNTESTED)
+- Snapshot of current optimized viewer code before rollback.
+- Use this folder for performance/virtualization experiments.
