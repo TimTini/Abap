@@ -292,6 +292,39 @@
       background: var(--panel);
     }
 
+    .input-tools {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .input-tools .goto-line-label {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .input-tools .goto-line-input {
+      width: 88px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--panel);
+      color: var(--text);
+      padding: 4px 8px;
+      font-size: 12px;
+      font-family: Consolas, monospace;
+    }
+
+    .input-tools .goto-line-meta {
+      font-size: 12px;
+      color: var(--muted);
+      font-family: Consolas, monospace;
+      min-width: 64px;
+      display: inline-block;
+      text-align: right;
+    }
+
     #inputGutter {
       width: 68px;
       flex: none;
@@ -421,6 +454,70 @@
       user-select: none;
     }
 
+    .template-object-filter {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 8px;
+      background: var(--panel);
+      min-width: 220px;
+    }
+
+    .template-object-filter > summary {
+      cursor: pointer;
+      user-select: none;
+      color: var(--muted);
+      font-size: 12px;
+      list-style: none;
+    }
+
+    .template-object-filter > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .template-object-filter-panel {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .template-object-filter-actions {
+      display: inline-flex;
+      gap: 6px;
+    }
+
+    .template-object-filter-actions .secondary {
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+
+    .template-object-filter-list {
+      max-height: 160px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      background: var(--code-bg);
+      min-width: 220px;
+    }
+
+    .template-object-filter-list .toggle {
+      font-size: 12px;
+      color: var(--text);
+      gap: 6px;
+    }
+
+    .template-object-filter-empty {
+      font-size: 12px;
+      color: var(--muted);
+      font-style: italic;
+    }
+
     .template-key-badge {
       border: 1px solid var(--border);
       border-radius: 999px;
@@ -443,6 +540,10 @@
       max-height: 42vh;
       background: var(--panel);
       color: var(--text);
+    }
+
+    .template-config-wrap[hidden] {
+      display: none !important;
     }
 
     .template-preview-output {
@@ -795,6 +896,12 @@
     <div class="layout" id="mainLayout">
       <div class="panel">
         <h2>Input (ABAP / JSON)</h2>
+        <div class="input-tools">
+          <span class="goto-line-label">Goto line</span>
+          <input type="number" id="inputGotoLineInput" class="goto-line-input" min="1" step="1" placeholder="Line">
+          <button type="button" id="inputGotoLineBtn" class="secondary">Go</button>
+          <span id="inputGotoLineMeta" class="goto-line-meta">1-1</span>
+        </div>
         <div class="input-editor" id="inputEditor">
           <div id="inputGutter"><div id="inputGutterContent"></div></div>
           <textarea id="inputText" placeholder="Paste ABAP code here" wrap="off"></textarea>
@@ -832,15 +939,34 @@
               <input type="checkbox" id="templateCopyTableOnly" checked>
               Copy table only
             </label>
+            <label class="template-copy-mode">
+              <input type="checkbox" id="templateShowAllTables">
+              Show all tables
+            </label>
+            <details id="templateObjectFilterDetails" class="template-object-filter">
+              <summary id="templateObjectFilterSummary">Object filter (all)</summary>
+              <div class="template-object-filter-panel">
+                <div class="template-object-filter-actions">
+                  <button type="button" id="templateObjectFilterAllBtn" class="secondary">All</button>
+                  <button type="button" id="templateObjectFilterNoneBtn" class="secondary">None</button>
+                </div>
+                <div id="templateObjectFilterList" class="template-object-filter-list">
+                  <div class="template-object-filter-empty">No objects loaded.</div>
+                </div>
+              </div>
+            </details>
             <button type="button" id="templateCopyAllBtn" class="secondary">Copy All</button>
             <button type="button" id="templateResetBtn" class="secondary">Reset default</button>
             <button type="button" id="templateExportBtn" class="secondary">Export config</button>
             <button type="button" id="templateImportBtn" class="secondary">Import config</button>
             <button type="button" id="templateApplyBtn" class="secondary">Apply JSON</button>
+            <button type="button" id="templateConfigToggleBtn" class="secondary">Show JSON editor</button>
             <input type="file" id="templateImportInput" accept=".json,application/json,text/plain" hidden>
           </div>
-          <div id="templateConfigError" class="template-error"></div>
-          <textarea id="templateConfigJson" class="template-config-json" spellcheck="false" placeholder="Template config JSON..."></textarea>
+          <div id="templateConfigWrap" class="template-config-wrap" hidden>
+            <div id="templateConfigError" class="template-error"></div>
+            <textarea id="templateConfigJson" class="template-config-json" spellcheck="false" placeholder="Template config JSON..."></textarea>
+          </div>
           <div id="templatePreviewOutput" class="template-preview-output muted">No data loaded.</div>
         </div>
         <div id="declDescPanel" hidden>
@@ -975,16 +1101,16 @@
     </div>
   </div>
 
-  <script src="../shared/abap-parser/01-context.js" defer></script>
-  <script src="../shared/abap-parser/02-config.js" defer></script>
-  <script src="../shared/abap-parser/03-statements.js" defer></script>
-  <script src="../shared/abap-parser/04-parse-core.js" defer></script>
-  <script src="../shared/abap-parser/05-extras.js" defer></script>
-  <script src="../shared/abap-parser/06-conditions.js" defer></script>
-  <script src="../shared/abap-parser/07-declarations.js" defer></script>
-  <script src="../shared/abap-parser/08-helpers.js" defer></script>
-  <script src="../shared/abap-parser/09-public-api.js" defer></script>
-  <script src="../shared/abap-parser.js" defer></script>
+  <script src="../../shared/abap-parser/01-context.js" defer></script>
+  <script src="../../shared/abap-parser/02-config.js" defer></script>
+  <script src="../../shared/abap-parser/03-statements.js" defer></script>
+  <script src="../../shared/abap-parser/04-parse-core.js" defer></script>
+  <script src="../../shared/abap-parser/05-extras.js" defer></script>
+  <script src="../../shared/abap-parser/06-conditions.js" defer></script>
+  <script src="../../shared/abap-parser/07-declarations.js" defer></script>
+  <script src="../../shared/abap-parser/08-helpers.js" defer></script>
+  <script src="../../shared/abap-parser/09-public-api.js" defer></script>
+  <script src="../../shared/abap-parser.js" defer></script>
   <!-- abap-parser-configs:start -->
   <script src="./configs.generated/append.js" defer></script>
   <script src="./configs.generated/assignment.js" defer></script>
@@ -1055,6 +1181,12 @@
   <script src="./app/output/07-render-tree.js" defer></script>
   <script src="./app/04-output-render.js" defer></script>
   <script src="./app/05-main.js" defer></script>
+  <script src="./app/06-input-gutter-virtual.js" defer></script>
+  <script src="./app/07-view-dom-optimizations.js" defer></script>
+  <script src="./app/08-input-goto-line.js" defer></script>
+  <script src="./app/09-template-object-filter.js" defer></script>
+  <script src="./app/10-default-performance-sample.js" defer></script>
+  <script src="./app/11-template-config-toggle.js" defer></script>
   <script src="./app.js" defer></script>
 </body>
 </html>

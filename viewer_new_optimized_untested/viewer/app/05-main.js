@@ -103,7 +103,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     setTemplateConfigError("");
 
     if (els.inputText && !els.inputText.value.trim()) {
-      els.inputText.value = SAMPLE_ABAP;
+      const defaultSample = typeof window.getAbapViewerDefaultSample === "function"
+        ? window.getAbapViewerDefaultSample()
+        : SAMPLE_ABAP;
+      els.inputText.value = String(defaultSample || SAMPLE_ABAP || "");
     }
 
     rebuildInputGutter();

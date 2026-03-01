@@ -60,7 +60,22 @@ SCRIPT_BLOCK_RE = re.compile(r"(?is)<script\b[^>]*>.*?</script>")
 SCRIPT_OPEN_RE = re.compile(r"(?is)<script\b[^>]*>")
 
 
-def inline_stylesheet_links(html: str, base_dir: Path, warnings: list[str]) -> tuple[str, int]:
+def _resolve_local_asset(base_dir: Path, ref: str, repo_root: Path) -> Path:
+    direct = (base_dir / ref).resolve()
+    if direct.exists():
+        return direct
+
+    # Fallback for copied viewer roots whose relative ../shared path no longer matches.
+    cleaned_parts = [p for p in Path(ref).parts if p not in {".", ".."}]
+    if cleaned_parts:
+        fallback = (repo_root / Path(*cleaned_parts)).resolve()
+        if fallback.exists():
+            return fallback
+
+    return direct
+
+
+def inline_stylesheet_links(html: str, base_dir: Path, repo_root: Path, warnings: list[str]) -> tuple[str, int]:
     replaced = 0
 
     def repl(m: re.Match[str]) -> str:
@@ -76,7 +91,7 @@ def inline_stylesheet_links(html: str, base_dir: Path, warnings: list[str]) -> t
             warnings.append(f"Skip remote stylesheet: {href}")
             return tag
 
-        css_path = (base_dir / href).resolve()
+        css_path = _resolve_local_asset(base_dir, href, repo_root)
         if not css_path.exists():
             warnings.append(f"Missing stylesheet: {href}")
             return tag
@@ -95,7 +110,7 @@ def inline_stylesheet_links(html: str, base_dir: Path, warnings: list[str]) -> t
     return LINK_TAG_RE.sub(repl, html), replaced
 
 
-def inline_script_src(html: str, base_dir: Path, warnings: list[str]) -> tuple[str, int]:
+def inline_script_src(html: str, base_dir: Path, repo_root: Path, warnings: list[str]) -> tuple[str, int]:
     replaced = 0
 
     def repl(m: re.Match[str]) -> str:
@@ -115,7 +130,7 @@ def inline_script_src(html: str, base_dir: Path, warnings: list[str]) -> tuple[s
             warnings.append(f"Skip remote script: {src}")
             return block
 
-        script_path = (base_dir / src).resolve()
+        script_path = _resolve_local_asset(base_dir, src, repo_root)
         if not script_path.exists():
             warnings.append(f"Missing script: {src}")
             return block
@@ -135,29 +150,30 @@ def inline_script_src(html: str, base_dir: Path, warnings: list[str]) -> tuple[s
     return SCRIPT_BLOCK_RE.sub(repl, html), replaced
 
 
-def main() -> int:
-    repo_root = Path(__file__).resolve().parent.parent
-    default_in = repo_root / "viewer" / "index.html"
-    default_out = repo_root / "viewer" / "index.inline.html"
+def _is_viewer_root(path: Path) -> bool:
+    return (path / "index.html").exists() and (path / "app.js").exists() and (path / "app").is_dir()
 
-    parser = argparse.ArgumentParser(description="Inline viewer HTML into a single file (offline).")
-    parser.add_argument("--input", type=Path, default=default_in, help="Path to viewer index.html")
-    parser.add_argument("--output", type=Path, default=default_out, help="Output HTML file path")
-    args = parser.parse_args()
 
-    input_path: Path = args.input
-    output_path: Path = args.output
+def _discover_viewer_roots(repo_root: Path) -> list[Path]:
+    roots: list[Path] = []
+    for idx in repo_root.rglob("index.html"):
+        parent = idx.parent
+        if not _is_viewer_root(parent):
+            continue
+        rel_parts = [p.lower() for p in parent.relative_to(repo_root).parts]
+        if any(p in {"node_modules", ".git", ".venv", "venv"} for p in rel_parts):
+            continue
+        roots.append(parent)
+    uniq = sorted({p.resolve() for p in roots}, key=lambda p: p.as_posix())
+    return uniq
 
-    if not input_path.exists():
-        print(f"Input not found: {input_path}", file=sys.stderr)
-        return 2
 
+def _build_inline(input_path: Path, output_path: Path, repo_root: Path) -> tuple[int, int, list[str]]:
     base_dir = input_path.resolve().parent
     html = _read_text(input_path)
-
     warnings: list[str] = []
-    html, css_count = inline_stylesheet_links(html, base_dir, warnings)
-    html, js_count = inline_script_src(html, base_dir, warnings)
+    html, css_count = inline_stylesheet_links(html, base_dir, repo_root, warnings)
+    html, js_count = inline_script_src(html, base_dir, repo_root, warnings)
 
     banner = "\n".join(
         [
@@ -172,11 +188,66 @@ def main() -> int:
     )
 
     _write_text(output_path, banner + html)
+    return js_count, css_count, warnings
 
-    print(f"Generated: {output_path} (inlined {js_count} scripts, {css_count} stylesheets)")
-    for w in warnings:
-        print(f"WARNING: {w}", file=sys.stderr)
 
+def main() -> int:
+    repo_root = Path(__file__).resolve().parent.parent
+
+    parser = argparse.ArgumentParser(description="Inline viewer HTML into a single file (offline).")
+    parser.add_argument("--input", type=Path, help="Path to viewer index.html (single build mode)")
+    parser.add_argument("--output", type=Path, help="Output HTML file path (single build mode)")
+    parser.add_argument(
+        "--all-viewers",
+        action="store_true",
+        help="Build all viewer roots found under repo (default when --input is omitted)",
+    )
+    args = parser.parse_args()
+
+    single_mode = args.input is not None
+    if args.output is not None and not single_mode:
+        print("--output requires --input.", file=sys.stderr)
+        return 2
+
+    if single_mode and not args.input.exists():
+        print(f"Input not found: {args.input}", file=sys.stderr)
+        return 2
+
+    if single_mode and not args.input.is_file():
+        print(f"Input is not a file: {args.input}", file=sys.stderr)
+        return 2
+
+    if single_mode:
+        input_path = args.input.resolve()
+        output_path = args.output.resolve() if args.output is not None else input_path.with_name("index.inline.html")
+        js_count, css_count, warnings = _build_inline(input_path, output_path, repo_root)
+        print(f"Generated: {output_path} (inlined {js_count} scripts, {css_count} stylesheets)")
+        for w in warnings:
+            print(f"WARNING: {w}", file=sys.stderr)
+        return 0
+
+    viewer_roots = _discover_viewer_roots(repo_root)
+    if not viewer_roots:
+        print("No viewer roots found (need index.html + app.js + app/).", file=sys.stderr)
+        return 2
+
+    total_js = 0
+    total_css = 0
+    total_warnings = 0
+    for root in viewer_roots:
+        input_path = root / "index.html"
+        output_path = root / "index.inline.html"
+        js_count, css_count, warnings = _build_inline(input_path, output_path, repo_root)
+        total_js += js_count
+        total_css += css_count
+        total_warnings += len(warnings)
+        print(f"Generated: {output_path} (inlined {js_count} scripts, {css_count} stylesheets)")
+        for w in warnings:
+            print(f"WARNING: {w}", file=sys.stderr)
+
+    print(
+        f"Done: {len(viewer_roots)} viewers, {total_js} scripts, {total_css} stylesheets, {total_warnings} warnings."
+    )
     return 0
 
 
