@@ -3,6 +3,37 @@
 window.AbapViewerModules = window.AbapViewerModules || {};
 window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
+  function resetParsedViewState() {
+    state.data = null;
+    state.renderObjects = [];
+    state.haystackById = {};
+    state.selectedId = "";
+    state.selectedTemplateIndex = "";
+    if (state.collapsedIds && typeof state.collapsedIds.clear === "function") {
+      state.collapsedIds.clear();
+    }
+    if (typeof populateTypeFilter === "function") {
+      populateTypeFilter([]);
+    }
+  }
+
+  function syncRightPanelAfterParseFailure() {
+    if (typeof renderOutput === "function") {
+      renderOutput();
+    } else if (typeof setOutputMessage === "function") {
+      setOutputMessage("No data loaded.");
+    }
+
+    if (state.rightTab === "descriptions" && typeof renderDeclDescPanelUi === "function") {
+      renderDeclDescPanelUi();
+      return;
+    }
+
+    if (state.rightTab === "template" && typeof renderTemplatePreview === "function") {
+      renderTemplatePreview();
+    }
+  }
+
   function parseFromTextarea(fileName) {
     const content = els.inputText.value || "";
     const trimmed = content.trim();
@@ -11,7 +42,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     rebuildInputGutter();
     if (!trimmed) {
       setError("Input is empty.");
-      setOutputMessage("No data loaded.");
+      resetParsedViewState();
+      syncRightPanelAfterParseFailure();
       return;
     }
 
@@ -27,13 +59,15 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         state.data = parsed;
       } catch (err) {
         setError(`JSON parse error: ${err && err.message ? err.message : err}`);
-        setOutputMessage("No data loaded.");
+        resetParsedViewState();
+        syncRightPanelAfterParseFailure();
         return;
       }
     } else {
       if (!window.AbapParser || typeof window.AbapParser.parseAbapText !== "function") {
         setError("AbapParser not loaded.");
-        setOutputMessage("No data loaded.");
+        resetParsedViewState();
+        syncRightPanelAfterParseFailure();
         return;
       }
 
@@ -44,7 +78,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         state.data = window.AbapParser.parseAbapText(content, configs, fileName || "");
       } catch (err) {
         setError(`Parse error: ${err && err.message ? err.message : err}`);
-        setOutputMessage("No data loaded.");
+        resetParsedViewState();
+        syncRightPanelAfterParseFailure();
         return;
       }
     }

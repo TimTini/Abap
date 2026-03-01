@@ -176,12 +176,46 @@
     return lines.join("\n");
   }
 
+  const STORAGE_KEY = "abap-parser-viewer.defaultPerfSample.v1";
   let cache = "";
-  window.getAbapViewerDefaultSample = function getAbapViewerDefaultSample() {
+
+  function getPerformanceSample() {
     if (!cache) {
       cache = buildDefaultPerformanceSample();
     }
     return cache;
+  }
+
+  function shouldUsePerformanceSampleByDefault() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw === "1" || raw === "true") {
+        return true;
+      }
+    } catch {
+      // ignore
+    }
+
+    try {
+      const search = window.location && typeof window.location.search === "string"
+        ? window.location.search
+        : "";
+      const params = new URLSearchParams(search);
+      const flag = String(params.get("perfSample") || params.get("perf") || "").trim().toLowerCase();
+      return flag === "1" || flag === "true" || flag === "yes";
+    } catch {
+      return false;
+    }
+  }
+
+  window.getAbapViewerPerformanceSample = function getAbapViewerPerformanceSample() {
+    return getPerformanceSample();
+  };
+
+  window.getAbapViewerDefaultSample = function getAbapViewerDefaultSample() {
+    if (!shouldUsePerformanceSampleByDefault()) {
+      return "";
+    }
+    return getPerformanceSample();
   };
 })();
-

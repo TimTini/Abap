@@ -63,12 +63,50 @@
     return Math.max(min, Math.min(max, Math.floor(num)));
   }
 
+  function cancelScheduledHandle(handle) {
+    const id = Number(handle) || 0;
+    if (!id) {
+      return;
+    }
+    const cancel = typeof window.cancelAnimationFrame === "function"
+      ? window.cancelAnimationFrame.bind(window)
+      : clearTimeout;
+    cancel(id);
+  }
+
   function resetDomPerfOnDataReload() {
     perf.outputChildRenderCountById = new Map();
     perf.templateExpandedBlocks = new Set();
     perf.descVirtual = null;
-    perf.outputVirtual = null;
-    perf.templateVirtual = null;
+
+    if (perf.outputVirtual && typeof perf.outputVirtual === "object") {
+      const outputV = perf.outputVirtual;
+      cancelScheduledHandle(outputV.pendingRaf);
+      outputV.pendingRaf = 0;
+      outputV.roots = [];
+      outputV.total = 0;
+      outputV.start = -1;
+      outputV.end = -1;
+      outputV.idToRootIndex = new Map();
+      outputV.lineTargetMap = new Map();
+      outputV.nodeById = new Map();
+      outputV.parentById = new Map();
+      outputV.childIndexById = new Map();
+      outputV.adjustingScroll = false;
+    }
+
+    if (perf.templateVirtual && typeof perf.templateVirtual === "object") {
+      const templateV = perf.templateVirtual;
+      cancelScheduledHandle(templateV.pendingRaf);
+      templateV.pendingRaf = 0;
+      templateV.items = [];
+      templateV.total = 0;
+      templateV.start = -1;
+      templateV.end = -1;
+      templateV.lineTargetMap = new Map();
+      templateV.adjustingScroll = false;
+      templateV.config = null;
+    }
   }
 
   function bindTemplateShowAllTablesControl() {
@@ -217,6 +255,9 @@
       end: -1,
       idToRootIndex: new Map(),
       lineTargetMap: new Map(),
+      nodeById: new Map(),
+      parentById: new Map(),
+      childIndexById: new Map(),
       pendingRaf: 0,
       scrollBound: false,
       adjustingScroll: false
@@ -242,6 +283,35 @@
       config: null
     };
     return perf.templateVirtual;
+  }
+
+  function clearOutputVirtualData() {
+    const v = ensureOutputVirtualState();
+    cancelScheduledHandle(v.pendingRaf);
+    v.pendingRaf = 0;
+    v.roots = [];
+    v.total = 0;
+    v.start = -1;
+    v.end = -1;
+    v.idToRootIndex = new Map();
+    v.lineTargetMap = new Map();
+    v.nodeById = new Map();
+    v.parentById = new Map();
+    v.childIndexById = new Map();
+    v.adjustingScroll = false;
+  }
+
+  function clearTemplateVirtualData() {
+    const v = ensureTemplateVirtualState();
+    cancelScheduledHandle(v.pendingRaf);
+    v.pendingRaf = 0;
+    v.items = [];
+    v.total = 0;
+    v.start = -1;
+    v.end = -1;
+    v.lineTargetMap = new Map();
+    v.adjustingScroll = false;
+    v.config = null;
   }
 
   function buildVirtualRange(total, scrollTop, viewportHeight, avgHeight) {
@@ -278,8 +348,11 @@
   function collectOutputVirtualMaps(roots) {
     const idToRootIndex = new Map();
     const lineTargetMap = new Map();
+    const nodeById = new Map();
+    const parentById = new Map();
+    const childIndexById = new Map();
 
-    const walk = (nodeInfo, rootIndex) => {
+    const walk = (nodeInfo, rootIndex, parentId, childIndex) => {
       if (!nodeInfo || typeof nodeInfo !== "object") {
         return;
       }
@@ -292,23 +365,28 @@
         : String(obj.id || "");
       if (nodeId) {
         idToRootIndex.set(nodeId, rootIndex);
+        nodeById.set(nodeId, nodeInfo);
+        if (parentId) {
+          parentById.set(nodeId, parentId);
+          childIndexById.set(nodeId, Number.isInteger(childIndex) ? childIndex : 0);
+        }
       }
       const lineStart = Number(obj.lineStart) || 0;
       if (lineStart > 0 && nodeId && !lineTargetMap.has(lineStart)) {
         lineTargetMap.set(lineStart, { kind: "output", id: nodeId });
       }
       const children = Array.isArray(nodeInfo.children) ? nodeInfo.children : [];
-      for (const child of children) {
-        walk(child, rootIndex);
+      for (let i = 0; i < children.length; i += 1) {
+        walk(children[i], rootIndex, nodeId, i);
       }
     };
 
     const list = Array.isArray(roots) ? roots : [];
     for (let i = 0; i < list.length; i += 1) {
-      walk(list[i], i);
+      walk(list[i], i, "", -1);
     }
 
-    return { idToRootIndex, lineTargetMap };
+    return { idToRootIndex, lineTargetMap, nodeById, parentById, childIndexById };
   }
 
   function collectTemplateVirtualLineMap(items) {
@@ -644,7 +722,7 @@
     els.output.replaceChildren(fragment);
 
     const renderedRootCards = Array.from(els.output.querySelectorAll(".card[data-root-index]"));
-    if (renderedRootCards.length) {
+    if (force && renderedRootCards.length) {
       let heightSum = 0;
       for (const card of renderedRootCards) {
         heightSum += Math.max(40, Number(card.offsetHeight) || 0);
@@ -693,7 +771,7 @@
     els.templatePreviewOutput.replaceChildren(fragment);
 
     const renderedBlocks = Array.from(els.templatePreviewOutput.querySelectorAll(".template-block[data-template-index]"));
-    if (renderedBlocks.length) {
+    if (force && renderedBlocks.length) {
       let heightSum = 0;
       for (const block of renderedBlocks) {
         heightSum += Math.max(40, Number(block.offsetHeight) || 0);
@@ -724,6 +802,7 @@
       }
 
       if (!state.data || !Array.isArray(state.renderObjects)) {
+        clearOutputVirtualData();
         if (typeof setOutputMessage === "function") {
           setOutputMessage("No data loaded.");
         } else if (els.output) {
@@ -748,6 +827,7 @@
         .filter(Boolean);
 
       if (!roots.length) {
+        clearOutputVirtualData();
         if (typeof setOutputMessage === "function") {
           setOutputMessage("No matches.");
         } else if (els.output) {
@@ -768,24 +848,89 @@
       const maps = collectOutputVirtualMaps(roots);
       v.idToRootIndex = maps.idToRootIndex;
       v.lineTargetMap = maps.lineTargetMap;
+      v.nodeById = maps.nodeById;
+      v.parentById = maps.parentById;
+      v.childIndexById = maps.childIndexById;
 
       renderOutputVirtualWindow(true);
     };
   }
 
+  function ensureOutputSelectionPathVisible(nodeId, virtualState) {
+    const selectedId = String(nodeId || "").trim();
+    const v = virtualState && typeof virtualState === "object" ? virtualState : null;
+    if (!selectedId || !v || !(v.parentById instanceof Map) || !(v.nodeById instanceof Map)) {
+      return false;
+    }
+
+    let changed = false;
+    let currentId = selectedId;
+    const visited = new Set();
+
+    while (currentId && !visited.has(currentId) && v.parentById.has(currentId)) {
+      visited.add(currentId);
+
+      const parentId = String(v.parentById.get(currentId) || "").trim();
+      if (!parentId) {
+        break;
+      }
+
+      if (state.collapsedIds && typeof state.collapsedIds.has === "function" && state.collapsedIds.has(parentId)) {
+        state.collapsedIds.delete(parentId);
+        changed = true;
+      }
+
+      const parentNodeInfo = v.nodeById.get(parentId);
+      const totalChildren = Array.isArray(parentNodeInfo && parentNodeInfo.children)
+        ? parentNodeInfo.children.length
+        : 0;
+      const childIndex = Number(v.childIndexById.get(currentId));
+      if (totalChildren > 0 && Number.isInteger(childIndex) && childIndex >= 0) {
+        const requiredCount = childIndex + 1;
+        const previousRaw = perf.outputChildRenderCountById.get(parentId);
+        const fallback = Math.min(totalChildren, perf.outputChildInitialSize);
+        const previous = Number.isInteger(previousRaw) && previousRaw > 0 ? previousRaw : fallback;
+        const next = clampInt(Math.max(previous, requiredCount), 1, totalChildren);
+        if (previousRaw !== next) {
+          perf.outputChildRenderCountById.set(parentId, next);
+          changed = true;
+        }
+      }
+
+      currentId = parentId;
+    }
+
+    return changed;
+  }
+
   if (originalSetSelectedCard) {
     setSelectedCard = function setSelectedCardVirtualAware(id, options) {
       const normalized = typeof normalizeId === "function" ? normalizeId(id) : String(id || "");
+      const opts = options && typeof options === "object" ? options : {};
+      const shouldScroll = opts.scroll !== false;
+      const shouldEnsureVisible = opts.ensureVisible === true;
+      const allowViewportAdjust = shouldScroll || shouldEnsureVisible;
       const v = ensureOutputVirtualState();
+      const pathChanged = allowViewportAdjust
+        ? ensureOutputSelectionPathVisible(normalized, v)
+        : false;
       if (normalized && v && v.idToRootIndex instanceof Map && v.idToRootIndex.has(normalized) && els.output) {
         const rootIndex = Number(v.idToRootIndex.get(normalized));
         const outsideRange = rootIndex < v.start || rootIndex >= v.end;
-        if (outsideRange) {
-          const targetTop = Math.max(0, Math.round((rootIndex * v.avgHeight) - (Number(els.output.clientHeight || 0) * 0.2)));
-          v.adjustingScroll = true;
-          els.output.scrollTop = targetTop;
+        const shouldRerenderWindow = pathChanged || (outsideRange && allowViewportAdjust);
+        if (shouldRerenderWindow) {
+          if (outsideRange && allowViewportAdjust) {
+            const targetTop = Math.max(
+              0,
+              Math.round((rootIndex * v.avgHeight) - (Number(els.output.clientHeight || 0) * 0.2))
+            );
+            v.adjustingScroll = true;
+            els.output.scrollTop = targetTop;
+          }
           renderOutputVirtualWindow(true);
-          v.adjustingScroll = false;
+          if (outsideRange && allowViewportAdjust) {
+            v.adjustingScroll = false;
+          }
         }
       }
       return originalSetSelectedCard.apply(this, arguments);
@@ -800,7 +945,11 @@
       }
 
       if (!state.data || !Array.isArray(state.renderObjects)) {
+        clearTemplateVirtualData();
         setTemplatePreviewMessageCompat("No data loaded.");
+        if (typeof refreshInputGutterTargets === "function") {
+          refreshInputGutterTargets();
+        }
         return;
       }
 
@@ -811,9 +960,13 @@
       if (typeof validateTemplateConfig === "function") {
         const check = validateTemplateConfig(config);
         if (!check.valid) {
+          clearTemplateVirtualData();
           setTemplatePreviewMessageCompat("Template config is invalid.");
           if (typeof setTemplateConfigError === "function") {
             setTemplateConfigError((check.errors || []).join("\n"));
+          }
+          if (typeof refreshInputGutterTargets === "function") {
+            refreshInputGutterTargets();
           }
           return;
         }
@@ -821,7 +974,11 @@
 
       const items = getRenderableObjectListForTemplate();
       if (!Array.isArray(items) || !items.length) {
+        clearTemplateVirtualData();
         setTemplatePreviewMessageCompat("No renderable objects.");
+        if (typeof refreshInputGutterTargets === "function") {
+          refreshInputGutterTargets();
+        }
         return;
       }
 
@@ -842,10 +999,14 @@
     setSelectedTemplateBlock = function setSelectedTemplateBlockVirtualAware(index, options) {
       const normalized = String(index === undefined || index === null ? "" : index).trim();
       const parsed = Number(normalized);
+      const opts = options && typeof options === "object" ? options : {};
+      const shouldScroll = opts.scroll !== false;
+      const shouldEnsureVisible = opts.ensureVisible === true;
+      const allowViewportAdjust = shouldScroll || shouldEnsureVisible;
       const v = ensureTemplateVirtualState();
       if (Number.isFinite(parsed) && parsed >= 0 && parsed < v.total && els.templatePreviewOutput) {
         const outsideRange = parsed < v.start || parsed >= v.end;
-        if (outsideRange) {
+        if (outsideRange && allowViewportAdjust) {
           const targetTop = Math.max(0, Math.round((parsed * v.avgHeight) - (Number(els.templatePreviewOutput.clientHeight || 0) * 0.2)));
           v.adjustingScroll = true;
           els.templatePreviewOutput.scrollTop = targetTop;

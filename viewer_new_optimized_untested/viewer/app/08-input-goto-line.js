@@ -110,6 +110,17 @@
     updateGotoLineMeta();
   }
 
+  function isEditableElement(el) {
+    if (!el || typeof el !== "object") {
+      return false;
+    }
+    if (el.isContentEditable) {
+      return true;
+    }
+    const tag = String(el.tagName || "").toUpperCase();
+    return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+  }
+
   gotoBtn.addEventListener("click", runGotoLine);
 
   gotoInput.addEventListener("keydown", (ev) => {
@@ -126,9 +137,20 @@
 
   window.addEventListener("keydown", (ev) => {
     const key = String(ev.key || "").toLowerCase();
-    if (!ev.ctrlKey || key !== "g") {
+    if (!ev.ctrlKey || ev.altKey || ev.shiftKey || key !== "g") {
       return;
     }
+
+    const active = document.activeElement;
+    if (active && active !== inputText && active !== gotoInput && isEditableElement(active)) {
+      return;
+    }
+
+    const openModal = document.querySelector(".modal:not([hidden])");
+    if (openModal && active && active !== inputText && active !== gotoInput && isEditableElement(active)) {
+      return;
+    }
+
     ev.preventDefault();
     gotoInput.focus();
     gotoInput.select();

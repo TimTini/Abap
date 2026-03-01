@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.02.27-r5">
-  <meta name="abap-viewer-updated-at" content="2026-02-27 15:10:13">
-  <meta name="abap-viewer-updated-note" content="AI note: Added runtime hotfix for struct-field desc/finalDesc normalization to avoid duplicated STRUCT prefixes in composed struct-item text. Split runtime wrappers and prior finalDesc/template/gutter fixes preserved. Manual metadata only. Offline only.">
+  <meta name="abap-viewer-version" content="v2026.03.01-r4">
+  <meta name="abap-viewer-updated-at" content="2026-03-01 21:19:23">
+  <meta name="abap-viewer-updated-note" content="AI note: Further stabilized virtual scrolling: lock avg-height adaptation during live scroll to remove minor reverse drift in Output/Template panels.">
   <title>ABAP Parser Viewer</title>
   <style>
     :root {
@@ -528,22 +528,189 @@
       font-size: 11px;
     }
 
-    .template-config-json {
-      width: 100%;
+    .template-editor-modal {
+      z-index: 1080;
+    }
+
+    .template-editor-modal-content {
+      width: min(1240px, 100%);
+      max-height: 92vh;
+    }
+
+    .template-editor-title-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .template-editor-status {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .template-editor-modal-body {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+    }
+
+    .template-editor-header-actions .template-mode-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #ffffff;
+    }
+
+    .template-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .template-form-section {
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 10px;
-      font-family: Consolas, monospace;
-      font-size: 12px;
-      resize: vertical;
-      min-height: 180px;
-      max-height: 42vh;
-      background: var(--panel);
+      background: var(--code-bg);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .template-form-section h3 {
+      margin: 0;
+      font-size: 13px;
       color: var(--text);
     }
 
-    .template-config-wrap[hidden] {
-      display: none !important;
+    .template-form-row {
+      display: flex;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .template-form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 8px;
+    }
+
+    .template-form-field {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--text);
+      min-width: 150px;
+    }
+
+    .template-form-field.checkbox-field {
+      flex-direction: row;
+      align-items: center;
+      min-width: 0;
+      gap: 6px;
+    }
+
+    .template-form-field label {
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .template-form-input {
+      width: 100%;
+      min-width: 150px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      font-size: 12px;
+    }
+
+    .template-form-textarea {
+      width: 100%;
+      min-height: 90px;
+      resize: vertical;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      font-family: Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .template-form-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .template-form-help {
+      color: var(--muted);
+      font-size: 12px;
+      margin: 0;
+    }
+
+    .template-entry-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .template-entry-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .template-entry-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .template-entry-title {
+      display: inline-flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .template-entry-kind {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--code-bg);
+    }
+
+    .template-entry-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .template-json-panel {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      background: var(--code-bg);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
 
     .template-preview-output {
@@ -959,14 +1126,10 @@
             <button type="button" id="templateResetBtn" class="secondary">Reset default</button>
             <button type="button" id="templateExportBtn" class="secondary">Export config</button>
             <button type="button" id="templateImportBtn" class="secondary">Import config</button>
-            <button type="button" id="templateApplyBtn" class="secondary">Apply JSON</button>
-            <button type="button" id="templateConfigToggleBtn" class="secondary">Show JSON editor</button>
+            <button type="button" id="templateConfigToggleBtn" class="secondary">Open Template Editor</button>
             <input type="file" id="templateImportInput" accept=".json,application/json,text/plain" hidden>
           </div>
-          <div id="templateConfigWrap" class="template-config-wrap" hidden>
-            <div id="templateConfigError" class="template-error"></div>
-            <textarea id="templateConfigJson" class="template-config-json" spellcheck="false" placeholder="Template config JSON..."></textarea>
-          </div>
+          <div id="templateConfigError" class="template-error"></div>
           <div id="templatePreviewOutput" class="template-preview-output muted">No data loaded.</div>
         </div>
         <div id="declDescPanel" hidden>
