@@ -457,6 +457,92 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     });
   }
 
+  function openTemplateCellTextEditModal(options) {
+    const opts = options && typeof options === "object" ? options : {};
+    const templateKey = String(opts.templateKey || "").trim();
+    const rangeKey = String(opts.rangeKey || "").trim();
+    const objectType = String(opts.objectType || "").trim();
+    const currentText = String(opts.currentText === undefined || opts.currentText === null ? "" : opts.currentText);
+    const onSave = typeof opts.onSave === "function" ? opts.onSave : null;
+
+    const modal = openTemplateDynamicModal("Edit Template Cell Text", { contentClass: "template-runtime-modal-content template-runtime-modal-wide" });
+
+    const saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.className = "secondary";
+    saveBtn.textContent = "Save";
+    modal.actions.prepend(saveBtn);
+
+    const hint = document.createElement("div");
+    hint.className = "muted";
+    hint.style.marginBottom = "8px";
+    hint.textContent = [
+      objectType ? `Object: ${objectType}` : "",
+      templateKey ? `Template: ${templateKey}` : "",
+      rangeKey ? `Range: ${rangeKey}` : ""
+    ].filter(Boolean).join(" • ");
+    modal.body.appendChild(hint);
+
+    const errorEl = document.createElement("div");
+    errorEl.className = "template-error";
+    errorEl.style.display = "none";
+    modal.body.appendChild(errorEl);
+
+    const textarea = document.createElement("textarea");
+    textarea.className = "template-config-json";
+    textarea.spellcheck = false;
+    textarea.placeholder = "Cell text...";
+    textarea.value = currentText;
+    modal.body.appendChild(textarea);
+
+    const showInlineError = (message) => {
+      const text = String(message || "").trim();
+      if (!text) {
+        errorEl.textContent = "";
+        errorEl.style.display = "none";
+        return;
+      }
+      errorEl.textContent = text;
+      errorEl.style.display = "block";
+    };
+
+    const submit = () => {
+      showInlineError("");
+      if (!onSave) {
+        closeTemplateDynamicModal();
+        return;
+      }
+      let ok = false;
+      try {
+        ok = onSave(String(textarea.value || "")) !== false;
+      } catch (err) {
+        showInlineError(err && err.message ? err.message : String(err));
+        return;
+      }
+      if (!ok) {
+        const fallback = String((els.templateConfigError && els.templateConfigError.textContent) || "").trim();
+        if (fallback) {
+          showInlineError(fallback);
+        }
+        return;
+      }
+      closeTemplateDynamicModal();
+    };
+
+    saveBtn.addEventListener("click", submit);
+    textarea.addEventListener("keydown", (ev) => {
+      if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
+        ev.preventDefault();
+        submit();
+      }
+    });
+
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(0, textarea.value.length);
+    }, 0);
+  }
+
   function getInputGotoControls() {
     return {
       input: document.getElementById("inputGotoLine"),
