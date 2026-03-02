@@ -55,8 +55,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     state.renderObjects = buildRenderableObjects(state.data && state.data.objects, RENDER_TREE_OPTIONS);
     state.haystackById = buildSearchIndex(state.renderObjects);
     populateTypeFilter(state.renderObjects);
-    renderOutput();
-    if (state.rightTab === "descriptions") {
+    if (state.rightTab === "output") {
+      renderOutput();
+    } else if (state.rightTab === "descriptions") {
       renderDeclDescPanelUi();
     } else if (state.rightTab === "template") {
       renderTemplatePreview();
@@ -111,6 +112,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (els.inputText) {
       els.inputText.addEventListener("input", rebuildInputGutter);
       els.inputText.addEventListener("scroll", syncInputGutterScroll);
+    }
+    if (els.output && typeof handleOutputVirtualScroll === "function") {
+      els.output.addEventListener("scroll", handleOutputVirtualScroll, { passive: true });
+    }
+    if (els.templatePreviewOutput && typeof handleTemplateVirtualScroll === "function") {
+      els.templatePreviewOutput.addEventListener("scroll", handleTemplateVirtualScroll, { passive: true });
     }
 
     if (els.inputGutter) {
