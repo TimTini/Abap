@@ -89,55 +89,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     };
   }
 
-  function hasTemplateResolvedValue(value) {
-    if (value === undefined || value === null) {
-      return false;
-    }
-    if (typeof value === "string") {
-      return value !== "";
-    }
-    if (Array.isArray(value)) {
-      return value.length > 0;
-    }
-    return true;
-  }
-
-  function patchTemplateValueFinalDescCompatibility() {
-    if (typeof resolveTemplatePlaceholderValue !== "function") {
-      return;
-    }
-    if (resolveTemplatePlaceholderValue.__abapValueFinalDescPatchApplied) {
-      return;
-    }
-
-    const originalResolve = resolveTemplatePlaceholderValue;
-    const valueDeclFinalDescPathPattern = /^values(?:\.[^.{}\s]+)+\.decl\.finaldesc$/i;
-
-    const patchedResolve = function patchedTemplatePlaceholderValue(obj, tokenExpression) {
-      const token = String(tokenExpression || "").trim();
-      if (valueDeclFinalDescPathPattern.test(token)) {
-        const valueLevelToken = token.replace(/\.decl\.finaldesc$/i, ".finalDesc");
-        const valueLevelResolved = originalResolve(obj, valueLevelToken);
-        if (hasTemplateResolvedValue(valueLevelResolved)) {
-          return valueLevelResolved;
-        }
-      }
-      return originalResolve(obj, tokenExpression);
-    };
-
-    patchedResolve.__abapValueFinalDescPatchApplied = true;
-    patchedResolve.__abapOriginal = originalResolve;
-
-    try {
-      resolveTemplatePlaceholderValue = patchedResolve;
-    } catch {
-      // ignore
-    }
-    if (typeof window !== "undefined") {
-      window.resolveTemplatePlaceholderValue = patchedResolve;
-    }
-  }
-
   function normalizeTemplateObjectTypeToken(value) {
     return String(value || "").trim().toUpperCase();
   }
@@ -698,7 +649,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
   function init() {
     renderBuildInfo();
-    patchTemplateValueFinalDescCompatibility();
     state.descOverrides = loadDescOverrides();
     state.descOverridesLegacy = loadLegacyDescOverrides();
     state.customRules = loadCustomRules();
