@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.03.02-r1">
-  <meta name="abap-viewer-updated-at" content="2026-03-02 13:06:54">
-  <meta name="abap-viewer-updated-note" content="Output/Template now use always-on virtualized window rendering with two-way append/drop; input gutter is windowed while textarea remains full-length; Copy All Template now exports from full dataset, independent of visible DOM window.">
+  <meta name="abap-viewer-version" content="v2026.03.02-r5">
+  <meta name="abap-viewer-updated-at" content="2026-03-02 19:33:01">
+  <meta name="abap-viewer-updated-note" content="Template placeholder compatibility now preserves value-level expressions for paths like values.*.decl.finalDesc (e.g., keeps + 1 in assignment expressions).">
   <title>ABAP Parser Viewer</title>
   <style>
     :root {
@@ -263,6 +263,38 @@
       font-size: 18px;
     }
 
+    .panel-heading-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    .panel-heading-row h2 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .goto-line-controls {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .goto-line-controls input {
+      width: 110px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      padding: 6px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+
     #inputText {
       width: 100%;
       min-height: 360px;
@@ -429,6 +461,52 @@
       color: var(--pill-text);
       font-family: Consolas, monospace;
       font-size: 11px;
+    }
+
+    .template-type-filter {
+      width: 100%;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      background: color-mix(in srgb, var(--panel) 88%, var(--hover));
+    }
+
+    .template-type-filter-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+
+    .template-type-filter-title {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .template-type-filter-actions {
+      display: inline-flex;
+      gap: 6px;
+    }
+
+    .template-type-filter-actions .secondary {
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+
+    .template-type-filter-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+      max-height: 98px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .template-type-filter-options .toggle {
+      font-size: 12px;
+      color: var(--text);
     }
 
     .template-config-json {
@@ -713,6 +791,24 @@
       min-height: 0;
     }
 
+    .template-runtime-modal-content {
+      width: min(980px, 100%);
+    }
+
+    .template-runtime-modal-wide {
+      width: min(1220px, 100%);
+    }
+
+    .template-runtime-modal-content .template-config-json {
+      min-height: 55vh;
+      max-height: 65vh;
+      margin-top: 8px;
+    }
+
+    .template-runtime-modal-content .template-type-filter-options {
+      max-height: 55vh;
+    }
+
     .modal-header {
       display: flex;
       align-items: center;
@@ -794,7 +890,14 @@
 
     <div class="layout" id="mainLayout">
       <div class="panel">
-        <h2>Input (ABAP / JSON)</h2>
+        <div class="panel-heading-row">
+          <h2>Input (ABAP / JSON)</h2>
+          <div class="goto-line-controls">
+            <label for="inputGotoLine">Goto line</label>
+            <input type="number" id="inputGotoLine" min="1" step="1" placeholder="e.g. 120">
+            <button type="button" id="inputGotoLineBtn" class="secondary">Go</button>
+          </div>
+        </div>
         <div class="input-editor" id="inputEditor">
           <div id="inputGutter"><div id="inputGutterContent"></div></div>
           <textarea id="inputText" placeholder="Paste ABAP code here" wrap="off"></textarea>
@@ -836,11 +939,10 @@
             <button type="button" id="templateResetBtn" class="secondary">Reset default</button>
             <button type="button" id="templateExportBtn" class="secondary">Export config</button>
             <button type="button" id="templateImportBtn" class="secondary">Import config</button>
-            <button type="button" id="templateApplyBtn" class="secondary">Apply JSON</button>
+            <button type="button" id="templateApplyBtn" class="secondary">Template JSON</button>
+            <button type="button" id="templateFilterModalBtn" class="secondary">Object Filter</button>
             <input type="file" id="templateImportInput" accept=".json,application/json,text/plain" hidden>
           </div>
-          <div id="templateConfigError" class="template-error"></div>
-          <textarea id="templateConfigJson" class="template-config-json" spellcheck="false" placeholder="Template config JSON..."></textarea>
           <div id="templatePreviewOutput" class="template-preview-output muted">No data loaded.</div>
         </div>
         <div id="declDescPanel" hidden>

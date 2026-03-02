@@ -3,6 +3,615 @@
 window.AbapViewerModules = window.AbapViewerModules || {};
 window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
+  const TEMPLATE_GUI_FILTER_STORAGE_KEY_V1 = "abap-parser-viewer.templateGuiHiddenObjectTypes.v1";
+  let activeTemplateDynamicModal = null;
+  let templateFilterModalControls = null;
+
+  function isTemplateDynamicModalOpen() {
+    return Boolean(activeTemplateDynamicModal && activeTemplateDynamicModal.root && activeTemplateDynamicModal.root.isConnected);
+  }
+
+  function closeTemplateDynamicModal() {
+    if (!activeTemplateDynamicModal) {
+      return;
+    }
+    const current = activeTemplateDynamicModal;
+    activeTemplateDynamicModal = null;
+
+    if (typeof current.cleanup === "function") {
+      try {
+        current.cleanup();
+      } catch {
+        // ignore
+      }
+    }
+
+    if (current.root && current.root.parentNode) {
+      current.root.remove();
+    }
+  }
+
+  function openTemplateDynamicModal(titleText, options) {
+    closeTemplateDynamicModal();
+    const opts = options && typeof options === "object" ? options : {};
+
+    const root = document.createElement("div");
+    root.className = "modal";
+
+    const content = document.createElement("div");
+    content.className = `modal-content ${opts.contentClass || ""}`.trim();
+    root.appendChild(content);
+
+    const header = document.createElement("div");
+    header.className = "modal-header";
+    content.appendChild(header);
+
+    const title = document.createElement("strong");
+    title.textContent = String(titleText || "Template");
+    header.appendChild(title);
+
+    const actions = document.createElement("div");
+    actions.className = "modal-actions";
+    header.appendChild(actions);
+
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "secondary";
+    closeBtn.textContent = "Close";
+    closeBtn.addEventListener("click", closeTemplateDynamicModal);
+    actions.appendChild(closeBtn);
+
+    const body = document.createElement("div");
+    body.className = "modal-body";
+    content.appendChild(body);
+
+    root.addEventListener("click", (ev) => {
+      if (ev.target === root) {
+        closeTemplateDynamicModal();
+      }
+    });
+
+    document.body.appendChild(root);
+    activeTemplateDynamicModal = { root, cleanup: null };
+
+    return {
+      root,
+      content,
+      header,
+      actions,
+      body,
+      closeBtn,
+      setCleanup(cleanup) {
+        if (activeTemplateDynamicModal && activeTemplateDynamicModal.root === root) {
+          activeTemplateDynamicModal.cleanup = typeof cleanup === "function" ? cleanup : null;
+        }
+      }
+    };
+  }
+
+  function hasTemplateResolvedValue(value) {
+    if (value === undefined || value === null) {
+      return false;
+    }
+    if (typeof value === "string") {
+      return value !== "";
+    }
+    if (Array.isArray(value)) {
+      return value.length > 0;
+    }
+    return true;
+  }
+
+  function patchTemplateValueFinalDescCompatibility() {
+    if (typeof resolveTemplatePlaceholderValue !== "function") {
+      return;
+    }
+    if (resolveTemplatePlaceholderValue.__abapValueFinalDescPatchApplied) {
+      return;
+    }
+
+    const originalResolve = resolveTemplatePlaceholderValue;
+    const valueDeclFinalDescPathPattern = /^values(?:\.[^.{}\s]+)+\.decl\.finaldesc$/i;
+
+    const patchedResolve = function patchedTemplatePlaceholderValue(obj, tokenExpression) {
+      const token = String(tokenExpression || "").trim();
+      if (valueDeclFinalDescPathPattern.test(token)) {
+        const valueLevelToken = token.replace(/\.decl\.finaldesc$/i, ".finalDesc");
+        const valueLevelResolved = originalResolve(obj, valueLevelToken);
+        if (hasTemplateResolvedValue(valueLevelResolved)) {
+          return valueLevelResolved;
+        }
+      }
+      return originalResolve(obj, tokenExpression);
+    };
+
+    patchedResolve.__abapValueFinalDescPatchApplied = true;
+    patchedResolve.__abapOriginal = originalResolve;
+
+    try {
+      resolveTemplatePlaceholderValue = patchedResolve;
+    } catch {
+      // ignore
+    }
+    if (typeof window !== "undefined") {
+      window.resolveTemplatePlaceholderValue = patchedResolve;
+    }
+  }
+
+  function normalizeTemplateObjectTypeToken(value) {
+    return String(value || "").trim().toUpperCase();
+  }
+
+  function ensureTemplateGuiFilterState() {
+    if (!(state.templateGuiHiddenTypes instanceof Set)) {
+      state.templateGuiHiddenTypes = new Set();
+    }
+    if (!Array.isArray(state.templateGuiObjectTypes)) {
+      state.templateGuiObjectTypes = [];
+    }
+  }
+
+  function loadTemplateGuiFilterState() {
+    ensureTemplateGuiFilterState();
+    let parsed = [];
+    try {
+      parsed = JSON.parse(localStorage.getItem(TEMPLATE_GUI_FILTER_STORAGE_KEY_V1) || "[]");
+    } catch {
+      parsed = [];
+    }
+
+    if (!Array.isArray(parsed)) {
+      parsed = [];
+    }
+
+    const normalized = new Set();
+    for (const value of parsed) {
+      const token = normalizeTemplateObjectTypeToken(value);
+      if (token) {
+        normalized.add(token);
+      }
+    }
+    state.templateGuiHiddenTypes = normalized;
+  }
+
+  function saveTemplateGuiFilterState() {
+    ensureTemplateGuiFilterState();
+    try {
+      localStorage.setItem(
+        TEMPLATE_GUI_FILTER_STORAGE_KEY_V1,
+        JSON.stringify(Array.from(state.templateGuiHiddenTypes.values()).sort((a, b) => a.localeCompare(b)))
+      );
+    } catch {
+      // ignore
+    }
+  }
+
+  function getTemplateFilterControls() {
+    if (templateFilterModalControls && templateFilterModalControls.options) {
+      return templateFilterModalControls;
+    }
+    return { panel: null, allBtn: null, noneBtn: null, options: null };
+  }
+
+  function collectTemplateObjectTypesFromTree() {
+    const tokens = new Set();
+    const roots = Array.isArray(state.renderObjects) ? state.renderObjects : [];
+
+    const walk = (obj) => {
+      if (!obj || typeof obj !== "object") {
+        return;
+      }
+      const objectType = normalizeTemplateObjectTypeToken(obj.objectType);
+      if (objectType) {
+        tokens.add(objectType);
+      }
+      const children = Array.isArray(obj.children) ? obj.children : [];
+      for (const child of children) {
+        walk(child);
+      }
+    };
+
+    for (const root of roots) {
+      walk(root);
+    }
+
+    return Array.from(tokens).sort((a, b) => a.localeCompare(b));
+  }
+
+  function refreshTemplateGuiFilterTypes() {
+    ensureTemplateGuiFilterState();
+    state.templateGuiObjectTypes = collectTemplateObjectTypesFromTree();
+    renderTemplateGuiFilterControls();
+  }
+
+  function isTemplateObjectTypeVisibleForGui(objectType) {
+    ensureTemplateGuiFilterState();
+    const token = normalizeTemplateObjectTypeToken(objectType);
+    if (!token) {
+      return true;
+    }
+    return !state.templateGuiHiddenTypes.has(token);
+  }
+
+  function rerenderTemplateForGuiFilterChange() {
+    if (state.selectedTemplateIndex !== "") {
+      state.selectedTemplateIndex = "";
+    }
+    if (state.data && Array.isArray(state.renderObjects) && typeof renderTemplatePreview === "function") {
+      renderTemplatePreview();
+      return;
+    }
+    if (typeof refreshInputGutterTargets === "function") {
+      refreshInputGutterTargets();
+    }
+  }
+
+  function applyTemplateGuiFilterSelection(mode) {
+    ensureTemplateGuiFilterState();
+    const objectTypes = Array.isArray(state.templateGuiObjectTypes) ? state.templateGuiObjectTypes : [];
+    if (mode === "all") {
+      for (const type of objectTypes) {
+        state.templateGuiHiddenTypes.delete(type);
+      }
+    } else if (mode === "none") {
+      for (const type of objectTypes) {
+        state.templateGuiHiddenTypes.add(type);
+      }
+    }
+    saveTemplateGuiFilterState();
+    renderTemplateGuiFilterControls();
+    rerenderTemplateForGuiFilterChange();
+  }
+
+  function renderTemplateGuiFilterControls() {
+    const controls = getTemplateFilterControls();
+    if (!controls.options) {
+      return;
+    }
+    ensureTemplateGuiFilterState();
+
+    const objectTypes = Array.isArray(state.templateGuiObjectTypes) ? state.templateGuiObjectTypes : [];
+    controls.options.replaceChildren();
+
+    if (!objectTypes.length) {
+      controls.options.appendChild(el("span", { className: "muted", text: "No object types loaded." }));
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+    for (const objectType of objectTypes) {
+      const label = document.createElement("label");
+      label.className = "toggle";
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.value = objectType;
+      checkbox.checked = !state.templateGuiHiddenTypes.has(objectType);
+      checkbox.addEventListener("change", () => {
+        if (checkbox.checked) {
+          state.templateGuiHiddenTypes.delete(objectType);
+        } else {
+          state.templateGuiHiddenTypes.add(objectType);
+        }
+        saveTemplateGuiFilterState();
+        rerenderTemplateForGuiFilterChange();
+      });
+
+      label.appendChild(checkbox);
+      label.appendChild(document.createTextNode(objectType));
+      frag.appendChild(label);
+    }
+
+    controls.options.appendChild(frag);
+  }
+
+  function initTemplateGuiFilterControls() {
+    loadTemplateGuiFilterState();
+  }
+
+  function buildTemplateFilterPanelElement() {
+    const panel = document.createElement("div");
+    panel.className = "template-type-filter";
+
+    const head = document.createElement("div");
+    head.className = "template-type-filter-head";
+    panel.appendChild(head);
+
+    const title = document.createElement("span");
+    title.className = "template-type-filter-title";
+    title.textContent = "Template Object Filter (GUI only)";
+    head.appendChild(title);
+
+    const actions = document.createElement("div");
+    actions.className = "template-type-filter-actions";
+    head.appendChild(actions);
+
+    const allBtn = document.createElement("button");
+    allBtn.type = "button";
+    allBtn.className = "secondary";
+    allBtn.textContent = "All";
+    actions.appendChild(allBtn);
+
+    const noneBtn = document.createElement("button");
+    noneBtn.type = "button";
+    noneBtn.className = "secondary";
+    noneBtn.textContent = "None";
+    actions.appendChild(noneBtn);
+
+    const options = document.createElement("div");
+    options.className = "template-type-filter-options";
+    panel.appendChild(options);
+
+    templateFilterModalControls = { panel, allBtn, noneBtn, options };
+    renderTemplateGuiFilterControls();
+
+    allBtn.addEventListener("click", () => applyTemplateGuiFilterSelection("all"));
+    noneBtn.addEventListener("click", () => applyTemplateGuiFilterSelection("none"));
+    return panel;
+  }
+
+  function openTemplateFilterModal() {
+    const modal = openTemplateDynamicModal("Template Object Filter", { contentClass: "template-runtime-modal-content" });
+    const panel = buildTemplateFilterPanelElement();
+    modal.body.appendChild(panel);
+    modal.setCleanup(() => {
+      templateFilterModalControls = null;
+    });
+  }
+
+  function getRenderableObjectListForTemplate(options) {
+    const opts = options && typeof options === "object" ? options : {};
+    const includeHidden = opts.includeHidden === true;
+    const out = [];
+    const roots = Array.isArray(state.renderObjects) ? state.renderObjects : [];
+
+    const appendNode = (obj, depth) => {
+      if (!obj || typeof obj !== "object") {
+        return;
+      }
+
+      if (includeHidden || isTemplateObjectTypeVisibleForGui(obj.objectType)) {
+        out.push({ obj, depth: Math.max(0, Number(depth) || 0) });
+      }
+
+      const children = Array.isArray(obj.children) ? obj.children : [];
+      for (const child of children) {
+        appendNode(child, (Number(depth) || 0) + 1);
+      }
+    };
+
+    for (const root of roots) {
+      appendNode(root, 0);
+    }
+
+    return out;
+  }
+
+  async function copyAllTemplateBlocks() {
+    const items = getRenderableObjectListForTemplate({ includeHidden: true });
+    if (!items.length) {
+      setError("Nothing to copy.");
+      return;
+    }
+
+    const virtual = typeof getTemplateVirtualState === "function" ? getTemplateVirtualState() : null;
+    const config = virtual && virtual.config && typeof virtual.config === "object"
+      ? virtual.config
+      : (state.templateConfig && typeof state.templateConfig === "object"
+        ? state.templateConfig
+        : getDefaultTemplateConfig());
+
+    const wrapper = document.createElement("div");
+    const plainLines = [];
+    const tableOnly = typeof isTemplateCopyTableOnlyEnabled === "function"
+      ? isTemplateCopyTableOnlyEnabled()
+      : Boolean(els.templateCopyTableOnly && els.templateCopyTableOnly.checked);
+
+    for (let index = 0; index < items.length; index += 1) {
+      const payload = buildTemplateBlockCopyPayload(items[index], index, config, tableOnly);
+      if (!payload || !payload.node) {
+        continue;
+      }
+      wrapper.appendChild(payload.node);
+      if (tableOnly) {
+        wrapper.appendChild(document.createElement("br"));
+      }
+      plainLines.push(payload.text);
+    }
+
+    if (!wrapper.childNodes.length) {
+      setError("Nothing to copy.");
+      return;
+    }
+
+    await copyHtmlWithFallback(wrapper.innerHTML, plainLines.filter(Boolean).join("\n\n"));
+  }
+
+  function writeTemplateConfigDraftToTextarea(textarea) {
+    if (!textarea) {
+      return;
+    }
+    if (typeof syncTemplateEditorFromState === "function") {
+      syncTemplateEditorFromState();
+      return;
+    }
+    try {
+      textarea.value = JSON.stringify(state.templateConfig || getDefaultTemplateConfig(), null, 2);
+    } catch {
+      textarea.value = "";
+    }
+  }
+
+  function openTemplateConfigModal() {
+    const modal = openTemplateDynamicModal("Template JSON", { contentClass: "template-runtime-modal-content template-runtime-modal-wide" });
+
+    const previousConfigJsonEl = els.templateConfigJson;
+    const previousConfigErrorEl = els.templateConfigError;
+
+    const applyBtn = document.createElement("button");
+    applyBtn.type = "button";
+    applyBtn.className = "secondary";
+    applyBtn.textContent = "Apply";
+    modal.actions.prepend(applyBtn);
+
+    const errorEl = document.createElement("div");
+    errorEl.className = "template-error";
+    modal.body.appendChild(errorEl);
+
+    const textarea = document.createElement("textarea");
+    textarea.className = "template-config-json";
+    textarea.spellcheck = false;
+    textarea.placeholder = "Template config JSON...";
+    modal.body.appendChild(textarea);
+
+    els.templateConfigJson = textarea;
+    els.templateConfigError = errorEl;
+    writeTemplateConfigDraftToTextarea(textarea);
+    if (typeof setTemplateConfigError === "function") {
+      setTemplateConfigError("");
+    }
+
+    const applyFromModal = () => {
+      try {
+        applyTemplateConfigFromEditor();
+      } catch (err) {
+        setError(`Apply failed: ${err && err.message ? err.message : err}`);
+        return;
+      }
+      if (typeof setError === "function") {
+        setError("");
+      }
+      const hasInlineError = String(errorEl.textContent || "").trim();
+      if (!hasInlineError) {
+        closeTemplateDynamicModal();
+      }
+    };
+
+    applyBtn.addEventListener("click", applyFromModal);
+    textarea.addEventListener("keydown", (ev) => {
+      if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
+        ev.preventDefault();
+        applyFromModal();
+      }
+    });
+
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(0, 0);
+    }, 0);
+
+    modal.setCleanup(() => {
+      els.templateConfigJson = previousConfigJsonEl || null;
+      els.templateConfigError = previousConfigErrorEl || null;
+    });
+  }
+
+  function getInputGotoControls() {
+    return {
+      input: document.getElementById("inputGotoLine"),
+      button: document.getElementById("inputGotoLineBtn")
+    };
+  }
+
+  function getCurrentInputLineCount() {
+    if (Number.isFinite(state.inputLineCount) && state.inputLineCount > 0) {
+      return Math.max(1, Number(state.inputLineCount));
+    }
+    if (typeof countInputLines === "function") {
+      return Math.max(1, Number(countInputLines((els.inputText && els.inputText.value) || "")) || 1);
+    }
+    const text = String((els.inputText && els.inputText.value) || "");
+    return Math.max(1, text.split(/\r\n|\r|\n/).length);
+  }
+
+  function goToInputLine(lineNumber) {
+    if (!els.inputText) {
+      return { line: 1, total: 1 };
+    }
+
+    const totalLines = getCurrentInputLineCount();
+    const next = Number.isFinite(Number(lineNumber)) ? Number(lineNumber) : 1;
+    const targetLine = Math.max(1, Math.min(totalLines, Math.floor(next)));
+
+    if (typeof selectCodeLines === "function") {
+      selectCodeLines(targetLine, targetLine);
+      return { line: targetLine, total: totalLines };
+    }
+
+    const text = els.inputText.value || "";
+    const offsets = Array.isArray(state.inputLineOffsets) && state.inputLineOffsets.length
+      ? state.inputLineOffsets
+      : computeLineOffsets(text);
+    const startOffset = Number(offsets[Math.max(0, targetLine - 1)]) || 0;
+    const nextOffsetIndex = Math.min(offsets.length - 1, targetLine);
+    const nextOffset = Number(offsets[nextOffsetIndex]);
+    const endOffset = Number.isFinite(nextOffset) && nextOffset > startOffset
+      ? Math.max(startOffset, nextOffset - 1)
+      : startOffset;
+
+    els.inputText.focus();
+    els.inputText.selectionStart = startOffset;
+    els.inputText.selectionEnd = endOffset;
+
+    let lineHeight = 18;
+    try {
+      lineHeight = Number.parseFloat(window.getComputedStyle(els.inputText).lineHeight || "18") || 18;
+    } catch {
+      lineHeight = 18;
+    }
+    const targetScrollTop = Math.max(
+      0,
+      Math.round(((targetLine - 1) * lineHeight) - ((Number(els.inputText.clientHeight) || 0) * 0.35))
+    );
+    els.inputText.scrollTop = targetScrollTop;
+    if (typeof syncInputGutterScroll === "function") {
+      syncInputGutterScroll();
+    }
+
+    return { line: targetLine, total: totalLines };
+  }
+
+  function submitInputGotoLine() {
+    const controls = getInputGotoControls();
+    if (!controls.input) {
+      return;
+    }
+
+    const raw = String(controls.input.value || "").trim();
+    if (!raw) {
+      setError("Enter a line number.");
+      controls.input.focus();
+      return;
+    }
+
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) {
+      setError("Invalid line number.");
+      controls.input.focus();
+      controls.input.select();
+      return;
+    }
+
+    const result = goToInputLine(parsed);
+    controls.input.value = String(result.line);
+    setError("");
+  }
+
+  function initInputGotoLineControls() {
+    const controls = getInputGotoControls();
+    if (controls.button) {
+      controls.button.addEventListener("click", submitInputGotoLine);
+    }
+    if (controls.input) {
+      controls.input.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") {
+          ev.preventDefault();
+          submitInputGotoLine();
+        }
+      });
+    }
+  }
+
   function parseFromTextarea(fileName) {
     const content = els.inputText.value || "";
     const trimmed = content.trim();
@@ -55,6 +664,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     state.renderObjects = buildRenderableObjects(state.data && state.data.objects, RENDER_TREE_OPTIONS);
     state.haystackById = buildSearchIndex(state.renderObjects);
     populateTypeFilter(state.renderObjects);
+    refreshTemplateGuiFilterTypes();
     if (state.rightTab === "output") {
       renderOutput();
     } else if (state.rightTab === "descriptions") {
@@ -88,6 +698,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
   function init() {
     renderBuildInfo();
+    patchTemplateValueFinalDescCompatibility();
     state.descOverrides = loadDescOverrides();
     state.descOverridesLegacy = loadLegacyDescOverrides();
     state.customRules = loadCustomRules();
@@ -108,6 +719,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     rebuildInputGutter();
+    initInputGotoLineControls();
+    initTemplateGuiFilterControls();
 
     if (els.inputText) {
       els.inputText.addEventListener("input", rebuildInputGutter);
@@ -214,16 +827,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     if (els.templateApplyBtn) {
-      els.templateApplyBtn.addEventListener("click", applyTemplateConfigFromEditor);
+      els.templateApplyBtn.addEventListener("click", openTemplateConfigModal);
     }
 
-    if (els.templateConfigJson) {
-      els.templateConfigJson.addEventListener("keydown", (ev) => {
-        if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
-          ev.preventDefault();
-          applyTemplateConfigFromEditor();
-        }
-      });
+    const templateFilterModalBtn = document.getElementById("templateFilterModalBtn");
+    if (templateFilterModalBtn) {
+      templateFilterModalBtn.addEventListener("click", openTemplateFilterModal);
     }
 
     if (els.declDescJsonBtn) {
@@ -386,6 +995,11 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     window.addEventListener("keydown", (ev) => {
       if (ev.key !== "Escape") {
+        return;
+      }
+
+      if (isTemplateDynamicModalOpen()) {
+        closeTemplateDynamicModal();
         return;
       }
 
