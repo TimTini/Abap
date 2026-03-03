@@ -394,66 +394,390 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
   }
 
   function openTemplateConfigModal() {
-    const modal = openTemplateDynamicModal("Template JSON", { contentClass: "template-runtime-modal-content template-runtime-modal-wide" });
-
-    const previousConfigJsonEl = els.templateConfigJson;
-    const previousConfigErrorEl = els.templateConfigError;
-
+    const modal = openTemplateDynamicModal("Template Form", { contentClass: "template-runtime-modal-content template-runtime-modal-wide" });
+    modal.closeBtn.textContent = "Cancel";
+    const prevJsonEl = els.templateConfigJson;
+    const prevErrEl = els.templateConfigError;
     const applyBtn = document.createElement("button");
     applyBtn.type = "button";
     applyBtn.className = "secondary";
     applyBtn.textContent = "Apply";
     modal.actions.prepend(applyBtn);
 
-    const errorEl = document.createElement("div");
-    errorEl.className = "template-error";
-    modal.body.appendChild(errorEl);
+    const tabs = document.createElement("div");
+    tabs.className = "template-config-editor-tabs";
+    const formBtn = document.createElement("button");
+    formBtn.type = "button";
+    formBtn.className = "secondary";
+    formBtn.textContent = "Form";
+    const jsonBtn = document.createElement("button");
+    jsonBtn.type = "button";
+    jsonBtn.className = "secondary";
+    jsonBtn.textContent = "JSON (Advanced)";
+    tabs.appendChild(formBtn);
+    tabs.appendChild(jsonBtn);
+    modal.body.appendChild(tabs);
+    const host = document.createElement("div");
+    host.className = "template-config-editor-host";
+    modal.body.appendChild(host);
+    const errEl = document.createElement("div");
+    errEl.className = "template-error";
+    modal.body.appendChild(errEl);
 
-    const textarea = document.createElement("textarea");
-    textarea.className = "template-config-json";
-    textarea.spellcheck = false;
-    textarea.placeholder = "Template config JSON...";
-    modal.body.appendChild(textarea);
-
-    els.templateConfigJson = textarea;
-    els.templateConfigError = errorEl;
-    writeTemplateConfigDraftToTextarea(textarea);
-    if (typeof setTemplateConfigError === "function") {
-      setTemplateConfigError("");
-    }
-
-    const applyFromModal = () => {
-      try {
-        applyTemplateConfigFromEditor();
-      } catch (err) {
-        setError(`Apply failed: ${err && err.message ? err.message : err}`);
-        return;
-      }
-      if (typeof setError === "function") {
-        setError("");
-      }
-      const hasInlineError = String(errorEl.textContent || "").trim();
-      if (!hasInlineError) {
-        closeTemplateDynamicModal();
+    const OPTION_KEYS = new Set(["_options", "options", "ranges", "compact", "hideemptyrows", "hiderowswithoutvalues", "expandmultilinerows", "removeemptyrows", "removeemptyrowsadvanced", "removeemptyrowsadv", "expandarrayrows", "arraytorows"]);
+    const FIELD_DEFS = [
+      { key: "text", label: "Text", kind: "text" },
+      { key: "background", label: "Background", kind: "text" },
+      { key: "border", label: "Border", kind: "text" },
+      { key: "font", label: "Font", kind: "text" },
+      { key: "font size", label: "Font Size", kind: "number" },
+      { key: "font color", label: "Font Color", kind: "text" },
+      { key: "align", label: "Align", kind: "select", opts: ["", "left", "center", "right"] },
+      { key: "valign", label: "VAlign", kind: "select", opts: ["", "top", "middle", "bottom"] },
+      { key: "wrap", label: "Wrap", kind: "bool" },
+      { key: "merge", label: "Merge", kind: "bool" },
+      { key: "bold", label: "Bold", kind: "bool" },
+      { key: "italic", label: "Italic", kind: "bool" },
+      { key: "underline", label: "Underline", kind: "bool" }
+    ];
+    const showErr = (m) => {
+      const t = String(m || "").trim();
+      errEl.textContent = t;
+      if (typeof setTemplateConfigError === "function") {
+        setTemplateConfigError(t);
       }
     };
+    const isOptionKey = (k) => (typeof isTemplateOptionConfigKey === "function")
+      ? Boolean(isTemplateOptionConfigKey(k))
+      : OPTION_KEYS.has(String(k || "").trim().toLowerCase());
+    const base = state.templateConfig && typeof state.templateConfig === "object" ? state.templateConfig : getDefaultTemplateConfig();
+    let draft = cloneJsonValue(base);
+    if (!draft || typeof draft !== "object" || Array.isArray(draft)) {
+      draft = getDefaultTemplateConfig();
+    }
+    draft.version = 1;
+    if (!draft.templates || typeof draft.templates !== "object" || Array.isArray(draft.templates)) {
+      draft.templates = {};
+    }
+    if (!Object.keys(draft.templates).length) {
+      draft.templates.DEFAULT = {};
+    }
+    let activeTab = "form";
+    let jsonArea = null;
+    let selKey = Object.keys(draft.templates)[0] || "DEFAULT";
+    let selRange = "";
+    els.templateConfigError = errEl;
+    els.templateConfigJson = null;
+    showErr("");
 
-    applyBtn.addEventListener("click", applyFromModal);
-    textarea.addEventListener("keydown", (ev) => {
-      if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
-        ev.preventDefault();
-        applyFromModal();
+    const tdef = (k, create) => {
+      const key = String(k || "").trim();
+      if (!key) return null;
+      let def = draft.templates[key];
+      if ((!def || typeof def !== "object" || Array.isArray(def)) && create) {
+        def = {};
+        draft.templates[key] = def;
       }
-    });
+      if (!def || typeof def !== "object" || Array.isArray(def)) return null;
+      const hasRanges = Object.prototype.hasOwnProperty.call(def, "ranges") && def.ranges && typeof def.ranges === "object" && !Array.isArray(def.ranges);
+      return { def, ranges: hasRanges ? def.ranges : def, hasRanges };
+    };
+    const listRanges = (k) => {
+      const info = tdef(k, true);
+      if (!info) return [];
+      const out = [];
+      for (const rk of Object.keys(info.ranges)) {
+        if (isOptionKey(rk)) continue;
+        const v = info.ranges[rk];
+        out.push({ rangeKey: rk, cell: (v && typeof v === "object" && !Array.isArray(v)) ? v : { text: String(v === undefined || v === null ? "" : v) } });
+      }
+      return out;
+    };
+    const readOpts = (k) => {
+      const info = tdef(k, true);
+      const out = { hideEmptyRows: true, hideRowsWithoutValues: true, expandMultilineRows: false };
+      if (!info) return out;
+      const setB = (x, v) => { if (!(v === undefined || v === null || v === "")) out[x] = Boolean(v); };
+      for (const src of [info.def.options, info.def._options]) {
+        if (!src || typeof src !== "object" || Array.isArray(src)) continue;
+        setB("hideEmptyRows", src.hideEmptyRows);
+        setB("hideRowsWithoutValues", src.hideRowsWithoutValues);
+        setB("expandMultilineRows", src.expandMultilineRows);
+      }
+      setB("hideEmptyRows", info.def.compact);
+      setB("hideEmptyRows", info.def.hideEmptyRows);
+      setB("hideRowsWithoutValues", info.def.hideRowsWithoutValues);
+      setB("hideRowsWithoutValues", info.def.removeEmptyRows || info.def.removeEmptyRowsAdvanced || info.def.removeEmptyRowsAdv);
+      setB("expandMultilineRows", info.def.expandMultilineRows || info.def.expandArrayRows || info.def.arrayToRows);
+      return out;
+    };
+    const setOpt = (k, name, v) => {
+      const info = tdef(k, true);
+      if (!info) return;
+      const next = info.def._options && typeof info.def._options === "object" && !Array.isArray(info.def._options) ? info.def._options : {};
+      next[name] = Boolean(v);
+      info.def._options = next;
+    };
+    const nextRangeKey = (k) => {
+      const info = tdef(k, true);
+      if (!info) return "A1";
+      const used = new Set(Object.keys(info.ranges).map((x) => String(x || "").trim().toUpperCase()));
+      for (let i = 1; i <= 9999; i += 1) {
+        const key = `A${i}`;
+        if (!used.has(key)) return key;
+      }
+      return `A${Date.now()}`;
+    };
+    const setCell = (k, r, f, v) => {
+      const info = tdef(k, true);
+      if (!info) return;
+      const cur = info.ranges[r];
+      const cell = cur && typeof cur === "object" && !Array.isArray(cur) ? cur : {};
+      if (f === "text") cell.text = String(v === undefined || v === null ? "" : v);
+      else if (f === "font size") {
+        const raw = String(v === undefined || v === null ? "" : v).trim();
+        if (!raw) delete cell["font size"];
+        else cell["font size"] = raw;
+      } else if (f === "wrap" || f === "merge" || f === "bold" || f === "italic" || f === "underline") cell[f] = Boolean(v);
+      else {
+        const txt = String(v === undefined || v === null ? "" : v).trim();
+        if (!txt) delete cell[f];
+        else cell[f] = txt;
+      }
+      info.ranges[r] = cell;
+    };
+    const validateDraft = () => {
+      const msg = [];
+      for (const key of Object.keys(draft.templates)) {
+        for (const e of listRanges(key)) {
+          try { parseRangeKey(e.rangeKey); } catch (er) { msg.push(`[${key}] ${e.rangeKey}: ${er && er.message ? er.message : "Invalid range."}`); }
+          if (Object.prototype.hasOwnProperty.call(e.cell, "font size")) {
+            const raw = String(e.cell["font size"] === undefined || e.cell["font size"] === null ? "" : e.cell["font size"]).trim();
+            if (raw && !Number.isFinite(Number(raw))) msg.push(`[${key}] ${e.rangeKey}: Font size must be numeric.`);
+          }
+        }
+      }
+      return { ok: msg.length === 0, messages: msg };
+    };
+    const serializeDraft = () => {
+      const out = cloneJsonValue(draft) || getDefaultTemplateConfig();
+      out.version = 1;
+      if (!out.templates || typeof out.templates !== "object" || Array.isArray(out.templates)) out.templates = {};
+      for (const key of Object.keys(out.templates)) {
+        const def = out.templates[key];
+        if (!def || typeof def !== "object" || Array.isArray(def)) continue;
+        const hasRanges = Object.prototype.hasOwnProperty.call(def, "ranges") && def.ranges && typeof def.ranges === "object" && !Array.isArray(def.ranges);
+        const ranges = hasRanges ? def.ranges : def;
+        const opts = readOpts(key);
+        def._options = { hideEmptyRows: Boolean(opts.hideEmptyRows), hideRowsWithoutValues: Boolean(opts.hideRowsWithoutValues), expandMultilineRows: Boolean(opts.expandMultilineRows) };
+        delete def.options; delete def.compact; delete def.hideEmptyRows; delete def.hideRowsWithoutValues; delete def.expandMultilineRows;
+        delete def.removeEmptyRows; delete def.removeEmptyRowsAdvanced; delete def.removeEmptyRowsAdv; delete def.expandArrayRows; delete def.arrayToRows;
+        for (const rk of Object.keys(ranges)) {
+          if (isOptionKey(rk)) continue;
+          const cell = ranges[rk];
+          if (!cell || typeof cell !== "object" || Array.isArray(cell)) continue;
+          if (Object.prototype.hasOwnProperty.call(cell, "font size")) {
+            const raw = String(cell["font size"] === undefined || cell["font size"] === null ? "" : cell["font size"]).trim();
+            if (!raw) delete cell["font size"];
+            else cell["font size"] = Number(raw);
+          }
+        }
+      }
+      return out;
+    };
+    const syncJsonToDraft = () => {
+      if (!jsonArea) return true;
+      const raw = String(jsonArea.value || "").trim();
+      if (!raw) { showErr("Template config JSON is empty."); return false; }
+      let parsed = null;
+      try { parsed = JSON.parse(raw); } catch (er) { showErr(`JSON parse error: ${er && er.message ? er.message : er}`); return false; }
+      const chk = validateTemplateConfig(parsed);
+      if (!chk.valid) { showErr(chk.errors.join("\n")); return false; }
+      draft = cloneJsonValue(parsed);
+      if (!draft || typeof draft !== "object" || Array.isArray(draft)) { showErr("Cannot load JSON draft."); return false; }
+      if (!draft.templates || typeof draft.templates !== "object" || Array.isArray(draft.templates)) draft.templates = {};
+      if (!Object.keys(draft.templates).length) draft.templates.DEFAULT = {};
+      if (!Object.prototype.hasOwnProperty.call(draft.templates, selKey)) selKey = Object.keys(draft.templates)[0] || "DEFAULT";
+      selRange = "";
+      showErr("");
+      return true;
+    };
 
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(0, 0);
-    }, 0);
+    function renderForm() {
+      els.templateConfigJson = null;
+      const root = document.createElement("div");
+      root.className = "template-config-form";
+      const keys = Object.keys(draft.templates);
+      if (!keys.includes(selKey)) selKey = keys[0] || "DEFAULT";
+      const keyRow = document.createElement("div");
+      keyRow.className = "template-config-key-row";
+      root.appendChild(keyRow);
+      const lbl = document.createElement("label");
+      lbl.className = "muted";
+      lbl.textContent = "Template Key";
+      keyRow.appendChild(lbl);
+      const sel = document.createElement("select");
+      sel.className = "template-config-select";
+      for (const k of keys) { const o = document.createElement("option"); o.value = k; o.textContent = k; sel.appendChild(o); }
+      sel.value = selKey;
+      sel.addEventListener("change", () => { selKey = sel.value; selRange = ""; renderActive(); });
+      keyRow.appendChild(sel);
+      const mkBtn = (txt, fn) => { const b = document.createElement("button"); b.type = "button"; b.className = "secondary"; b.textContent = txt; b.addEventListener("click", fn); keyRow.appendChild(b); };
+      mkBtn("Add Key", () => { let i = 1; let k = "NEW_TEMPLATE"; while (Object.prototype.hasOwnProperty.call(draft.templates, k)) { i += 1; k = `NEW_TEMPLATE_${i}`; } draft.templates[k] = {}; selKey = k; selRange = ""; showErr(""); renderActive(); });
+      mkBtn("Clone Key", () => { const src = draft.templates[selKey]; if (!src || typeof src !== "object") { showErr("Current template key is invalid."); return; } let i = 1; let k = `${selKey}_COPY`; while (Object.prototype.hasOwnProperty.call(draft.templates, k)) { i += 1; k = `${selKey}_COPY_${i}`; } draft.templates[k] = cloneJsonValue(src); selKey = k; selRange = ""; showErr(""); renderActive(); });
+      mkBtn("Delete Key", () => { if (Object.keys(draft.templates).length <= 1) { showErr("At least one template key is required."); return; } if (!confirm(`Delete template key \"${selKey}\"?`)) return; delete draft.templates[selKey]; selKey = Object.keys(draft.templates)[0] || "DEFAULT"; selRange = ""; showErr(""); renderActive(); });
+      const opts = readOpts(selKey);
+      const optRow = document.createElement("div");
+      optRow.className = "template-config-options-row";
+      root.appendChild(optRow);
+      const optToggle = (name) => { const l = document.createElement("label"); l.className = "toggle"; const c = document.createElement("input"); c.type = "checkbox"; c.checked = Boolean(opts[name]); c.addEventListener("change", () => { setOpt(selKey, name, c.checked); showErr(""); }); l.appendChild(c); l.appendChild(document.createTextNode(name)); optRow.appendChild(l); };
+      optToggle("hideEmptyRows"); optToggle("hideRowsWithoutValues"); optToggle("expandMultilineRows");
+      const tool = document.createElement("div");
+      tool.className = "template-config-ranges-toolbar";
+      root.appendChild(tool);
+      const mkToolBtn = (txt, fn) => { const b = document.createElement("button"); b.type = "button"; b.className = "secondary"; b.textContent = txt; b.addEventListener("click", fn); tool.appendChild(b); };
+      mkToolBtn("Add Range", () => { const info = tdef(selKey, true); if (!info) return; const k = nextRangeKey(selKey); info.ranges[k] = { text: "" }; selRange = k; showErr(""); renderActive(); });
+      mkToolBtn("Duplicate", () => { if (!selRange) { showErr("Select a range to duplicate."); return; } const info = tdef(selKey, true); if (!info || !Object.prototype.hasOwnProperty.call(info.ranges, selRange)) { showErr("Selected range not found."); return; } const k = nextRangeKey(selKey); info.ranges[k] = cloneJsonValue(info.ranges[selRange]) || {}; selRange = k; showErr(""); renderActive(); });
+      mkToolBtn("Delete", () => { if (!selRange) { showErr("Select a range to delete."); return; } const info = tdef(selKey, true); if (!info || !Object.prototype.hasOwnProperty.call(info.ranges, selRange)) { showErr("Selected range not found."); return; } delete info.ranges[selRange]; selRange = ""; showErr(""); renderActive(); });
+      mkToolBtn("Sort by position", () => { const info = tdef(selKey, true); if (!info) return; const entries = listRanges(selKey); const ok = []; const bad = []; for (const e of entries) { try { const p = parseRangeKey(e.rangeKey); ok.push({ ...e, p }); } catch { bad.push(e); } } ok.sort((a, b) => (a.p.r1 - b.p.r1) || (a.p.c1 - b.p.c1) || (a.p.r2 - b.p.r2) || (a.p.c2 - b.p.c2)); const next = {}; for (const e of ok) next[e.rangeKey] = info.ranges[e.rangeKey]; for (const e of bad) next[e.rangeKey] = info.ranges[e.rangeKey]; if (info.hasRanges) info.def.ranges = next; else { const keep = {}; for (const k of Object.keys(info.def)) if (isOptionKey(k)) keep[k] = info.def[k]; for (const [k, v] of Object.entries(next)) keep[k] = v; for (const k of Object.keys(info.def)) delete info.def[k]; for (const [k, v] of Object.entries(keep)) info.def[k] = v; } renderActive(); });
+      const sLbl = document.createElement("span");
+      sLbl.className = "muted";
+      sLbl.textContent = selRange ? `Selected: ${selRange}` : "Selected: (none)";
+      tool.appendChild(sLbl);
+      const wrap = document.createElement("div");
+      wrap.className = "template-config-ranges-wrap";
+      root.appendChild(wrap);
+      const table = document.createElement("table");
+      table.className = "template-config-ranges-table";
+      const th = document.createElement("thead");
+      const trh = document.createElement("tr");
+      for (const t of ["Sel", "Range", ...FIELD_DEFS.map((f) => f.label)]) { const c = document.createElement("th"); c.textContent = t; trh.appendChild(c); }
+      th.appendChild(trh);
+      table.appendChild(th);
+      const tb = document.createElement("tbody");
+      const entries = listRanges(selKey);
+      if (!selRange && entries.length) selRange = entries[0].rangeKey;
+      for (const e of entries) {
+        const tr = document.createElement("tr");
+        if (e.rangeKey === selRange) tr.classList.add("is-selected");
+        const tdSel = document.createElement("td");
+        const rd = document.createElement("input");
+        rd.type = "radio";
+        rd.name = "templateRangeSelect";
+        rd.checked = e.rangeKey === selRange;
+        rd.addEventListener("change", () => { selRange = e.rangeKey; renderActive(); });
+        tdSel.appendChild(rd);
+        tr.appendChild(tdSel);
+        const tdKey = document.createElement("td");
+        const inpKey = document.createElement("input");
+        inpKey.type = "text";
+        inpKey.className = "template-config-cell-input";
+        inpKey.value = e.rangeKey;
+        inpKey.addEventListener("focus", () => { selRange = e.rangeKey; });
+        inpKey.addEventListener("blur", () => {
+          const oldK = String(e.rangeKey || "").trim();
+          const newK = String(inpKey.value || "").trim().toUpperCase();
+          if (!newK || oldK === newK) return;
+          const info = tdef(selKey, true);
+          if (!info || !Object.prototype.hasOwnProperty.call(info.ranges, oldK)) return;
+          if (Object.prototype.hasOwnProperty.call(info.ranges, newK)) { showErr(`Range ${newK} already exists.`); renderActive(); return; }
+          const v = info.ranges[oldK]; delete info.ranges[oldK]; info.ranges[newK] = v; if (selRange === oldK) selRange = newK; showErr(""); renderActive();
+        });
+        tdKey.appendChild(inpKey);
+        tr.appendChild(tdKey);
+        for (const f of FIELD_DEFS) {
+          const td = document.createElement("td");
+          if (f.kind === "bool") {
+            const c = document.createElement("input");
+            c.type = "checkbox";
+            c.checked = Boolean(e.cell[f.key]);
+            c.addEventListener("change", () => { selRange = e.rangeKey; setCell(selKey, e.rangeKey, f.key, c.checked); showErr(""); });
+            td.appendChild(c);
+          } else if (f.kind === "select") {
+            const s = document.createElement("select");
+            s.className = "template-config-select";
+            for (const ov of f.opts || []) { const o = document.createElement("option"); o.value = ov; o.textContent = ov || "(default)"; s.appendChild(o); }
+            s.value = String(e.cell[f.key] === undefined || e.cell[f.key] === null ? "" : e.cell[f.key]);
+            s.addEventListener("change", () => { selRange = e.rangeKey; setCell(selKey, e.rangeKey, f.key, s.value); showErr(""); });
+            td.appendChild(s);
+          } else {
+            const i = document.createElement("input");
+            i.type = "text";
+            i.className = "template-config-cell-input";
+            i.value = String(e.cell[f.key] === undefined || e.cell[f.key] === null ? "" : e.cell[f.key]);
+            i.addEventListener("input", () => { selRange = e.rangeKey; setCell(selKey, e.rangeKey, f.key, i.value); if (f.key === "font size" && i.value.trim() && !Number.isFinite(Number(i.value))) showErr(`[${selKey}] ${e.rangeKey}: Font size must be numeric.`); else showErr(""); });
+            td.appendChild(i);
+          }
+          tr.appendChild(td);
+        }
+        tb.appendChild(tr);
+      }
+      table.appendChild(tb);
+      wrap.appendChild(table);
+      const check = validateDraft();
+      if (!check.ok) { const sum = document.createElement("div"); sum.className = "template-error"; sum.textContent = check.messages.join("\n"); root.appendChild(sum); }
+      host.replaceChildren(root);
+    }
 
+    function renderJson() {
+      const root = document.createElement("div");
+      root.className = "template-config-json-tab";
+      const hint = document.createElement("div");
+      hint.className = "muted";
+      hint.textContent = "Advanced mode. Apply validates schema and keeps compatibility.";
+      root.appendChild(hint);
+      const ta = document.createElement("textarea");
+      ta.className = "template-config-json";
+      ta.spellcheck = false;
+      ta.placeholder = "Template config JSON...";
+      ta.value = safeJson(draft, true);
+      ta.addEventListener("keydown", (ev) => { if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") { ev.preventDefault(); applyFromModal(); } });
+      root.appendChild(ta);
+      host.replaceChildren(root);
+      jsonArea = ta;
+      els.templateConfigJson = ta;
+      setTimeout(() => { ta.focus(); ta.setSelectionRange(0, 0); }, 0);
+    }
+
+    function renderActive() {
+      formBtn.classList.toggle("active", activeTab === "form");
+      jsonBtn.classList.toggle("active", activeTab === "json");
+      if (activeTab === "json") renderJson();
+      else { jsonArea = null; renderForm(); }
+    }
+
+    function switchTab(next) {
+      const tab = next === "json" ? "json" : "form";
+      if (tab === activeTab) return;
+      if (activeTab === "json" && !syncJsonToDraft()) return;
+      activeTab = tab;
+      showErr("");
+      renderActive();
+    }
+
+    function applyFromModal() {
+      if (activeTab === "json" && !syncJsonToDraft()) return;
+      const preCheck = validateDraft();
+      if (!preCheck.ok) { showErr(preCheck.messages.join("\n")); if (activeTab !== "form") { activeTab = "form"; renderActive(); } return; }
+      const nextConfig = serializeDraft();
+      const chk = validateTemplateConfig(nextConfig);
+      if (!chk.valid) { showErr(chk.errors.join("\n")); return; }
+      const ok = applyTemplateConfigObject(nextConfig, { save: true });
+      if (!ok) { const fallback = String((els.templateConfigError && els.templateConfigError.textContent) || "").trim(); if (fallback) showErr(fallback); return; }
+      showErr("");
+      setError("");
+      closeTemplateDynamicModal();
+    }
+
+    formBtn.addEventListener("click", () => switchTab("form"));
+    jsonBtn.addEventListener("click", () => switchTab("json"));
+    applyBtn.addEventListener("click", applyFromModal);
+    modal.root.addEventListener("keydown", (ev) => { if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") { ev.preventDefault(); applyFromModal(); } });
+    renderActive();
     modal.setCleanup(() => {
-      els.templateConfigJson = previousConfigJsonEl || null;
-      els.templateConfigError = previousConfigErrorEl || null;
+      els.templateConfigJson = prevJsonEl || null;
+      els.templateConfigError = prevErrEl || null;
+      jsonArea = null;
     });
   }
 
