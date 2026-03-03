@@ -543,6 +543,402 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }, 0);
   }
 
+  function openTemplateCellUnifiedEditModal(options) {
+    const opts = options && typeof options === "object" ? options : {};
+    const textPart = opts.textPart && typeof opts.textPart === "object" ? opts.textPart : {};
+    const descPart = opts.descPart && typeof opts.descPart === "object" ? opts.descPart : {};
+
+    const templateKey = String(textPart.templateKey || "").trim();
+    const rangeKey = String(textPart.rangeKey || "").trim();
+    const objectType = String(textPart.objectType || "").trim();
+    const currentText = String(textPart.currentText === undefined || textPart.currentText === null ? "" : textPart.currentText);
+    const onSaveText = typeof textPart.onSaveText === "function" ? textPart.onSaveText : null;
+
+    const legacyDecl = descPart.decl && typeof descPart.decl === "object" ? descPart.decl : null;
+    const token = String(descPart.token || "").trim();
+    const currentDesc = String(descPart.currentDesc === undefined || descPart.currentDesc === null ? "" : descPart.currentDesc);
+    const skipNormalize = Boolean(descPart.skipNormalize);
+    const onSaveDesc = typeof descPart.onSaveDesc === "function" ? descPart.onSaveDesc : null;
+
+    const normalizeDeclCandidate = (candidate, index) => {
+      if (!candidate || typeof candidate !== "object") {
+        return null;
+      }
+      const decl = candidate.decl && typeof candidate.decl === "object"
+        ? candidate.decl
+        : (candidate.objectType && candidate.name ? candidate : null);
+      if (!decl) {
+        return null;
+      }
+      let declKey = String(candidate.declKey || "").trim();
+      if (!declKey && typeof getDeclOverrideStorageKey === "function") {
+        declKey = String(getDeclOverrideStorageKey(decl) || "").trim();
+      }
+      const techName = typeof getDeclTechName === "function"
+        ? getDeclTechName(decl)
+        : String(decl.name || "");
+      const scopeLabel = String(decl.scopeLabel || "").trim();
+      const fallbackLabel = scopeLabel
+        ? `${techName || "(unknown)"} @ ${scopeLabel}`
+        : `${techName || "(unknown)"}`;
+      return {
+        decl,
+        declKey: declKey || `idx:${index}`,
+        label: String(candidate.label || fallbackLabel),
+        currentDesc: String(candidate.currentDesc === undefined || candidate.currentDesc === null ? "" : candidate.currentDesc),
+        skipNormalize: Boolean(candidate.skipNormalize),
+        selected: candidate.selected === true
+      };
+    };
+
+    const rawDeclCandidates = Array.isArray(descPart.declCandidates)
+      ? descPart.declCandidates
+      : [];
+    let declCandidates = rawDeclCandidates
+      .map((candidate, index) => normalizeDeclCandidate(candidate, index))
+      .filter(Boolean);
+
+    if (!declCandidates.length && legacyDecl) {
+      declCandidates = [{
+        decl: legacyDecl,
+        declKey: (typeof getDeclOverrideStorageKey === "function" ? String(getDeclOverrideStorageKey(legacyDecl) || "") : "") || "idx:0",
+        label: (() => {
+          const name = typeof getDeclTechName === "function" ? getDeclTechName(legacyDecl) : String(legacyDecl.name || "");
+          const scope = String(legacyDecl.scopeLabel || "").trim();
+          return scope ? `${name || "(unknown)"} @ ${scope}` : `${name || "(unknown)"}`;
+        })(),
+        currentDesc,
+        skipNormalize,
+        selected: true
+      }];
+    }
+
+    const hasDecl = Boolean(declCandidates.length && onSaveDesc);
+    const modal = openTemplateDynamicModal("Edit Template Cell", { contentClass: "template-runtime-modal-content template-runtime-modal-wide" });
+
+    const saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.className = "secondary";
+    saveBtn.textContent = "Save";
+    modal.actions.prepend(saveBtn);
+
+    const hint = document.createElement("div");
+    hint.className = "muted";
+    hint.style.marginBottom = "8px";
+    hint.textContent = [
+      objectType ? `Object: ${objectType}` : "",
+      templateKey ? `Template: ${templateKey}` : "",
+      rangeKey ? `Range: ${rangeKey}` : "",
+      token ? `Token: ${token}` : ""
+    ].filter(Boolean).join(" • ");
+    modal.body.appendChild(hint);
+
+    const errorEl = document.createElement("div");
+    errorEl.className = "template-error";
+    errorEl.style.display = "none";
+    modal.body.appendChild(errorEl);
+
+    const tabBar = document.createElement("div");
+    tabBar.className = "modal-actions";
+    tabBar.style.marginBottom = "8px";
+    modal.body.appendChild(tabBar);
+
+    const textTabBtn = document.createElement("button");
+    textTabBtn.type = "button";
+    textTabBtn.className = "secondary";
+    textTabBtn.textContent = "Template Text";
+    tabBar.appendChild(textTabBtn);
+
+    const descTabBtn = document.createElement("button");
+    descTabBtn.type = "button";
+    descTabBtn.className = "secondary";
+    descTabBtn.textContent = "Description";
+    tabBar.appendChild(descTabBtn);
+
+    const tabContent = document.createElement("div");
+    modal.body.appendChild(tabContent);
+
+    let activeTab = "text";
+    let textValue = currentText;
+    let activeTextarea = null;
+    const descDraftByKey = new Map();
+    for (const candidate of declCandidates) {
+      descDraftByKey.set(candidate.declKey, {
+        text: String(candidate.currentDesc || ""),
+        skipNormalize: Boolean(candidate.skipNormalize)
+      });
+    }
+
+    let selectedDeclIndex = declCandidates.findIndex((candidate) => candidate.selected === true);
+    if (selectedDeclIndex < 0) {
+      selectedDeclIndex = 0;
+    }
+
+    const getSelectedDeclCandidate = () => {
+      if (!declCandidates.length) {
+        return null;
+      }
+      const safeIndex = Math.max(0, Math.min(declCandidates.length - 1, selectedDeclIndex));
+      return declCandidates[safeIndex] || null;
+    };
+
+    const getDescDraft = () => {
+      const selected = getSelectedDeclCandidate();
+      if (!selected) {
+        return { text: "", skipNormalize: false };
+      }
+      const existing = descDraftByKey.get(selected.declKey);
+      if (existing && typeof existing === "object") {
+        return {
+          text: String(existing.text || ""),
+          skipNormalize: Boolean(existing.skipNormalize)
+        };
+      }
+      return { text: "", skipNormalize: false };
+    };
+
+    const setDescDraft = (patch) => {
+      const selected = getSelectedDeclCandidate();
+      if (!selected) {
+        return;
+      }
+      const current = getDescDraft();
+      const next = {
+        text: patch && Object.prototype.hasOwnProperty.call(patch, "text") ? String(patch.text || "") : current.text,
+        skipNormalize: patch && Object.prototype.hasOwnProperty.call(patch, "skipNormalize") ? Boolean(patch.skipNormalize) : current.skipNormalize
+      };
+      descDraftByKey.set(selected.declKey, next);
+    };
+
+    const syncActiveInputState = () => {
+      if (activeTab === "text" && activeTextarea) {
+        textValue = String(activeTextarea.value || "");
+      }
+      if (activeTab === "desc" && activeTextarea) {
+        setDescDraft({ text: String(activeTextarea.value || "") });
+      }
+    };
+
+    const bindEditorHotkeys = (textarea, onEscape) => {
+      textarea.addEventListener("keydown", (ev) => {
+        if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
+          ev.preventDefault();
+          submit();
+        }
+        if (ev.key === "Escape") {
+          ev.preventDefault();
+          onEscape();
+        }
+      });
+    };
+
+    const setActiveTabStyles = () => {
+      textTabBtn.style.fontWeight = activeTab === "text" ? "700" : "400";
+      descTabBtn.style.fontWeight = activeTab === "desc" ? "700" : "400";
+    };
+
+    const renderActiveTab = () => {
+      tabContent.replaceChildren();
+      setActiveTabStyles();
+
+      if (activeTab === "text") {
+        const textLabel = document.createElement("div");
+        textLabel.className = "muted";
+        textLabel.style.marginBottom = "6px";
+        textLabel.textContent = "Template Text";
+        tabContent.appendChild(textLabel);
+
+        const textArea = document.createElement("textarea");
+        textArea.className = "template-config-json";
+        textArea.spellcheck = false;
+        textArea.placeholder = "Cell text...";
+        textArea.value = textValue;
+        tabContent.appendChild(textArea);
+        activeTextarea = textArea;
+        bindEditorHotkeys(textArea, closeTemplateDynamicModal);
+        setTimeout(() => {
+          textArea.focus();
+          textArea.setSelectionRange(0, textArea.value.length);
+        }, 0);
+        return;
+      }
+
+      const descLabel = document.createElement("div");
+      descLabel.className = "muted";
+      descLabel.style.marginBottom = "6px";
+      descLabel.textContent = "Description";
+      tabContent.appendChild(descLabel);
+
+      const descInfo = document.createElement("div");
+      descInfo.className = "muted";
+      descInfo.style.marginBottom = "6px";
+      tabContent.appendChild(descInfo);
+
+      if (hasDecl && declCandidates.length > 1) {
+        const selectorLabel = document.createElement("div");
+        selectorLabel.className = "muted";
+        selectorLabel.style.marginBottom = "4px";
+        selectorLabel.textContent = "Target";
+        tabContent.appendChild(selectorLabel);
+
+        const selector = document.createElement("select");
+        selector.className = "template-config-json";
+        selector.style.height = "32px";
+        selector.style.marginBottom = "8px";
+        for (let i = 0; i < declCandidates.length; i += 1) {
+          const candidate = declCandidates[i];
+          const option = document.createElement("option");
+          option.value = String(i);
+          option.textContent = candidate.label;
+          if (i === selectedDeclIndex) {
+            option.selected = true;
+          }
+          selector.appendChild(option);
+        }
+        selector.addEventListener("change", () => {
+          syncActiveInputState();
+          const nextIndex = Number(selector.value);
+          if (Number.isFinite(nextIndex)) {
+            selectedDeclIndex = Math.max(0, Math.min(declCandidates.length - 1, nextIndex));
+          }
+          renderActiveTab();
+        });
+        tabContent.appendChild(selector);
+      }
+
+      const descArea = document.createElement("textarea");
+      descArea.className = "template-config-json";
+      descArea.spellcheck = false;
+      descArea.placeholder = "Description override...";
+
+      const skipWrap = document.createElement("label");
+      skipWrap.className = "toggle";
+      const skipInput = document.createElement("input");
+      skipInput.type = "checkbox";
+      skipWrap.appendChild(skipInput);
+      skipWrap.appendChild(document.createTextNode("Skip normalize"));
+
+      if (!hasDecl) {
+        descInfo.textContent = "Khong tim thay decl cho o nay.";
+        descArea.disabled = true;
+        skipInput.disabled = true;
+        descArea.value = "";
+        skipInput.checked = false;
+      } else {
+        const selected = getSelectedDeclCandidate();
+        const draft = getDescDraft();
+        descArea.value = draft.text;
+        skipInput.checked = draft.skipNormalize;
+        descInfo.textContent = selected ? `Decl: ${selected.label}` : "Decl: (unknown)";
+        skipInput.addEventListener("change", () => {
+          setDescDraft({ skipNormalize: Boolean(skipInput.checked) });
+        });
+      }
+
+      tabContent.appendChild(descArea);
+      tabContent.appendChild(skipWrap);
+      activeTextarea = descArea;
+      bindEditorHotkeys(descArea, closeTemplateDynamicModal);
+      setTimeout(() => {
+        descArea.focus();
+        descArea.setSelectionRange(0, descArea.value.length);
+      }, 0);
+    };
+
+    textTabBtn.addEventListener("click", () => {
+      if (activeTab === "text") {
+        return;
+      }
+      syncActiveInputState();
+      activeTab = "text";
+      renderActiveTab();
+    });
+
+    descTabBtn.addEventListener("click", () => {
+      if (activeTab === "desc") {
+        return;
+      }
+      syncActiveInputState();
+      activeTab = "desc";
+      renderActiveTab();
+    });
+
+    renderActiveTab();
+
+    const showInlineError = (message) => {
+      const text = String(message || "").trim();
+      if (!text) {
+        errorEl.textContent = "";
+        errorEl.style.display = "none";
+        return;
+      }
+      errorEl.textContent = text;
+      errorEl.style.display = "block";
+    };
+
+    const normalizeSaveResult = (result, fallbackError) => {
+      if (result === false || result === null || result === undefined) {
+        return { ok: false, error: fallbackError || "Save failed." };
+      }
+      if (typeof result === "object") {
+        const ok = result.ok !== false;
+        return { ok, error: ok ? "" : String(result.error || fallbackError || "Save failed.") };
+      }
+      return { ok: true, error: "" };
+    };
+
+    const submit = () => {
+      showInlineError("");
+      if (!templateKey || !rangeKey || !onSaveText) {
+        showInlineError("Cannot edit this template cell: missing template key/range.");
+        return;
+      }
+      syncActiveInputState();
+
+      let textResult = null;
+      try {
+        textResult = normalizeSaveResult(
+          onSaveText({ text: String(textValue || "") }),
+          "Save template text failed."
+        );
+      } catch (err) {
+        showInlineError(err && err.message ? err.message : String(err));
+        return;
+      }
+      if (!textResult.ok) {
+        const fallback = String((els.templateConfigError && els.templateConfigError.textContent) || "").trim();
+        showInlineError(textResult.error || fallback || "Save template text failed.");
+        return;
+      }
+
+      if (hasDecl) {
+        const selected = getSelectedDeclCandidate();
+        const draft = getDescDraft();
+        let descResult = null;
+        try {
+          descResult = normalizeSaveResult(onSaveDesc({
+            decl: selected ? selected.decl : null,
+            declKey: selected ? selected.declKey : "",
+            text: String(draft.text || ""),
+            skipNormalize: Boolean(draft.skipNormalize)
+          }), "Save description failed.");
+        } catch (err) {
+          showInlineError(err && err.message ? err.message : String(err));
+          return;
+        }
+        if (!descResult.ok) {
+          showInlineError(descResult.error || "Save description failed.");
+          return;
+        }
+      }
+
+      closeTemplateDynamicModal();
+    };
+
+    saveBtn.addEventListener("click", submit);
+  }
+  window.openTemplateCellUnifiedEditModal = openTemplateCellUnifiedEditModal;
+
   function getInputGotoControls() {
     return {
       input: document.getElementById("inputGotoLine"),
