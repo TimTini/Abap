@@ -1,0 +1,9 @@
+# Keep AI/file search focused on source files only.
+# Generated inline bundle: do not read directly, rebuild via script.
+viewer/index.inline.html
+
+# Large temporary runtime/source dumps.
+tmp-*.js
+
+# Heavy reference HTML corpus (not needed for most code tasks).
+knowledge_base/raw/**
