@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.03.03-r11">
-  <meta name="abap-viewer-updated-at" content="2026-03-03 23:52:41">
-  <meta name="abap-viewer-updated-note" content="Replaced Template JSON editor with dynamic hybrid Template Form + JSON Advanced modal (manual Apply, key/range editing, validation, unknown-key preservation).">
+  <meta name="abap-viewer-version" content="v2026.03.04-r12">
+  <meta name="abap-viewer-updated-at" content="2026-03-04 22:33:26">
+  <meta name="abap-viewer-updated-note" content="Code button now jumps Input reliably and no longer forces Output/Template block selection/auto-scroll.">
   <title>ABAP Parser Viewer</title>
   <style>
     :root {
@@ -800,9 +800,14 @@
     }
 
     .template-runtime-modal-content .template-config-json {
-      min-height: 55vh;
-      max-height: 65vh;
+      min-height: 120px;
+      max-height: 34vh;
       margin-top: 8px;
+    }
+
+    .template-runtime-modal-content .template-config-json.template-config-json-large {
+      min-height: 52vh;
+      max-height: 64vh;
     }
 
     .template-runtime-modal-content .template-type-filter-options {

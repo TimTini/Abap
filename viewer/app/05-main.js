@@ -393,6 +393,145 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
   }
 
+  function findRenderObjectById(id) {
+    const targetId = String(id === undefined || id === null ? "" : id).trim();
+    if (!targetId || !Array.isArray(state.renderObjects)) {
+      return null;
+    }
+    const stack = state.renderObjects.slice();
+    while (stack.length) {
+      const current = stack.pop();
+      if (!current || typeof current !== "object") {
+        continue;
+      }
+      if (String(current.id === undefined || current.id === null ? "" : current.id) === targetId) {
+        return current;
+      }
+      const children = Array.isArray(current.children) ? current.children : [];
+      for (let index = children.length - 1; index >= 0; index -= 1) {
+        stack.push(children[index]);
+      }
+    }
+    return null;
+  }
+
+  function findTemplateObjectByIndex(index) {
+    const absIndex = Number(index);
+    if (!Number.isFinite(absIndex) || absIndex < 0) {
+      return null;
+    }
+    if (typeof getTemplateVirtualState === "function") {
+      const virtual = getTemplateVirtualState();
+      const items = virtual && Array.isArray(virtual.items) ? virtual.items : [];
+      if (absIndex < items.length) {
+        const item = items[absIndex];
+        if (item && typeof item === "object") {
+          if (item.obj && typeof item.obj === "object") {
+            return item.obj;
+          }
+          if (item.nodeInfo && item.nodeInfo.obj && typeof item.nodeInfo.obj === "object") {
+            return item.nodeInfo.obj;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  function jumpInputToCodeRange(lineStart, lineEnd) {
+    const start = Math.max(1, Number(lineStart) || 1);
+    const end = Math.max(start, Number(lineEnd) || start);
+    if (typeof selectCodeLines === "function") {
+      selectCodeLines(start, end);
+    } else if (els.inputText) {
+      const text = String(els.inputText.value || "");
+      const lines = text.split(/\r\n|\r|\n/);
+      const toOffset = (lineNo) => {
+        const line = Math.max(1, Math.min(lines.length || 1, Number(lineNo) || 1));
+        let offset = 0;
+        for (let i = 0; i < line - 1; i += 1) {
+          offset += lines[i].length + 1;
+        }
+        return offset;
+      };
+      const startOffset = toOffset(start);
+      const endOffset = toOffset(end + 1);
+      els.inputText.focus();
+      els.inputText.setSelectionRange(startOffset, Math.max(startOffset, endOffset));
+    }
+
+    if (!els.inputText) {
+      return;
+    }
+    const lineHeight = typeof getInputGutterLineHeightPx === "function"
+      ? Math.max(12, Number(getInputGutterLineHeightPx()) || 18)
+      : 18;
+    const viewportHeight = Math.max(0, Number(els.inputText.clientHeight) || 0);
+    const offsetTop = Math.max(0, Math.round(viewportHeight * 0.28));
+    const targetTop = Math.max(0, Math.round(((start - 1) * lineHeight) - offsetTop));
+    els.inputText.scrollTop = targetTop;
+    if (typeof syncInputGutterScroll === "function") {
+      syncInputGutterScroll();
+    }
+  }
+
+  function interceptOutputCodeButtonClick(ev) {
+    if (!els.output || !ev || !ev.target || !(ev.target instanceof Element)) {
+      return;
+    }
+    const btn = ev.target.closest("button.btn-ghost");
+    if (!btn || !els.output.contains(btn)) {
+      return;
+    }
+    if (String(btn.textContent || "").trim().toLowerCase() !== "code") {
+      return;
+    }
+    const card = btn.closest(".card[data-id]");
+    if (!card) {
+      return;
+    }
+    const objId = String(card.getAttribute("data-id") || "").trim();
+    const obj = findRenderObjectById(objId);
+    const lineStart = Number(obj && obj.lineStart) || Number(card.getAttribute("data-line-start")) || 0;
+    const lineEnd = Number(obj && obj.block && obj.block.lineEnd) || lineStart;
+    if (lineStart <= 0) {
+      return;
+    }
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (typeof ev.stopImmediatePropagation === "function") {
+      ev.stopImmediatePropagation();
+    }
+    jumpInputToCodeRange(lineStart, lineEnd);
+  }
+
+  function interceptTemplateCodeButtonClick(ev) {
+    if (!els.templatePreviewOutput || !ev || !ev.target || !(ev.target instanceof Element)) {
+      return;
+    }
+    const btn = ev.target.closest("button[data-template-action=\"code\"]");
+    if (!btn || !els.templatePreviewOutput.contains(btn)) {
+      return;
+    }
+    const block = btn.closest(".template-block");
+    if (!block) {
+      return;
+    }
+    const absIndex = Number(block.getAttribute("data-template-index"));
+    const obj = findTemplateObjectByIndex(absIndex);
+    const lineStart = Number(obj && obj.lineStart) || Number(block.getAttribute("data-line-start")) || 0;
+    const lineEnd = Number(obj && obj.block && obj.block.lineEnd) || lineStart;
+    if (lineStart <= 0) {
+      return;
+    }
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (typeof ev.stopImmediatePropagation === "function") {
+      ev.stopImmediatePropagation();
+    }
+    jumpInputToCodeRange(lineStart, lineEnd);
+  }
+
   function openTemplateConfigModal() {
     const modal = openTemplateDynamicModal("Template Form", { contentClass: "template-runtime-modal-content template-runtime-modal-wide" });
     modal.closeBtn.textContent = "Cancel";
@@ -727,7 +866,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       hint.textContent = "Advanced mode. Apply validates schema and keeps compatibility.";
       root.appendChild(hint);
       const ta = document.createElement("textarea");
-      ta.className = "template-config-json";
+      ta.className = "template-config-json template-config-json-large";
       ta.spellcheck = false;
       ta.placeholder = "Template config JSON...";
       ta.value = safeJson(draft, true);
@@ -883,6 +1022,147 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const currentDesc = String(descPart.currentDesc === undefined || descPart.currentDesc === null ? "" : descPart.currentDesc);
     const skipNormalize = Boolean(descPart.skipNormalize);
     const onSaveDesc = typeof descPart.onSaveDesc === "function" ? descPart.onSaveDesc : null;
+    const normalizeEnabled = Boolean(state && state.settings && state.settings.normalizeDeclDesc);
+
+    const normalizeDescValueForModal = (decl, value, noNormalize) => {
+      const raw = String(value === undefined || value === null ? "" : value);
+      if (!raw) {
+        return "";
+      }
+      if (!normalizeEnabled || noNormalize) {
+        return raw;
+      }
+      if (typeof normalizeDeclDescText === "function") {
+        const normalized = String(normalizeDeclDescText(decl, raw) || "");
+        return normalized || raw;
+      }
+      return raw;
+    };
+
+    const getDeclOverrideEntrySafeByDecl = (decl) => {
+      if (!decl || typeof decl !== "object") {
+        return { text: "", noNormalize: false };
+      }
+      if (typeof getDeclOverrideEntry === "function") {
+        try {
+          const entry = getDeclOverrideEntry(decl);
+          if (entry && typeof entry === "object") {
+            return { text: String(entry.text || ""), noNormalize: Boolean(entry.noNormalize) };
+          }
+        } catch {
+          // fallback below
+        }
+      }
+      let key = "";
+      if (typeof getDeclOverrideStorageKey === "function") {
+        try {
+          key = String(getDeclOverrideStorageKey(decl) || "").trim();
+        } catch {
+          key = "";
+        }
+      }
+      if (!key || !state || !state.descOverrides || !Object.prototype.hasOwnProperty.call(state.descOverrides, key)) {
+        return { text: "", noNormalize: false };
+      }
+      const raw = state.descOverrides[key];
+      if (typeof raw === "string") {
+        return { text: raw, noNormalize: false };
+      }
+      if (raw && typeof raw === "object") {
+        return { text: String(raw.text || ""), noNormalize: Boolean(raw.noNormalize) };
+      }
+      return { text: "", noNormalize: false };
+    };
+
+    const isStructFieldDeclForModal = (decl) => {
+      if (!decl || typeof decl !== "object") {
+        return false;
+      }
+      if (typeof isStructFieldDecl === "function") {
+        try {
+          return Boolean(isStructFieldDecl(decl));
+        } catch {
+          // fallback below
+        }
+      }
+      return String(decl.objectType || "").trim().toUpperCase() === "STRUCT_FIELD";
+    };
+
+    const buildStructDeclFromFieldDeclSafe = (decl) => {
+      if (!decl || typeof decl !== "object") {
+        return null;
+      }
+      if (typeof buildStructDeclFromFieldDecl === "function") {
+        try {
+          const resolved = buildStructDeclFromFieldDecl(decl);
+          if (resolved && typeof resolved === "object") {
+            return resolved;
+          }
+        } catch {
+          // fallback below
+        }
+      }
+      if (!decl.scopeLabel || !decl.structName) {
+        return null;
+      }
+      return {
+        id: decl.structId || null,
+        objectType: decl.structObjectType || decl.objectType || "STRUCT",
+        name: String(decl.structName || ""),
+        file: decl.file || "",
+        lineStart: decl.structLineStart || null,
+        raw: decl.structRaw || "",
+        comment: decl.structComment || decl.structTypeComment || "",
+        scopeId: decl.scopeId || 0,
+        scopeLabel: decl.scopeLabel || "",
+        scopeType: decl.scopeType || "",
+        scopeName: decl.scopeName || ""
+      };
+    };
+
+    const getEffectiveDescSafe = (decl) => {
+      if (!decl || typeof decl !== "object") {
+        return "";
+      }
+      if (typeof getEffectiveDeclDesc === "function") {
+        try {
+          return String(getEffectiveDeclDesc(decl) || "");
+        } catch {
+          return "";
+        }
+      }
+      return "";
+    };
+
+    const getAtomicEffectiveDescSafe = (decl) => {
+      if (!decl || typeof decl !== "object") {
+        return "";
+      }
+      if (typeof getEffectiveDeclAtomicDescNormalized === "function") {
+        try {
+          return String(getEffectiveDeclAtomicDescNormalized(decl) || "");
+        } catch {
+          // fallback below
+        }
+      }
+      return getEffectiveDescSafe(decl);
+    };
+
+    const stripStructPrefixForModalItemText = (itemText, structName) => {
+      const raw = String(itemText || "").trim();
+      if (!raw) {
+        return "";
+      }
+      const struct = String(structName || "").trim();
+      if (!struct) {
+        return raw;
+      }
+      const prefix = `${struct.toUpperCase()}-`;
+      if (raw.toUpperCase().startsWith(prefix)) {
+        return raw.slice(struct.length + 1).trim();
+      }
+      return raw;
+    };
 
     const normalizeDeclCandidate = (candidate, index) => {
       if (!candidate || typeof candidate !== "object") {
@@ -912,6 +1192,62 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         currentDesc: String(candidate.currentDesc === undefined || candidate.currentDesc === null ? "" : candidate.currentDesc),
         skipNormalize: Boolean(candidate.skipNormalize),
         selected: candidate.selected === true
+      };
+    };
+
+    const buildDescDraftForCandidate = (candidate) => {
+      const decl = candidate && candidate.decl && typeof candidate.decl === "object" ? candidate.decl : null;
+      if (!decl) {
+        return {
+          mode: "single",
+          text: String(candidate && candidate.currentDesc ? candidate.currentDesc : ""),
+          skipNormalize: Boolean(candidate && candidate.skipNormalize)
+        };
+      }
+
+      const itemEntry = getDeclOverrideEntrySafeByDecl(decl);
+      const itemDisplayRaw = itemEntry.text
+        ? normalizeDescValueForModal(decl, itemEntry.text, itemEntry.noNormalize)
+        : (String(candidate && candidate.currentDesc ? candidate.currentDesc : "") || getAtomicEffectiveDescSafe(decl));
+      const itemDisplay = stripStructPrefixForModalItemText(itemDisplayRaw, String(decl.structName || ""));
+
+      if (!isStructFieldDeclForModal(decl)) {
+        return {
+          mode: "single",
+          text: itemDisplay,
+          skipNormalize: Boolean(itemEntry.noNormalize || (candidate && candidate.skipNormalize))
+        };
+      }
+
+      const structDecl = buildStructDeclFromFieldDeclSafe(decl);
+      const structKey = structDecl && typeof getDeclOverrideStorageKey === "function"
+        ? String(getDeclOverrideStorageKey(structDecl) || "")
+        : "";
+      const itemKey = typeof getDeclOverrideStorageKey === "function"
+        ? String(getDeclOverrideStorageKey(decl) || "")
+        : String(candidate && candidate.declKey ? candidate.declKey : "");
+      if (!structDecl || !structKey || !itemKey) {
+        return {
+          mode: "single",
+          text: itemDisplay,
+          skipNormalize: Boolean(itemEntry.noNormalize || (candidate && candidate.skipNormalize))
+        };
+      }
+
+      const structEntry = getDeclOverrideEntrySafeByDecl(structDecl);
+      const structDisplay = structEntry.text
+        ? normalizeDescValueForModal(structDecl, structEntry.text, false)
+        : getEffectiveDescSafe(structDecl);
+
+      return {
+        mode: "structField",
+        structDecl,
+        itemDecl: decl,
+        structKey,
+        itemKey,
+        structText: String(structDisplay || ""),
+        itemText: String(itemDisplay || ""),
+        skipNormalize: Boolean(itemEntry.noNormalize || (candidate && candidate.skipNormalize))
       };
     };
 
@@ -985,12 +1321,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     let activeTab = "text";
     let textValue = currentText;
     let activeTextarea = null;
+    let activeStructTextarea = null;
+    let activeItemTextarea = null;
+    let activeSkipCheckbox = null;
     const descDraftByKey = new Map();
     for (const candidate of declCandidates) {
-      descDraftByKey.set(candidate.declKey, {
-        text: String(candidate.currentDesc || ""),
-        skipNormalize: Boolean(candidate.skipNormalize)
-      });
+      descDraftByKey.set(candidate.declKey, buildDescDraftForCandidate(candidate));
     }
 
     let selectedDeclIndex = declCandidates.findIndex((candidate) => candidate.selected === true);
@@ -1009,16 +1345,31 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const getDescDraft = () => {
       const selected = getSelectedDeclCandidate();
       if (!selected) {
-        return { text: "", skipNormalize: false };
+        return { mode: "single", text: "", skipNormalize: false };
       }
       const existing = descDraftByKey.get(selected.declKey);
       if (existing && typeof existing === "object") {
+        if (existing.mode === "structField") {
+          return {
+            mode: "structField",
+            structDecl: existing.structDecl || null,
+            itemDecl: existing.itemDecl || selected.decl,
+            structKey: String(existing.structKey || ""),
+            itemKey: String(existing.itemKey || selected.declKey || ""),
+            structText: String(existing.structText || ""),
+            itemText: String(existing.itemText || ""),
+            skipNormalize: Boolean(existing.skipNormalize)
+          };
+        }
         return {
+          mode: "single",
           text: String(existing.text || ""),
           skipNormalize: Boolean(existing.skipNormalize)
         };
       }
-      return { text: "", skipNormalize: false };
+      const draft = buildDescDraftForCandidate(selected);
+      descDraftByKey.set(selected.declKey, draft);
+      return draft;
     };
 
     const setDescDraft = (patch) => {
@@ -1027,18 +1378,45 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         return;
       }
       const current = getDescDraft();
-      const next = {
-        text: patch && Object.prototype.hasOwnProperty.call(patch, "text") ? String(patch.text || "") : current.text,
-        skipNormalize: patch && Object.prototype.hasOwnProperty.call(patch, "skipNormalize") ? Boolean(patch.skipNormalize) : current.skipNormalize
-      };
-      descDraftByKey.set(selected.declKey, next);
+      if (current.mode === "structField") {
+        descDraftByKey.set(selected.declKey, {
+          ...current,
+          structText: patch && Object.prototype.hasOwnProperty.call(patch, "structText")
+            ? String(patch.structText || "")
+            : String(current.structText || ""),
+          itemText: patch && Object.prototype.hasOwnProperty.call(patch, "itemText")
+            ? String(patch.itemText || "")
+            : String(current.itemText || ""),
+          skipNormalize: patch && Object.prototype.hasOwnProperty.call(patch, "skipNormalize")
+            ? Boolean(patch.skipNormalize)
+            : Boolean(current.skipNormalize)
+        });
+        return;
+      }
+      descDraftByKey.set(selected.declKey, {
+        mode: "single",
+        text: patch && Object.prototype.hasOwnProperty.call(patch, "text") ? String(patch.text || "") : String(current.text || ""),
+        skipNormalize: patch && Object.prototype.hasOwnProperty.call(patch, "skipNormalize") ? Boolean(patch.skipNormalize) : Boolean(current.skipNormalize)
+      });
     };
 
     const syncActiveInputState = () => {
       if (activeTab === "text" && activeTextarea) {
         textValue = String(activeTextarea.value || "");
       }
-      if (activeTab === "desc" && activeTextarea) {
+      if (activeTab !== "desc") {
+        return;
+      }
+      const draft = getDescDraft();
+      if (draft.mode === "structField") {
+        setDescDraft({
+          structText: activeStructTextarea ? String(activeStructTextarea.value || "") : String(draft.structText || ""),
+          itemText: activeItemTextarea ? String(activeItemTextarea.value || "") : String(draft.itemText || ""),
+          skipNormalize: activeSkipCheckbox ? Boolean(activeSkipCheckbox.checked) : Boolean(draft.skipNormalize)
+        });
+        return;
+      }
+      if (activeTextarea) {
         setDescDraft({ text: String(activeTextarea.value || "") });
       }
     };
@@ -1064,6 +1442,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const renderActiveTab = () => {
       tabContent.replaceChildren();
       setActiveTabStyles();
+      activeTextarea = null;
+      activeStructTextarea = null;
+      activeItemTextarea = null;
+      activeSkipCheckbox = null;
 
       if (activeTab === "text") {
         const textLabel = document.createElement("div");
@@ -1130,38 +1512,112 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         tabContent.appendChild(selector);
       }
 
+      if (!hasDecl) {
+        descInfo.textContent = "Khong tim thay decl cho o nay.";
+        const descArea = document.createElement("textarea");
+        descArea.className = "template-config-json";
+        descArea.spellcheck = false;
+        descArea.placeholder = "Description override...";
+        descArea.disabled = true;
+        descArea.value = "";
+        tabContent.appendChild(descArea);
+        activeTextarea = descArea;
+        bindEditorHotkeys(descArea, closeTemplateDynamicModal);
+        setTimeout(() => {
+          descArea.focus();
+          descArea.setSelectionRange(0, descArea.value.length);
+        }, 0);
+        return;
+      }
+
+      const selected = getSelectedDeclCandidate();
+      const draft = getDescDraft();
+
+      if (draft.mode === "structField") {
+        descInfo.textContent = selected ? `Decl: ${selected.label} (Struct + Item)` : "Decl: (unknown)";
+
+        const structLabel = document.createElement("div");
+        structLabel.className = "muted";
+        structLabel.style.marginBottom = "4px";
+        structLabel.textContent = "Struct";
+        tabContent.appendChild(structLabel);
+
+        const structArea = document.createElement("textarea");
+        structArea.className = "template-config-json";
+        structArea.spellcheck = false;
+        structArea.placeholder = "Struct description override...";
+        structArea.value = String(draft.structText || "");
+        structArea.addEventListener("input", () => {
+          setDescDraft({ structText: String(structArea.value || "") });
+        });
+        tabContent.appendChild(structArea);
+
+        const itemLabel = document.createElement("div");
+        itemLabel.className = "muted";
+        itemLabel.style.marginTop = "8px";
+        itemLabel.style.marginBottom = "4px";
+        itemLabel.textContent = "Item";
+        tabContent.appendChild(itemLabel);
+
+        const itemArea = document.createElement("textarea");
+        itemArea.className = "template-config-json";
+        itemArea.spellcheck = false;
+        itemArea.placeholder = "Item description override...";
+        itemArea.value = String(draft.itemText || "");
+        itemArea.addEventListener("input", () => {
+          setDescDraft({ itemText: String(itemArea.value || "") });
+        });
+        tabContent.appendChild(itemArea);
+
+        const skipWrap = document.createElement("label");
+        skipWrap.className = "toggle";
+        const skipInput = document.createElement("input");
+        skipInput.type = "checkbox";
+        skipInput.checked = Boolean(draft.skipNormalize);
+        skipInput.addEventListener("change", () => {
+          setDescDraft({ skipNormalize: Boolean(skipInput.checked) });
+        });
+        skipWrap.appendChild(skipInput);
+        skipWrap.appendChild(document.createTextNode("Skip normalize (Item)"));
+        tabContent.appendChild(skipWrap);
+
+        activeStructTextarea = structArea;
+        activeItemTextarea = itemArea;
+        activeSkipCheckbox = skipInput;
+        bindEditorHotkeys(structArea, closeTemplateDynamicModal);
+        bindEditorHotkeys(itemArea, closeTemplateDynamicModal);
+        setTimeout(() => {
+          structArea.focus();
+          structArea.setSelectionRange(0, structArea.value.length);
+        }, 0);
+        return;
+      }
+
+      descInfo.textContent = selected ? `Decl: ${selected.label}` : "Decl: (unknown)";
       const descArea = document.createElement("textarea");
       descArea.className = "template-config-json";
       descArea.spellcheck = false;
       descArea.placeholder = "Description override...";
+      descArea.value = String(draft.text || "");
+      descArea.addEventListener("input", () => {
+        setDescDraft({ text: String(descArea.value || "") });
+      });
 
       const skipWrap = document.createElement("label");
       skipWrap.className = "toggle";
       const skipInput = document.createElement("input");
       skipInput.type = "checkbox";
+      skipInput.checked = Boolean(draft.skipNormalize);
+      skipInput.addEventListener("change", () => {
+        setDescDraft({ skipNormalize: Boolean(skipInput.checked) });
+      });
       skipWrap.appendChild(skipInput);
       skipWrap.appendChild(document.createTextNode("Skip normalize"));
-
-      if (!hasDecl) {
-        descInfo.textContent = "Khong tim thay decl cho o nay.";
-        descArea.disabled = true;
-        skipInput.disabled = true;
-        descArea.value = "";
-        skipInput.checked = false;
-      } else {
-        const selected = getSelectedDeclCandidate();
-        const draft = getDescDraft();
-        descArea.value = draft.text;
-        skipInput.checked = draft.skipNormalize;
-        descInfo.textContent = selected ? `Decl: ${selected.label}` : "Decl: (unknown)";
-        skipInput.addEventListener("change", () => {
-          setDescDraft({ skipNormalize: Boolean(skipInput.checked) });
-        });
-      }
 
       tabContent.appendChild(descArea);
       tabContent.appendChild(skipWrap);
       activeTextarea = descArea;
+      activeSkipCheckbox = skipInput;
       bindEditorHotkeys(descArea, closeTemplateDynamicModal);
       setTimeout(() => {
         descArea.focus();
@@ -1238,21 +1694,57 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       if (hasDecl) {
         const selected = getSelectedDeclCandidate();
         const draft = getDescDraft();
-        let descResult = null;
-        try {
-          descResult = normalizeSaveResult(onSaveDesc({
-            decl: selected ? selected.decl : null,
-            declKey: selected ? selected.declKey : "",
-            text: String(draft.text || ""),
-            skipNormalize: Boolean(draft.skipNormalize)
-          }), "Save description failed.");
-        } catch (err) {
-          showInlineError(err && err.message ? err.message : String(err));
-          return;
-        }
-        if (!descResult.ok) {
-          showInlineError(descResult.error || "Save description failed.");
-          return;
+        if (draft.mode === "structField") {
+          let structResult = null;
+          try {
+            structResult = normalizeSaveResult(onSaveDesc({
+              decl: draft.structDecl || null,
+              declKey: String(draft.structKey || ""),
+              text: String(draft.structText || ""),
+              skipNormalize: false
+            }), "Save struct description failed.");
+          } catch (err) {
+            showInlineError(err && err.message ? err.message : String(err));
+            return;
+          }
+          if (!structResult.ok) {
+            showInlineError(structResult.error || "Save struct description failed.");
+            return;
+          }
+
+          let itemResult = null;
+          try {
+            itemResult = normalizeSaveResult(onSaveDesc({
+              decl: selected ? selected.decl : (draft.itemDecl || null),
+              declKey: selected ? selected.declKey : String(draft.itemKey || ""),
+              text: String(draft.itemText || ""),
+              skipNormalize: Boolean(draft.skipNormalize)
+            }), "Save item description failed.");
+          } catch (err) {
+            showInlineError(err && err.message ? err.message : String(err));
+            return;
+          }
+          if (!itemResult.ok) {
+            showInlineError(itemResult.error || "Save item description failed.");
+            return;
+          }
+        } else {
+          let descResult = null;
+          try {
+            descResult = normalizeSaveResult(onSaveDesc({
+              decl: selected ? selected.decl : null,
+              declKey: selected ? selected.declKey : "",
+              text: String(draft.text || ""),
+              skipNormalize: Boolean(draft.skipNormalize)
+            }), "Save description failed.");
+          } catch (err) {
+            showInlineError(err && err.message ? err.message : String(err));
+            return;
+          }
+          if (!descResult.ok) {
+            showInlineError(descResult.error || "Save description failed.");
+            return;
+          }
         }
       }
 
@@ -1369,6 +1861,521 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
   }
 
+  function isDeclLikeRecordForSynthetic(decl) {
+    return Boolean(decl)
+      && typeof decl === "object"
+      && typeof decl.objectType === "string"
+      && typeof decl.name === "string";
+  }
+
+  function normalizeDeclKeyTokenForSynthetic(value) {
+    return String(value || "").trim().toUpperCase();
+  }
+
+  function makeDeclScopeNameKeyForSynthetic(scopeLabel, name) {
+    const scope = normalizeDeclKeyTokenForSynthetic(scopeLabel);
+    const declName = normalizeDeclKeyTokenForSynthetic(name);
+    if (!scope || !declName) {
+      return "";
+    }
+    return `${scope}:${declName}`;
+  }
+
+  function extractStructFieldRefForSynthetic(rawValue) {
+    const text = String(rawValue || "").trim();
+    if (!text) {
+      return null;
+    }
+
+    const match = text.match(/(^|[^A-Za-z0-9_<>])([A-Za-z_][A-Za-z0-9_]*-[A-Za-z_][A-Za-z0-9_]*(?:-[A-Za-z_][A-Za-z0-9_]*)*)/);
+    if (!match || !match[2]) {
+      return null;
+    }
+
+    const fullRef = String(match[2] || "").trim();
+    const dash = fullRef.indexOf("-");
+    if (dash <= 0 || dash >= fullRef.length - 1) {
+      return null;
+    }
+
+    const structName = fullRef.slice(0, dash).trim();
+    const fieldPath = fullRef.slice(dash + 1).trim();
+    if (!structName || !fieldPath) {
+      return null;
+    }
+
+    const structUpper = normalizeDeclKeyTokenForSynthetic(structName);
+    // Skip ABAP system fields (SY-*) and field symbols (<fs>-*) in this synthetic flow.
+    if (structUpper === "SY" || structName.startsWith("<")) {
+      return null;
+    }
+
+    return { fullRef, structName, fieldPath, structUpper };
+  }
+
+  function collectScopeHintsFromObjectForSynthetic(obj) {
+    const hints = new Set();
+    if (!obj || typeof obj !== "object") {
+      return hints;
+    }
+
+    const addScope = (decl) => {
+      if (!isDeclLikeRecordForSynthetic(decl)) {
+        return;
+      }
+      const scope = String(decl.scopeLabel || "").trim();
+      if (scope) {
+        hints.add(scope);
+      }
+    };
+
+    const values = obj.values && typeof obj.values === "object" ? obj.values : null;
+    if (values) {
+      for (const entryOrList of Object.values(values)) {
+        const list = Array.isArray(entryOrList) ? entryOrList : [entryOrList];
+        for (const entry of list) {
+          if (!entry || typeof entry !== "object") {
+            continue;
+          }
+          addScope(entry.decl);
+        }
+      }
+    }
+
+    const extras = obj.extras && typeof obj.extras === "object" ? obj.extras : null;
+    if (!extras) {
+      return hints;
+    }
+
+    const addFromAssignSections = (container, sections) => {
+      for (const sectionName of sections) {
+        const list = container && Array.isArray(container[sectionName]) ? container[sectionName] : [];
+        for (const entry of list) {
+          if (!entry || typeof entry !== "object") {
+            continue;
+          }
+          addScope(entry.valueDecl);
+          const origins = Array.isArray(entry.originDecls) ? entry.originDecls : [];
+          for (const origin of origins) {
+            addScope(origin);
+          }
+        }
+      }
+    };
+
+    if (extras.callFunction) {
+      addFromAssignSections(extras.callFunction, ["exporting", "importing", "changing", "tables", "exceptions"]);
+    }
+    if (extras.callMethod) {
+      addFromAssignSections(extras.callMethod, ["exporting", "importing", "changing", "receiving", "exceptions"]);
+    }
+    if (extras.performCall) {
+      addFromAssignSections(extras.performCall, ["using", "changing", "tables"]);
+    }
+
+    if (extras.form && Array.isArray(extras.form.params)) {
+      for (const param of extras.form.params) {
+        const origins = param && Array.isArray(param.originDecls) ? param.originDecls : [];
+        for (const origin of origins) {
+          addScope(origin);
+        }
+      }
+    }
+
+    const conditionContainers = [];
+    if (extras.ifCondition && Array.isArray(extras.ifCondition.conditions)) {
+      conditionContainers.push(extras.ifCondition.conditions);
+    }
+    if (extras.performCall && Array.isArray(extras.performCall.ifConditions)) {
+      conditionContainers.push(extras.performCall.ifConditions);
+    }
+    if (extras.select) {
+      if (Array.isArray(extras.select.whereConditions)) {
+        conditionContainers.push(extras.select.whereConditions);
+      }
+      if (Array.isArray(extras.select.havingConditions)) {
+        conditionContainers.push(extras.select.havingConditions);
+      }
+    }
+    for (const key of ["readTable", "loopAtItab", "modifyItab", "deleteItab"]) {
+      if (extras[key] && Array.isArray(extras[key].conditions)) {
+        conditionContainers.push(extras[key].conditions);
+      }
+    }
+
+    for (const conditions of conditionContainers) {
+      for (const clause of conditions) {
+        if (!clause || typeof clause !== "object") {
+          continue;
+        }
+        addScope(clause.leftOperandDecl);
+        addScope(clause.rightOperandDecl);
+      }
+    }
+
+    return hints;
+  }
+
+  function sanitizeDeclSyntheticIdToken(value) {
+    return String(value || "")
+      .trim()
+      .replace(/\s+/g, "_")
+      .replace(/[^A-Za-z0-9_:\-./[\]#]/g, "_")
+      .toUpperCase();
+  }
+
+  function pickStructBaseDeclForSynthetic(candidate, context, index) {
+    if (!candidate || !candidate.structUpper || !index || !(index.byNameUpper instanceof Map)) {
+      return null;
+    }
+
+    const candidates = index.byNameUpper.get(candidate.structUpper) || [];
+    const usableCandidates = candidates.filter((decl) => {
+      const objectType = normalizeDeclKeyTokenForSynthetic(decl && decl.objectType);
+      return objectType !== "STRUCT_FIELD" && objectType !== "PATH_DECL" && objectType !== "SYSTEM";
+    });
+    if (!usableCandidates.length) {
+      return null;
+    }
+
+    const preferredScopes = context && context.scopeHints instanceof Set
+      ? Array.from(context.scopeHints.values()).map((value) => String(value || "").trim()).filter(Boolean)
+      : [];
+    const preferredScopeSet = new Set(preferredScopes.map((value) => normalizeDeclKeyTokenForSynthetic(value)));
+    const usageFile = context ? String(context.file || "").trim() : "";
+    const usageLine = context ? (Number(context.lineStart) || 0) : 0;
+
+    const scoreCandidate = (decl) => {
+      const declScope = normalizeDeclKeyTokenForSynthetic(decl.scopeLabel);
+      const declFile = String(decl.file || "").trim();
+      const declLine = Number(decl.lineStart || 0) || 0;
+
+      let score = 0;
+      if (preferredScopeSet.size && preferredScopeSet.has(declScope)) {
+        score += 1000000;
+      }
+      if (usageFile && declFile && usageFile === declFile) {
+        score += 100000;
+      }
+      if (usageLine > 0 && declLine > 0) {
+        if (declLine <= usageLine) {
+          score += 10000;
+          score += Math.max(0, 5000 - Math.abs(usageLine - declLine));
+        } else {
+          score += Math.max(0, 1000 - Math.abs(usageLine - declLine));
+        }
+      }
+      return score;
+    };
+
+    let best = null;
+    let bestScore = Number.NEGATIVE_INFINITY;
+    for (const decl of usableCandidates) {
+      const score = scoreCandidate(decl);
+      if (score > bestScore) {
+        best = decl;
+        bestScore = score;
+      }
+    }
+    return best;
+  }
+
+  function createSyntheticStructFieldDecl(baseDecl, candidate, context) {
+    if (!isDeclLikeRecordForSynthetic(baseDecl) || !candidate) {
+      return null;
+    }
+
+    const scopeLabel = String(baseDecl.scopeLabel || "").trim();
+    if (!scopeLabel) {
+      return null;
+    }
+
+    const fullRef = String(candidate.fullRef || "").trim();
+    const fieldPath = String(candidate.fieldPath || "").trim();
+    if (!fullRef || !fieldPath) {
+      return null;
+    }
+
+    const idScope = sanitizeDeclSyntheticIdToken(scopeLabel) || "NO_SCOPE";
+    const idStruct = sanitizeDeclSyntheticIdToken(baseDecl.name || candidate.structName || "") || "STRUCT";
+    const idField = sanitizeDeclSyntheticIdToken(fieldPath) || "FIELD";
+    const usageFile = context ? String(context.file || "").trim() : "";
+    const usageLine = context ? (Number(context.lineStart) || 0) : 0;
+
+    return {
+      id: `SYNTH:STRUCT_FIELD:${idScope}:${idStruct}:${idField}`,
+      objectType: "STRUCT_FIELD",
+      name: fullRef,
+      file: String(baseDecl.file || usageFile || ""),
+      lineStart: Number(baseDecl.lineStart || usageLine) || null,
+      raw: String(baseDecl.raw || ""),
+      comment: "",
+      scopeId: Number(baseDecl.scopeId || 0) || 0,
+      scopeLabel,
+      scopeType: String(baseDecl.scopeType || ""),
+      scopeName: String(baseDecl.scopeName || ""),
+      structId: baseDecl.id || null,
+      structName: String(baseDecl.name || candidate.structName || ""),
+      structObjectType: String(baseDecl.objectType || "STRUCT"),
+      structLineStart: Number(baseDecl.lineStart || 0) || null,
+      structRaw: String(baseDecl.raw || ""),
+      structComment: String(baseDecl.comment || ""),
+      fieldPath,
+      synthetic: true
+    };
+  }
+
+  function buildSyntheticDeclIndex(data) {
+    const byNameUpper = new Map();
+    const byScopeName = new Map();
+    const sourceDecls = [];
+
+    const pushDecl = (decl) => {
+      if (!isDeclLikeRecordForSynthetic(decl)) {
+        return;
+      }
+      sourceDecls.push(decl);
+    };
+
+    if (data && Array.isArray(data.decls)) {
+      for (const decl of data.decls) {
+        pushDecl(decl);
+      }
+    }
+
+    if (data && Array.isArray(data.objects) && typeof walkObjects === "function") {
+      walkObjects(data.objects, (obj) => {
+        if (!obj || typeof obj !== "object") {
+          return;
+        }
+        const values = obj.values && typeof obj.values === "object" ? obj.values : null;
+        if (values) {
+          for (const entryOrList of Object.values(values)) {
+            const list = Array.isArray(entryOrList) ? entryOrList : [entryOrList];
+            for (const entry of list) {
+              if (!entry || typeof entry !== "object") {
+                continue;
+              }
+              pushDecl(entry.decl);
+            }
+          }
+        }
+      });
+    }
+
+    const addToMaps = (decl) => {
+      const nameUpper = normalizeDeclKeyTokenForSynthetic(decl.name);
+      if (nameUpper) {
+        if (!byNameUpper.has(nameUpper)) {
+          byNameUpper.set(nameUpper, []);
+        }
+        const list = byNameUpper.get(nameUpper);
+        if (!list.includes(decl)) {
+          list.push(decl);
+        }
+      }
+
+      const key = makeDeclScopeNameKeyForSynthetic(decl.scopeLabel, decl.name);
+      if (key && !byScopeName.has(key)) {
+        byScopeName.set(key, decl);
+      }
+    };
+
+    for (const decl of sourceDecls) {
+      addToMaps(decl);
+    }
+
+    return { byNameUpper, byScopeName };
+  }
+
+  function ensureSyntheticStructFieldDeclForEntry(entry, options, index, createdDecls) {
+    if (!entry || typeof entry !== "object" || !options || !index) {
+      return false;
+    }
+
+    const targetProp = String(options.targetProp || "decl");
+    const currentDecl = entry[targetProp];
+    if (isDeclLikeRecordForSynthetic(currentDecl)) {
+      return false;
+    }
+
+    const sourceKeys = Array.isArray(options.sourceKeys) && options.sourceKeys.length
+      ? options.sourceKeys
+      : ["declRef", "value", "name"];
+    let candidate = null;
+    for (const key of sourceKeys) {
+      candidate = extractStructFieldRefForSynthetic(entry[key]);
+      if (candidate) {
+        break;
+      }
+    }
+    if (!candidate) {
+      return false;
+    }
+
+    const baseDecl = pickStructBaseDeclForSynthetic(candidate, options.context, index);
+    if (!baseDecl) {
+      return false;
+    }
+
+    const scopeNameKey = makeDeclScopeNameKeyForSynthetic(baseDecl.scopeLabel, candidate.fullRef);
+    if (!scopeNameKey) {
+      return false;
+    }
+
+    let fieldDecl = index.byScopeName.get(scopeNameKey) || null;
+    if (!fieldDecl) {
+      fieldDecl = createSyntheticStructFieldDecl(baseDecl, candidate, options.context);
+      if (!fieldDecl) {
+        return false;
+      }
+      index.byScopeName.set(scopeNameKey, fieldDecl);
+
+      const nameUpper = normalizeDeclKeyTokenForSynthetic(fieldDecl.name);
+      if (nameUpper) {
+        if (!index.byNameUpper.has(nameUpper)) {
+          index.byNameUpper.set(nameUpper, []);
+        }
+        index.byNameUpper.get(nameUpper).push(fieldDecl);
+      }
+      if (Array.isArray(createdDecls)) {
+        createdDecls.push(fieldDecl);
+      }
+    }
+
+    entry[targetProp] = fieldDecl;
+
+    if (targetProp === "decl" && !String(entry.declRef || "").trim()) {
+      entry.declRef = candidate.fullRef;
+    }
+    if (targetProp === "valueDecl" && !String(entry.valueRef || "").trim()) {
+      entry.valueRef = candidate.fullRef;
+    }
+    if (targetProp === "leftOperandDecl" && !String(entry.leftOperandRef || "").trim()) {
+      entry.leftOperandRef = candidate.fullRef;
+    }
+    if (targetProp === "rightOperandDecl" && !String(entry.rightOperandRef || "").trim()) {
+      entry.rightOperandRef = candidate.fullRef;
+    }
+
+    return true;
+  }
+
+  function augmentSyntheticStructFieldDecls(data) {
+    if (!data || typeof data !== "object" || !Array.isArray(data.objects)) {
+      return 0;
+    }
+
+    const index = buildSyntheticDeclIndex(data);
+    const createdDecls = [];
+
+    const processAssignSections = (container, sections, context) => {
+      for (const sectionName of sections) {
+        const list = container && Array.isArray(container[sectionName]) ? container[sectionName] : [];
+        for (const entry of list) {
+          if (!entry || typeof entry !== "object") {
+            continue;
+          }
+          ensureSyntheticStructFieldDeclForEntry(entry, {
+            targetProp: "valueDecl",
+            sourceKeys: ["valueRef", "declRef", "value", "name"],
+            context
+          }, index, createdDecls);
+        }
+      }
+    };
+
+    const processConditionList = (conditions, context) => {
+      const list = Array.isArray(conditions) ? conditions : [];
+      for (const clause of list) {
+        if (!clause || typeof clause !== "object") {
+          continue;
+        }
+        ensureSyntheticStructFieldDeclForEntry(clause, {
+          targetProp: "leftOperandDecl",
+          sourceKeys: ["leftOperandRef", "leftOperand"],
+          context
+        }, index, createdDecls);
+        ensureSyntheticStructFieldDeclForEntry(clause, {
+          targetProp: "rightOperandDecl",
+          sourceKeys: ["rightOperandRef", "rightOperand"],
+          context
+        }, index, createdDecls);
+      }
+    };
+
+    if (typeof walkObjects === "function") {
+      walkObjects(data.objects, (obj) => {
+        if (!obj || typeof obj !== "object") {
+          return;
+        }
+
+        const context = {
+          file: String(obj.file || ""),
+          lineStart: Number(obj.lineStart || 0) || 0,
+          scopeHints: collectScopeHintsFromObjectForSynthetic(obj)
+        };
+
+        const values = obj.values && typeof obj.values === "object" ? obj.values : null;
+        if (values) {
+          for (const entryOrList of Object.values(values)) {
+            const list = Array.isArray(entryOrList) ? entryOrList : [entryOrList];
+            for (const entry of list) {
+              if (!entry || typeof entry !== "object") {
+                continue;
+              }
+              ensureSyntheticStructFieldDeclForEntry(entry, {
+                targetProp: "decl",
+                sourceKeys: ["declRef", "value", "name"],
+                context
+              }, index, createdDecls);
+            }
+          }
+        }
+
+        const extras = obj.extras && typeof obj.extras === "object" ? obj.extras : null;
+        if (!extras) {
+          return;
+        }
+
+        if (extras.callFunction) {
+          processAssignSections(extras.callFunction, ["exporting", "importing", "changing", "tables", "exceptions"], context);
+        }
+        if (extras.callMethod) {
+          processAssignSections(extras.callMethod, ["exporting", "importing", "changing", "receiving", "exceptions"], context);
+        }
+        if (extras.performCall) {
+          processAssignSections(extras.performCall, ["using", "changing", "tables"], context);
+          processConditionList(extras.performCall.ifConditions, context);
+        }
+
+        if (extras.ifCondition) {
+          processConditionList(extras.ifCondition.conditions, context);
+        }
+
+        if (extras.select) {
+          processConditionList(extras.select.whereConditions, context);
+          processConditionList(extras.select.havingConditions, context);
+        }
+
+        for (const key of ["readTable", "loopAtItab", "modifyItab", "deleteItab"]) {
+          if (extras[key]) {
+            processConditionList(extras[key].conditions, context);
+          }
+        }
+      });
+    }
+
+    if (!Array.isArray(data.decls)) {
+      data.decls = [];
+    }
+    for (const decl of createdDecls) {
+      data.decls.push(decl);
+    }
+
+    return createdDecls.length;
+  }
+
   function parseFromTextarea(fileName) {
     const content = els.inputText.value || "";
     const trimmed = content.trim();
@@ -1414,6 +2421,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         return;
       }
     }
+
+    augmentSyntheticStructFieldDecls(state.data);
 
     state.collapsedIds.clear();
     state.selectedId = "";
@@ -1485,8 +2494,14 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (els.output && typeof handleOutputVirtualScroll === "function") {
       els.output.addEventListener("scroll", handleOutputVirtualScroll, { passive: true });
     }
+    if (els.output) {
+      els.output.addEventListener("click", interceptOutputCodeButtonClick, true);
+    }
     if (els.templatePreviewOutput && typeof handleTemplateVirtualScroll === "function") {
       els.templatePreviewOutput.addEventListener("scroll", handleTemplateVirtualScroll, { passive: true });
+    }
+    if (els.templatePreviewOutput) {
+      els.templatePreviewOutput.addEventListener("click", interceptTemplateCodeButtonClick, true);
     }
 
     if (els.inputGutter) {
@@ -1774,8 +2789,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         return;
       }
 
-      if (state.rightTab === "descriptions" || state.rightTab === "template") {
-        setRightTab("output");
+      if (els.settingsModal && !els.settingsModal.hidden) {
+        closeSettingsModal();
         return;
       }
     });
