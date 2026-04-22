@@ -1,0 +1,2047 @@
+{
+  "file": "legacy-core.abap",
+  "objects": [
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "legacy-core.abap",
+      "keywords": {
+        "stmt": {
+          "label": "stmt",
+          "text": "PARAMETERS"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        }
+      },
+      "lineStart": 3,
+      "objectType": "PARAMETERS",
+      "raw": "PARAMETERS p_user TYPE xubname.",
+      "segmentIndex": 0,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "PARAMETERS",
+            "name": "p_user",
+            "file": "legacy-core.abap",
+            "lineStart": 3,
+            "raw": "PARAMETERS p_user TYPE xubname.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "p_user",
+          "label": "param-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "p_user"
+        },
+        "type": {
+          "codeDesc": "",
+          "label": "type-name",
+          "name": "type",
+          "userDesc": "",
+          "value": "xubname"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "legacy-core.abap",
+      "keywords": {
+        "stmt": {
+          "label": "stmt",
+          "text": "PARAMETERS"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        }
+      },
+      "lineStart": 4,
+      "objectType": "PARAMETERS",
+      "raw": "PARAMETERS p_flag TYPE abap_bool.",
+      "segmentIndex": 0,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "PARAMETERS",
+            "name": "p_flag",
+            "file": "legacy-core.abap",
+            "lineStart": 4,
+            "raw": "PARAMETERS p_flag TYPE abap_bool.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "p_flag",
+          "label": "param-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "p_flag"
+        },
+        "type": {
+          "codeDesc": "",
+          "label": "type-name",
+          "name": "type",
+          "userDesc": "",
+          "value": "abap_bool"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": {
+        "structDef": {
+          "depth": 1,
+          "isDecl": true,
+          "kind": "BEGIN",
+          "rootNameUpper": "TY_USER"
+        }
+      },
+      "file": "legacy-core.abap",
+      "keywords": {
+        "begin-of": {
+          "label": "begin-of",
+          "text": "BEGIN OF"
+        },
+        "stmt": {
+          "label": "stmt",
+          "text": "TYPES"
+        }
+      },
+      "lineStart": 6,
+      "objectType": "TYPES",
+      "raw": "TYPES BEGIN OF ty_user.",
+      "segmentIndex": 0,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "TYPES",
+            "name": "ty_user",
+            "file": "legacy-core.abap",
+            "lineStart": 6,
+            "raw": "TYPES BEGIN OF ty_user.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "ty_user",
+          "label": "type-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "ty_user"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": {
+        "structDef": {
+          "depth": 1,
+          "isDecl": false,
+          "kind": "FIELD",
+          "rootNameUpper": "TY_USER"
+        }
+      },
+      "file": "legacy-core.abap",
+      "keywords": {
+        "stmt": {
+          "label": "stmt",
+          "text": "TYPES"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        }
+      },
+      "lineStart": 7,
+      "objectType": "TYPES",
+      "raw": "TYPES uname TYPE xubname.",
+      "segmentIndex": 0,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "label": "type-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "uname"
+        },
+        "type": {
+          "codeDesc": "",
+          "label": "type",
+          "name": "type",
+          "userDesc": "",
+          "value": "xubname"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": {
+        "structDef": {
+          "depth": 1,
+          "isDecl": false,
+          "kind": "FIELD",
+          "rootNameUpper": "TY_USER"
+        }
+      },
+      "file": "legacy-core.abap",
+      "keywords": {
+        "stmt": {
+          "label": "stmt",
+          "text": "TYPES"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        }
+      },
+      "lineStart": 8,
+      "objectType": "TYPES",
+      "raw": "TYPES active TYPE abap_bool.",
+      "segmentIndex": 0,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "label": "type-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "active"
+        },
+        "type": {
+          "codeDesc": "",
+          "label": "type",
+          "name": "type",
+          "userDesc": "",
+          "value": "abap_bool"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": {
+        "structDef": {
+          "depth": 1,
+          "isDecl": false,
+          "kind": "FIELD",
+          "rootNameUpper": "TY_USER"
+        }
+      },
+      "file": "legacy-core.abap",
+      "keywords": {
+        "stmt": {
+          "label": "stmt",
+          "text": "TYPES"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        }
+      },
+      "lineStart": 9,
+      "objectType": "TYPES",
+      "raw": "TYPES city TYPE string.",
+      "segmentIndex": 0,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "label": "type-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "city"
+        },
+        "type": {
+          "codeDesc": "",
+          "label": "type",
+          "name": "type",
+          "userDesc": "",
+          "value": "string"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": {
+        "structDef": {
+          "depth": 1,
+          "isDecl": false,
+          "kind": "END",
+          "rootNameUpper": "TY_USER"
+        }
+      },
+      "file": "legacy-core.abap",
+      "keywords": {
+        "end-of": {
+          "label": "end-of",
+          "text": "END OF"
+        },
+        "stmt": {
+          "label": "stmt",
+          "text": "TYPES"
+        }
+      },
+      "lineStart": 10,
+      "objectType": "TYPES",
+      "raw": "TYPES END OF ty_user.",
+      "segmentIndex": 0,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "TYPES",
+            "name": "ty_user",
+            "file": "legacy-core.abap",
+            "lineStart": 6,
+            "raw": "TYPES BEGIN OF ty_user.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "ty_user",
+          "label": "type-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "ty_user"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "legacy-core.abap",
+      "keywords": {
+        "of": {
+          "label": "of",
+          "text": "OF"
+        },
+        "stmt": {
+          "label": "stmt",
+          "text": "DATA"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        }
+      },
+      "lineStart": 12,
+      "objectType": "DATA",
+      "raw": "DATA gt_users TYPE STANDARD TABLE OF ty_user.",
+      "segmentIndex": 0,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "gt_users",
+            "file": "legacy-core.abap",
+            "lineStart": 12,
+            "raw": "DATA gt_users TYPE STANDARD TABLE OF ty_user.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "gt_users",
+          "label": "var-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "gt_users"
+        },
+        "type": {
+          "codeDesc": "",
+          "label": "type-name",
+          "name": "type",
+          "userDesc": "",
+          "value": "STANDARD"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "legacy-core.abap",
+      "keywords": {
+        "stmt": {
+          "label": "stmt",
+          "text": "DATA"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        }
+      },
+      "lineStart": 13,
+      "objectType": "DATA",
+      "raw": "DATA gs_ctx TYPE ty_user.",
+      "segmentIndex": 0,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "gs_ctx",
+            "file": "legacy-core.abap",
+            "lineStart": 13,
+            "raw": "DATA gs_ctx TYPE ty_user.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "gs_ctx",
+          "label": "var-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "gs_ctx"
+        },
+        "type": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "TYPES",
+            "name": "ty_user",
+            "file": "legacy-core.abap",
+            "lineStart": 6,
+            "raw": "TYPES BEGIN OF ty_user.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "ty_user",
+          "label": "type-name",
+          "name": "type",
+          "userDesc": "",
+          "value": "ty_user"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "legacy-core.abap",
+      "keywords": {
+        "stmt": {
+          "label": "stmt",
+          "text": "DATA"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        }
+      },
+      "lineStart": 14,
+      "objectType": "DATA",
+      "raw": "DATA lv_result TYPE string.",
+      "segmentIndex": 0,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "lv_result",
+            "file": "legacy-core.abap",
+            "lineStart": 14,
+            "raw": "DATA lv_result TYPE string.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "lv_result",
+          "label": "var-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "lv_result"
+        },
+        "type": {
+          "codeDesc": "",
+          "label": "type-name",
+          "name": "type",
+          "userDesc": "",
+          "value": "string"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "legacy-core.abap",
+      "keywords": {
+        "stmt": {
+          "label": "stmt",
+          "text": "DATA"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        }
+      },
+      "lineStart": 15,
+      "objectType": "DATA",
+      "raw": "DATA lv_a TYPE i.",
+      "segmentIndex": 0,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "lv_a",
+            "file": "legacy-core.abap",
+            "lineStart": 15,
+            "raw": "DATA lv_a TYPE i.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "lv_a",
+          "label": "var-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "lv_a"
+        },
+        "type": {
+          "codeDesc": "",
+          "label": "type-name",
+          "name": "type",
+          "userDesc": "",
+          "value": "i"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "legacy-core.abap",
+      "keywords": {
+        "stmt": {
+          "label": "stmt",
+          "text": "DATA"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        }
+      },
+      "lineStart": 15,
+      "objectType": "DATA",
+      "raw": "DATA lv_b TYPE i.",
+      "segmentIndex": 1,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "lv_b",
+            "file": "legacy-core.abap",
+            "lineStart": 15,
+            "raw": "DATA lv_b TYPE i.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "lv_b",
+          "label": "var-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "lv_b"
+        },
+        "type": {
+          "codeDesc": "",
+          "label": "type-name",
+          "name": "type",
+          "userDesc": "",
+          "value": "i"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "legacy-core.abap",
+      "keywords": {
+        "assign": {
+          "label": "assign",
+          "text": "="
+        }
+      },
+      "lineStart": 15,
+      "objectType": "ASSIGNMENT",
+      "raw": "lv_a = 1.",
+      "segmentIndex": 2,
+      "values": {
+        "expr": {
+          "codeDesc": "",
+          "label": "expr",
+          "name": "expr",
+          "userDesc": "",
+          "value": "1"
+        },
+        "op": {
+          "codeDesc": "",
+          "label": "op",
+          "name": "op",
+          "userDesc": "",
+          "value": "="
+        },
+        "target": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "lv_a",
+            "file": "legacy-core.abap",
+            "lineStart": 15,
+            "raw": "DATA lv_a TYPE i.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "lv_a",
+          "label": "target",
+          "name": "target",
+          "userDesc": "",
+          "value": "lv_a"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "legacy-core.abap",
+      "keywords": {
+        "assign": {
+          "label": "assign",
+          "text": "="
+        }
+      },
+      "lineStart": 15,
+      "objectType": "ASSIGNMENT",
+      "raw": "lv_b = 2.",
+      "segmentIndex": 3,
+      "values": {
+        "expr": {
+          "codeDesc": "",
+          "label": "expr",
+          "name": "expr",
+          "userDesc": "",
+          "value": "2"
+        },
+        "op": {
+          "codeDesc": "",
+          "label": "op",
+          "name": "op",
+          "userDesc": "",
+          "value": "="
+        },
+        "target": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "lv_b",
+            "file": "legacy-core.abap",
+            "lineStart": 15,
+            "raw": "DATA lv_b TYPE i.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "lv_b",
+          "label": "target",
+          "name": "target",
+          "userDesc": "",
+          "value": "lv_b"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "legacy-core.abap",
+      "keywords": {
+        "stmt": {
+          "label": "stmt",
+          "text": "DATA"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        },
+        "value": {
+          "label": "value",
+          "text": "VALUE"
+        }
+      },
+      "lineStart": 16,
+      "objectType": "DATA",
+      "raw": "DATA lv_text TYPE string VALUE |A, B|.",
+      "segmentIndex": 0,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "lv_text",
+            "file": "legacy-core.abap",
+            "lineStart": 16,
+            "raw": "DATA lv_text TYPE string VALUE |A, B|.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "lv_text",
+          "label": "var-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "lv_text"
+        },
+        "type": {
+          "codeDesc": "",
+          "label": "type-name",
+          "name": "type",
+          "userDesc": "",
+          "value": "string"
+        },
+        "value": {
+          "codeDesc": "",
+          "label": "value",
+          "name": "value",
+          "userDesc": "",
+          "value": "|A, B|"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "legacy-core.abap",
+      "keywords": {
+        "stmt": {
+          "label": "stmt",
+          "text": "DATA"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        },
+        "value": {
+          "label": "value",
+          "text": "VALUE"
+        }
+      },
+      "lineStart": 17,
+      "objectType": "DATA",
+      "raw": "DATA lv_other TYPE string VALUE |C|.",
+      "segmentIndex": 0,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "lv_other",
+            "file": "legacy-core.abap",
+            "lineStart": 17,
+            "raw": "DATA lv_other TYPE string VALUE |C|.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "lv_other",
+          "label": "var-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "lv_other"
+        },
+        "type": {
+          "codeDesc": "",
+          "label": "type-name",
+          "name": "type",
+          "userDesc": "",
+          "value": "string"
+        },
+        "value": {
+          "codeDesc": "",
+          "label": "value",
+          "name": "value",
+          "userDesc": "",
+          "value": "|C|"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "legacy-core.abap",
+      "keywords": {
+        "assign": {
+          "label": "assign",
+          "text": "="
+        }
+      },
+      "lineStart": 19,
+      "objectType": "ASSIGNMENT",
+      "raw": "lv_result = 1.5.",
+      "segmentIndex": 0,
+      "values": {
+        "expr": {
+          "codeDesc": "",
+          "label": "expr",
+          "name": "expr",
+          "userDesc": "",
+          "value": "1.5"
+        },
+        "op": {
+          "codeDesc": "",
+          "label": "op",
+          "name": "op",
+          "userDesc": "",
+          "value": "="
+        },
+        "target": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "lv_result",
+            "file": "legacy-core.abap",
+            "lineStart": 14,
+            "raw": "DATA lv_result TYPE string.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "lv_result",
+          "label": "target",
+          "name": "target",
+          "userDesc": "",
+          "value": "lv_result"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": {
+        "callMethod": {
+          "changing": [],
+          "exceptions": [],
+          "exporting": [
+            {
+              "name": "iv_user",
+              "originDecls": [
+                {
+                  "objectType": "PARAMETERS",
+                  "name": "p_user",
+                  "file": "legacy-core.abap",
+                  "lineStart": 3,
+                  "raw": "PARAMETERS p_user TYPE xubname.",
+                  "comment": "",
+                  "scopeLabel": "GLOBAL",
+                  "scopeType": "GLOBAL",
+                  "scopeName": "",
+                  "structName": "",
+                  "structObjectType": "",
+                  "structLineStart": 0,
+                  "fieldPath": "",
+                  "traceFile": "",
+                  "traceLineStart": 0,
+                  "synthetic": false
+                }
+              ],
+              "value": "p_user",
+              "valueDecl": {
+                "objectType": "PARAMETERS",
+                "name": "p_user",
+                "file": "legacy-core.abap",
+                "lineStart": 3,
+                "raw": "PARAMETERS p_user TYPE xubname.",
+                "comment": "",
+                "scopeLabel": "GLOBAL",
+                "scopeType": "GLOBAL",
+                "scopeName": "",
+                "structName": "",
+                "structObjectType": "",
+                "structLineStart": 0,
+                "fieldPath": "",
+                "traceFile": "",
+                "traceLineStart": 0,
+                "synthetic": false
+              },
+              "valueRef": "p_user"
+            }
+          ],
+          "importing": [],
+          "receiving": [
+            {
+              "name": "result",
+              "originDecls": [
+                {
+                  "objectType": "DATA",
+                  "name": "lv_result",
+                  "file": "legacy-core.abap",
+                  "lineStart": 14,
+                  "raw": "DATA lv_result TYPE string.",
+                  "comment": "",
+                  "scopeLabel": "GLOBAL",
+                  "scopeType": "GLOBAL",
+                  "scopeName": "",
+                  "structName": "",
+                  "structObjectType": "",
+                  "structLineStart": 0,
+                  "fieldPath": "",
+                  "traceFile": "",
+                  "traceLineStart": 0,
+                  "synthetic": false
+                }
+              ],
+              "value": "lv_result )",
+              "valueDecl": {
+                "objectType": "DATA",
+                "name": "lv_result",
+                "file": "legacy-core.abap",
+                "lineStart": 14,
+                "raw": "DATA lv_result TYPE string.",
+                "comment": "",
+                "scopeLabel": "GLOBAL",
+                "scopeType": "GLOBAL",
+                "scopeName": "",
+                "structName": "",
+                "structObjectType": "",
+                "structLineStart": 0,
+                "fieldPath": "",
+                "traceFile": "",
+                "traceLineStart": 0,
+                "synthetic": false
+              },
+              "valueRef": "lv_result"
+            }
+          ],
+          "target": "lcl_demo=>get_default("
+        }
+      },
+      "file": "legacy-core.abap",
+      "keywords": {
+        "call-method": {
+          "label": "call-method",
+          "text": "CALL METHOD"
+        },
+        "exporting": {
+          "label": "exporting",
+          "text": "EXPORTING"
+        },
+        "receiving": {
+          "label": "receiving",
+          "text": "RECEIVING"
+        }
+      },
+      "lineStart": 21,
+      "objectType": "CALL_METHOD",
+      "raw": "CALL METHOD lcl_demo=>get_default( EXPORTING iv_user = p_user RECEIVING result = lv_result ).",
+      "segmentIndex": 0,
+      "values": {
+        "exportingRaw": {
+          "codeDesc": "",
+          "label": "exporting",
+          "name": "exportingRaw",
+          "userDesc": "",
+          "value": "iv_user = p_user"
+        },
+        "receivingRaw": {
+          "codeDesc": "",
+          "label": "receiving",
+          "name": "receivingRaw",
+          "userDesc": "",
+          "value": "result = lv_result )"
+        },
+        "target": {
+          "codeDesc": "",
+          "label": "target",
+          "name": "target",
+          "userDesc": "",
+          "value": "lcl_demo=>get_default("
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": {
+        "readTable": {
+          "assigning": "",
+          "conditions": [
+            {
+              "comparisonOperator": "=",
+              "leftOperand": "uname",
+              "leftOperandDecl": {
+                "objectType": "CONDITION_VALUE",
+                "name": "uname",
+                "file": "",
+                "lineStart": 0,
+                "raw": "uname",
+                "comment": "",
+                "scopeLabel": "CONDITION",
+                "scopeType": "SYSTEM",
+                "scopeName": "",
+                "structName": "",
+                "structObjectType": "",
+                "structLineStart": 0,
+                "fieldPath": "",
+                "traceFile": "",
+                "traceLineStart": 0,
+                "synthetic": false
+              },
+              "leftOperandRef": "uname",
+              "logicalConnector": "AND",
+              "rightOperand": "p_user",
+              "rightOperandDecl": {
+                "objectType": "PARAMETERS",
+                "name": "p_user",
+                "file": "legacy-core.abap",
+                "lineStart": 3,
+                "raw": "PARAMETERS p_user TYPE xubname.",
+                "comment": "",
+                "scopeLabel": "GLOBAL",
+                "scopeType": "GLOBAL",
+                "scopeName": "",
+                "structName": "",
+                "structObjectType": "",
+                "structLineStart": 0,
+                "fieldPath": "",
+                "traceFile": "",
+                "traceLineStart": 0,
+                "synthetic": false
+              },
+              "rightOperandRef": "p_user"
+            },
+            {
+              "comparisonOperator": "=",
+              "leftOperand": "active",
+              "leftOperandDecl": {
+                "objectType": "CONDITION_VALUE",
+                "name": "active",
+                "file": "",
+                "lineStart": 0,
+                "raw": "active",
+                "comment": "",
+                "scopeLabel": "CONDITION",
+                "scopeType": "SYSTEM",
+                "scopeName": "",
+                "structName": "",
+                "structObjectType": "",
+                "structLineStart": 0,
+                "fieldPath": "",
+                "traceFile": "",
+                "traceLineStart": 0,
+                "synthetic": false
+              },
+              "leftOperandRef": "active",
+              "logicalConnector": "",
+              "rightOperand": "p_flag",
+              "rightOperandDecl": {
+                "objectType": "PARAMETERS",
+                "name": "p_flag",
+                "file": "legacy-core.abap",
+                "lineStart": 4,
+                "raw": "PARAMETERS p_flag TYPE abap_bool.",
+                "comment": "",
+                "scopeLabel": "GLOBAL",
+                "scopeType": "GLOBAL",
+                "scopeName": "",
+                "structName": "",
+                "structObjectType": "",
+                "structLineStart": 0,
+                "fieldPath": "",
+                "traceFile": "",
+                "traceLineStart": 0,
+                "synthetic": false
+              },
+              "rightOperandRef": "p_flag"
+            }
+          ],
+          "index": "",
+          "into": "gs_ctx",
+          "itab": "gt_users",
+          "refInto": "",
+          "withKeyRaw": "uname = p_user active = p_flag",
+          "withTableKeyRaw": ""
+        }
+      },
+      "file": "legacy-core.abap",
+      "keywords": {
+        "into": {
+          "label": "into",
+          "text": "INTO"
+        },
+        "read-table": {
+          "label": "read-table",
+          "text": "READ TABLE"
+        },
+        "with-key": {
+          "label": "with-key",
+          "text": "WITH KEY"
+        }
+      },
+      "lineStart": 27,
+      "objectType": "READ_TABLE",
+      "raw": "READ TABLE gt_users INTO gs_ctx WITH KEY uname = p_user active = p_flag.",
+      "segmentIndex": 0,
+      "values": {
+        "into": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "gs_ctx",
+            "file": "legacy-core.abap",
+            "lineStart": 13,
+            "raw": "DATA gs_ctx TYPE ty_user.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "gs_ctx",
+          "label": "into",
+          "name": "into",
+          "userDesc": "",
+          "value": "gs_ctx"
+        },
+        "itab": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "gt_users",
+            "file": "legacy-core.abap",
+            "lineStart": 12,
+            "raw": "DATA gt_users TYPE STANDARD TABLE OF ty_user.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "gt_users",
+          "label": "itab",
+          "name": "itab",
+          "userDesc": "",
+          "value": "gt_users"
+        },
+        "withKey": {
+          "codeDesc": "",
+          "label": "with-key",
+          "name": "withKey",
+          "userDesc": "",
+          "value": "uname = p_user active = p_flag"
+        }
+      }
+    },
+    {
+      "block": {
+        "endKeyword": "ENDIF",
+        "endRaw": "ENDIF.",
+        "lineEnd": 32
+      },
+      "children": [
+        {
+          "block": null,
+          "children": [],
+          "comment": "",
+          "extras": {
+            "performCall": {
+              "changing": [],
+              "form": "frm_use_ctx",
+              "ifCondition": "",
+              "ifConditions": [],
+              "program": "",
+              "tables": [],
+              "using": [
+                {
+                  "originDecls": [
+                    {
+                      "objectType": "DATA",
+                      "name": "gs_ctx",
+                      "file": "legacy-core.abap",
+                      "lineStart": 13,
+                      "raw": "DATA gs_ctx TYPE ty_user.",
+                      "comment": "",
+                      "scopeLabel": "GLOBAL",
+                      "scopeType": "GLOBAL",
+                      "scopeName": "",
+                      "structName": "",
+                      "structObjectType": "",
+                      "structLineStart": 0,
+                      "fieldPath": "",
+                      "traceFile": "",
+                      "traceLineStart": 0,
+                      "synthetic": false
+                    }
+                  ],
+                  "value": "gs_ctx",
+                  "valueDecl": {
+                    "objectType": "DATA",
+                    "name": "gs_ctx",
+                    "file": "legacy-core.abap",
+                    "lineStart": 13,
+                    "raw": "DATA gs_ctx TYPE ty_user.",
+                    "comment": "",
+                    "scopeLabel": "GLOBAL",
+                    "scopeType": "GLOBAL",
+                    "scopeName": "",
+                    "structName": "",
+                    "structObjectType": "",
+                    "structLineStart": 0,
+                    "fieldPath": "",
+                    "traceFile": "",
+                    "traceLineStart": 0,
+                    "synthetic": false
+                  },
+                  "valueRef": "gs_ctx"
+                }
+              ]
+            }
+          },
+          "file": "legacy-core.abap",
+          "keywords": {
+            "stmt": {
+              "label": "stmt",
+              "text": "PERFORM"
+            },
+            "using": {
+              "label": "using",
+              "text": "USING"
+            }
+          },
+          "lineStart": 31,
+          "objectType": "PERFORM",
+          "raw": "PERFORM frm_use_ctx USING gs_ctx.",
+          "segmentIndex": 0,
+          "values": {
+            "form": {
+              "codeDesc": "",
+              "label": "form-name",
+              "name": "form",
+              "userDesc": "",
+              "value": "frm_use_ctx"
+            },
+            "usingRaw": {
+              "codeDesc": "",
+              "decl": {
+                "objectType": "DATA",
+                "name": "gs_ctx",
+                "file": "legacy-core.abap",
+                "lineStart": 13,
+                "raw": "DATA gs_ctx TYPE ty_user.",
+                "comment": "",
+                "scopeLabel": "GLOBAL",
+                "scopeType": "GLOBAL",
+                "scopeName": "",
+                "structName": "",
+                "structObjectType": "",
+                "structLineStart": 0,
+                "fieldPath": "",
+                "traceFile": "",
+                "traceLineStart": 0,
+                "synthetic": false
+              },
+              "declRef": "gs_ctx",
+              "label": "using",
+              "name": "usingRaw",
+              "userDesc": "",
+              "value": "gs_ctx"
+            }
+          }
+        }
+      ],
+      "comment": "",
+      "extras": {
+        "ifCondition": {
+          "conditionRaw": "p_user = p_user AND p_flag = abap_true",
+          "conditions": [
+            {
+              "comparisonOperator": "=",
+              "leftOperand": "p_user",
+              "leftOperandDecl": {
+                "objectType": "PARAMETERS",
+                "name": "p_user",
+                "file": "legacy-core.abap",
+                "lineStart": 3,
+                "raw": "PARAMETERS p_user TYPE xubname.",
+                "comment": "",
+                "scopeLabel": "GLOBAL",
+                "scopeType": "GLOBAL",
+                "scopeName": "",
+                "structName": "",
+                "structObjectType": "",
+                "structLineStart": 0,
+                "fieldPath": "",
+                "traceFile": "",
+                "traceLineStart": 0,
+                "synthetic": false
+              },
+              "leftOperandRef": "p_user",
+              "logicalConnector": "AND",
+              "rightOperand": "p_user",
+              "rightOperandDecl": {
+                "objectType": "PARAMETERS",
+                "name": "p_user",
+                "file": "legacy-core.abap",
+                "lineStart": 3,
+                "raw": "PARAMETERS p_user TYPE xubname.",
+                "comment": "",
+                "scopeLabel": "GLOBAL",
+                "scopeType": "GLOBAL",
+                "scopeName": "",
+                "structName": "",
+                "structObjectType": "",
+                "structLineStart": 0,
+                "fieldPath": "",
+                "traceFile": "",
+                "traceLineStart": 0,
+                "synthetic": false
+              },
+              "rightOperandRef": "p_user"
+            },
+            {
+              "comparisonOperator": "=",
+              "leftOperand": "p_flag",
+              "leftOperandDecl": {
+                "objectType": "PARAMETERS",
+                "name": "p_flag",
+                "file": "legacy-core.abap",
+                "lineStart": 4,
+                "raw": "PARAMETERS p_flag TYPE abap_bool.",
+                "comment": "",
+                "scopeLabel": "GLOBAL",
+                "scopeType": "GLOBAL",
+                "scopeName": "",
+                "structName": "",
+                "structObjectType": "",
+                "structLineStart": 0,
+                "fieldPath": "",
+                "traceFile": "",
+                "traceLineStart": 0,
+                "synthetic": false
+              },
+              "leftOperandRef": "p_flag",
+              "logicalConnector": "",
+              "rightOperand": "abap_true",
+              "rightOperandDecl": {
+                "objectType": "SYSTEM",
+                "name": "ABAP_TRUE",
+                "file": "",
+                "lineStart": 0,
+                "raw": "",
+                "comment": "",
+                "scopeLabel": "SYSTEM",
+                "scopeType": "SYSTEM",
+                "scopeName": "",
+                "structName": "",
+                "structObjectType": "",
+                "structLineStart": 0,
+                "fieldPath": "",
+                "traceFile": "",
+                "traceLineStart": 0,
+                "synthetic": false
+              },
+              "rightOperandRef": "abap_true"
+            }
+          ]
+        }
+      },
+      "file": "legacy-core.abap",
+      "keywords": {
+        "and": {
+          "label": "and",
+          "text": "AND"
+        },
+        "stmt": {
+          "label": "stmt",
+          "text": "IF"
+        }
+      },
+      "lineStart": 30,
+      "objectType": "IF",
+      "raw": "IF p_user = p_user AND p_flag = abap_true.",
+      "segmentIndex": 0,
+      "values": {
+        "condition": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "PARAMETERS",
+            "name": "p_user",
+            "file": "legacy-core.abap",
+            "lineStart": 3,
+            "raw": "PARAMETERS p_user TYPE xubname.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "p_user",
+          "label": "condition",
+          "name": "condition",
+          "userDesc": "",
+          "value": "p_user = p_user AND p_flag = abap_true"
+        }
+      }
+    },
+    {
+      "block": {
+        "endKeyword": "ENDFORM",
+        "endRaw": "ENDFORM.",
+        "lineEnd": 38
+      },
+      "children": [
+        {
+          "block": {
+            "endKeyword": "ENDIF",
+            "endRaw": "ENDIF.",
+            "lineEnd": 37
+          },
+          "children": [
+            {
+              "block": null,
+              "children": [],
+              "comment": "",
+              "extras": null,
+              "file": "legacy-core.abap",
+              "keywords": {
+                "assign": {
+                  "label": "assign",
+                  "text": "="
+                }
+              },
+              "lineStart": 36,
+              "objectType": "ASSIGNMENT",
+              "raw": "is_ctx-city = |City: { is_ctx-uname }|.",
+              "segmentIndex": 0,
+              "values": {
+                "expr": {
+                  "codeDesc": "",
+                  "label": "expr",
+                  "name": "expr",
+                  "userDesc": "",
+                  "value": "|City: { is_ctx-uname }|"
+                },
+                "op": {
+                  "codeDesc": "",
+                  "label": "op",
+                  "name": "op",
+                  "userDesc": "",
+                  "value": "="
+                },
+                "target": {
+                  "codeDesc": "",
+                  "label": "target",
+                  "name": "target",
+                  "userDesc": "",
+                  "value": "is_ctx-city"
+                }
+              }
+            }
+          ],
+          "comment": "",
+          "extras": {
+            "ifCondition": {
+              "conditionRaw": "is_ctx-uname IS NOT INITIAL",
+              "conditions": [
+                {
+                  "comparisonOperator": "IS",
+                  "leftOperand": "is_ctx-uname",
+                  "leftOperandDecl": {
+                    "objectType": "CONDITION_VALUE",
+                    "name": "is_ctx-uname",
+                    "file": "",
+                    "lineStart": 0,
+                    "raw": "is_ctx-uname",
+                    "comment": "",
+                    "scopeLabel": "CONDITION",
+                    "scopeType": "SYSTEM",
+                    "scopeName": "",
+                    "structName": "",
+                    "structObjectType": "",
+                    "structLineStart": 0,
+                    "fieldPath": "",
+                    "traceFile": "",
+                    "traceLineStart": 0,
+                    "synthetic": false
+                  },
+                  "leftOperandRef": "is_ctx-uname",
+                  "logicalConnector": "",
+                  "rightOperand": "NOT INITIAL",
+                  "rightOperandDecl": {
+                    "objectType": "SYSTEM",
+                    "name": "NOT INITIAL",
+                    "file": "",
+                    "lineStart": 0,
+                    "raw": "",
+                    "comment": "",
+                    "scopeLabel": "SYSTEM",
+                    "scopeType": "SYSTEM",
+                    "scopeName": "",
+                    "structName": "",
+                    "structObjectType": "",
+                    "structLineStart": 0,
+                    "fieldPath": "",
+                    "traceFile": "",
+                    "traceLineStart": 0,
+                    "synthetic": false
+                  }
+                }
+              ]
+            }
+          },
+          "file": "legacy-core.abap",
+          "keywords": {
+            "initial": {
+              "label": "initial",
+              "text": "INITIAL"
+            },
+            "is": {
+              "label": "is",
+              "text": "IS"
+            },
+            "not": {
+              "label": "not",
+              "text": "NOT"
+            },
+            "stmt": {
+              "label": "stmt",
+              "text": "IF"
+            }
+          },
+          "lineStart": 35,
+          "objectType": "IF",
+          "raw": "IF is_ctx-uname IS NOT INITIAL.",
+          "segmentIndex": 0,
+          "values": {
+            "condition": {
+              "codeDesc": "",
+              "label": "condition",
+              "name": "condition",
+              "userDesc": "",
+              "value": "is_ctx-uname IS NOT INITIAL"
+            }
+          }
+        }
+      ],
+      "comment": "",
+      "extras": {
+        "form": {
+          "exceptions": [],
+          "name": "frm_use_ctx",
+          "nameFromComment": "",
+          "params": [
+            {
+              "doc": null,
+              "name": "is_ctx",
+              "originDecls": [
+                {
+                  "objectType": "DATA",
+                  "name": "gs_ctx",
+                  "file": "legacy-core.abap",
+                  "lineStart": 13,
+                  "raw": "DATA gs_ctx TYPE ty_user.",
+                  "comment": "",
+                  "scopeLabel": "GLOBAL",
+                  "scopeType": "GLOBAL",
+                  "scopeName": "",
+                  "structName": "",
+                  "structObjectType": "",
+                  "structLineStart": 0,
+                  "fieldPath": "",
+                  "traceFile": "",
+                  "traceLineStart": 0,
+                  "synthetic": false
+                }
+              ],
+              "section": "USING",
+              "typing": {
+                "kind": "TYPE",
+                "value": "ty_user"
+              }
+            }
+          ]
+        }
+      },
+      "file": "legacy-core.abap",
+      "keywords": {
+        "stmt": {
+          "label": "stmt",
+          "text": "FORM"
+        },
+        "using": {
+          "label": "using",
+          "text": "USING"
+        }
+      },
+      "lineStart": 34,
+      "objectType": "FORM",
+      "raw": "FORM frm_use_ctx USING is_ctx TYPE ty_user.",
+      "segmentIndex": 0,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "label": "form-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "frm_use_ctx"
+        },
+        "usingRaw": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "FORM_PARAM",
+            "name": "is_ctx",
+            "file": "legacy-core.abap",
+            "lineStart": 34,
+            "raw": "FORM frm_use_ctx USING is_ctx TYPE ty_user.",
+            "comment": "",
+            "scopeLabel": "FORM:FRM_USE_CTX",
+            "scopeType": "FORM",
+            "scopeName": "frm_use_ctx",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "is_ctx",
+          "label": "using",
+          "name": "usingRaw",
+          "userDesc": "",
+          "value": "is_ctx TYPE ty_user"
+        }
+      }
+    }
+  ],
+  "decls": [
+    {
+      "objectType": "PARAMETERS",
+      "name": "p_user",
+      "file": "legacy-core.abap",
+      "lineStart": 3,
+      "raw": "PARAMETERS p_user TYPE xubname.",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "PARAMETERS",
+      "name": "p_flag",
+      "file": "legacy-core.abap",
+      "lineStart": 4,
+      "raw": "PARAMETERS p_flag TYPE abap_bool.",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "TYPES",
+      "name": "ty_user",
+      "file": "legacy-core.abap",
+      "lineStart": 6,
+      "raw": "TYPES BEGIN OF ty_user.",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "DATA",
+      "name": "gt_users",
+      "file": "legacy-core.abap",
+      "lineStart": 12,
+      "raw": "DATA gt_users TYPE STANDARD TABLE OF ty_user.",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "DATA",
+      "name": "gs_ctx",
+      "file": "legacy-core.abap",
+      "lineStart": 13,
+      "raw": "DATA gs_ctx TYPE ty_user.",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "DATA",
+      "name": "lv_result",
+      "file": "legacy-core.abap",
+      "lineStart": 14,
+      "raw": "DATA lv_result TYPE string.",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "DATA",
+      "name": "lv_a",
+      "file": "legacy-core.abap",
+      "lineStart": 15,
+      "raw": "DATA lv_a TYPE i.",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "DATA",
+      "name": "lv_b",
+      "file": "legacy-core.abap",
+      "lineStart": 15,
+      "raw": "DATA lv_b TYPE i.",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "DATA",
+      "name": "lv_text",
+      "file": "legacy-core.abap",
+      "lineStart": 16,
+      "raw": "DATA lv_text TYPE string VALUE |A, B|.",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "DATA",
+      "name": "lv_other",
+      "file": "legacy-core.abap",
+      "lineStart": 17,
+      "raw": "DATA lv_other TYPE string VALUE |C|.",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "STRUCT_FIELD",
+      "name": "gs_ctx-uname",
+      "file": "legacy-core.abap",
+      "lineStart": 7,
+      "raw": "uname TYPE xubname",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "gs_ctx",
+      "structObjectType": "DATA",
+      "structLineStart": 13,
+      "fieldPath": "uname",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "STRUCT_FIELD",
+      "name": "gs_ctx-active",
+      "file": "legacy-core.abap",
+      "lineStart": 8,
+      "raw": "active TYPE abap_bool",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "gs_ctx",
+      "structObjectType": "DATA",
+      "structLineStart": 13,
+      "fieldPath": "active",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "STRUCT_FIELD",
+      "name": "gs_ctx-city",
+      "file": "legacy-core.abap",
+      "lineStart": 9,
+      "raw": "city TYPE string",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "gs_ctx",
+      "structObjectType": "DATA",
+      "structLineStart": 13,
+      "fieldPath": "city",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "FORM_PARAM",
+      "name": "is_ctx",
+      "file": "legacy-core.abap",
+      "lineStart": 34,
+      "raw": "FORM frm_use_ctx USING is_ctx TYPE ty_user.",
+      "comment": "",
+      "scopeLabel": "FORM:FRM_USE_CTX",
+      "scopeType": "FORM",
+      "scopeName": "frm_use_ctx",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    }
+  ]
+}

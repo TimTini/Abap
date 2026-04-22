@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.03.04-r12">
-  <meta name="abap-viewer-updated-at" content="2026-03-04 22:33:26">
-  <meta name="abap-viewer-updated-note" content="Code button now jumps Input reliably and no longer forces Output/Template block selection/auto-scroll.">
+  <meta name="abap-viewer-version" content="v2026.04.21-r26">
+  <meta name="abap-viewer-updated-at" content="2026-04-21 18:51:26">
+  <meta name="abap-viewer-updated-note" content="Template Builder grid now matches Template Preview square cell sizing.">
   <title>ABAP Parser Viewer</title>
   <style>
     :root {
@@ -590,13 +590,33 @@
       min-width: 56px;
       max-width: 360px;
       border: none;
-      padding: 4px 6px;
-      vertical-align: top;
+      padding: 2px 3px;
+      vertical-align: middle;
       white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      line-height: 1.1;
       font-size: 10pt;
       font-family: "MS PGothic", "MS UI Gothic", Meiryo, sans-serif;
       color: #111111;
       background: #ffffff;
+    }
+
+    .template-preview-table td.template-preview-editable {
+      cursor: pointer;
+      position: relative;
+      transition: box-shadow 0.12s ease, background-image 0.12s ease;
+    }
+
+    .template-preview-table td.template-preview-editable:hover {
+      background-image: linear-gradient(rgba(96, 165, 250, 0.1), rgba(96, 165, 250, 0.1));
+      box-shadow: inset 0 0 0 2px rgba(31, 122, 224, 0.35);
+    }
+
+    .template-preview-table td.template-preview-editable:focus-visible {
+      outline: 2px solid #1f7ae0;
+      outline-offset: -2px;
+      box-shadow: inset 0 0 0 2px rgba(31, 122, 224, 0.35);
     }
 
     .template-empty {
@@ -828,12 +848,19 @@
 
     .template-config-editor-host {
       min-height: 0;
+      overflow: auto;
+      padding-right: 2px;
     }
 
     .template-config-form {
       display: flex;
       flex-direction: column;
       gap: 10px;
+    }
+
+    .template-config-editor-hint {
+      color: var(--muted);
+      font-size: 12px;
     }
 
     .template-config-key-row {
@@ -915,10 +942,386 @@
       font-size: 12px;
     }
 
+    .template-config-text-field {
+      position: relative;
+      min-width: 160px;
+    }
+
+    .template-config-token-suggest {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      max-height: 220px;
+      overflow: auto;
+      padding: 6px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--panel) 94%, var(--bg));
+      box-shadow: 0 16px 32px rgba(0, 0, 0, 0.28);
+    }
+
+    .template-config-token-suggest[hidden] {
+      display: none !important;
+    }
+
+    .template-config-token-option {
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text);
+      text-align: left;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+      padding: 6px 8px;
+      cursor: pointer;
+    }
+
+    .template-config-token-option:hover,
+    .template-config-token-option.is-active {
+      background: var(--hover);
+      border-color: var(--accent);
+    }
+
+    .template-config-color-field {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 170px;
+    }
+
+    .template-config-color-swatch {
+      width: 36px;
+      min-width: 36px;
+      height: 32px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--panel);
+      padding: 2px;
+      cursor: pointer;
+    }
+
+    .template-config-builder {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+    }
+
+    .template-builder-topbar,
+    .template-builder-options-row,
+    .template-builder-key-actions,
+    .template-builder-inspector-actions,
+    .template-builder-path-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .template-builder-topbar {
+      justify-content: space-between;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .template-builder-field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      min-width: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .template-builder-key-field {
+      min-width: min(280px, 100%);
+    }
+
+    .template-builder-shell {
+      display: grid;
+      grid-template-columns: minmax(150px, 0.55fr) minmax(320px, 1.5fr) minmax(260px, 0.95fr);
+      gap: 10px;
+      min-height: 0;
+      align-items: stretch;
+    }
+
+    .template-builder-palette,
+    .template-builder-grid-panel,
+    .template-builder-inspector {
+      min-width: 0;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: color-mix(in srgb, var(--panel) 92%, var(--hover));
+    }
+
+    .template-builder-palette,
+    .template-builder-inspector {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 10px;
+    }
+
+    .template-builder-grid-panel {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .template-builder-panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .template-builder-section-title {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: var(--text);
+    }
+
+    .template-builder-palette-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel);
+      color: var(--text);
+      padding: 10px;
+      text-align: left;
+      cursor: grab;
+    }
+
+    .template-builder-palette-item:hover,
+    .template-builder-palette-item:focus-visible {
+      border-color: var(--accent);
+      background: var(--hover);
+      outline: none;
+    }
+
+    .template-builder-palette-item span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .template-builder-grid-wrap {
+      flex: 1;
+      min-height: 280px;
+      overflow: auto;
+      padding: 10px;
+      background: var(--code-bg);
+    }
+
+    .template-builder-grid {
+      width: max-content;
+      min-width: 100%;
+      margin: 0;
+      border-collapse: collapse;
+      table-layout: fixed;
+      user-select: none;
+      font-size: 12px;
+    }
+
+    .template-builder-grid th,
+    .template-builder-grid td {
+      border: 1px solid var(--border);
+      min-width: var(--template-builder-cell-size, 18px);
+      width: var(--template-builder-cell-size, 18px);
+      height: var(--template-builder-cell-size, 18px);
+      padding: 0;
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    .template-builder-grid th {
+      position: sticky;
+      z-index: 1;
+      background: color-mix(in srgb, var(--panel) 86%, var(--hover));
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .template-builder-grid tr:first-child th {
+      top: 0;
+    }
+
+    .template-builder-grid tr th:first-child {
+      left: 0;
+    }
+
+    .template-builder-grid td {
+      background: #ffffff;
+      color: #111111;
+      overflow: visible;
+      cursor: crosshair;
+      outline-offset: -2px;
+      line-height: 1;
+      font-family: "MS PGothic", "MS UI Gothic", Meiryo, sans-serif;
+    }
+
+    .template-builder-grid td.has-border-token {
+      box-shadow: inset 0 0 0 1px #111111;
+    }
+
+    .template-builder-grid td.in-selection {
+      outline: 2px solid var(--accent);
+      box-shadow: inset 0 0 0 999px rgba(96, 165, 250, 0.16);
+    }
+
+    .template-builder-grid td.anchor {
+      outline: 2px solid var(--selected-focus-ring);
+    }
+
+    .template-builder-grid td.is-drop-target {
+      outline: 3px solid var(--accent);
+      background-image: linear-gradient(rgba(96, 165, 250, 0.18), rgba(96, 165, 250, 0.18));
+    }
+
+    .template-builder-empty-cell {
+      color: rgba(17, 17, 17, 0.28);
+      font-size: 15px;
+    }
+
+    .template-builder-placeholder-token {
+      display: inline-block;
+      color: #1d4ed8;
+      background: rgba(37, 99, 235, 0.10);
+      border-radius: 4px;
+      padding: 0 2px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 11px;
+      line-height: 1.15;
+    }
+
+    .template-builder-selection-pill {
+      white-space: nowrap;
+    }
+
+    .template-builder-text-field {
+      min-width: 0;
+    }
+
+    .template-builder-textarea {
+      min-height: 70px !important;
+      max-height: 140px !important;
+      margin-top: 0 !important;
+    }
+
+    .template-builder-path-row {
+      align-items: stretch;
+    }
+
+    .template-builder-path-row .template-config-select {
+      flex: 1;
+      min-width: 160px;
+    }
+
+    .template-builder-style-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .template-builder-toggle-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .secondary.danger-lite {
+      border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+      color: var(--danger);
+    }
+
     .template-config-json-tab {
       display: flex;
       flex-direction: column;
       gap: 8px;
+    }
+
+    .template-config-modal-body {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow: hidden;
+    }
+
+    .template-config-workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.95fr);
+      gap: 12px;
+      min-height: 0;
+      flex: 1;
+    }
+
+    .template-config-editor-pane {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+      min-width: 0;
+    }
+
+    .template-config-live-preview {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      min-width: 0;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: var(--panel);
+    }
+
+    .template-config-live-preview-head {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      background: color-mix(in srgb, var(--panel) 88%, var(--hover));
+    }
+
+    .template-config-live-preview-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .template-config-live-preview-meta,
+    .template-config-live-preview-note {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .template-config-live-preview-note.is-warning {
+      color: var(--danger);
+    }
+
+    .template-config-live-preview-body {
+      flex: 1;
+      min-height: 220px;
+      overflow: auto;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: var(--code-bg);
+    }
+
+    .template-config-live-preview-body .template-block {
+      margin-bottom: 0;
     }
 
     .modal-header {
@@ -966,6 +1369,20 @@
 
       .splitter {
         display: none;
+      }
+    }
+
+    @media (max-width: 1180px) {
+      .template-config-workspace {
+        grid-template-columns: 1fr;
+      }
+
+      .template-builder-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .template-config-live-preview {
+        min-height: 280px;
       }
     }
   </style>
@@ -1189,15 +1606,6 @@
     </div>
   </div>
 
-  <script src="../shared/abap-parser/01-context.js" defer></script>
-  <script src="../shared/abap-parser/02-config.js" defer></script>
-  <script src="../shared/abap-parser/03-statements.js" defer></script>
-  <script src="../shared/abap-parser/04-parse-core.js" defer></script>
-  <script src="../shared/abap-parser/05-extras.js" defer></script>
-  <script src="../shared/abap-parser/06-conditions.js" defer></script>
-  <script src="../shared/abap-parser/07-declarations.js" defer></script>
-  <script src="../shared/abap-parser/08-helpers.js" defer></script>
-  <script src="../shared/abap-parser/09-public-api.js" defer></script>
   <script src="../shared/abap-parser.js" defer></script>
   <!-- abap-parser-configs:start -->
   <script src="./configs.generated/append.js" defer></script>
@@ -1242,31 +1650,9 @@
   <script src="./configs.generated/when.js" defer></script>
   <!-- abap-parser-configs:end -->
   <script src="./variable-descriptions.js" defer></script>
-  <script src="./app/core/01-runtime-state.js" defer></script>
-  <script src="./app/core/02-build-info.js" defer></script>
-  <script src="./app/core/03-storage.js" defer></script>
-  <script src="./app/core/04-template-config.js" defer></script>
-  <script src="./app/core/05-theme-layout.js" defer></script>
-  <script src="./app/core/06-rules.js" defer></script>
-  <script src="./app/core/07-settings-modal.js" defer></script>
   <script src="./app/01-core.js" defer></script>
-  <script src="./app/descriptions/01-normalize-and-desc.js" defer></script>
-  <script src="./app/descriptions/02-overrides-and-edit.js" defer></script>
-  <script src="./app/descriptions/03-value-finaldesc.js" defer></script>
-  <script src="./app/descriptions/04-panel-render.js" defer></script>
   <script src="./app/02-descriptions.js" defer></script>
-  <script src="./app/template/01-path-resolver.js" defer></script>
-  <script src="./app/template/02-grid-and-style.js" defer></script>
-  <script src="./app/template/03-preview-render.js" defer></script>
-  <script src="./app/template/04-copy-import-export.js" defer></script>
   <script src="./app/03-template-preview.js" defer></script>
-  <script src="./app/output/01-xml-export.js" defer></script>
-  <script src="./app/output/02-search-index.js" defer></script>
-  <script src="./app/output/03-selection-gutter.js" defer></script>
-  <script src="./app/output/04-render-shared.js" defer></script>
-  <script src="./app/output/05-render-values.js" defer></script>
-  <script src="./app/output/06-render-extras.js" defer></script>
-  <script src="./app/output/07-render-tree.js" defer></script>
   <script src="./app/04-output-render.js" defer></script>
   <script src="./app/05-main.js" defer></script>
   <script src="./app.js" defer></script>

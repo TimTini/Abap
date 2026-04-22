@@ -1,10 +1,392 @@
-"use strict";
+      name: upper,
+      file: "",
+      lineStart: null,
+      raw: "",
+      comment: "",
+      scopeId: 0,
+      scopeLabel: "SYSTEM",
+      scopeType: "SYSTEM",
+      scopeName: ""
+    };
+  }
 
-(function (root) {
-  const globalRoot = root || (typeof globalThis !== "undefined" ? globalThis : this);
-  const registry = globalRoot.__AbapSourceParts = globalRoot.__AbapSourceParts || {};
-  const targetKey = "shared/abap-parser.js";
-  const partKey = "shared/abap-parser/07-declarations.js";
-  const bucket = registry[targetKey] = registry[targetKey] || {};
-  bucket[partKey] = "      name: upper,\n      file: \"\",\n      lineStart: null,\n      raw: \"\",\n      comment: \"\",\n      scopeId: 0,\n      scopeLabel: \"SYSTEM\",\n      scopeType: \"SYSTEM\",\n      scopeName: \"\"\n    };\n  }\n\n  function extractFirstIdentifierFromExpression(expression) {\n    const text = String(expression || \"\").trim();\n    if (!text) {\n      return \"\";\n    }\n    if (text.startsWith(\"'\") || text.startsWith(\"|\")) {\n      return \"\";\n    }\n    if (/^[+-]?\\d/.test(text)) {\n      return \"\";\n    }\n\n    const sysMatch = text.match(/^SY-[A-Za-z_][A-Za-z0-9_]*/i);\n    if (sysMatch) {\n      return sysMatch[0].toUpperCase();\n    }\n\n    const fieldPath = extractFirstFieldPathFromExpression(text);\n    if (fieldPath) {\n      return fieldPath;\n    }\n\n    const inline = extractFirstInlineDeclaration(text);\n    if (inline) {\n      return inline;\n    }\n\n    const matches = text.matchAll(/<[^>]+>|[A-Za-z_][A-Za-z0-9_]*/g);\n    for (const match of matches) {\n      const candidate = normalizeIdentifierCandidate(match[0]);\n      if (candidate) {\n        return candidate;\n      }\n    }\n\n    return \"\";\n  }\n\n  function extractFirstFieldPathFromExpression(text) {\n    const match = String(text || \"\").match(/^(<[^>]+>|[A-Za-z_][A-Za-z0-9_]*)(?:-[A-Za-z_][A-Za-z0-9_]*)+/);\n    if (!match) {\n      return \"\";\n    }\n    const candidate = normalizeIdentifierCandidate(match[0]);\n    return candidate || \"\";\n  }\n\n  function extractFirstInlineDeclaration(text) {\n    const patterns = [\n      { regex: /@?DATA\\s*\\(\\s*([^)]+)\\s*\\)/i, group: 1 },\n      { regex: /@?FINAL\\s*\\(\\s*([^)]+)\\s*\\)/i, group: 1 },\n      { regex: /FIELD-SYMBOL\\s*\\(\\s*(<[^>]+>)\\s*\\)/i, group: 1 }\n    ];\n\n    let best = null;\n    for (const pattern of patterns) {\n      const match = pattern.regex.exec(text);\n      if (!match) {\n        continue;\n      }\n      const candidate = normalizeIdentifierCandidate(match[pattern.group]);\n      if (!candidate) {\n        continue;\n      }\n      if (!best || match.index < best.index) {\n        best = { index: match.index, name: candidate };\n      }\n    }\n\n    return best ? best.name : \"\";\n  }\n\n  const CONDITION_OPERATORS = new Set([\n    \"=\",\n    \"<>\",\n    \"<\",\n    \">\",\n    \"<=\",\n    \">=\",\n    \"EQ\",\n    \"NE\",\n    \"LT\",\n    \"GT\",\n    \"LE\",\n    \"GE\",\n    \"CO\",\n    \"CN\",\n    \"CA\",\n    \"NA\",\n    \"CS\",\n    \"NS\",\n    \"CP\",\n    \"NP\",\n    \"IN\",\n    \"IS\",\n    \"BT\",\n    \"NB\"\n  ]);\n\n  const CONDITION_CONNECTORS = new Set([\"AND\", \"OR\"]);\n\n  function isConditionOperator(tokenUpper) {\n    return CONDITION_OPERATORS.has(String(tokenUpper || \"\").toUpperCase());\n  }\n\n  function isConditionConnector(tokenUpper) {\n    return CONDITION_CONNECTORS.has(String(tokenUpper || \"\").toUpperCase());\n  }\n\n  function normalizeReadTableKeyConditionSource(segmentRaw) {\n    const raw = String(segmentRaw || \"\").trim();\n    if (!raw) {\n      return \"\";\n    }\n\n    const match = raw.match(/^(?:[A-Za-z_][A-Za-z0-9_]*\\s+)?COMPONENTS\\s+(.+)$/i);\n    if (!match) {\n      return raw;\n    }\n    return String(match[1] || \"\").trim();\n  }\n\n  function parseConditionClauses(segmentRaw, options) {\n    const raw = String(segmentRaw || \"\").trim();\n    if (!raw) {\n      return [];\n    }\n\n    const allowImplicitAnd = !options || options.allowImplicitAnd !== false;\n    const tokens = tokenize(`${raw}.`);\n    if (!tokens.length) {\n      return [];\n    }\n\n    const clauses = [];\n    let index = 0;\n\n    while (index < tokens.length) {\n      while (index < tokens.length && isConditionConnector(tokens[index].upper)) {\n        index += 1;\n      }\n      if (index >= tokens.length) {\n        break;\n      }\n\n      let opIndex = -1;\n      for (let i = index; i < tokens.length; i += 1) {\n        if (isConditionConnector(tokens[i].upper)) {\n          break;\n        }\n        if (isConditionOperator(tokens[i].upper)) {\n          opIndex = i;\n          break;\n        }\n      }\n      if (opIndex <= index) {\n        break;\n      }\n\n      const leftTokens = tokens.slice(index, opIndex);\n      if (!leftTokens.length) {\n        index = opIndex + 1;\n        continue;\n      }\n\n      const rightStart = opIndex + 1;\n      if (rightStart >= tokens.length) {\n        break;\n      }\n\n      let rightEnd = tokens.length - 1;\n      let explicitConnectorIndex = -1;\n      let implicitNextClauseIndex = -1;\n      const operatorUpper = String(tokens[opIndex].upper || \"\").toUpperCase();\n      const expectsRangeBounds = operatorUpper === \"BT\" || operatorUpper === \"NB\";\n      let rangeConnectorConsumed = false;\n\n      for (let i = rightStart; i < tokens.length; i += 1) {\n        if (isConditionConnector(tokens[i].upper)) {\n          if (expectsRangeBounds && !rangeConnectorConsumed && String(tokens[i].upper || \"\").toUpperCase() === \"AND\") {\n            rangeConnectorConsumed = true;\n            continue;\n          }\n          explicitConnectorIndex = i;\n          rightEnd = i - 1;\n          break;\n        }\n\n        const next = tokens[i + 1];\n        if (allowImplicitAnd && i > rightStart && next && isConditionOperator(next.upper)) {\n          implicitNextClauseIndex = i;\n          rightEnd = i - 1;\n          break;\n        }\n      }\n\n      const rightTokens = tokens.slice(rightStart, rightEnd + 1);\n      if (!rightTokens.length) {\n        if (explicitConnectorIndex >= 0) {\n          index = explicitConnectorIndex + 1;\n          continue;\n        }\n        break;\n      }\n\n      const leftOperand = leftTokens.map((token) => token.raw).join(\" \").trim();\n      const rightOperand = rightTokens.map((token) => token.raw).join(\" \").trim();\n      const comparisonOperator = String(tokens[opIndex].raw || \"\").trim();\n      if (!leftOperand || !rightOperand || !comparisonOperator) {\n        break;\n      }\n\n      let logicalConnector = \"\";\n      if (explicitConnectorIndex >= 0) {\n        logicalConnector = String(tokens[explicitConnectorIndex].upper || \"\").trim();\n      } else if (implicitNextClauseIndex >= 0) {\n        logicalConnector = \"AND\";\n      }\n\n      clauses.push({\n        leftOperand,\n        rightOperand,\n        comparisonOperator,\n        logicalConnector\n      });\n\n      if (explicitConnectorIndex >= 0) {\n        index = explicitConnectorIndex + 1;\n      } else if (implicitNextClauseIndex >= 0) {\n        index = implicitNextClauseIndex;\n      } else {\n        break;\n      }\n    }\n\n    return clauses;\n  }\n\n  function parseArgumentTokens(segmentRaw) {\n    const trimmed = String(segmentRaw || \"\").trim();\n    if (!trimmed) {\n      return [];\n    }\n\n    const tokens = tokenize(`${trimmed}.`);\n    return tokens.map((token) => token.raw).filter(Boolean);\n  }\n\n  function parseAssignments(segmentRaw) {\n    const trimmed = String(segmentRaw || \"\").trim();\n    if (!trimmed) {\n      return [];\n    }\n\n    const tokens = tokenize(`${trimmed}.`).map((token) => token.raw).filter(Boolean);\n    const assignments = [];\n\n    function findNextAssignmentStart(startIndex) {\n      for (let index = startIndex; index < tokens.length; index += 1) {\n        const token = tokens[index];\n        if (token === \"=\") {\n          continue;\n        }\n\n        if (tokens[index + 1] === \"=\" && normalizeFormParamName(token)) {\n          return index;\n        }\n\n        const equalIndex = token.indexOf(\"=\");\n        if (equalIndex > 0) {\n          const left = token.slice(0, equalIndex).trim();\n          if (normalizeFormParamName(left)) {\n            return index;\n          }\n        }\n      }\n      return tokens.length;\n    }\n\n    for (let index = 0; index < tokens.length;) {\n      const token = tokens[index];\n      let name = \"\";\n      let valueStartIndex = -1;\n      let inlineFirstValue = \"\";\n\n      if (token !== \"=\") {\n        const equalIndex = token.indexOf(\"=\");\n        if (equalIndex > 0) {\n          const left = token.slice(0, equalIndex).trim();\n          const rightInline = token.slice(equalIndex + 1).trim();\n          const parsedName = normalizeFormParamName(left);\n          if (parsedName) {\n            name = parsedName;\n            inlineFirstValue = rightInline;\n            valueStartIndex = index + 1;\n            index += 1;\n          }\n        } else if (tokens[index + 1] === \"=\") {\n          const parsedName = normalizeFormParamName(token);\n          if (parsedName) {\n            name = parsedName;\n            valueStartIndex = index + 2;\n            index += 2;\n          }\n        }\n      }\n\n      if (!name) {\n        index += 1;\n        continue;\n      }\n\n      const nextAssignmentIndex = findNextAssignmentStart(valueStartIndex);\n      const valueParts = [];\n      if (inlineFirstValue) {\n        valueParts.push(inlineFirstValue);\n      }\n      for (let valueIndex = valueStartIndex; valueIndex < nextAssignmentIndex; valueIndex += 1) {\n        valueParts.push(tokens[valueIndex]);\n      }\n\n      assignments.push({ name, value: valueParts.join(\" \").trim() });\n      index = nextAssignmentIndex;\n    }\n\n    return assignments;\n  }\n\n  function valuesToFirstValueMap(values) {\n    const map = {};\n\n    if (Array.isArray(values)) {\n      for (const entry of values) {\n        if (!entry || !entry.name) {\n          continue;\n        }\n        if (map[entry.name] === undefined) {\n          map[entry.name] = entry.value || \"\";\n        }\n      }\n      return map;\n    }\n\n    if (!values || typeof values !== \"object\") {\n      return map;\n    }\n\n    for (const [name, entryOrList] of Object.entries(values)) {\n      const entry = Array.isArray(entryOrList) ? entryOrList[0] : entryOrList;\n      if (!entry) {\n        continue;\n      }\n      map[name] = entry.value || \"\";\n    }\n\n    return map;\n  }\n\n  function groupEntriesByKey(entries, key) {\n    const map = {};\n    for (const entry of entries || []) {\n      if (!entry || entry[key] === undefined || entry[key] === null) {\n        continue;\n      }\n\n      const name = String(entry[key]).trim();\n      if (!name) {\n        continue;\n      }\n\n      const current = map[name];\n      if (current === undefined) {\n        map[name] = entry;\n        continue;\n      }\n\n      if (Array.isArray(current)) {\n        current.push(entry);\n        continue;\n      }\n";
-})(typeof globalThis !== "undefined" ? globalThis : (typeof self !== "undefined" ? self : this));
+  function extractFirstIdentifierFromExpression(expression) {
+    const text = String(expression || "").trim();
+    if (!text) {
+      return "";
+    }
+    if (text.startsWith("'") || text.startsWith("|")) {
+      return "";
+    }
+    if (/^[+-]?\d/.test(text)) {
+      return "";
+    }
+
+    const sysMatch = text.match(/^SY-[A-Za-z_][A-Za-z0-9_]*/i);
+    if (sysMatch) {
+      return sysMatch[0].toUpperCase();
+    }
+
+    const fieldPath = extractFirstFieldPathFromExpression(text);
+    if (fieldPath) {
+      return fieldPath;
+    }
+
+    const inline = extractFirstInlineDeclaration(text);
+    if (inline) {
+      return inline;
+    }
+
+    const matches = text.matchAll(/<[^>]+>|[A-Za-z_][A-Za-z0-9_]*/g);
+    for (const match of matches) {
+      const candidate = normalizeIdentifierCandidate(match[0]);
+      if (candidate) {
+        return candidate;
+      }
+    }
+
+    return "";
+  }
+
+  function extractFirstFieldPathFromExpression(text) {
+    const match = String(text || "").match(/^(<[^>]+>|[A-Za-z_][A-Za-z0-9_]*)(?:-[A-Za-z_][A-Za-z0-9_]*)+/);
+    if (!match) {
+      return "";
+    }
+    const candidate = normalizeIdentifierCandidate(match[0]);
+    return candidate || "";
+  }
+
+  function extractFirstInlineDeclaration(text) {
+    const patterns = [
+      { regex: /@?DATA\s*\(\s*([^)]+)\s*\)/i, group: 1 },
+      { regex: /@?FINAL\s*\(\s*([^)]+)\s*\)/i, group: 1 },
+      { regex: /FIELD-SYMBOL\s*\(\s*(<[^>]+>)\s*\)/i, group: 1 }
+    ];
+
+    let best = null;
+    for (const pattern of patterns) {
+      const match = pattern.regex.exec(text);
+      if (!match) {
+        continue;
+      }
+      const candidate = normalizeIdentifierCandidate(match[pattern.group]);
+      if (!candidate) {
+        continue;
+      }
+      if (!best || match.index < best.index) {
+        best = { index: match.index, name: candidate };
+      }
+    }
+
+    return best ? best.name : "";
+  }
+
+  const CONDITION_OPERATORS = new Set([
+    "=",
+    "<>",
+    "<",
+    ">",
+    "<=",
+    ">=",
+    "EQ",
+    "NE",
+    "LT",
+    "GT",
+    "LE",
+    "GE",
+    "CO",
+    "CN",
+    "CA",
+    "NA",
+    "CS",
+    "NS",
+    "CP",
+    "NP",
+    "IN",
+    "IS",
+    "BT",
+    "NB"
+  ]);
+
+  const CONDITION_CONNECTORS = new Set(["AND", "OR"]);
+
+  function isConditionOperator(tokenUpper) {
+    return CONDITION_OPERATORS.has(String(tokenUpper || "").toUpperCase());
+  }
+
+  function isConditionConnector(tokenUpper) {
+    return CONDITION_CONNECTORS.has(String(tokenUpper || "").toUpperCase());
+  }
+
+  function normalizeReadTableKeyConditionSource(segmentRaw) {
+    const raw = String(segmentRaw || "").trim();
+    if (!raw) {
+      return "";
+    }
+
+    const match = raw.match(/^(?:[A-Za-z_][A-Za-z0-9_]*\s+)?COMPONENTS\s+(.+)$/i);
+    if (!match) {
+      return raw;
+    }
+    return String(match[1] || "").trim();
+  }
+
+  function parseConditionClauses(segmentRaw, options) {
+    const raw = String(segmentRaw || "").trim();
+    if (!raw) {
+      return [];
+    }
+
+    const allowImplicitAnd = !options || options.allowImplicitAnd !== false;
+    const tokens = tokenize(`${raw}.`);
+    if (!tokens.length) {
+      return [];
+    }
+
+    const clauses = [];
+    let index = 0;
+
+    while (index < tokens.length) {
+      while (index < tokens.length && isConditionConnector(tokens[index].upper)) {
+        index += 1;
+      }
+      if (index >= tokens.length) {
+        break;
+      }
+
+      let opIndex = -1;
+      for (let i = index; i < tokens.length; i += 1) {
+        if (isConditionConnector(tokens[i].upper)) {
+          break;
+        }
+        if (isConditionOperator(tokens[i].upper)) {
+          opIndex = i;
+          break;
+        }
+      }
+      if (opIndex <= index) {
+        break;
+      }
+
+      const leftTokens = tokens.slice(index, opIndex);
+      if (!leftTokens.length) {
+        index = opIndex + 1;
+        continue;
+      }
+
+      const rightStart = opIndex + 1;
+      if (rightStart >= tokens.length) {
+        break;
+      }
+
+      let rightEnd = tokens.length - 1;
+      let explicitConnectorIndex = -1;
+      let implicitNextClauseIndex = -1;
+      const operatorUpper = String(tokens[opIndex].upper || "").toUpperCase();
+      const expectsRangeBounds = operatorUpper === "BT" || operatorUpper === "NB";
+      let rangeConnectorConsumed = false;
+
+      for (let i = rightStart; i < tokens.length; i += 1) {
+        if (isConditionConnector(tokens[i].upper)) {
+          if (expectsRangeBounds && !rangeConnectorConsumed && String(tokens[i].upper || "").toUpperCase() === "AND") {
+            rangeConnectorConsumed = true;
+            continue;
+          }
+          explicitConnectorIndex = i;
+          rightEnd = i - 1;
+          break;
+        }
+
+        const next = tokens[i + 1];
+        if (allowImplicitAnd && i > rightStart && next && isConditionOperator(next.upper)) {
+          implicitNextClauseIndex = i;
+          rightEnd = i - 1;
+          break;
+        }
+      }
+
+      const rightTokens = tokens.slice(rightStart, rightEnd + 1);
+      if (!rightTokens.length) {
+        if (explicitConnectorIndex >= 0) {
+          index = explicitConnectorIndex + 1;
+          continue;
+        }
+        break;
+      }
+
+      const leftOperand = leftTokens.map((token) => token.raw).join(" ").trim();
+      const rightOperand = rightTokens.map((token) => token.raw).join(" ").trim();
+      const comparisonOperator = String(tokens[opIndex].raw || "").trim();
+      if (!leftOperand || !rightOperand || !comparisonOperator) {
+        break;
+      }
+
+      let logicalConnector = "";
+      if (explicitConnectorIndex >= 0) {
+        logicalConnector = String(tokens[explicitConnectorIndex].upper || "").trim();
+      } else if (implicitNextClauseIndex >= 0) {
+        logicalConnector = "AND";
+      }
+
+      clauses.push({
+        leftOperand,
+        rightOperand,
+        comparisonOperator,
+        logicalConnector
+      });
+
+      if (explicitConnectorIndex >= 0) {
+        index = explicitConnectorIndex + 1;
+      } else if (implicitNextClauseIndex >= 0) {
+        index = implicitNextClauseIndex;
+      } else {
+        break;
+      }
+    }
+
+    return clauses;
+  }
+
+  function parseArgumentTokens(segmentRaw) {
+    const trimmed = String(segmentRaw || "").trim();
+    if (!trimmed) {
+      return [];
+    }
+
+    const tokens = tokenize(`${trimmed}.`);
+    return tokens.map((token) => token.raw).filter(Boolean);
+  }
+
+  function parseAssignments(segmentRaw) {
+    const trimmed = String(segmentRaw || "").trim();
+    if (!trimmed) {
+      return [];
+    }
+
+    const tokens = tokenize(`${trimmed}.`).map((token) => token.raw).filter(Boolean);
+    const assignments = [];
+
+    function findNextAssignmentStart(startIndex) {
+      for (let index = startIndex; index < tokens.length; index += 1) {
+        const token = tokens[index];
+        if (token === "=") {
+          continue;
+        }
+
+        if (tokens[index + 1] === "=" && normalizeFormParamName(token)) {
+          return index;
+        }
+
+        const equalIndex = token.indexOf("=");
+        if (equalIndex > 0) {
+          const left = token.slice(0, equalIndex).trim();
+          if (normalizeFormParamName(left)) {
+            return index;
+          }
+        }
+      }
+      return tokens.length;
+    }
+
+    for (let index = 0; index < tokens.length;) {
+      const token = tokens[index];
+      let name = "";
+      let valueStartIndex = -1;
+      let inlineFirstValue = "";
+
+      if (token !== "=") {
+        const equalIndex = token.indexOf("=");
+        if (equalIndex > 0) {
+          const left = token.slice(0, equalIndex).trim();
+          const rightInline = token.slice(equalIndex + 1).trim();
+          const parsedName = normalizeFormParamName(left);
+          if (parsedName) {
+            name = parsedName;
+            inlineFirstValue = rightInline;
+            valueStartIndex = index + 1;
+            index += 1;
+          }
+        } else if (tokens[index + 1] === "=") {
+          const parsedName = normalizeFormParamName(token);
+          if (parsedName) {
+            name = parsedName;
+            valueStartIndex = index + 2;
+            index += 2;
+          }
+        }
+      }
+
+      if (!name) {
+        index += 1;
+        continue;
+      }
+
+      const nextAssignmentIndex = findNextAssignmentStart(valueStartIndex);
+      const valueParts = [];
+      if (inlineFirstValue) {
+        valueParts.push(inlineFirstValue);
+      }
+      for (let valueIndex = valueStartIndex; valueIndex < nextAssignmentIndex; valueIndex += 1) {
+        valueParts.push(tokens[valueIndex]);
+      }
+
+      assignments.push({ name, value: valueParts.join(" ").trim() });
+      index = nextAssignmentIndex;
+    }
+
+    return assignments;
+  }
+
+  function valuesToFirstValueMap(values) {
+    const map = {};
+
+    if (Array.isArray(values)) {
+      for (const entry of values) {
+        if (!entry || !entry.name) {
+          continue;
+        }
+        if (map[entry.name] === undefined) {
+          map[entry.name] = entry.value || "";
+        }
+      }
+      return map;
+    }
+
+    if (!values || typeof values !== "object") {
+      return map;
+    }
+
+    for (const [name, entryOrList] of Object.entries(values)) {
+      const entry = Array.isArray(entryOrList) ? entryOrList[0] : entryOrList;
+      if (!entry) {
+        continue;
+      }
+      map[name] = entry.value || "";
+    }
+
+    return map;
+  }
+
+  function groupEntriesByKey(entries, key) {
+    const map = {};
+    for (const entry of entries || []) {
+      if (!entry || entry[key] === undefined || entry[key] === null) {
+        continue;
+      }
+
+      const name = String(entry[key]).trim();
+      if (!name) {
+        continue;
+      }
+
+      const current = map[name];
+      if (current === undefined) {
+        map[name] = entry;
+        continue;
+      }
+
+      if (Array.isArray(current)) {
+        current.push(entry);
+        continue;
+      }

@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Template Builder Demo</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1220;
+      --panel: #0f172a;
+      --panel-soft: #132033;
+      --border: #22324a;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #60a5fa;
+      --accent-soft: rgba(96, 165, 250, 0.18);
+      --warning: #f59e0b;
+      --font: "Segoe UI", Tahoma, sans-serif;
+      --mono: Consolas, "Courier New", monospace;
+      --cell-size: 42px;
+      --shadow: 0 12px 28px rgba(2, 8, 23, 0.28);
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+    }
+    body { padding: 20px; }
+
+    .page { display: grid; gap: 16px; }
+    .hero, .panel {
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+    }
+    .hero { padding: 18px 20px; display: grid; gap: 10px; }
+    .hero h1 { margin: 0; font-size: 24px; }
+    .hero p { margin: 0; color: var(--muted); line-height: 1.55; }
+    .hero .note { color: #bfdbfe; font-size: 13px; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(640px, 1.5fr) minmax(360px, 0.9fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .panel {
+      padding: 16px;
+      display: grid;
+      gap: 14px;
+      min-height: 0;
+      align-content: start;
+    }
+    .panel h2, .panel h3 { margin: 0; }
+
+    .toolbar, .canvas-wrap, .subgrid, .surface-card {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+    .canvas-wrap {
+      padding: 0;
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+    }
+    .toolbar {
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(15, 23, 42, 0.74);
+      box-shadow: var(--shadow);
+    }
+    .surface-card {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      background: rgba(15, 23, 42, 0.74);
+    }
+    .surface-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .surface-header p { margin: 0; color: var(--muted); font-size: 13px; }
+
+    .toolbar-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: end;
+      align-content: flex-start;
+    }
+    .field { display: grid; gap: 6px; min-width: 120px; }
+    .field.grow { flex: 1; min-width: 220px; }
+    label { font-size: 12px; color: var(--muted); }
+
+    input, select, textarea, button { font: inherit; }
+    input[type="text"], input[type="number"], select, textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel-soft);
+      color: var(--text);
+      padding: 10px 12px;
+    }
+    input[type="color"] {
+      width: 100%;
+      min-height: 42px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel-soft);
+      padding: 4px;
+    }
+    textarea {
+      min-height: 180px;
+      resize: vertical;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    button {
+      border: 1px solid var(--border);
+      background: var(--panel-soft);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    button:hover { background: #16263d; }
+    button.primary {
+      background: var(--accent);
+      border-color: #3b82f6;
+      color: #08111f;
+      font-weight: 600;
+    }
+    button.warning {
+      background: rgba(245, 158, 11, 0.18);
+      border-color: rgba(245, 158, 11, 0.4);
+      color: #fde68a;
+    }
+    button.danger {
+      background: rgba(239, 68, 68, 0.18);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #fecaca;
+    }
+
+    .selection-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: #bfdbfe;
+      font-size: 12px;
+      font-family: var(--mono);
+    }
+
+    .grid-shell {
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #08111f;
+      padding: 10px;
+      min-height: 0;
+    }
+
+    table.preview-grid {
+      border-collapse: collapse;
+      table-layout: fixed;
+      width: max-content;
+      min-width: 100%;
+      user-select: none;
+    }
+    .preview-grid th, .preview-grid td {
+      border: 1px solid var(--border);
+      text-align: center;
+      vertical-align: middle;
+      min-width: var(--cell-size);
+      width: var(--cell-size);
+      height: var(--cell-size);
+      padding: 0;
+    }
+    .preview-grid th {
+      background: #101d31;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .preview-grid td {
+      background: #ffffff;
+      color: #111827;
+      font-size: 12px;
+      line-height: 1.25;
+      padding: 4px;
+      overflow: hidden;
+      position: relative;
+      cursor: crosshair;
+    }
+    .preview-grid .placeholder { color: #2563eb; font-style: italic; }
+    .preview-grid td.in-selection {
+      outline: 2px solid rgba(96, 165, 250, 0.8);
+      outline-offset: -2px;
+      box-shadow: inset 0 0 0 999px rgba(96, 165, 250, 0.12);
+    }
+    .preview-grid td.anchor {
+      box-shadow:
+        inset 0 0 0 999px rgba(96, 165, 250, 0.12),
+        inset 0 0 0 2px rgba(245, 158, 11, 0.95);
+    }
+
+    .option-grid, .inspector-grid {
+      display: grid;
+      gap: 10px;
+    }
+    .option-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .inspector-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 42px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel-soft);
+    }
+    .toggle input { margin: 0; }
+    .inspector-actions, .token-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .token-row select { flex: 1; }
+
+    .status { min-height: 20px; font-size: 13px; color: var(--muted); }
+    .status.error { color: #fecaca; }
+    .status.success { color: #bbf7d0; }
+    .hint-list { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .small { font-size: 12px; color: var(--muted); }
+
+    @media (max-width: 1200px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 900px) {
+      body { padding: 14px; }
+      .inspector-grid { grid-template-columns: 1fr; }
+      .option-grid { grid-template-columns: 1fr; }
+      .toolbar-row > button,
+      .toolbar-row > .field,
+      .toolbar-row > .field.grow,
+      .toolbar-row > input,
+      .toolbar-row > select {
+        width: 100%;
+        min-width: 0;
+        flex: 1 1 100%;
+      }
+      .token-row { flex-direction: column; }
+      .token-row select,
+      .token-row button,
+      .inspector-actions button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <h1>Template Builder Demo</h1>
+      <p>
+        Standalone prototype for building template config visually. This page is isolated from the main viewer runtime.
+        It does not patch the stable app and only writes to its own demo state.
+      </p>
+      <div class="note">
+        Use this to shape FORM or other templates visually first, then port JSON into the real viewer later.
+      </div>
+    </section>
+
+    <div class="layout">
+      <section class="canvas-wrap">
+        <div class="toolbar">
+          <div class="toolbar-row">
+            <div class="field">
+              <label for="templateKeySelect">Template key</label>
+              <select id="templateKeySelect"></select>
+            </div>
+            <div class="field">
+              <label for="starterPresetSelect">Starter preset</label>
+              <select id="starterPresetSelect">
+                <option value="FORM">FORM</option>
+                <option value="PERFORM">PERFORM</option>
+                <option value="IF">IF</option>
+                <option value="DEFAULT">DEFAULT</option>
+              </select>
+            </div>
+            <div class="field grow">
+              <label for="newTemplateKeyInput">Create template key</label>
+              <input type="text" id="newTemplateKeyInput" placeholder="FORM">
+            </div>
+            <button id="createTemplateBtn" class="primary" type="button">Create template</button>
+            <button id="resetCurrentTemplateBtn" class="warning" type="button">Reset current</button>
+          </div>
+
+          <div class="toolbar-row">
+            <div class="field">
+              <label for="gridRowsInput">Rows</label>
+              <input type="number" id="gridRowsInput" min="4" max="40" step="1">
+            </div>
+            <div class="field">
+              <label for="gridColsInput">Cols</label>
+              <input type="number" id="gridColsInput" min="4" max="26" step="1">
+            </div>
+            <button id="applyGridBtn" type="button">Apply grid size</button>
+            <button id="loadStarterBtn" type="button">Load starter into current</button>
+            <button id="copyJsonBtn" type="button">Copy JSON</button>
+            <button id="downloadJsonBtn" type="button">Download JSON</button>
+            <button id="openJsonFileBtn" type="button">Import JSON file</button>
+            <input type="file" id="jsonFileInput" accept="application/json,.json" hidden>
+          </div>
+        </div>
+
+        <div class="surface-card">
+          <div class="surface-header">
+            <div>
+              <h2>Live Preview</h2>
+              <p>Primary editing surface. Click or drag directly on preview cells to select the range you want to edit.</p>
+            </div>
+            <div class="selection-pill">
+              <span>Selection</span>
+              <strong id="selectionLabel">A1</strong>
+            </div>
+          </div>
+          <div class="grid-shell">
+            <table class="preview-grid" id="previewGrid"></table>
+          </div>
+        </div>
+      </section>
+
+      <aside class="panel subgrid">
+        <section class="surface-card">
+          <div class="surface-header">
+            <div>
+              <h2>Inspector</h2>
+              <p>Edit the current range and anchor cell without typing raw range keys.</p>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="cellTextInput">Anchor cell text</label>
+            <textarea id="cellTextInput" placeholder="{values.name.finalDesc}"></textarea>
+          </div>
+
+          <div class="field">
+            <label>Insert token preset</label>
+            <div class="token-row">
+              <select id="tokenPresetSelect"></select>
+              <button id="insertTokenBtn" type="button">Insert token</button>
+            </div>
+          </div>
+
+          <div class="inspector-grid">
+            <div class="field">
+              <label for="backgroundInput">Background</label>
+              <input type="color" id="backgroundInput" value="#ffffff">
+            </div>
+            <div class="field">
+              <label for="fontColorInput">Font color</label>
+              <input type="color" id="fontColorInput" value="#111111">
+            </div>
+            <div class="field">
+              <label for="borderSelect">Border</label>
+              <select id="borderSelect">
+                <option value="">(none)</option>
+                <option value="outside-thin">outside-thin</option>
+                <option value="outside-medium">outside-medium</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="fontSizeInput">Font size</label>
+              <input type="number" id="fontSizeInput" min="8" max="32" step="1" value="10">
+            </div>
+            <div class="field">
+              <label for="alignSelect">Align</label>
+              <select id="alignSelect">
+                <option value="left">left</option>
+                <option value="center">center</option>
+                <option value="right">right</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="valignSelect">VAlign</label>
+              <select id="valignSelect">
+                <option value="top">top</option>
+                <option value="middle">middle</option>
+                <option value="bottom">bottom</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="option-grid">
+            <label class="toggle"><input type="checkbox" id="wrapCheckbox"> Wrap</label>
+            <label class="toggle"><input type="checkbox" id="boldCheckbox"> Bold</label>
+            <label class="toggle"><input type="checkbox" id="mergeCheckbox"> Merge range</label>
+          </div>
+
+          <div class="inspector-actions">
+            <button id="applyRangeBtn" class="primary" type="button">Apply range style + text</button>
+            <button id="clearRangeStyleBtn" type="button">Clear range style</button>
+            <button id="clearAnchorTextBtn" class="danger" type="button">Clear anchor text</button>
+          </div>
+        </section>
+
+        <section class="surface-card">
+          <div class="surface-header">
+            <div>
+              <h2>Template options</h2>
+              <p>These map to the same option block shape used by the real viewer config.</p>
+            </div>
+          </div>
+
+          <div class="option-grid">
+            <label class="toggle"><input type="checkbox" id="hideEmptyRowsCheckbox"> hideEmptyRows</label>
+            <label class="toggle"><input type="checkbox" id="hideRowsWithoutValuesCheckbox"> hideRowsWithoutValues</label>
+            <label class="toggle"><input type="checkbox" id="expandMultilineRowsCheckbox"> expandMultilineRows</label>
+          </div>
+        </section>
+
+        <section class="surface-card">
+          <div class="surface-header">
+            <div>
+              <h2>Generated JSON</h2>
+              <p>Editable. You can paste a full config object or a single template object here.</p>
+            </div>
+          </div>
+          <textarea id="jsonOutput"></textarea>
+          <div class="inspector-actions">
+            <button id="applyJsonBtn" class="primary" type="button">Apply JSON into demo</button>
+            <button id="formatJsonBtn" type="button">Format JSON</button>
+          </div>
+          <div class="status" id="statusBar"></div>
+        </section>
+
+        <section class="surface-card">
+          <div class="surface-header">
+            <div><h3>How to use</h3></div>
+          </div>
+          <ol class="hint-list">
+            <li>Select a template key or create one from a starter preset.</li>
+            <li>Drag or click directly on Live Preview to choose a range.</li>
+            <li>Edit text and style in the inspector, then apply.</li>
+            <li>Check the result, then copy or download the generated JSON.</li>
+            <li>If the output looks right, port the JSON into the real viewer later.</li>
+          </ol>
+          <div class="small">Demo storage key: <code>abap-template-builder-demo.v1</code></div>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <script defer src="./template-builder-demo.js"></script>
+</body>
+</html>

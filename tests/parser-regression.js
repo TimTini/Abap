@@ -1,11 +1,13 @@
 "use strict";
 
 const assert = require("assert");
+const fs = require("fs");
 const path = require("path");
 const { parseAbapText } = require("../shared/abap-parser");
 const { loadConfigs } = require("../cli/config-loader");
 
 const configs = loadConfigs(path.resolve(__dirname, "..", "configs"));
+const configsDir = path.resolve(__dirname, "..", "configs");
 
 function parse(code) {
   return parseAbapText(code, configs, "test.abap");
@@ -32,6 +34,10 @@ function findObject(objects, objectType) {
   return objects.find((obj) => obj && obj.objectType === objectType) || null;
 }
 
+function findObjects(objects, objectType) {
+  return objects.filter((obj) => obj && obj.objectType === objectType);
+}
+
 function getValue(values, key) {
   if (!values || typeof values !== "object") {
     return "";
@@ -47,6 +53,346 @@ function getValueEntry(values, key) {
   }
   const entryOrList = values[key];
   return Array.isArray(entryOrList) ? (entryOrList[0] || null) : (entryOrList || null);
+}
+
+function assertHasObjectTypes(objects, expectedTypes, caseName) {
+  const actualTypes = new Set(
+    (Array.isArray(objects) ? objects : [])
+      .map((obj) => (obj && obj.objectType ? obj.objectType : ""))
+      .filter(Boolean)
+  );
+
+  for (const expectedType of expectedTypes) {
+    assert(
+      actualTypes.has(expectedType),
+      `${caseName}: Expected ${expectedType} object. Got [${Array.from(actualTypes).join(", ")}].`
+    );
+  }
+}
+
+function getConfigFileNames() {
+  return fs.readdirSync(configsDir)
+    .filter((name) => name.toLowerCase().endsWith(".json"))
+    .sort();
+}
+
+function testMultipleStatementsOnSingleLine() {
+  const result = parse("DATA lv_a TYPE i. DATA lv_b TYPE i. lv_a = 1. lv_b = 2.\n");
+  const objects = flattenObjects(result.objects);
+  const dataObjects = findObjects(objects, "DATA");
+  const assignmentObjects = findObjects(objects, "ASSIGNMENT");
+
+  assert.strictEqual(dataObjects.length, 2, "Expected two DATA objects from one-line statements.");
+  assert.strictEqual(assignmentObjects.length, 2, "Expected two ASSIGNMENT objects from one-line statements.");
+  assert.strictEqual(getValue(dataObjects[0].values, "name"), "lv_a");
+  assert.strictEqual(getValue(dataObjects[1].values, "name"), "lv_b");
+  assert.strictEqual(getValue(assignmentObjects[0].values, "target"), "lv_a");
+  assert.strictEqual(getValue(assignmentObjects[1].values, "target"), "lv_b");
+  assert.strictEqual(dataObjects[0].lineStart, 1, "First DATA statement should keep its source line.");
+  assert.strictEqual(dataObjects[1].lineStart, 1, "Second DATA statement should keep its source line.");
+  assert.strictEqual(assignmentObjects[0].lineStart, 1, "First assignment should keep its source line.");
+  assert.strictEqual(assignmentObjects[1].lineStart, 1, "Second assignment should keep its source line.");
+}
+
+function testSingleLineTrailingCommentAppliesToLastStatementOnly() {
+  const result = parse("DATA lv_a TYPE i. DATA lv_b TYPE i. \"last-data-comment\n");
+  const objects = flattenObjects(result.objects);
+  const dataObjects = findObjects(objects, "DATA");
+
+  assert.strictEqual(dataObjects.length, 2, "Expected two DATA objects from one-line statements with comment.");
+  assert.strictEqual(dataObjects[0].comment, "");
+  assert.strictEqual(dataObjects[1].comment, "last-data-comment");
+}
+
+function testDecimalLiteralDoesNotSplitStatement() {
+  const result = parse("DATA lv_total TYPE decfloat34.\nlv_total = 1.5.\n");
+  const objects = flattenObjects(result.objects);
+  const assignmentObjects = findObjects(objects, "ASSIGNMENT");
+
+  assert.strictEqual(assignmentObjects.length, 1, "Expected a single ASSIGNMENT for decimal literal.");
+  assert.strictEqual(assignmentObjects[0].raw, "lv_total = 1.5.");
+  assert.strictEqual(getValue(assignmentObjects[0].values, "expr"), "1.5");
+}
+
+function testChainedDataStatementSingleLine() {
+  const result = parse("DATA: lv_a TYPE i, lv_b TYPE i.\n");
+  const objects = flattenObjects(result.objects);
+  const dataObjects = findObjects(objects, "DATA");
+
+  assert.strictEqual(dataObjects.length, 2, "Expected chained DATA statement to split into two DATA objects.");
+  assert.strictEqual(getValue(dataObjects[0].values, "name"), "lv_a");
+  assert.strictEqual(getValue(dataObjects[1].values, "name"), "lv_b");
+}
+
+function testChainedDataStatementAcrossLines() {
+  const code = [
+    "DATA: lv_a TYPE i,",
+    "      lv_b TYPE i.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+  const dataObjects = findObjects(objects, "DATA");
+
+  assert.strictEqual(dataObjects.length, 2, "Expected multi-line chained DATA statement to split into two DATA objects.");
+  assert.strictEqual(getValue(dataObjects[0].values, "name"), "lv_a");
+  assert.strictEqual(getValue(dataObjects[1].values, "name"), "lv_b");
+}
+
+function testChainedDataStatementKeepsCommaInsideTemplateLiteral() {
+  const result = parse("DATA: lv_text TYPE string VALUE |A, B|, lv_other TYPE string VALUE |C|.\n");
+  const objects = flattenObjects(result.objects);
+  const dataObjects = findObjects(objects, "DATA");
+
+  assert.strictEqual(dataObjects.length, 2, "Expected commas inside template literals not to break chained DATA splitting.");
+  assert.strictEqual(getValue(dataObjects[0].values, "name"), "lv_text");
+  assert.strictEqual(getValue(dataObjects[0].values, "value"), "|A, B|");
+  assert.strictEqual(getValue(dataObjects[1].values, "name"), "lv_other");
+  assert.strictEqual(getValue(dataObjects[1].values, "value"), "|C|");
+}
+
+function testBacktickLiteralKeepsStatementAndInlineComment() {
+  const result = parse('DATA lv_text TYPE string VALUE `A.B "C`. DATA lv_other TYPE string.\n');
+  const objects = flattenObjects(result.objects);
+  const dataObjects = findObjects(objects, "DATA");
+
+  assert.strictEqual(dataObjects.length, 2, "Expected backtick literals to keep the statement intact.");
+  assert.strictEqual(getValue(dataObjects[0].values, "name"), "lv_text");
+  assert.strictEqual(getValue(dataObjects[0].values, "value"), '`A.B "C`');
+  assert.strictEqual(dataObjects[0].comment, "");
+  assert.strictEqual(getValue(dataObjects[1].values, "name"), "lv_other");
+}
+
+function testSupportedStatementSmokeMatrix() {
+  const cases = [
+    {
+      name: "append",
+      covers: ["append.json"],
+      expectedTypes: ["APPEND"],
+      code: "APPEND ls_row TO lt_rows.\n"
+    },
+    {
+      name: "assignment",
+      covers: ["assignment.json"],
+      expectedTypes: ["ASSIGNMENT"],
+      code: "lv_total = gv_total + 1.\n"
+    },
+    {
+      name: "call-function",
+      covers: ["call-function.json"],
+      expectedTypes: ["CALL_FUNCTION"],
+      code: "CALL FUNCTION 'Z_DEMO' EXPORTING iv_user = p_user IMPORTING ev_text = lv_text.\n"
+    },
+    {
+      name: "call-method-expression",
+      covers: ["call-method-expression.json"],
+      expectedTypes: ["CALL_METHOD"],
+      code: "lv_result = lcl_demo=>get_default( EXPORTING iv_user = p_user ).\n"
+    },
+    {
+      name: "call-method-classic",
+      covers: ["call-method.json"],
+      expectedTypes: ["CALL_METHOD"],
+      code: "CALL METHOD lo_demo->run EXPORTING iv_user = p_user IMPORTING ev_text = lv_text.\n"
+    },
+    {
+      name: "call-transaction",
+      covers: ["call-transaction.json"],
+      expectedTypes: ["CALL_TRANSACTION"],
+      code: "CALL TRANSACTION 'SE38'.\n"
+    },
+    {
+      name: "case-when",
+      covers: ["case.json", "when.json"],
+      expectedTypes: ["CASE", "WHEN"],
+      code: "CASE lv_kind. WHEN 'A'. ENDCASE.\n"
+    },
+    {
+      name: "try-catch-cleanup",
+      covers: ["try.json", "catch.json", "cleanup.json"],
+      expectedTypes: ["TRY", "CATCH", "CLEANUP"],
+      code: "TRY. CATCH cx_root INTO DATA(lx_root). CLEANUP. ENDTRY.\n"
+    },
+    {
+      name: "class-data",
+      covers: ["class-data.json"],
+      expectedTypes: ["CLASS-DATA"],
+      code: "CLASS-DATA gv_count TYPE i.\n"
+    },
+    {
+      name: "class-methods",
+      covers: ["class-methods.json"],
+      expectedTypes: ["CLASS-METHODS"],
+      code: "CLASS-METHODS build RETURNING VALUE(rv_text) TYPE string.\n"
+    },
+    {
+      name: "class",
+      covers: ["class.json"],
+      expectedTypes: ["CLASS"],
+      code: "CLASS lcl_demo DEFINITION. ENDCLASS.\n"
+    },
+    {
+      name: "clear",
+      covers: ["clear.json"],
+      expectedTypes: ["CLEAR"],
+      code: "CLEAR lv_text.\n"
+    },
+    {
+      name: "constants",
+      covers: ["constants.json"],
+      expectedTypes: ["CONSTANTS"],
+      code: "CONSTANTS gc_flag TYPE abap_bool VALUE abap_true.\n"
+    },
+    {
+      name: "data",
+      covers: ["data.json"],
+      expectedTypes: ["DATA"],
+      code: "DATA lv_text TYPE string.\n"
+    },
+    {
+      name: "delete-itab",
+      covers: ["delete-itab.json"],
+      expectedTypes: ["DELETE_ITAB"],
+      code: "DELETE lt_rows WHERE id = lv_id.\n"
+    },
+    {
+      name: "do",
+      covers: ["do.json"],
+      expectedTypes: ["DO"],
+      code: "DO 2 TIMES. ENDDO.\n"
+    },
+    {
+      name: "if-elseif-else",
+      covers: ["if.json", "elseif.json", "else.json"],
+      expectedTypes: ["IF", "ELSEIF", "ELSE"],
+      code: "IF lv_kind = 'A'. ELSEIF lv_kind = 'B'. ELSE. ENDIF.\n"
+    },
+    {
+      name: "field-symbols",
+      covers: ["field-symbols.json"],
+      expectedTypes: ["FIELD-SYMBOLS"],
+      code: "FIELD-SYMBOLS <ls_row> TYPE any.\n"
+    },
+    {
+      name: "form",
+      covers: ["form.json"],
+      expectedTypes: ["FORM"],
+      code: "FORM main USING p_user TYPE syuname. ENDFORM.\n"
+    },
+    {
+      name: "insert-itab",
+      covers: ["insert-itab.json"],
+      expectedTypes: ["INSERT_ITAB"],
+      code: "INSERT ls_row INTO TABLE lt_rows.\n"
+    },
+    {
+      name: "loop-at-itab",
+      covers: ["loop-at-itab.json"],
+      expectedTypes: ["LOOP_AT_ITAB"],
+      code: "LOOP AT lt_rows INTO ls_row. ENDLOOP.\n"
+    },
+    {
+      name: "method",
+      covers: ["method.json"],
+      expectedTypes: ["METHOD"],
+      code: "METHOD run. ENDMETHOD.\n"
+    },
+    {
+      name: "methods",
+      covers: ["methods.json"],
+      expectedTypes: ["METHODS"],
+      code: "METHODS run IMPORTING iv_user TYPE syuname RETURNING VALUE(rv_text) TYPE string.\n"
+    },
+    {
+      name: "modify-itab",
+      covers: ["modify-itab.json"],
+      expectedTypes: ["MODIFY_ITAB"],
+      code: "MODIFY lt_rows FROM ls_row TRANSPORTING name WHERE id = lv_id.\n"
+    },
+    {
+      name: "move-corresponding",
+      covers: ["move-corresponding.json"],
+      expectedTypes: ["MOVE-CORRESPONDING"],
+      code: "MOVE-CORRESPONDING ls_src TO ls_dst.\n"
+    },
+    {
+      name: "move",
+      covers: ["move.json"],
+      expectedTypes: ["MOVE"],
+      code: "MOVE lv_src TO lv_dst.\n"
+    },
+    {
+      name: "parameters",
+      covers: ["parameters.json"],
+      expectedTypes: ["PARAMETERS"],
+      code: "PARAMETERS p_user TYPE syuname.\n"
+    },
+    {
+      name: "perform",
+      covers: ["perform.json"],
+      expectedTypes: ["PERFORM"],
+      code: "PERFORM main USING p_user CHANGING lv_text.\n"
+    },
+    {
+      name: "ranges",
+      covers: ["ranges.json"],
+      expectedTypes: ["RANGES"],
+      code: "RANGES lr_user FOR sy-uname.\n"
+    },
+    {
+      name: "read-table",
+      covers: ["read-table.json"],
+      expectedTypes: ["READ_TABLE"],
+      code: "READ TABLE lt_rows WITH KEY id = lv_id INTO ls_row.\n"
+    },
+    {
+      name: "select-options",
+      covers: ["select-options.json"],
+      expectedTypes: ["SELECT-OPTIONS"],
+      code: "SELECT-OPTIONS s_user FOR sy-uname.\n"
+    },
+    {
+      name: "select",
+      covers: ["select.json"],
+      expectedTypes: ["SELECT"],
+      code: "SELECT * FROM usr02 INTO TABLE lt_users WHERE bname = p_user.\n"
+    },
+    {
+      name: "sort-itab",
+      covers: ["sort-itab.json"],
+      expectedTypes: ["SORT_ITAB"],
+      code: "SORT lt_rows BY id.\n"
+    },
+    {
+      name: "statics",
+      covers: ["statics.json"],
+      expectedTypes: ["STATICS"],
+      code: "STATICS sv_count TYPE i.\n"
+    },
+    {
+      name: "types",
+      covers: ["types.json"],
+      expectedTypes: ["TYPES"],
+      code: "TYPES ty_text TYPE string.\n"
+    }
+  ];
+
+  const coveredConfigFiles = new Set();
+  for (const smokeCase of cases) {
+    for (const configFile of smokeCase.covers) {
+      coveredConfigFiles.add(configFile);
+    }
+    const result = parse(smokeCase.code);
+    const objects = flattenObjects(result.objects);
+    assertHasObjectTypes(objects, smokeCase.expectedTypes, smokeCase.name);
+  }
+
+  assert.deepStrictEqual(
+    Array.from(coveredConfigFiles).sort(),
+    getConfigFileNames(),
+    "Smoke matrix must cover every parser config file."
+  );
 }
 
 function testInlineCommentInsideSingleQuote() {
@@ -738,6 +1084,13 @@ function testConditionOperandsAlwaysHaveDecl() {
 }
 
 function run() {
+  testMultipleStatementsOnSingleLine();
+  testSingleLineTrailingCommentAppliesToLastStatementOnly();
+  testDecimalLiteralDoesNotSplitStatement();
+  testChainedDataStatementSingleLine();
+  testChainedDataStatementAcrossLines();
+  testChainedDataStatementKeepsCommaInsideTemplateLiteral();
+  testBacktickLiteralKeepsStatementAndInlineComment();
   testInlineCommentInsideSingleQuote();
   testInlineCommentInsideTemplate();
   testEscapedSingleQuoteTokenization();
@@ -757,6 +1110,7 @@ function run() {
   testIsInitialAndIsNotInitialConditions();
   testImplicitSplitOnlyForReadTable();
   testConditionOperandsAlwaysHaveDecl();
+  testSupportedStatementSmokeMatrix();
   console.log("parser-regression: ok");
 }
 

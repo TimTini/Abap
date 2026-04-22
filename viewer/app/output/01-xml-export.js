@@ -1,10 +1,3117 @@
 "use strict";
 
-(function (root) {
-  const globalRoot = root || (typeof globalThis !== "undefined" ? globalThis : this);
-  const registry = globalRoot.__AbapSourceParts = globalRoot.__AbapSourceParts || {};
-  const targetKey = "viewer/app/04-output-render.js";
-  const partKey = "viewer/app/output/01-xml-export.js";
-  const bucket = registry[targetKey] = registry[targetKey] || {};
-  bucket[partKey] = "\"use strict\";\n\nwindow.AbapViewerModules = window.AbapViewerModules || {};\nwindow.AbapViewerModules.parts = window.AbapViewerModules.parts || {};\n\n  function isValueLikeEntryObject(value) {\n    if (!isPlainObjectRecord(value)) {\n      return false;\n    }\n    if (isDeclLikeObject(value) || isAbapStatementObject(value)) {\n      return false;\n    }\n    return (\n      hasValueLevelDescFields(value)\n      || Object.prototype.hasOwnProperty.call(value, \"declRef\")\n      || Object.prototype.hasOwnProperty.call(value, \"value\")\n      || Object.prototype.hasOwnProperty.call(value, \"name\")\n      || Object.prototype.hasOwnProperty.call(value, \"label\")\n    );\n  }\n\n  function isAssignmentLikeEntryObject(value) {\n    if (!isPlainObjectRecord(value)) {\n      return false;\n    }\n    if (isDeclLikeObject(value) || isAbapStatementObject(value)) {\n      return false;\n    }\n    const hasValueSignals = (\n      Object.prototype.hasOwnProperty.call(value, \"value\")\n      || Object.prototype.hasOwnProperty.call(value, \"valueRef\")\n      || Object.prototype.hasOwnProperty.call(value, \"valueDecl\")\n      || Object.prototype.hasOwnProperty.call(value, \"originDecls\")\n    );\n    if (!hasValueSignals) {\n      return false;\n    }\n    return (\n      Object.prototype.hasOwnProperty.call(value, \"name\")\n      || Object.prototype.hasOwnProperty.call(value, \"value\")\n      || Object.prototype.hasOwnProperty.call(value, \"valueRef\")\n    );\n  }\n\n  function isConditionClauseLikeObject(value) {\n    if (!isPlainObjectRecord(value)) {\n      return false;\n    }\n    return (\n      Object.prototype.hasOwnProperty.call(value, \"leftOperand\")\n      || Object.prototype.hasOwnProperty.call(value, \"rightOperand\")\n      || Object.prototype.hasOwnProperty.call(value, \"comparisonOperator\")\n    );\n  }\n\n  function normalizeEntryObjectForXml(value, keyHint, pathParts, ownerContext) {\n    if (!isPlainObjectRecord(value)) {\n      return value;\n    }\n    if (isDeclLikeObject(value) || isAbapStatementObject(value)) {\n      return value;\n    }\n\n    const pathKey = buildPathKeyFromParts(pathParts);\n    const pathLower = pathKey.toLowerCase();\n    const inValuesPath = pathLower.includes(\"/values/\");\n    const inExtrasPath = pathLower.includes(\"/extras/\");\n    const keyHintLower = String(keyHint || \"\").trim().toLowerCase();\n    const extrasItemLike = keyHintLower === \"item\";\n    const source = getDeclSourceContextFromObject(ownerContext);\n\n    let next = value;\n\n    if (inValuesPath && isValueLikeEntryObject(next)) {\n      next = ensureEntryDeclWithSynthetic(next, {\n        pathKey,\n        file: source.file,\n        lineStart: source.lineStart,\n        raw: source.raw,\n        role: \"xml:value\"\n      });\n    }\n\n    if (inExtrasPath && extrasItemLike) {\n      if (isConditionClauseLikeObject(next)) {\n        next = ensureConditionClauseDeclsWithSynthetic(next, {\n          pathKey,\n          file: source.file,\n          lineStart: source.lineStart,\n          raw: source.raw\n        });\n      }\n\n      if (isAssignmentLikeEntryObject(next)) {\n        next = ensureValueDeclWithSynthetic(next, {\n          pathKey,\n          file: source.file,\n          lineStart: source.lineStart,\n          raw: source.raw,\n          role: \"xml:extras:value\",\n          nameHint: String(keyHint || \"value\")\n        });\n      }\n\n      if (isValueLikeEntryObject(next)) {\n        next = ensureEntryDeclWithSynthetic(next, {\n          pathKey,\n          file: source.file,\n          lineStart: source.lineStart,\n          raw: source.raw,\n          role: \"xml:extras\"\n        });\n      }\n    }\n\n    return next;\n  }\n\n  function appendXmlValue(lines, keyHint, tagName, value, indent, pathParts, ownerContext) {\n    const pad = \" \".repeat(indent);\n    const currentPathParts = Array.isArray(pathParts) ? pathParts : [];\n    const currentOwnerContext = ownerContext && typeof ownerContext === \"object\" ? ownerContext : null;\n\n    if (value === undefined) {\n      return;\n    }\n\n    if (value === null) {\n      lines.push(`${pad}<${tagName}/>`);\n      return;\n    }\n\n    if (typeof value === \"string\" || typeof value === \"number\" || typeof value === \"boolean\") {\n      lines.push(`${pad}<${tagName}>${escapeXmlText(String(value))}</${tagName}>`);\n      return;\n    }\n\n    if (Array.isArray(value)) {\n      const itemTag = getArrayItemTagName(keyHint);\n      lines.push(`${pad}<${tagName}>`);\n      for (let index = 0; index < value.length; index += 1) {\n        const item = value[index];\n        const itemPathParts = currentPathParts.concat(`${itemTag}[${index + 1}]`);\n        appendXmlValue(lines, itemTag, itemTag, item, indent + 2, itemPathParts, currentOwnerContext);\n      }\n      lines.push(`${pad}</${tagName}>`);\n      return;\n    }\n\n    if (typeof value === \"object\") {\n      const nextOwnerContext = isAbapStatementObject(value) ? value : currentOwnerContext;\n      const normalizedValue = normalizeEntryObjectForXml(value, keyHint, currentPathParts, nextOwnerContext);\n      lines.push(`${pad}<${tagName}>`);\n\n      const valueIsDecl = isDeclObjectForXml(keyHint, normalizedValue);\n      let hasComputedFinalDesc = false;\n\n      if (valueIsDecl) {\n        const declDesc = getEffectiveDeclDesc(normalizedValue);\n        if (declDesc) {\n          lines.push(`${\" \".repeat(indent + 2)}<desc>${escapeXmlText(declDesc)}</desc>`);\n        } else {\n          lines.push(`${\" \".repeat(indent + 2)}<desc/>`);\n        }\n\n        const finalDeclDesc = getFinalDeclDesc(normalizedValue);\n        hasComputedFinalDesc = true;\n        if (finalDeclDesc) {\n          lines.push(`${\" \".repeat(indent + 2)}<finalDesc>${escapeXmlText(finalDeclDesc)}</finalDesc>`);\n        } else {\n          lines.push(`${\" \".repeat(indent + 2)}<finalDesc/>`);\n        }\n\n        const declName = getDeclDisplayName(normalizedValue) || getDeclTechName(normalizedValue);\n        lines.push(`${\" \".repeat(indent + 2)}<name>${escapeXmlText(declName)}</name>`);\n      }\n\n      if (!valueIsDecl) {\n        let shouldEmitFinalDesc = false;\n        let finalDesc = \"\";\n        if (hasValueLevelDescFields(normalizedValue)) {\n          shouldEmitFinalDesc = true;\n          finalDesc = resolveValueLevelFinalDesc(normalizedValue);\n        } else if (isDeclLikeObject(normalizedValue.decl)) {\n          shouldEmitFinalDesc = true;\n          finalDesc = getFinalDeclDesc(normalizedValue.decl);\n        }\n\n        if (shouldEmitFinalDesc) {\n          hasComputedFinalDesc = true;\n          if (finalDesc) {\n            lines.push(`${\" \".repeat(indent + 2)}<finalDesc>${escapeXmlText(finalDesc)}</finalDesc>`);\n          } else {\n            lines.push(`${\" \".repeat(indent + 2)}<finalDesc/>`);\n          }\n        }\n      }\n\n      const preferredOrder = [\n        \"id\",\n        \"parent\",\n        \"objectType\",\n        \"file\",\n        \"lineStart\",\n        \"comment\",\n        \"raw\",\n        \"keywords\",\n        \"values\",\n        \"extras\",\n        \"block\",\n        \"children\"\n      ];\n\n      const keys = Object.keys(normalizedValue);\n      keys.sort((a, b) => {\n        const ai = preferredOrder.indexOf(a);\n        const bi = preferredOrder.indexOf(b);\n        if (ai !== -1 || bi !== -1) {\n          return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);\n        }\n        return a.localeCompare(b);\n      });\n\n      for (const key of keys) {\n        if (key === \"desc\" && valueIsDecl) {\n          // computed above\n          continue;\n        }\n        if (key === \"name\" && valueIsDecl) {\n          // computed above (normalized via settings)\n          continue;\n        }\n        if (key === \"finalDesc\" && hasComputedFinalDesc) {\n          continue;\n        }\n        const childTag = toXmlTagName(key);\n        appendXmlValue(\n          lines,\n          key,\n          childTag,\n          normalizedValue[key],\n          indent + 2,\n          currentPathParts.concat(key),\n          nextOwnerContext\n        );\n      }\n\n      lines.push(`${pad}</${tagName}>`);\n      return;\n    }\n\n    lines.push(`${pad}<${tagName}>${escapeXmlText(String(value))}</${tagName}>`);\n  }\n\n  function buildAbapFlowXml(data) {\n    const fileName = data && typeof data === \"object\" ? String(data.file || \"\") : \"\";\n    const objects = data && typeof data === \"object\" && Array.isArray(data.objects) ? data.objects : [];\n    const renderObjects = buildRenderableObjects(objects, RENDER_TREE_OPTIONS);\n    const exportRoots = buildXmlExportRoots(renderObjects);\n\n    const lines = ['<?xml version=\"1.0\" encoding=\"UTF-8\"?>', \"<abapflowObjects>\"];\n    if (fileName) {\n      lines.push(`  <file>${escapeXmlText(fileName)}</file>`);\n    }\n    lines.push(\"  <objects>\");\n    for (let index = 0; index < exportRoots.length; index += 1) {\n      const obj = exportRoots[index];\n      appendXmlValue(lines, \"object\", \"object\", obj, 4, [\"objects\", `object[${index + 1}]`], obj);\n    }\n    lines.push(\"  </objects>\");\n    lines.push(\"</abapflowObjects>\");\n\n    return lines.join(\"\\n\");\n  }\n\n  function walkObjects(roots, visit) {\n    const stack = Array.isArray(roots) ? roots.slice().reverse() : [];\n    while (stack.length) {\n      const node = stack.pop();\n      if (!node) {\n        continue;\n      }\n      visit(node);\n      const children = Array.isArray(node.children) ? node.children : [];\n      for (let i = children.length - 1; i >= 0; i -= 1) {\n        stack.push(children[i]);\n      }\n    }\n  }\n\n  function collectDeclSearchTextFromExtras(extras) {\n    if (!extras || typeof extras !== \"object\") {\n      return \"\";\n    }\n\n    const decls = [];\n    const addDecl = (decl) => {\n      if (decl && typeof decl === \"object\") {\n        decls.push(decl);\n      }\n    };\n    const addDeclList = (list) => {\n      if (!Array.isArray(list)) {\n        return;\n      }\n      for (const decl of list) {\n        addDecl(decl);\n      }\n    };\n\n    const collectFromAssignmentSections = (obj, sections) => {\n      for (const sectionName of sections) {\n        const list = obj && Array.isArray(obj[sectionName]) ? obj[sectionName] : [];\n        for (const entry of list) {\n          addDeclList(entry && entry.originDecls);\n          addDecl(entry && entry.valueDecl);\n        }\n      }\n    };\n\n    if (extras.callFunction) {\n      collectFromAssignmentSections(extras.callFunction, [\"exporting\", \"importing\", \"changing\", \"tables\", \"exceptions\"]);\n    }\n\n    if (extras.callMethod) {\n      collectFromAssignmentSections(extras.callMethod, [\"exporting\", \"importing\", \"changing\", \"receiving\", \"exceptions\"]);\n    }\n\n    if (extras.performCall) {\n      for (const sectionName of [\"using\", \"changing\", \"tables\"]) {\n        const list = Array.isArray(extras.performCall[sectionName]) ? extras.performCall[sectionName] : [];\n        for (const entry of list) {\n          addDeclList(entry && entry.originDecls);\n          addDecl(entry && entry.valueDecl);\n        }\n\n      }\n    }\n\n    if (extras.form && Array.isArray(extras.form.params)) {\n      for (const param of extras.form.params) {\n        addDeclList(param && param.originDecls);\n      }\n    }\n\n    collectConditionDeclsFromExtras(extras, addDecl);\n\n    const seen = new Set();\n    const parts = [];\n    for (const decl of decls) {\n      const key = getDeclOverrideStorageKey(decl) || stringifyDecl(decl);\n      if (!key || seen.has(key)) {\n        continue;\n      }\n      seen.add(key);\n      parts.push(String(decl.name || \"\"));\n      const desc = getEffectiveDeclDesc(decl);\n      if (desc) {\n        parts.push(desc);\n      }\n    }\n\n    return parts.filter(Boolean).join(\"\\n\");\n  }\n\n  function buildSearchIndex(objects) {\n    const map = new Map();\n    walkObjects(objects, (obj) => {\n      const id = normalizeId(obj && obj.id);\n      if (!id) {\n        return;\n      }\n\n      const keywordEntries = getKeywordEntries(obj);\n      const keywordsText = keywordEntries.length\n        ? keywordEntries.map((k) => `${k.text || \"\"} ${k.label || \"\"}`.trim()).join(\"\\n\")\n        : \"\";\n\n      const valueEntries = getValueEntries(obj);\n      const valuesText = valueEntries.length\n        ? valueEntries\n            .map((v) => {\n              const declText = stringifyDecl(v && v.decl);\n              const declDesc = getEffectiveDeclDesc(v && v.decl);\n              return [\n                v && v.name ? String(v.name) : \"\",\n                v && v.value ? String(v.value) : \"\",\n                v && v.label ? String(v.label) : \"\",\n                v && v.codeDesc ? String(v.codeDesc) : \"\",\n                v && v.declRef ? String(v.declRef) : \"\",\n                declText,\n                declDesc\n              ]\n                .filter(Boolean)\n                .join(\" \");\n            })\n            .join(\"\\n\")\n        : \"\";\n\n      const extrasText = obj.extras && typeof obj.extras === \"object\" ? safeJson(obj.extras, false) : \"\";\n      const extrasDeclText = collectDeclSearchTextFromExtras(obj.extras);\n\n      const haystack = [\n        obj.objectType || \"\",\n        obj.raw || \"\",\n        obj.comment || \"\",\n        keywordsText,\n        valuesText,\n        extrasText,\n        extrasDeclText\n      ]\n        .filter(Boolean)\n        .join(\"\\n\")\n        .toLowerCase();\n\n      map.set(id, haystack);\n    });\n    return map;\n  }\n\n  function computeLineOffsets(text) {\n    const value = String(text || \"\");\n    const offsets = [0];\n    for (let i = 0; i < value.length; i += 1) {\n      if (value[i] === \"\\n\") {\n        offsets.push(i + 1);\n      }\n    }\n    return offsets;\n  }\n\n  function getSelectionRangeForLines(text, lineStart, lineEnd) {\n    const value = String(text || \"\");\n    const offsets = state.inputLineOffsets.length ? state.inputLineOffsets : computeLineOffsets(value);\n    const start = Math.max(1, Number(lineStart) || 1);\n    const end = Math.max(start, Number(lineEnd) || start);\n    const startLineIndex = start - 1;\n    const endLineIndex = end - 1;\n    const startOffset = offsets[startLineIndex] ?? 0;\n    const endOffset = offsets[endLineIndex + 1] ?? value.length;\n    return { start: startOffset, end: Math.max(startOffset, endOffset) };\n  }\n\n  function selectCodeLines(lineStart, lineEnd) {\n    const text = els.inputText.value || \"\";\n    state.inputLineOffsets = computeLineOffsets(text);\n    const range = getSelectionRangeForLines(text, lineStart, lineEnd);\n    els.inputText.focus();\n    els.inputText.setSelectionRange(range.start, range.end);\n    syncInputGutterScroll();\n  }\n\n  function scrollElementInContainer(container, element, options) {\n    if (!container || !element || typeof container.scrollTop !== \"number\") {\n      return;\n    }\n\n    const opts = options && typeof options === \"object\" ? options : {};\n    const mode = String(opts.mode || \"nearest\").toLowerCase();\n    const padTop = Math.max(0, Number(opts.padTop) || 0);\n    const padBottom = Math.max(0, Number(opts.padBottom) || 0);\n    const behavior = opts.behavior === \"smooth\" ? \"smooth\" : \"auto\";\n\n    const containerRect = container.getBoundingClientRect();\n    const elementRect = element.getBoundingClientRect();\n    if (!containerRect || !elementRect || !Number.isFinite(containerRect.top) || !Number.isFinite(elementRect.top)) {\n      return;\n    }\n\n    const currentTop = Number(container.scrollTop || 0) || 0;\n    let nextTop = currentTop;\n\n    if (mode === \"start\") {\n      nextTop = currentTop + (elementRect.top - containerRect.top) - padTop;\n    } else if (mode === \"center\") {\n      nextTop = currentTop\n        + (elementRect.top + (elementRect.height / 2))\n        - (containerRect.top + (containerRect.height / 2));\n    } else {\n      const topLimit = containerRect.top + padTop;\n      const bottomLimit = containerRect.bottom - padBottom;\n      if (elementRect.top < topLimit) {\n        nextTop = currentTop + (elementRect.top - topLimit);\n      } else if (elementRect.bottom > bottomLimit) {\n        nextTop = currentTop + (elementRect.bottom - bottomLimit);\n      } else {\n        return;\n      }\n    }\n\n    const maxTop = Math.max(0, Number(container.scrollHeight || 0) - Number(container.clientHeight || 0));\n    const clampedTop = Math.max(0, Math.min(maxTop, Math.round(nextTop)));\n    if (Math.abs(clampedTop - currentTop) < 1) {\n      return;\n    }\n\n    if (typeof container.scrollTo === \"function\") {\n      container.scrollTo({ top: clampedTop, behavior });\n    } else {\n      container.scrollTop = clampedTop;\n    }\n  }\n\n  function setSelectedCard(id, options) {\n    const normalized = normalizeId(id);\n    if (!normalized) {\n      return;\n    }\n    const opts = options && typeof options === \"object\" ? options : {};\n    const shouldScroll = opts.scroll !== false;\n    const scrollMode = String(opts.scrollMode || \"start\").toLowerCase();\n\n    if (state.selectedId) {\n      const prev = els.output.querySelector(`[data-id=\"${escapeSelectorValue(state.selectedId)}\"]`);\n      if (prev) {\n        prev.classList.remove(\"selected\");\n      }\n    }\n\n    state.selectedId = normalized;\n    const next = els.output.querySelector(`[data-id=\"${escapeSelectorValue(normalized)}\"]`);\n    if (next) {\n      next.classList.add(\"selected\");\n      if (shouldScroll) {\n        scrollElementInContainer(els.output, next, { mode: scrollMode, padTop: 10, padBottom: 10 });\n      }\n    }\n  }\n\n  function setSelectedTemplateBlock(index, options) {\n    if (!els.templatePreviewOutput) {\n      return;\n    }\n\n    const opts = options && typeof options === \"object\" ? options : {};\n    const shouldScroll = opts.scroll !== false;\n    const scrollMode = String(opts.scrollMode || \"start\").toLowerCase();\n    const normalized = String(index === undefined || index === null ? \"\" : index).trim();\n    if (!normalized) {\n      return;\n    }\n\n    if (state.selectedTemplateIndex !== \"\") {\n      const prev = els.templatePreviewOutput.querySelector(\n        `.template-block[data-template-index=\"${escapeSelectorValue(state.selectedTemplateIndex)}\"]`\n      );\n      if (prev) {\n        prev.classList.remove(\"selected\");\n      }\n    }\n\n    state.selectedTemplateIndex = normalized;\n    const next = els.templatePreviewOutput.querySelector(\n      `.template-block[data-template-index=\"${escapeSelectorValue(normalized)}\"]`\n    );\n    if (next) {\n      next.classList.add(\"selected\");\n      if (shouldScroll) {\n        scrollElementInContainer(els.templatePreviewOutput, next, { mode: scrollMode, padTop: 10, padBottom: 10 });\n      }\n    }\n  }\n\n  function setSelectedDeclRow(declKey) {\n    const key = String(declKey || \"\").trim();\n    if (!key || !els.declDescTable) {\n      return;\n    }\n\n    if (state.selectedDeclKey) {\n      const prev = els.declDescTable.querySelector(`tr[data-decl-key=\"${escapeSelectorValue(state.selectedDeclKey)}\"]`);\n      if (prev) {\n        prev.classList.remove(\"desc-selected\");\n      }\n    }\n\n    state.selectedDeclKey = key;\n    const next = els.declDescTable.querySelector(`tr[data-decl-key=\"${escapeSelectorValue(key)}\"]`);\n    if (next) {\n      next.classList.add(\"desc-selected\");\n      scrollElementInContainer(els.declDescPanel, next, { mode: \"nearest\", padTop: 8, padBottom: 8 });\n    }\n  }\n\n  function countInputLines(value) {\n    const text = String(value || \"\");\n    if (!text) {\n      return 1;\n    }\n    return text.split(\"\\n\").length;\n  }\n\n  function syncInputGutterScroll() {\n    if (!els.inputText || !els.inputGutterContent) {\n      return;\n    }\n\n    const scrollTop = Number(els.inputText.scrollTop || 0) || 0;\n    els.inputGutterContent.style.transform = `translateY(${-scrollTop}px)`;\n  }\n\n  function rebuildInputGutter() {\n    if (!els.inputText || !els.inputGutterContent) {\n      return;\n    }\n\n    const trimmed = String(els.inputText.value || \"\").trim();\n    const isJsonLike = (trimmed.startsWith(\"{\") || trimmed.startsWith(\"[\")) && trimmed.length > 1;\n    state.inputMode = isJsonLike ? \"json\" : \"abap\";\n\n    const lineCount = Math.max(1, countInputLines(els.inputText.value || \"\"));\n    if (lineCount === state.inputLineCount && state.inputGutterButtonsByLine.size) {\n      syncInputGutterScroll();\n      refreshInputGutterTargets();\n      return;\n    }\n\n    state.inputLineCount = lineCount;\n    state.inputGutterButtonsByLine = new Map();\n\n    const frag = document.createDocumentFragment();\n    for (let line = 1; line <= lineCount; line += 1) {\n      const row = document.createElement(\"div\");\n      row.className = \"gutter-line\";\n\n      const btn = document.createElement(\"button\");\n      btn.type = \"button\";\n      btn.className = \"gutter-jump\";\n      btn.textContent = \"↪\";\n      btn.hidden = true;\n      btn.setAttribute(\"data-line\", String(line));\n      row.appendChild(btn);\n\n      const num = document.createElement(\"span\");\n      num.className = \"gutter-num\";\n      num.textContent = String(line);\n      row.appendChild(num);\n\n      state.inputGutterButtonsByLine.set(line, btn);\n      frag.appendChild(row);\n    }\n\n    els.inputGutterContent.replaceChildren(frag);\n    syncInputGutterScroll();\n    refreshInputGutterTargets();\n  }\n\n  function computeInputGutterTargetsForOutput() {\n    const targets = new Map();\n    if (!els.output) {\n      return targets;\n    }\n\n    const cards = els.output.querySelectorAll(\".card[data-id][data-line-start]\");\n    for (const card of Array.from(cards)) {\n      const line = Number(card.getAttribute(\"data-line-start\")) || 0;\n      const id = String(card.getAttribute(\"data-id\") || \"\");\n      if (!line || !id || targets.has(line)) {\n        continue;\n      }\n      targets.set(line, { kind: \"output\", id });\n    }\n\n    return targets;\n  }\n\n  function computeInputGutterTargetsForDescriptions() {\n    const targets = new Map();\n    if (!els.declDescTable) {\n      return targets;\n    }\n\n\n    const rows = els.declDescTable.querySelectorAll(\"tr[data-decl-key][data-line-start]\");\n    for (const row of Array.from(rows)) {\n      const line = Number(row.getAttribute(\"data-line-start\")) || 0;\n      const declKey = String(row.getAttribute(\"data-decl-key\") || \"\");\n      if (!line || !declKey || targets.has(line)) {\n        continue;\n      }\n      targets.set(line, { kind: \"descriptions\", declKey });\n    }\n\n    return targets;\n  }\n\n  function computeInputGutterTargetsForTemplate() {\n    const targets = new Map();\n    if (!els.templatePreviewOutput) {\n      return targets;\n    }\n\n    const blocks = els.templatePreviewOutput.querySelectorAll(\".template-block[data-template-index][data-line-start]\");\n    for (const block of Array.from(blocks)) {\n      const line = Number(block.getAttribute(\"data-line-start\")) || 0;\n      const index = String(block.getAttribute(\"data-template-index\") || \"\");\n      if (!line || !index || targets.has(line)) {\n        continue;\n      }\n      targets.set(line, { kind: \"template\", index });\n    }\n\n    return targets;\n  }\n\n  function refreshInputGutterTargets() {\n    if (!els.inputGutterContent || !state.inputGutterButtonsByLine.size) {\n      return;\n    }\n\n    if (state.inputMode !== \"abap\") {\n      state.inputGutterTargetsByLine = new Map();\n      for (const btn of state.inputGutterButtonsByLine.values()) {\n        btn.hidden = true;\n      }\n      return;\n    }\n\n    let targets = new Map();\n    if (state.rightTab === \"descriptions\") {\n      targets = computeInputGutterTargetsForDescriptions();\n    } else if (state.rightTab === \"output\") {\n      targets = computeInputGutterTargetsForOutput();\n    } else if (state.rightTab === \"template\") {\n      targets = computeInputGutterTargetsForTemplate();\n    }\n\n    state.inputGutterTargetsByLine = targets;\n    const title = state.rightTab === \"descriptions\"\n      ? \"Jump to Descriptions\"\n      : (state.rightTab === \"output\"\n        ? \"Jump to Output\"\n        : (state.rightTab === \"template\" ? \"Jump to Template\" : \"\"));\n    for (const [line, btn] of state.inputGutterButtonsByLine.entries()) {\n      const target = targets.get(line);\n      btn.hidden = !target;\n      if (target) {\n        btn.title = title;\n        btn.setAttribute(\"aria-label\", title);\n      }\n    }\n  }\n\n  function onInputGutterClick(ev) {\n    const target = ev && ev.target && typeof ev.target.closest === \"function\"\n      ? ev.target.closest(\"button.gutter-jump\")\n      : null;\n    if (!target) {\n      return;\n    }\n\n    const line = Number(target.getAttribute(\"data-line\")) || 0;\n    if (!line) {\n      return;\n    }\n\n    const jumpTarget = state.inputGutterTargetsByLine.get(line);\n    if (!jumpTarget) {\n      return;\n    }\n\n    if (state.rightTab === \"output\" && jumpTarget.kind === \"output\") {\n      setSelectedCard(jumpTarget.id, { scroll: true, scrollMode: \"start\" });\n      return;\n    }\n\n    if (state.rightTab === \"template\" && jumpTarget.kind === \"template\") {\n      setSelectedTemplateBlock(jumpTarget.index, { scroll: true, scrollMode: \"start\" });\n      return;\n    }\n\n    if (state.rightTab === \"descriptions\" && jumpTarget.kind === \"descriptions\") {\n      setSelectedDeclRow(jumpTarget.declKey);\n    }\n  }\n\n  function openJsonModal(value) {\n    openTextModal(\"Object JSON\", safeJson(value, true));\n  }\n\n  function openTextModal(title, text) {\n    if (!els.editModal.hidden) {\n      closeEditModal();\n    }\n\n    if (els.jsonTitle) {\n      els.jsonTitle.textContent = title ? String(title) : \"\";\n    }\n\n    els.jsonPre.textContent = text ? String(text) : \"\";\n    els.jsonModal.hidden = false;\n  }\n\n  function closeJsonModal() {\n    els.jsonModal.hidden = true;\n    if (els.jsonTitle) {\n      els.jsonTitle.textContent = \"Object JSON\";\n    }\n    els.jsonPre.textContent = \"\";\n  }\n\n  async function copyJsonToClipboard() {\n    const text = els.jsonPre.textContent || \"\";\n    if (!text) {\n      return;\n    }\n\n    if (navigator.clipboard && typeof navigator.clipboard.writeText === \"function\") {\n      await navigator.clipboard.writeText(text);\n      return;\n    }\n\n    const selection = window.getSelection();\n    if (!selection) {\n      return;\n    }\n    selection.removeAllRanges();\n    const range = document.createRange();\n    range.selectNodeContents(els.jsonPre);\n    selection.addRange(range);\n    document.execCommand(\"copy\");\n    selection.removeAllRanges();\n  }\n\n  function stringifyDecl(decl) {\n    if (!decl || typeof decl !== \"object\") {\n      return \"\";\n    }\n\n    const techName = getDeclTechName(decl);\n    const displayName = getDeclDisplayName(decl);\n\n    const parts = [];\n    if (decl.objectType) {\n      parts.push(String(decl.objectType));\n    }\n    if (decl.scopeLabel) {\n      parts.push(`[${String(decl.scopeLabel)}]`);\n    }\n    if (displayName) {\n      parts.push(displayName);\n    }\n    if (techName && displayName && techName !== displayName) {\n      parts.push(`(${techName})`);\n    }\n    if (decl.file) {\n      parts.push(String(decl.file));\n    }\n    if (decl.lineStart) {\n      parts.push(`#${decl.lineStart}`);\n    }\n    return parts.join(\" \");\n  }\n\n  function getDeclTechName(decl) {\n    if (!decl || typeof decl !== \"object\") {\n      return \"\";\n    }\n    return decl.name ? String(decl.name) : \"\";\n  }\n\n  function stripAngleBrackets(text) {\n    const trimmed = String(text || \"\").trim();\n    if (trimmed.startsWith(\"<\") && trimmed.endsWith(\">\") && trimmed.length > 2) {\n      return trimmed.slice(1, -1);\n    }\n    return trimmed;\n  }\n\n  function stripDeclCategoryPrefix(text) {\n    const raw = String(text || \"\").trim();\n    if (!raw) {\n      return \"\";\n    }\n\n    const match = raw.match(\n      /^\\s*(HẰNG|HANG|STRUCT|TABLE|RANGETABLE|BIẾN|BIEN|CỜ|CO|FIELDSYMBOL)\\b\\s*[:\\-\\[\\]]*\\s*/i\n    );\n    if (!match) {\n      return raw;\n    }\n\n    let rest = raw.slice(match[0].length).trim();\n    // If the prefix included an opening \"[\" (e.g. \"BIẾN:[\") then strip ONE trailing \"]\" (e.g. \"...]\")\n    // so \"BIẾN:[desc]\" -> \"desc\" instead of \"desc]\".\n    if (match[0].includes(\"[\") && rest.endsWith(\"]\")) {\n      rest = rest.slice(0, -1).trim();\n    }\n    return rest;\n  }\n\n  function isStructFieldDecl(decl) {\n    if (!decl || typeof decl !== \"object\") {\n      return false;\n    }\n    if (decl.objectType === \"STRUCT_FIELD\") {\n      return true;\n    }\n    return Boolean(decl.structName && decl.fieldPath);\n  }\n\n  function getDeclDisplayName(decl) {\n    const techName = getDeclTechName(decl);\n    if (!techName) {\n      return \"\";\n    }\n\n    if (isStructFieldDecl(decl)) {\n      return techName;\n    }\n\n    const desc = getEffectiveDeclDesc(decl);\n    const descTrimmed = String(desc || \"\").trim();\n    if (!descTrimmed) {\n      return techName;\n    }\n\n    const settings = state.settings || DEFAULT_SETTINGS;\n    if (settings.normalizeDeclDesc) {\n      return descTrimmed;\n    }\n\n    const bare = stripAngleBrackets(techName);\n    if (bare.length < 3) {\n      return techName;\n    }\n\n    const code = bare.slice(1, 3).toUpperCase();\n    const templates = settings.nameTemplatesByCode || DEFAULT_SETTINGS.nameTemplatesByCode;\n    const template = templates && Object.prototype.hasOwnProperty.call(templates, code) ? String(templates[code] || \"\") : \"\";\n    if (!template.trim()) {\n      return techName;\n    }\n\n    const strippedKnownPrefix = stripDeclCategoryPrefix(descTrimmed);\n    const normalizedDesc = stripDeclTemplateAffixes(strippedKnownPrefix, template);\n    const displayName = template.replace(/\\{\\{desc\\}\\}/g, normalizedDesc).trim();\n    return displayName || techName;\n  }\n\n  function buildDeclTitle(decl) {\n    if (!decl || typeof decl !== \"object\") {\n      return \"\";\n    }\n\n    const lines = [];\n    lines.push(stringifyDecl(decl));\n\n    const desc = getEffectiveDeclDesc(decl);\n    if (desc) {\n      lines.push(`Desc: ${desc}`);\n    }\n\n    if (decl.raw) {\n      lines.push(String(decl.raw));\n    }\n\n    return lines.filter(Boolean).join(\"\\n\");\n  }\n\n  function renderDeclNameCell(decl) {\n    const text = decl ? getDeclDisplayName(decl) : \"\";\n    const title = buildDeclTitle(decl);\n    const cell = el(\"td\", { text, attrs: title ? { title } : {} });\n\n    if (decl && decl.lineStart) {\n      cell.style.cursor = \"pointer\";\n      cell.addEventListener(\"click\", (ev) => {\n        ev.stopPropagation();\n        selectCodeLines(decl.lineStart, decl.lineStart);\n        if (decl.id) {\n          setSelectedCard(decl.id);\n        }\n      });\n    }\n\n    return cell;\n  }\n\n  function renderDeclDescCell(decl) {\n    const text = getEffectiveDeclDesc(decl);\n    const title = buildDeclTitle(decl);\n    const cell = el(\"td\", { attrs: title ? { title } : {} });\n\n    const wrap = el(\"div\", { className: \"decl-desc\" });\n    wrap.appendChild(el(\"div\", { className: \"decl-desc-text\", text: text || \"\" }));\n\n    if (getDeclOverrideStorageKey(decl)) {\n      const btn = el(\"button\", {\n        className: \"icon-btn\",\n        text: \"✎\",\n        attrs: {\n          type: \"button\",\n          title: \"Edit decl description\",\n          \"aria-label\": \"Edit decl description\"\n        }\n      });\n      btn.addEventListener(\"click\", (ev) => {\n        ev.stopPropagation();\n        editDeclDesc(decl);\n      });\n      wrap.appendChild(btn);\n    }\n\n    cell.appendChild(wrap);\n\n    return cell;\n\n  }\n\n  var PERFORM_TRACE_META_KEY_OUTPUT = \"__abapPerformTraceBinding\";\n\n  function getDeclRenderKey(decl) {\n    if (!decl || typeof decl !== \"object\") {\n      return \"\";\n    }\n    return (\n      getDeclKey(decl) ||\n      [\n        decl.objectType || \"\",\n        decl.scopeLabel || \"\",\n        decl.name || \"\",\n        decl.file || \"\",\n        decl.lineStart || \"\"\n      ].join(\"|\")\n    );\n  }\n\n  function dedupeDecls(list) {\n    const output = [];\n    const seen = new Set();\n    for (const decl of list || []) {\n      if (!decl) {\n        continue;\n      }\n      const key = getDeclRenderKey(decl);\n      if (!key || seen.has(key)) {\n        continue;\n      }\n      seen.add(key);\n      output.push(decl);\n    }\n    return output;\n  }\n\n  function getExpandedPerformBindingContext(obj) {\n    if (!obj || typeof obj !== \"object\") {\n      return null;\n    }\n    const bindingContext = obj[PERFORM_TRACE_META_KEY_OUTPUT];\n    if (!bindingContext || typeof bindingContext !== \"object\") {\n      return null;\n    }\n    if (!(bindingContext.byParamUpper instanceof Map)) {\n      return null;\n    }\n    return bindingContext;\n  }\n\n  function resolveExpandedPerformTraceDecls(obj, decl) {\n    if (!decl || typeof decl !== \"object\") {\n      return [];\n    }\n    if (String(decl.objectType || \"\").toUpperCase() !== \"FORM_PARAM\") {\n      return [];\n    }\n    const bindingContext = getExpandedPerformBindingContext(obj);\n    if (!bindingContext) {\n      return [];\n    }\n    const paramUpper = String(decl.name || \"\").trim().toUpperCase();\n    if (!paramUpper) {\n      return [];\n    }\n    const traceDecls = bindingContext.byParamUpper.get(paramUpper);\n    if (!Array.isArray(traceDecls) || !traceDecls.length) {\n      return [];\n    }\n    return dedupeDecls(traceDecls.filter((item) => item && typeof item === \"object\"));\n  }\n\n  function buildDeclTraceListForObject(obj, decl) {\n    const list = [];\n    if (decl && typeof decl === \"object\") {\n      list.push(decl);\n    }\n    const traceDecls = resolveExpandedPerformTraceDecls(obj, decl);\n    if (traceDecls.length) {\n      list.push(...traceDecls);\n    }\n    return dedupeDecls(list);\n  }\n\n  function getDeclListDisplayName(decl) {\n    if (!decl || typeof decl !== \"object\") {\n      return \"\";\n    }\n\n    const displayName = String(getDeclDisplayName(decl) || \"\").trim();\n    const descText = String(getEffectiveDeclDesc(decl) || \"\").trim();\n    if (\n      displayName &&\n      descText &&\n      displayName.localeCompare(descText, undefined, { sensitivity: \"accent\" }) === 0\n    ) {\n      const techName = String(getDeclTechName(decl) || \"\").trim();\n      if (techName) {\n        return techName;\n      }\n    }\n\n    return displayName || String(getDeclTechName(decl) || \"\").trim();\n  }\n\n  function renderDeclListCells(decls, fallbackDecl) {\n    const list = dedupeDecls(Array.isArray(decls) ? decls.filter(Boolean) : []);\n    const effectiveList = list.length ? list : dedupeDecls(fallbackDecl ? [fallbackDecl] : []);\n\n    const nameCell = el(\"td\");\n    const descCell = el(\"td\");\n\n    if (!effectiveList.length) {\n      return { nameCell, descCell };\n    }\n\n    const nameWrap = el(\"div\");\n    const descWrap = el(\"div\");\n\n    for (const decl of effectiveList) {\n      const nameLine = el(\"div\", { text: getDeclListDisplayName(decl) });\n      const title = buildDeclTitle(decl);\n      if (title) {\n        nameLine.title = title;\n      }\n\n      if (decl && decl.lineStart) {\n        nameLine.style.cursor = \"pointer\";\n        nameLine.addEventListener(\"click\", (ev) => {\n          ev.stopPropagation();\n          selectCodeLines(decl.lineStart, decl.lineStart);\n          if (decl.id) {\n            setSelectedCard(decl.id);\n          }\n        });\n      }\n\n      nameWrap.appendChild(nameLine);\n\n      const descLineWrap = el(\"div\", { className: \"decl-desc-line\" });\n      const descLineText = el(\"div\", { className: \"decl-desc-text\", text: getEffectiveDeclDesc(decl) || \"\" });\n      if (title) {\n        descLineText.title = title;\n      }\n      descLineWrap.appendChild(descLineText);\n\n      if (getDeclOverrideStorageKey(decl)) {\n        const btn = el(\"button\", {\n          className: \"icon-btn\",\n          text: \"✎\",\n          attrs: {\n            type: \"button\",\n            title: \"Edit decl description\",\n            \"aria-label\": \"Edit decl description\"\n          }\n        });\n        btn.addEventListener(\"click\", (ev) => {\n          ev.stopPropagation();\n          editDeclDesc(decl);\n        });\n        descLineWrap.appendChild(btn);\n      }\n\n      descWrap.appendChild(descLineWrap);\n    }\n\n    nameCell.appendChild(nameWrap);\n    descCell.appendChild(descWrap);\n    return { nameCell, descCell };\n  }\n\n  function matchesFilters(obj) {\n    const typeOk = !state.type || obj.objectType === state.type;\n    if (!typeOk) {\n      return false;\n    }\n\n    if (!state.query) {\n      return true;\n    }\n\n    const id = normalizeId(obj && obj.id);\n    const haystack = id ? state.haystackById.get(id) : \"\";\n    return haystack ? haystack.includes(state.query) : false;\n  }\n\n  function filterTree(obj) {\n    const children = Array.isArray(obj.children) ? obj.children : [];\n    const filteredChildren = [];\n    for (const child of children) {\n      const filtered = filterTree(child);\n      if (filtered) {\n        filteredChildren.push(filtered);\n      }\n    }\n\n    const selfMatches = matchesFilters(obj);\n    if (!selfMatches && !filteredChildren.length) {\n      return null;\n    }\n\n    return { obj, children: filteredChildren, selfMatches };\n  }\n\n  function el(tag, options) {\n    const node = document.createElement(tag);\n    if (options && options.className) {\n      node.className = options.className;\n    }\n    if (options && options.text !== undefined) {\n      node.textContent = options.text;\n    }\n    if (options && options.attrs) {\n      for (const [key, value] of Object.entries(options.attrs)) {\n        node.setAttribute(key, String(value));\n      }\n    }\n    return node;\n  }\n\n  function renderKeywords(obj) {\n    const keywords = getKeywordEntries(obj);\n    if (!keywords.length) {\n      return null;\n    }\n\n    const wrap = el(\"div\");\n    for (const keyword of keywords) {\n      wrap.appendChild(\n        el(\"span\", {\n          className: \"pill\",\n          text: keyword && keyword.text ? String(keyword.text) : \"\",\n          attrs: keyword && keyword.label ? { title: String(keyword.label) } : {}\n        })\n      );\n    }\n    return wrap;\n  }\n\n  function collectDeclsForValueEntry(obj, entry) {\n    const decls = [];\n    const addDecl = (decl) => {\n      if (decl && typeof decl === \"object\") {\n        decls.push(decl);\n      }\n    };\n    const addDeclWithTrace = (decl) => {\n      if (!decl || typeof decl !== \"object\") {\n        return;\n      }\n      const traceList = buildDeclTraceListForObject(obj, decl);\n      if (!traceList.length) {\n        addDecl(decl);\n        return;\n      }\n      for (const traceDecl of traceList) {\n        addDecl(traceDecl);\n      }\n    };\n\n    const normalizedEntry = ensureEntryDeclForOutput(obj, cloneValueEntryForOutput(entry));\n\n    addDeclWithTrace(normalizedEntry && normalizedEntry.decl);\n    addDeclWithTrace(normalizedEntry && normalizedEntry.valueDecl);\n    if (normalizedEntry && Array.isArray(normalizedEntry.originDecls)) {\n      for (const originDecl of normalizedEntry.originDecls) {\n        addDeclWithTrace(originDecl);\n      }\n    }\n\n    const extras = obj && obj.extras && typeof obj.extras === \"object\" ? obj.extras : null;\n    if (!extras) {\n      return dedupeDecls(decls);\n    }\n\n    const entryName = String(normalizedEntry && normalizedEntry.name ? normalizedEntry.name : \"\").trim().toLowerCase();\n    if (!entryName) {\n      return dedupeDecls(decls);\n    }\n\n    if (entryName === \"condition\" && extras.ifCondition) {\n      collectConditionDeclsFromClauses(extras.ifCondition.conditions, addDeclWithTrace);\n    } else if (entryName === \"ifcondition\" && extras.performCall) {\n      collectConditionDeclsFromClauses(extras.performCall.ifConditions, addDeclWithTrace);\n    } else if (entryName === \"where\") {\n      if (extras.select) {\n        collectConditionDeclsFromClauses(extras.select.whereConditions, addDeclWithTrace);\n      }\n      if (extras.loopAtItab) {\n        collectConditionDeclsFromClauses(extras.loopAtItab.conditions, addDeclWithTrace);\n      }\n      if (extras.modifyItab) {\n        collectConditionDeclsFromClauses(extras.modifyItab.conditions, addDeclWithTrace);\n      }\n      if (extras.deleteItab) {\n        collectConditionDeclsFromClauses(extras.deleteItab.conditions, addDeclWithTrace);\n      }\n    } else if (entryName === \"having\" && extras.select) {\n      collectConditionDeclsFromClauses(extras.select.havingConditions, addDeclWithTrace);\n    } else if ((entryName === \"withkey\" || entryName === \"withtablekey\") && extras.readTable) {\n      collectConditionDeclsFromClauses(extras.readTable.conditions, addDeclWithTrace);\n    }\n\n    return dedupeDecls(decls);\n  }\n\n  function isRawValueEntry(entry) {\n    const name = entry && entry.name ? String(entry.name).trim() : \"\";\n    return Boolean(name) && /raw$/i.test(name);\n  }\n\n  function makeSectionIndexName(sectionName, indexOneBased) {\n    return `${sectionName}[${indexOneBased}]`;\n  }\n\n  function makeParsedValueRow({\n    sectionName,\n    indexOneBased,\n    valueText,\n    baseEntry,\n    decl,\n    valueDecl,\n    originDecls,\n    valueRef\n  }) {\n    const row = {\n      name: makeSectionIndexName(sectionName, indexOneBased),\n      value: valueText ? String(valueText) : \"\",\n      label: baseEntry && baseEntry.label ? String(baseEntry.label) : sectionName,\n      userDesc: baseEntry && baseEntry.userDesc ? String(baseEntry.userDesc) : \"\",\n      codeDesc: baseEntry && baseEntry.codeDesc ? String(baseEntry.codeDesc) : \"\"\n    };\n\n    if (decl && typeof decl === \"object\") {\n      row.decl = decl;\n    }\n    if (valueDecl && typeof valueDecl === \"object\") {\n      row.valueDecl = valueDecl;\n    }\n    if (Array.isArray(originDecls) && originDecls.length) {\n      row.originDecls = originDecls.filter((item) => item && typeof item === \"object\");\n    }\n    if (valueRef) {\n      row.declRef = String(valueRef);\n    }\n\n    return row;\n  }\n\n  function buildParsedRowsFromPerformList(sectionName, list, baseEntry) {\n    const items = Array.isArray(list) ? list : [];\n    return items.map((item, index) => makeParsedValueRow({\n      sectionName,\n      indexOneBased: index + 1,\n      valueText: item && item.value ? String(item.value) : \"\",\n      baseEntry,\n      decl: item && item.valueDecl ? item.valueDecl : (baseEntry && baseEntry.decl ? baseEntry.decl : null),\n      valueDecl: item && item.valueDecl ? item.valueDecl : null,\n      originDecls: item && Array.isArray(item.originDecls) ? item.originDecls : [],\n      valueRef: item && item.valueRef ? String(item.valueRef) : \"\"\n    }));\n  }\n\n  function buildParsedRowsFromAssignments(sectionName, list, baseEntry) {\n    const items = Array.isArray(list) ? list : [];\n    return items.map((item, index) => {\n      const leftName = item && item.name ? String(item.name) : \"\";\n      const rightValue = item && item.value ? String(item.value) : \"\";\n      const valueText = leftName && rightValue\n        ? `${leftName} = ${rightValue}`\n        : (leftName || rightValue);\n      return makeParsedValueRow({\n        sectionName,\n        indexOneBased: index + 1,\n        valueText,\n        baseEntry,\n        decl: item && item.valueDecl ? item.valueDecl : (baseEntry && baseEntry.decl ? baseEntry.decl : null),\n        valueDecl: item && item.valueDecl ? item.valueDecl : null,\n        originDecls: item && Array.isArray(item.originDecls) ? item.originDecls : [],\n        valueRef: item && item.valueRef ? String(item.valueRef) : \"\"\n      });\n    });\n  }\n\n  function buildParsedRowsFromParams(sectionName, list, baseEntry) {\n    const items = Array.isArray(list) ? list : [];\n    return items.map((param, index) => {\n      const paramName = param && param.name ? String(param.name) : \"\";\n      const typingText = formatTyping(param && param.typing);\n      const valueText = [paramName, typingText].filter(Boolean).join(\" \").trim();\n      const origins = param && Array.isArray(param.originDecls) ? param.originDecls : [];\n      return makeParsedValueRow({\n        sectionName,\n        indexOneBased: index + 1,\n        valueText,\n        baseEntry,\n        decl: origins.length ? origins[0] : (baseEntry && baseEntry.decl ? baseEntry.decl : null),\n        valueDecl: null,\n\n        originDecls: origins,\n        valueRef: \"\"\n      });\n    });\n  }\n\n  function buildParsedRowsFromExceptions(sectionName, list, baseEntry) {\n    const items = Array.isArray(list) ? list : [];\n    return items.map((item, index) => {\n      const name = item && item.name ? String(item.name) : \"\";\n      return makeParsedValueRow({\n        sectionName,\n        indexOneBased: index + 1,\n        valueText: name,\n        baseEntry,\n        decl: baseEntry && baseEntry.decl ? baseEntry.decl : null,\n        valueDecl: null,\n        originDecls: item && Array.isArray(item.originDecls) ? item.originDecls : [],\n        valueRef: \"\"\n      });\n    });\n  }\n\n  function buildParsedRowsForRawEntry(obj, baseEntry) {\n    if (!obj || !baseEntry) {\n      return [];\n    }\n\n    const extras = obj.extras && typeof obj.extras === \"object\" ? obj.extras : null;\n    if (!extras) {\n      return [];\n    }\n\n    const rawName = baseEntry.name ? String(baseEntry.name).trim().toLowerCase() : \"\";\n    if (!rawName) {\n      return [];\n    }\n\n    if (extras.performCall) {\n      const sectionMap = {\n        usingraw: \"using\",\n        changingraw: \"changing\",\n        tablesraw: \"tables\"\n      };\n      const sectionName = sectionMap[rawName];\n      if (sectionName) {\n        return buildParsedRowsFromPerformList(sectionName, extras.performCall[sectionName], baseEntry);\n      }\n    }\n\n    if (extras.callFunction) {\n      const sectionMap = {\n        exportingraw: \"exporting\",\n        importingraw: \"importing\",\n        changingraw: \"changing\",\n        tablesraw: \"tables\",\n        exceptionsraw: \"exceptions\"\n      };\n      const sectionName = sectionMap[rawName];\n      if (sectionName) {\n        return buildParsedRowsFromAssignments(sectionName, extras.callFunction[sectionName], baseEntry);\n      }\n    }\n\n    if (extras.callMethod) {\n      const sectionMap = {\n        exportingraw: \"exporting\",\n        importingraw: \"importing\",\n        changingraw: \"changing\",\n        receivingraw: \"receiving\",\n        exceptionsraw: \"exceptions\"\n      };\n      const sectionName = sectionMap[rawName];\n      if (sectionName) {\n        return buildParsedRowsFromAssignments(sectionName, extras.callMethod[sectionName], baseEntry);\n      }\n    }\n\n    if (extras.form) {\n      const paramsByRawName = {\n        usingraw: \"USING\",\n        changingraw: \"CHANGING\",\n        tablesraw: \"TABLES\"\n      };\n      if (Object.prototype.hasOwnProperty.call(paramsByRawName, rawName)) {\n        const sectionUpper = paramsByRawName[rawName];\n        const params = Array.isArray(extras.form.params)\n          ? extras.form.params.filter((param) => String(param && param.section ? param.section : \"\").toUpperCase() === sectionUpper)\n          : [];\n        return buildParsedRowsFromParams(sectionUpper.toLowerCase(), params, baseEntry);\n      }\n      if (rawName === \"raisingraw\") {\n        return buildParsedRowsFromExceptions(\"raising\", extras.form.exceptions, baseEntry);\n      }\n    }\n\n    if (extras.methodSignature) {\n      const paramsByRawName = {\n        importingraw: \"IMPORTING\",\n        exportingraw: \"EXPORTING\",\n        changingraw: \"CHANGING\",\n        returningraw: \"RETURNING\"\n      };\n      if (Object.prototype.hasOwnProperty.call(paramsByRawName, rawName)) {\n        const sectionUpper = paramsByRawName[rawName];\n        const params = Array.isArray(extras.methodSignature.params)\n          ? extras.methodSignature.params.filter((param) => String(param && param.section ? param.section : \"\").toUpperCase() === sectionUpper)\n          : [];\n        return buildParsedRowsFromParams(sectionUpper.toLowerCase(), params, baseEntry);\n      }\n      if (rawName === \"raisingraw\") {\n        return buildParsedRowsFromExceptions(\"raising\", extras.methodSignature.exceptions, baseEntry);\n      }\n    }\n\n    return [];\n  }\n\n  function cloneValueEntryForOutput(entry) {\n    if (!entry || typeof entry !== \"object\") {\n      return entry;\n    }\n    const out = { ...entry };\n    if (Array.isArray(entry.originDecls)) {\n      out.originDecls = entry.originDecls.slice();\n    }\n    return out;\n  }\n\n  function ensureEntryDeclForOutput(obj, entry) {\n    if (!entry || typeof entry !== \"object\") {\n      return entry;\n    }\n    const source = getDeclSourceContextFromObject(obj);\n    const entryName = String(entry.name || \"value\").trim() || \"value\";\n    return ensureEntryDeclWithSynthetic(entry, {\n      pathKey: buildPathKeyFromParts([buildObjectPathBase(obj), \"values\", entryName]),\n      file: source.file,\n      lineStart: source.lineStart,\n      raw: source.raw,\n      role: \"value\"\n    });\n  }\n\n  function buildRenderableValueEntries(obj) {\n    const values = getValueEntries(obj);\n    if (!values.length) {\n      return [];\n    }\n\n    const rows = [];\n    for (const entry of values) {\n      const rawRow = cloneValueEntryForOutput(entry);\n      if (!isRawValueEntry(entry)) {\n        rows.push(ensureEntryDeclForOutput(obj, rawRow));\n        continue;\n      }\n\n      const parsedRows = buildParsedRowsForRawEntry(obj, entry);\n      if (parsedRows.length) {\n        for (const parsedRow of parsedRows) {\n          rows.push(ensureEntryDeclForOutput(obj, cloneValueEntryForOutput(parsedRow)));\n        }\n      } else {\n        rows.push(ensureEntryDeclForOutput(obj, rawRow));\n      }\n    }\n\n    return rows;\n  }\n\n  function renderValues(obj) {\n    const values = buildRenderableValueEntries(obj);\n    if (!values.length) {\n      return null;\n    }\n\n    const table = el(\"table\");\n    const thead = el(\"thead\");\n    const headRow = el(\"tr\");\n    for (const name of [\"name\", \"value\", \"label\", \"codeDesc\", \"declName\", \"declDesc\"]) {\n      headRow.appendChild(el(\"th\", { text: name }));\n    }\n    thead.appendChild(headRow);\n    table.appendChild(thead);\n\n    const tbody = el(\"tbody\");\n    for (const entry of values) {\n      const row = el(\"tr\");\n      const relatedDecls = collectDeclsForValueEntry(obj, entry);\n      const declListCells = renderDeclListCells(\n        relatedDecls.length ? relatedDecls : null,\n        relatedDecls.length ? null : entry && entry.decl\n      );\n      row.appendChild(el(\"td\", { text: entry && entry.name ? String(entry.name) : \"\" }));\n      row.appendChild(el(\"td\", { text: entry && entry.value ? String(entry.value) : \"\" }));\n      row.appendChild(el(\"td\", { text: entry && entry.label ? String(entry.label) : \"\" }));\n      row.appendChild(el(\"td\", { text: entry && entry.codeDesc ? String(entry.codeDesc) : \"\" }));\n      row.appendChild(declListCells.nameCell);\n      row.appendChild(declListCells.descCell);\n      tbody.appendChild(row);\n    }\n    table.appendChild(tbody);\n    return table;\n  }\n\n  function buildExtrasEntryPathKey(obj, extrasScope, sectionName, indexOneBased, itemKind) {\n    return buildPathKeyFromParts([\n      buildObjectPathBase(obj),\n      \"extras\",\n      extrasScope || \"extras\",\n      sectionName || \"section\",\n      `${itemKind || \"item\"}[${indexOneBased}]`\n    ]);\n  }\n\n  function normalizeExtrasEntryForOutput(obj, extrasScope, sectionName, indexOneBased, entry) {\n    if (!entry || typeof entry !== \"object\") {\n      return entry;\n    }\n\n    const source = getDeclSourceContextFromObject(obj);\n    const basePath = buildExtrasEntryPathKey(obj, extrasScope, sectionName, indexOneBased, \"item\");\n    let next = cloneValueEntryForOutput(entry);\n    next = ensureEntryDeclWithSynthetic(next, {\n      pathKey: basePath,\n      file: source.file,\n      lineStart: source.lineStart,\n      raw: source.raw,\n      role: `${extrasScope || \"extras\"}:${sectionName || \"entry\"}`\n    });\n    next = ensureValueDeclWithSynthetic(next, {\n      pathKey: basePath,\n      file: source.file,\n      lineStart: source.lineStart,\n      raw: source.raw,\n      role: `${extrasScope || \"extras\"}:${sectionName || \"entry\"}:value`,\n      nameHint: sectionName || \"value\"\n    });\n    return next;\n  }\n\n  function renderAssignmentTable(title, list, context) {\n    const items = Array.isArray(list) ? list : [];\n    if (!items.length) {\n      return null;\n    }\n\n    const obj = context && context.obj ? context.obj : null;\n    const extrasScope = context && context.extrasScope ? String(context.extrasScope) : \"extras\";\n\n    const section = el(\"div\");\n    section.appendChild(el(\"div\", { className: \"muted\", text: title }));\n\n    const table = el(\"table\");\n    const thead = el(\"thead\");\n    const headRow = el(\"tr\");\n    for (const key of [\"name\", \"value\", \"ref\", \"declName\", \"declDesc\"]) {\n      headRow.appendChild(el(\"th\", { text: key }));\n    }\n    thead.appendChild(headRow);\n    table.appendChild(thead);\n\n    const tbody = el(\"tbody\");\n    for (let index = 0; index < items.length; index += 1) {\n      const entry = items[index];\n      const normalizedEntry = normalizeExtrasEntryForOutput(obj, extrasScope, title, index + 1, entry);\n      const row = el(\"tr\");\n      row.appendChild(el(\"td\", { text: normalizedEntry && normalizedEntry.name ? String(normalizedEntry.name) : \"\" }));\n      row.appendChild(el(\"td\", { text: normalizedEntry && normalizedEntry.value ? String(normalizedEntry.value) : \"\" }));\n      row.appendChild(el(\"td\", { text: normalizedEntry && normalizedEntry.valueRef ? String(normalizedEntry.valueRef) : \"\" }));\n      const { nameCell, descCell } = renderDeclListCells(\n        normalizedEntry && normalizedEntry.originDecls,\n        normalizedEntry && normalizedEntry.valueDecl\n      );\n      row.appendChild(nameCell);\n      row.appendChild(descCell);\n      tbody.appendChild(row);\n    }\n    table.appendChild(tbody);\n    section.appendChild(table);\n    return section;\n  }\n\n  function renderValueListTable(title, list, context) {\n    const items = Array.isArray(list) ? list : [];\n    if (!items.length) {\n      return null;\n    }\n\n    const obj = context && context.obj ? context.obj : null;\n    const extrasScope = context && context.extrasScope ? String(context.extrasScope) : \"extras\";\n\n    const section = el(\"div\");\n    section.appendChild(el(\"div\", { className: \"muted\", text: title }));\n\n    const table = el(\"table\");\n    const thead = el(\"thead\");\n    const headRow = el(\"tr\");\n    for (const key of [\"value\", \"ref\", \"declName\", \"declDesc\"]) {\n      headRow.appendChild(el(\"th\", { text: key }));\n    }\n    thead.appendChild(headRow);\n    table.appendChild(thead);\n\n    const tbody = el(\"tbody\");\n    for (let index = 0; index < items.length; index += 1) {\n      const entry = items[index];\n      const normalizedEntry = normalizeExtrasEntryForOutput(obj, extrasScope, title, index + 1, entry);\n      const row = el(\"tr\");\n      row.appendChild(el(\"td\", { text: normalizedEntry && normalizedEntry.value ? String(normalizedEntry.value) : \"\" }));\n      row.appendChild(el(\"td\", { text: normalizedEntry && normalizedEntry.valueRef ? String(normalizedEntry.valueRef) : \"\" }));\n      const { nameCell, descCell } = renderDeclListCells(\n        normalizedEntry && normalizedEntry.originDecls,\n        normalizedEntry && normalizedEntry.valueDecl\n      );\n      row.appendChild(nameCell);\n      row.appendChild(descCell);\n      tbody.appendChild(row);\n    }\n    table.appendChild(tbody);\n    section.appendChild(table);\n    return section;\n  }\n\n  function resolveConditionDeclForViewer(decl, refCandidate) {\n    if (decl && typeof decl === \"object\") {\n      return decl;\n    }\n\n    const ref = String(refCandidate || \"\").trim();\n    if (!ref) {\n      return null;\n    }\n\n\n    const decls = state.data && typeof state.data === \"object\" && Array.isArray(state.data.decls)\n      ? state.data.decls\n      : [];\n    if (!decls.length) {\n      return null;\n    }\n\n    const upperRef = ref.toUpperCase();\n    let matched = null;\n    for (const candidate of decls) {\n      if (!candidate || typeof candidate !== \"object\") {\n        continue;\n      }\n      const nameUpper = String(candidate.name || \"\").trim().toUpperCase();\n      if (!nameUpper || nameUpper !== upperRef) {\n        continue;\n      }\n\n      if (!matched) {\n        matched = candidate;\n      }\n\n      const scopeUpper = String(candidate.scopeLabel || \"\").trim().toUpperCase();\n      if (scopeUpper === \"GLOBAL\") {\n        return candidate;\n      }\n    }\n\n    return matched;\n  }\n\n  function renderConditionTable(title, clauses, context) {\n    const items = Array.isArray(clauses) ? clauses : [];\n    if (!items.length) {\n      return null;\n    }\n\n    const obj = context && context.obj ? context.obj : null;\n    const extrasScope = context && context.extrasScope ? String(context.extrasScope) : \"extras\";\n    const source = getDeclSourceContextFromObject(obj);\n\n    const section = el(\"div\");\n    if (title) {\n      section.appendChild(el(\"div\", { className: \"muted\", text: title }));\n    }\n\n    const table = el(\"table\");\n    const thead = el(\"thead\");\n    const headRow = el(\"tr\");\n    for (const key of [\n      \"leftOperand\",\n      \"operator\",\n      \"rightOperand\",\n      \"connector\",\n      \"leftRef\",\n      \"leftDeclName\",\n      \"leftDeclDesc\",\n      \"rightRef\",\n      \"rightDeclName\",\n      \"rightDeclDesc\"\n    ]) {\n      headRow.appendChild(el(\"th\", { text: key }));\n    }\n    thead.appendChild(headRow);\n    table.appendChild(thead);\n\n    const tbody = el(\"tbody\");\n    for (let index = 0; index < items.length; index += 1) {\n      const clause = items[index];\n      const clausePath = buildExtrasEntryPathKey(obj, extrasScope, title || \"conditions\", index + 1, \"clause\");\n      let normalizedClause = clause;\n      let leftRef = clause && clause.leftOperandRef ? String(clause.leftOperandRef) : \"\";\n      let rightRef = clause && clause.rightOperandRef ? String(clause.rightOperandRef) : \"\";\n      const row = el(\"tr\");\n      const leftDecl = resolveConditionDeclForViewer(\n        clause && clause.leftOperandDecl ? clause.leftOperandDecl : null,\n        leftRef || (clause && clause.leftOperand ? clause.leftOperand : \"\")\n      );\n      const rightDecl = resolveConditionDeclForViewer(\n        clause && clause.rightOperandDecl ? clause.rightOperandDecl : null,\n        rightRef || (clause && clause.rightOperand ? clause.rightOperand : \"\")\n      );\n      let effectiveLeftDecl = leftDecl;\n      let effectiveRightDecl = rightDecl;\n\n      if (!effectiveLeftDecl || !effectiveRightDecl) {\n        normalizedClause = ensureConditionClauseDeclsWithSynthetic(clause, {\n          pathKey: clausePath,\n          file: source.file,\n          lineStart: source.lineStart,\n          raw: source.raw\n        });\n        leftRef = normalizedClause && normalizedClause.leftOperandRef ? String(normalizedClause.leftOperandRef) : leftRef;\n        rightRef = normalizedClause && normalizedClause.rightOperandRef ? String(normalizedClause.rightOperandRef) : rightRef;\n        if (!effectiveLeftDecl) {\n          effectiveLeftDecl = normalizedClause && normalizedClause.leftOperandDecl\n            ? normalizedClause.leftOperandDecl\n            : null;\n        }\n        if (!effectiveRightDecl) {\n          effectiveRightDecl = normalizedClause && normalizedClause.rightOperandDecl\n            ? normalizedClause.rightOperandDecl\n            : null;\n        }\n      }\n\n      row.appendChild(el(\"td\", { text: normalizedClause && normalizedClause.leftOperand ? String(normalizedClause.leftOperand) : \"\" }));\n      row.appendChild(el(\"td\", { text: normalizedClause && normalizedClause.comparisonOperator ? String(normalizedClause.comparisonOperator) : \"\" }));\n      row.appendChild(el(\"td\", { text: normalizedClause && normalizedClause.rightOperand ? String(normalizedClause.rightOperand) : \"\" }));\n      row.appendChild(el(\"td\", { text: normalizedClause && normalizedClause.logicalConnector ? String(normalizedClause.logicalConnector) : \"\" }));\n      row.appendChild(el(\"td\", { text: leftRef }));\n\n      const leftTraceDecls = buildDeclTraceListForObject(obj, effectiveLeftDecl);\n      const leftDeclCells = renderDeclListCells(leftTraceDecls, effectiveLeftDecl);\n      row.appendChild(leftDeclCells.nameCell);\n      row.appendChild(leftDeclCells.descCell);\n\n      row.appendChild(el(\"td\", { text: rightRef }));\n      const rightTraceDecls = buildDeclTraceListForObject(obj, effectiveRightDecl);\n      const rightDeclCells = renderDeclListCells(rightTraceDecls, effectiveRightDecl);\n      row.appendChild(rightDeclCells.nameCell);\n      row.appendChild(rightDeclCells.descCell);\n\n      tbody.appendChild(row);\n    }\n\n    table.appendChild(tbody);\n    section.appendChild(table);\n    return section;\n  }\n\n  function appendConditionSection(wrap, title, rawText, clauses, context) {\n    if (!wrap) {\n      return;\n    }\n\n    const raw = String(rawText || \"\").trim();\n    if (raw) {\n      wrap.appendChild(el(\"div\", { className: \"muted\", text: raw }));\n    }\n\n    const table = renderConditionTable(title, clauses, context);\n    if (table) {\n      wrap.appendChild(table);\n    }\n  }\n\n  function renderParamsTable(title, params) {\n    const items = Array.isArray(params) ? params : [];\n    if (!items.length) {\n      return null;\n    }\n\n    const section = el(\"div\");\n    section.appendChild(el(\"div\", { className: \"muted\", text: title }));\n\n    const table = el(\"table\");\n    const thead = el(\"thead\");\n    const headRow = el(\"tr\");\n    for (const key of [\"section\", \"name\", \"typing\", \"doc\", \"declName\", \"declDesc\"]) {\n      headRow.appendChild(el(\"th\", { text: key }));\n    }\n    thead.appendChild(headRow);\n    table.appendChild(thead);\n\n    const tbody = el(\"tbody\");\n    for (const param of items) {\n      const row = el(\"tr\");\n      row.appendChild(el(\"td\", { text: param && param.section ? String(param.section) : \"\" }));\n      row.appendChild(el(\"td\", { text: param && param.name ? String(param.name) : \"\" }));\n      const typingText = formatTyping(param && param.typing);\n      row.appendChild(el(\"td\", { text: typingText }));\n      const docText = param && param.doc\n        ? [param.doc.direction || \"\", param.doc.text || \"\"].filter(Boolean).join(\" \")\n        : \"\";\n      row.appendChild(el(\"td\", { text: docText }));\n      const { nameCell, descCell } = renderDeclListCells(param && param.originDecls);\n      row.appendChild(nameCell);\n      row.appendChild(descCell);\n      tbody.appendChild(row);\n    }\n    table.appendChild(tbody);\n    section.appendChild(table);\n    return section;\n  }\n\n  function formatTyping(typing) {\n    if (!typing) {\n      return \"\";\n    }\n    if (typeof typing === \"string\") {\n      return typing;\n    }\n    if (Array.isArray(typing)) {\n      return typing.map((item) => formatTyping(item)).filter(Boolean).join(\" \");\n    }\n    if (typeof typing === \"object\") {\n      const kind = typing.kind ? String(typing.kind) : \"\";\n      let value = \"\";\n\n      if (typeof typing.value === \"string\") {\n        value = typing.value;\n      } else if (typing.value && typeof typing.value === \"object\") {\n        if (typeof typing.value.value === \"string\") {\n          value = typing.value.value;\n        } else if (typeof typing.value.raw === \"string\") {\n          value = typing.value.raw;\n        } else if (typeof typing.value.name === \"string\") {\n          value = typing.value.name;\n        } else {\n          value = safeJson(typing.value, false);\n        }\n      } else if (typing.value !== undefined && typing.value !== null) {\n        value = String(typing.value);\n      }\n\n      return [kind, value].filter(Boolean).join(\" \").trim();\n    }\n    return String(typing);\n  }\n\n  function renderNameList(title, items) {\n    const list = Array.isArray(items) ? items : [];\n    if (!list.length) {\n      return null;\n    }\n\n    const section = el(\"div\");\n    section.appendChild(el(\"div\", { className: \"muted\", text: title }));\n\n    const wrap = el(\"div\");\n    for (const entry of list) {\n      wrap.appendChild(el(\"span\", { className: \"pill\", text: entry && entry.name ? String(entry.name) : \"\" }));\n    }\n    section.appendChild(wrap);\n    return section;\n  }\n\n  function renderExtras(obj) {\n    const extras = obj.extras;\n    if (!extras || typeof extras !== \"object\") {\n      return null;\n    }\n\n    const wrap = el(\"div\", { className: \"extras\" });\n    wrap.appendChild(el(\"div\", { className: \"muted\", text: \"Extras\" }));\n\n    if (extras.form) {\n      const form = extras.form;\n      const titleParts = [form.name ? `FORM ${form.name}` : \"\"].filter(Boolean);\n      if (form.nameFromComment && form.nameFromComment !== form.name) {\n        titleParts.push(`(comment: ${form.nameFromComment})`);\n      }\n      if (titleParts.length) {\n        wrap.appendChild(el(\"div\", { className: \"muted\", text: titleParts.join(\" \") }));\n      }\n\n      const paramsTable = renderParamsTable(\"params\", form.params);\n      if (paramsTable) {\n        wrap.appendChild(paramsTable);\n      }\n\n      const exceptions = renderNameList(\"exceptions\", form.exceptions);\n      if (exceptions) {\n        wrap.appendChild(exceptions);\n      }\n\n      return wrap;\n    }\n\n    if (extras.methodSignature) {\n      const signature = extras.methodSignature;\n      if (signature.name) {\n        wrap.appendChild(el(\"div\", { className: \"muted\", text: `METHOD ${signature.name}` }));\n      }\n\n      const paramsTable = renderParamsTable(\"params\", signature.params);\n      if (paramsTable) {\n        wrap.appendChild(paramsTable);\n      }\n\n      const exceptions = renderNameList(\"exceptions\", signature.exceptions);\n      if (exceptions) {\n        wrap.appendChild(exceptions);\n      }\n\n      return wrap;\n    }\n\n    if (extras.callFunction) {\n      const call = extras.callFunction;\n      wrap.appendChild(el(\"div\", { className: \"muted\", text: call.name ? `CALL FUNCTION ${call.name}` : \"CALL FUNCTION\" }));\n      if (call.destination) {\n        wrap.appendChild(el(\"div\", { className: \"muted\", text: `DESTINATION ${call.destination}` }));\n      }\n\n      for (const sectionName of [\"exporting\", \"importing\", \"changing\", \"tables\", \"exceptions\"]) {\n        const table = renderAssignmentTable(sectionName, call[sectionName], { obj, extrasScope: \"callFunction\" });\n        if (table) {\n          wrap.appendChild(table);\n        }\n      }\n\n      return wrap;\n    }\n\n    if (extras.callMethod) {\n      const call = extras.callMethod;\n      wrap.appendChild(el(\"div\", { className: \"muted\", text: call.target ? `CALL METHOD ${call.target}` : \"CALL METHOD\" }));\n\n      for (const sectionName of [\"exporting\", \"importing\", \"changing\", \"receiving\", \"exceptions\"]) {\n        const table = renderAssignmentTable(sectionName, call[sectionName], { obj, extrasScope: \"callMethod\" });\n        if (table) {\n          wrap.appendChild(table);\n        }\n      }\n\n      return wrap;\n    }\n\n    if (extras.performCall) {\n      const call = extras.performCall;\n      wrap.appendChild(el(\"div\", { className: \"muted\", text: call.form ? `PERFORM ${call.form}` : \"PERFORM\" }));\n      if (call.program) {\n        wrap.appendChild(el(\"div\", { className: \"muted\", text: `IN PROGRAM ${call.program}` }));\n      }\n      appendConditionSection(\n        wrap,\n        \"ifConditions\",\n        call.ifCondition ? `IF ${call.ifCondition}` : \"\",\n        call.ifConditions,\n        { obj, extrasScope: \"performCall\" }\n      );\n\n      for (const sectionName of [\"using\", \"changing\", \"tables\"]) {\n        const table = renderValueListTable(sectionName, call[sectionName], { obj, extrasScope: \"performCall\" });\n        if (table) {\n\n          wrap.appendChild(table);\n        }\n      }\n\n      return wrap;\n    }\n\n    if (extras.ifCondition) {\n      const info = extras.ifCondition;\n      appendConditionSection(\n        wrap,\n        \"conditions\",\n        info.conditionRaw ? `IF ${info.conditionRaw}` : \"\",\n        info.conditions,\n        { obj, extrasScope: \"ifCondition\" }\n      );\n      return wrap;\n    }\n\n    if (extras.select) {\n      const info = extras.select;\n      appendConditionSection(\n        wrap,\n        \"whereConditions\",\n        info.whereRaw ? `WHERE ${info.whereRaw}` : \"\",\n        info.whereConditions,\n        { obj, extrasScope: \"select.where\" }\n      );\n      appendConditionSection(\n        wrap,\n        \"havingConditions\",\n        info.havingRaw ? `HAVING ${info.havingRaw}` : \"\",\n        info.havingConditions,\n        { obj, extrasScope: \"select.having\" }\n      );\n      return wrap;\n    }\n\n    if (extras.readTable) {\n      const info = extras.readTable;\n      const raw = info.withTableKeyRaw\n        ? `WITH TABLE KEY ${info.withTableKeyRaw}`\n        : (info.withKeyRaw ? `WITH KEY ${info.withKeyRaw}` : \"\");\n      appendConditionSection(wrap, \"conditions\", raw, info.conditions, { obj, extrasScope: \"readTable\" });\n      return wrap;\n    }\n\n    if (extras.loopAtItab) {\n      const info = extras.loopAtItab;\n      appendConditionSection(\n        wrap,\n        \"conditions\",\n        info.whereRaw ? `WHERE ${info.whereRaw}` : \"\",\n        info.conditions,\n        { obj, extrasScope: \"loopAtItab\" }\n      );\n      return wrap;\n    }\n\n    if (extras.modifyItab) {\n      const info = extras.modifyItab;\n      appendConditionSection(\n        wrap,\n        \"conditions\",\n        info.whereRaw ? `WHERE ${info.whereRaw}` : \"\",\n        info.conditions,\n        { obj, extrasScope: \"modifyItab\" }\n      );\n      return wrap;\n    }\n\n    if (extras.deleteItab) {\n      const info = extras.deleteItab;\n      appendConditionSection(\n        wrap,\n        \"conditions\",\n        info.whereRaw ? `WHERE ${info.whereRaw}` : \"\",\n        info.conditions,\n        { obj, extrasScope: \"deleteItab\" }\n      );\n      return wrap;\n    }\n\n    wrap.appendChild(el(\"pre\", { text: safeJson(extras, true) }));\n    return wrap;\n  }\n\n  function renderMeta(obj) {\n    const parts = [];\n    if (obj.file) {\n      parts.push(String(obj.file));\n    }\n    if (obj.lineStart) {\n      parts.push(`line ${obj.lineStart}`);\n    }\n    if (obj.block && obj.block.lineEnd) {\n      parts.push(`end ${obj.block.lineEnd}`);\n    }\n    if (obj.id !== undefined && obj.id !== null) {\n      parts.push(`#${obj.id}`);\n    }\n    return parts.join(\" • \");\n  }\n\n  function getObjectLabel(obj) {\n    for (const key of [\"name\", \"target\", \"form\"]) {\n      const value = getFirstValueFromValues(obj.values, key);\n      if (value) {\n        return value;\n      }\n    }\n\n    if (obj.extras && obj.extras.callFunction && obj.extras.callFunction.name) {\n      return String(obj.extras.callFunction.name);\n    }\n    if (obj.extras && obj.extras.callMethod && obj.extras.callMethod.target) {\n      return String(obj.extras.callMethod.target);\n    }\n    if (obj.extras && obj.extras.performCall && obj.extras.performCall.form) {\n      return String(obj.extras.performCall.form);\n    }\n    if (obj.extras && obj.extras.form && obj.extras.form.name) {\n      return String(obj.extras.form.name);\n    }\n    if (obj.extras && obj.extras.methodSignature && obj.extras.methodSignature.name) {\n      return String(obj.extras.methodSignature.name);\n    }\n\n    return \"\";\n  }\n\n  function renderNode(nodeInfo, options) {\n    const opts = options && typeof options === \"object\" ? options : {};\n    const includeChildren = opts.includeChildren !== false;\n    const depth = Math.max(0, Number(opts.depth) || 0);\n    const obj = nodeInfo.obj;\n    const id = normalizeId(obj.id);\n    const children = nodeInfo.children || [];\n\n    const cardAttrs = {};\n    if (id) {\n      cardAttrs[\"data-id\"] = id;\n    }\n    if (obj && obj.lineStart) {\n      cardAttrs[\"data-line-start\"] = String(obj.lineStart);\n    }\n\n    const card = el(\"div\", {\n      className: `card${obj.block ? \" block\" : \"\"}${id && id === state.selectedId ? \" selected\" : \"\"}`,\n      attrs: Object.keys(cardAttrs).length ? cardAttrs : {}\n    });\n    card.setAttribute(\"data-depth\", String(depth));\n    if (depth > 0) {\n      card.style.marginLeft = `${Math.min(144, depth * 14)}px`;\n    } else {\n      card.style.marginLeft = \"\";\n    }\n\n    const header = el(\"div\", { className: \"card-header\" });\n    const label = getObjectLabel(obj);\n    const titleText = `${String(obj.objectType || \"(unknown)\")}${label ? ` ${label}` : \"\"}`;\n    const title = el(\"h3\", { className: \"card-title\", text: titleText });\n\n    const meta = renderMeta(obj);\n    if (meta) {\n      title.appendChild(el(\"span\", { className: \"muted\", text: `  (${meta})` }));\n    }\n\n    header.appendChild(title);\n\n    const actions = el(\"div\", { className: \"card-actions\" });\n\n    const btnCode = el(\"button\", { className: \"btn-ghost\", text: \"Code\" });\n    btnCode.type = \"button\";\n    btnCode.addEventListener(\"click\", (ev) => {\n      ev.stopPropagation();\n      setSelectedCard(id);\n      const lineEnd = obj.block && obj.block.lineEnd ? obj.block.lineEnd : obj.lineStart;\n      selectCodeLines(obj.lineStart, lineEnd);\n    });\n    actions.appendChild(btnCode);\n\n    const btnJson = el(\"button\", { className: \"btn-ghost\", text: \"JSON\" });\n    btnJson.type = \"button\";\n    btnJson.addEventListener(\"click\", (ev) => {\n      ev.stopPropagation();\n      setSelectedCard(id);\n      openJsonModal(obj);\n    });\n    actions.appendChild(btnJson);\n\n    if (children.length && id) {\n      const isCollapsed = state.collapsedIds.has(id);\n      const btnCollapse = el(\"button\", { className: \"btn-ghost\", text: isCollapsed ? \"Expand\" : \"Collapse\" });\n      btnCollapse.type = \"button\";\n      btnCollapse.addEventListener(\"click\", (ev) => {\n        ev.stopPropagation();\n        if (state.collapsedIds.has(id)) {\n          state.collapsedIds.delete(id);\n        } else {\n          state.collapsedIds.add(id);\n        }\n        renderOutput();\n        setSelectedCard(id);\n      });\n      actions.appendChild(btnCollapse);\n    }\n\n    header.appendChild(actions);\n    card.appendChild(header);\n\n    if (obj.comment) {\n      card.appendChild(el(\"div\", { className: \"muted\", text: String(obj.comment) }));\n    }\n\n    if (state.showKeywords) {\n      const kw = renderKeywords(obj);\n      if (kw) {\n        card.appendChild(kw);\n      }\n    }\n\n    if (state.showValues) {\n      const valuesTable = renderValues(obj);\n      if (valuesTable) {\n        card.appendChild(valuesTable);\n      }\n    }\n\n    if (state.showRaw && obj.raw) {\n      card.appendChild(el(\"div\", { className: \"raw\", text: String(obj.raw) }));\n    }\n\n    if (state.showExtras) {\n      const extras = renderExtras(obj);\n      if (extras) {\n        card.appendChild(extras);\n      }\n    }\n\n    if (includeChildren && children.length && !state.collapsedIds.has(id)) {\n      const childWrap = el(\"div\", { className: \"children\" });\n      for (const child of children) {\n        childWrap.appendChild(renderNode(child, { includeChildren: true, depth: depth + 1 }));\n      }\n      card.appendChild(childWrap);\n    }\n\n    card.addEventListener(\"click\", () => setSelectedCard(id));\n    return card;\n  }\n\n  function populateTypeFilter(objects) {\n    const types = new Set();\n    walkObjects(objects, (obj) => {\n      if (obj && obj.objectType) {\n        types.add(String(obj.objectType));\n      }\n    });\n\n    const sorted = Array.from(types).sort((a, b) => a.localeCompare(b));\n    const current = els.typeFilter.value || \"\";\n\n    while (els.typeFilter.options.length > 1) {\n      els.typeFilter.remove(1);\n    }\n\n    for (const type of sorted) {\n      const opt = document.createElement(\"option\");\n      opt.value = type;\n      opt.textContent = type;\n      els.typeFilter.appendChild(opt);\n    }\n\n    els.typeFilter.value = sorted.includes(current) ? current : \"\";\n  }\n\n  function renderOutput() {\n    const scrollTop = els.output.scrollTop;\n    setError(\"\");\n\n    if (!state.data || !Array.isArray(state.renderObjects)) {\n      setOutputMessage(\"No data loaded.\");\n      refreshInputGutterTargets();\n      return;\n    }\n\n    state.query = (els.searchInput.value || \"\").trim().toLowerCase();\n    state.type = els.typeFilter.value || \"\";\n    state.showRaw = Boolean(els.showRaw && els.showRaw.checked);\n    state.showKeywords = Boolean(els.showKeywords && els.showKeywords.checked);\n    state.showValues = Boolean(els.showValues && els.showValues.checked);\n    state.showExtras = Boolean(els.showExtras && els.showExtras.checked);\n\n    const filteredRoots = (state.renderObjects || [])\n      .map((obj) => filterTree(obj))\n      .filter(Boolean);\n\n    if (!filteredRoots.length) {\n      setOutputMessage(\"No matches.\");\n      refreshInputGutterTargets();\n      return;\n    }\n\n    const frag = document.createDocumentFragment();\n    for (const root of filteredRoots) {\n      frag.appendChild(renderNode(root));\n    }\n\n    els.output.classList.remove(\"muted\");\n    els.output.replaceChildren(frag);\n    els.output.scrollTop = scrollTop;\n\n    if (state.selectedId) {\n      setSelectedCard(state.selectedId, { scroll: false });\n    }\n\n    refreshInputGutterTargets();\n  }\n\n  function normalizeParsedJson(json) {\n    if (Array.isArray(json)) {\n      return { file: \"\", objects: json, decls: [] };\n    }\n    if (json && typeof json === \"object\" && Array.isArray(json.objects)) {\n      return {\n        file: String(json.file || \"\"),\n        objects: json.objects,\n        decls: Array.isArray(json.decls) ? json.decls : []\n      };\n    }\n    return null;\n  }\n\n  function getOutputVirtualState() {\n    if (!state.outputVirtual || typeof state.outputVirtual !== \"object\") {\n      state.outputVirtual = {\n        roots: [],\n        itemCount: 0,\n        start: 0,\n        end: 0,\n        lastScrollTop: 0,\n        scrollDir: \"down\",\n        pendingRaf: 0,\n        isAdjustingScroll: false,\n        avgItemHeight: 200,\n        idToRootIndex: new Map(),\n        lineTargetMap: new Map(),\n        isInitialized: false\n      };\n    }\n    if (!(state.outputVirtual.idToRootIndex instanceof Map)) {\n      state.outputVirtual.idToRootIndex = new Map();\n    }\n    if (!(state.outputVirtual.lineTargetMap instanceof Map)) {\n      state.outputVirtual.lineTargetMap = new Map();\n    }\n    return state.outputVirtual;\n  }\n\n  function getTemplateVirtualStateForOutput() {\n    if (!state.templateVirtual || typeof state.templateVirtual !== \"object\") {\n      state.templateVirtual = {\n        items: [],\n        itemCount: 0,\n        start: 0,\n        end: 0,\n        lastScrollTop: 0,\n        scrollDir: \"down\",\n        pendingRaf: 0,\n        isAdjustingScroll: false,\n        avgItemHeight: 140,\n        lineTargetMap: new Map(),\n        isInitialized: false\n      };\n    }\n    if (!(state.templateVirtual.lineTargetMap instanceof Map)) {\n      state.templateVirtual.lineTargetMap = new Map();\n    }\n    return state.templateVirtual;\n  }\n\n  function getInputGutterVirtualState() {\n    if (!state.inputGutterVirtual || typeof state.inputGutterVirtual !== \"object\") {\n      state.inputGutterVirtual = {\n        lineCount: 0,\n        startLine: 1,\n        endLine: 1,\n        lineHeightPx: 18,\n        topPadPx: 0,\n        bottomPadPx: 0,\n        pendingRaf: 0,\n        lastScrollTop: 0,\n        overscanLines: 6,\n        isInitialized: false\n      };\n    }\n    return state.inputGutterVirtual;\n  }\n\n  function getVirtualWindowConfig(container, avgItemHeight) {\n    const safeAvg = Math.max(1, Number(avgItemHeight) || 1);\n    const clientHeight = Math.max(0, Number(container && container.clientHeight) || 0);\n    const visibleEstimate = Math.max(1, Math.ceil(clientHeight / safeAvg));\n    const overscanCount = Math.max(2, Math.ceil(visibleEstimate * 0.5));\n    const batchCount = Math.max(4, Math.ceil(visibleEstimate * 0.5));\n    const targetCount = visibleEstimate + (overscanCount * 2);\n    const maxCount = targetCount + (batchCount * 2);\n    const edgeThresholdPx = Math.max(40, Math.round(clientHeight * 0.2));\n    return { visibleEstimate, overscanCount, batchCount, targetCount, maxCount, edgeThresholdPx };\n  }\n\n  function measureOuterHeight(node) {\n    if (!node || typeof node.getBoundingClientRect !== \"function\") {\n      return 0;\n    }\n    const rect = node.getBoundingClientRect();\n    let marginTop = 0;\n    let marginBottom = 0;\n    try {\n      const style = window.getComputedStyle(node);\n      marginTop = Number.parseFloat(style && style.marginTop ? style.marginTop : \"0\") || 0;\n      marginBottom = Number.parseFloat(style && style.marginBottom ? style.marginBottom : \"0\") || 0;\n    } catch {\n      // ignore\n    }\n    return Math.max(0, rect.height + marginTop + marginBottom);\n  }\n\n  function updateAverageItemHeight(virtualState, heights, minimum) {\n    const minValue = Math.max(1, Number(minimum) || 1);\n    const list = Array.isArray(heights) ? heights.filter((v) => Number(v) > 0) : [];\n    if (!list.length) {\n      return;\n    }\n    const sampleAvg = list.reduce((sum, value) => sum + Number(value || 0), 0) / list.length;\n    const prev = Math.max(minValue, Number(virtualState.avgItemHeight) || minValue);\n    const next = Math.max(minValue, ((prev * 0.8) + (sampleAvg * 0.2)));\n    virtualState.avgItemHeight = Math.round(next);\n  }\n\n  function buildOutputVirtualData(filteredRoots) {\n    const roots = Array.isArray(filteredRoots) ? filteredRoots : [];\n    const items = [];\n    const idToRootIndex = new Map();\n    const lineTargetMap = new Map();\n\n    const registerHiddenSubtree = (nodeInfo, anchorIndex) => {\n      if (!nodeInfo || typeof nodeInfo !== \"object\" || !nodeInfo.obj) {\n        return;\n      }\n      const obj = nodeInfo.obj;\n      const id = normalizeId(obj.id);\n      if (id && !idToRootIndex.has(id)) {\n        idToRootIndex.set(id, anchorIndex);\n      }\n      const line = Number(obj.lineStart) || 0;\n      if (line > 0 && id && !lineTargetMap.has(line)) {\n        lineTargetMap.set(line, { kind: \"output\", id });\n      }\n      const children = Array.isArray(nodeInfo.children) ? nodeInfo.children : [];\n      for (const child of children) {\n        registerHiddenSubtree(child, anchorIndex);\n      }\n    };\n\n    const walkVisible = (nodeInfo, depth) => {\n      if (!nodeInfo || typeof nodeInfo !== \"object\" || !nodeInfo.obj) {\n        return;\n      }\n      const obj = nodeInfo.obj;\n      const id = normalizeId(obj.id);\n      const itemIndex = items.length;\n      items.push({ nodeInfo, depth });\n\n      if (id) {\n        idToRootIndex.set(id, itemIndex);\n      }\n      const line = Number(obj.lineStart) || 0;\n      if (line > 0 && id && !lineTargetMap.has(line)) {\n        lineTargetMap.set(line, { kind: \"output\", id });\n      }\n\n      const children = Array.isArray(nodeInfo.children) ? nodeInfo.children : [];\n      if (!children.length) {\n        return;\n      }\n      if (id && state.collapsedIds.has(id)) {\n        for (const child of children) {\n          registerHiddenSubtree(child, itemIndex);\n        }\n        return;\n      }\n      for (const child of children) {\n        walkVisible(child, depth + 1);\n      }\n    };\n\n    for (const rootInfo of roots) {\n      walkVisible(rootInfo, 0);\n    }\n\n    return { items, idToRootIndex, lineTargetMap };\n  }\n\n  function buildOutputRootElement(item, itemIndex) {\n    const nodeInfo = item && item.nodeInfo ? item.nodeInfo : null;\n    if (!nodeInfo || !nodeInfo.obj) {\n      return null;\n    }\n    const depth = Math.max(0, Number(item && item.depth) || 0);\n    const node = renderNode(nodeInfo, { includeChildren: false, depth });\n    node.setAttribute(\"data-virtual-root-index\", String(itemIndex));\n    node.setAttribute(\"data-virtual-item-index\", String(itemIndex));\n    return node;\n  }\n\n  function getOutputEstimatedItemHeight(virtual) {\n    return Math.max(24, Number(virtual && virtual.avgItemHeight) || 200);\n  }\n\n  function computeOutputVirtualRangeFromScroll(scrollTop) {\n    const virtual = getOutputVirtualState();\n    const total = Number(virtual.itemCount) || 0;\n    if (!els.output || !total) {\n      return { start: 0, end: 0 };\n    }\n\n    const estimatedHeight = getOutputEstimatedItemHeight(virtual);\n    const metrics = getVirtualWindowConfig(els.output, estimatedHeight);\n    if (total <= metrics.targetCount) {\n      return { start: 0, end: total };\n    }\n\n    const top = Math.max(0, Number(scrollTop) || 0);\n    const firstVisible = Math.max(0, Math.floor(top / estimatedHeight));\n    let start = Math.max(0, firstVisible - metrics.overscanCount);\n    let end = Math.min(total, start + metrics.targetCount);\n    if ((end - start) < metrics.targetCount) {\n      start = Math.max(0, end - metrics.targetCount);\n    }\n\n    return { start, end };\n  }\n\n  function renderOutputVirtualInitialRange(options) {\n    if (!els.output) {\n      return;\n    }\n    const opts = options && typeof options === \"object\" ? options : {};\n    const virtual = getOutputVirtualState();\n    const items = Array.isArray(virtual.roots) ? virtual.roots : [];\n    const total = items.length;\n    const start = Math.max(0, Math.min(total, Number(virtual.start) || 0));\n    const end = Math.max(start, Math.min(total, Number(virtual.end) || 0));\n    const estimatedHeight = getOutputEstimatedItemHeight(virtual);\n\n    const frag = document.createDocumentFragment();\n    const topSpacer = document.createElement(\"div\");\n    topSpacer.className = \"virtual-spacer output-virtual-spacer-top\";\n    topSpacer.style.height = String(Math.max(0, Math.round(start * estimatedHeight))) + \"px\";\n    topSpacer.setAttribute(\"aria-hidden\", \"true\");\n    frag.appendChild(topSpacer);\n\n    const heights = [];\n    for (let index = start; index < end; index += 1) {\n      const elNode = buildOutputRootElement(items[index], index);\n      if (!elNode) {\n        continue;\n      }\n      frag.appendChild(elNode);\n      heights.push(measureOuterHeight(elNode));\n    }\n\n    const bottomSpacer = document.createElement(\"div\");\n    bottomSpacer.className = \"virtual-spacer output-virtual-spacer-bottom\";\n    bottomSpacer.style.height = String(Math.max(0, Math.round((total - end) * estimatedHeight))) + \"px\";\n    bottomSpacer.setAttribute(\"aria-hidden\", \"true\");\n    frag.appendChild(bottomSpacer);\n\n    els.output.classList.remove(\"muted\");\n    els.output.replaceChildren(frag);\n    updateAverageItemHeight(virtual, heights, 80);\n\n    if (opts.preserveScroll) {\n      const maxTop = Math.max(0, Number(els.output.scrollHeight || 0) - Number(els.output.clientHeight || 0));\n      els.output.scrollTop = Math.max(0, Math.min(maxTop, Number(opts.scrollTop) || 0));\n    } else {\n      els.output.scrollTop = Math.max(0, Number(opts.scrollTop) || 0);\n    }\n\n    virtual.lastScrollTop = Number(els.output.scrollTop || 0) || 0;\n  }\n\n  function initOutputVirtualWindow(filteredRoots, options) {\n    const opts = options && typeof options === \"object\" ? options : {};\n    const virtual = getOutputVirtualState();\n    const roots = Array.isArray(filteredRoots) ? filteredRoots : [];\n\n    if (virtual.pendingRaf) {\n      cancelAnimationFrame(virtual.pendingRaf);\n      virtual.pendingRaf = 0;\n    }\n\n    const virtualData = buildOutputVirtualData(roots);\n    virtual.roots = virtualData.items;\n    virtual.itemCount = virtualData.items.length;\n    virtual.idToRootIndex = virtualData.idToRootIndex;\n    virtual.lineTargetMap = virtualData.lineTargetMap;\n    virtual.start = 0;\n    virtual.end = 0;\n    virtual.scrollDir = \"down\";\n    virtual.isAdjustingScroll = false;\n    virtual.isInitialized = virtual.itemCount > 0;\n\n    if (!virtual.itemCount) {\n      return;\n    }\n\n    const metrics = getVirtualWindowConfig(els.output, virtual.avgItemHeight);\n    const total = virtual.itemCount;\n    let start = 0;\n    let end = Math.min(total, metrics.targetCount);\n\n    const selectedRootIndex = state.selectedId && virtual.idToRootIndex.has(state.selectedId)\n      ? Number(virtual.idToRootIndex.get(state.selectedId))\n      : -1;\n    if (selectedRootIndex >= 0) {\n      start = Math.max(0, selectedRootIndex - Math.floor(metrics.targetCount / 2));\n      end = Math.min(total, start + metrics.targetCount);\n      if ((end - start) < metrics.targetCount) {\n        start = Math.max(0, end - metrics.targetCount);\n      }\n    } else if (opts.preserveScroll === true) {\n      const range = computeOutputVirtualRangeFromScroll(Number(opts.scrollTop) || 0);\n      start = range.start;\n      end = range.end;\n    }\n\n    virtual.start = start;\n    virtual.end = end;\n    renderOutputVirtualInitialRange({\n      preserveScroll: true,\n      scrollTop: opts.preserveScroll === true ? (Number(opts.scrollTop) || 0) : 0\n    });\n  }\n\n  function ensureOutputWindowContainsRootIndex(rootIndex) {\n    const index = Number(rootIndex);\n    if (!Number.isFinite(index) || index < 0 || !els.output) {\n      return false;\n    }\n    const virtual = getOutputVirtualState();\n    const total = Number(virtual.itemCount) || 0;\n    if (!virtual.isInitialized || total <= 0 || index >= total) {\n      return false;\n    }\n    if (index >= virtual.start && index < virtual.end) {\n      return true;\n    }\n\n    const metrics = getVirtualWindowConfig(els.output, virtual.avgItemHeight);\n    let start = Math.max(0, index - Math.floor(metrics.targetCount / 2));\n    let end = Math.min(total, start + metrics.targetCount);\n    if ((end - start) < metrics.targetCount) {\n      start = Math.max(0, end - metrics.targetCount);\n    }\n\n    virtual.start = start;\n    virtual.end = end;\n    const targetTop = Math.max(0, Math.round(start * getOutputEstimatedItemHeight(virtual)));\n    renderOutputVirtualInitialRange({ preserveScroll: false, scrollTop: targetTop });\n    return true;\n  }\n\n  function processOutputVirtualScrollFrame() {\n    if (!els.output) {\n      return;\n    }\n    const virtual = getOutputVirtualState();\n    const total = Number(virtual.itemCount) || 0;\n    if (!virtual.isInitialized || !total) {\n      return;\n    }\n\n    const currentTop = Number(els.output.scrollTop || 0) || 0;\n    const prevTop = Number(virtual.lastScrollTop || 0) || 0;\n    virtual.scrollDir = currentTop >= prevTop ? \"down\" : \"up\";\n    virtual.lastScrollTop = currentTop;\n\n    const range = computeOutputVirtualRangeFromScroll(currentTop);\n    if (range.start === virtual.start && range.end === virtual.end) {\n      return;\n    }\n\n    virtual.start = range.start;\n    virtual.end = range.end;\n    renderOutputVirtualInitialRange({ preserveScroll: true, scrollTop: currentTop });\n  }\n\n  function scheduleOutputVirtualScroll() {\n    const virtual = getOutputVirtualState();\n    if (virtual.pendingRaf) {\n      return;\n    }\n    virtual.pendingRaf = requestAnimationFrame(() => {\n      virtual.pendingRaf = 0;\n      processOutputVirtualScrollFrame();\n    });\n  }\n\n  function handleOutputVirtualScroll() {\n    scheduleOutputVirtualScroll();\n  }\n\nfunction resetOutputVirtualState() {\n    const virtual = getOutputVirtualState();\n    if (virtual.pendingRaf) {\n      cancelAnimationFrame(virtual.pendingRaf);\n      virtual.pendingRaf = 0;\n    }\n    virtual.roots = [];\n    virtual.itemCount = 0;\n    virtual.start = 0;\n    virtual.end = 0;\n    virtual.lastScrollTop = 0;\n    virtual.scrollDir = \"down\";\n    virtual.isAdjustingScroll = false;\n    virtual.idToRootIndex = new Map();\n    virtual.lineTargetMap = new Map();\n    virtual.isInitialized = false;\n  }\n\n  function setSelectedCard(id, options) {\n    const normalized = normalizeId(id);\n    if (!normalized) {\n      return;\n    }\n\n    const opts = options && typeof options === \"object\" ? options : {};\n    const shouldScroll = opts.scroll !== false;\n    const shouldEnsure = opts.ensure !== false;\n    const scrollMode = String(opts.scrollMode || \"start\").toLowerCase();\n\n    if (state.selectedId) {\n      const prev = els.output.querySelector(`[data-id=\"${escapeSelectorValue(state.selectedId)}\"]`);\n      if (prev) {\n        prev.classList.remove(\"selected\");\n      }\n    }\n\n    state.selectedId = normalized;\n    let next = els.output.querySelector(`[data-id=\"${escapeSelectorValue(normalized)}\"]`);\n    if (!next && shouldEnsure) {\n      const virtual = getOutputVirtualState();\n      const rootIndex = virtual.idToRootIndex.has(normalized) ? Number(virtual.idToRootIndex.get(normalized)) : -1;\n      if (rootIndex >= 0) {\n        ensureOutputWindowContainsRootIndex(rootIndex);\n        next = els.output.querySelector(`[data-id=\"${escapeSelectorValue(normalized)}\"]`);\n      }\n    }\n\n    if (next) {\n      next.classList.add(\"selected\");\n      if (shouldScroll) {\n        scrollElementInContainer(els.output, next, { mode: scrollMode, padTop: 10, padBottom: 10 });\n      }\n    }\n  }\n\n  function setSelectedTemplateBlock(index, options) {\n    if (!els.templatePreviewOutput) {\n      return;\n    }\n\n    const opts = options && typeof options === \"object\" ? options : {};\n    const shouldScroll = opts.scroll !== false;\n    const shouldEnsure = opts.ensure !== false;\n    const scrollMode = String(opts.scrollMode || \"start\").toLowerCase();\n    const normalized = String(index === undefined || index === null ? \"\" : index).trim();\n    if (!normalized) {\n      return;\n    }\n\n    if (state.selectedTemplateIndex !== \"\") {\n      const prev = els.templatePreviewOutput.querySelector(\n        `.template-block[data-template-index=\"${escapeSelectorValue(state.selectedTemplateIndex)}\"]`\n      );\n      if (prev) {\n        prev.classList.remove(\"selected\");\n      }\n    }\n\n    state.selectedTemplateIndex = normalized;\n    let next = els.templatePreviewOutput.querySelector(\n      `.template-block[data-template-index=\"${escapeSelectorValue(normalized)}\"]`\n    );\n    if (!next && shouldEnsure && typeof ensureTemplateWindowContainsIndex === \"function\") {\n      const targetIndex = Number(normalized);\n      if (Number.isFinite(targetIndex)) {\n        ensureTemplateWindowContainsIndex(targetIndex);\n        next = els.templatePreviewOutput.querySelector(\n          `.template-block[data-template-index=\"${escapeSelectorValue(normalized)}\"]`\n        );\n      }\n    }\n\n    if (next) {\n      next.classList.add(\"selected\");\n      if (shouldScroll) {\n        scrollElementInContainer(els.templatePreviewOutput, next, { mode: scrollMode, padTop: 10, padBottom: 10 });\n      }\n    }\n  }\n\n  function getInputGutterLineHeightPx() {\n    if (!els.inputText) {\n      return 18;\n    }\n    let lineHeight = 0;\n    try {\n      const style = window.getComputedStyle(els.inputText);\n      lineHeight = Number.parseFloat(style && style.lineHeight ? style.lineHeight : \"0\") || 0;\n    } catch {\n      // ignore\n    }\n    return Math.max(12, lineHeight || 18);\n  }\n\n  function scheduleInputGutterVirtualRender() {\n    const virtual = getInputGutterVirtualState();\n    if (virtual.pendingRaf) {\n      return;\n    }\n    virtual.pendingRaf = requestAnimationFrame(() => {\n      virtual.pendingRaf = 0;\n      renderInputGutterWindow({ force: false });\n    });\n  }\n\n  function renderInputGutterWindow(options) {\n    if (!els.inputText || !els.inputGutterContent) {\n      return;\n    }\n    const opts = options && typeof options === \"object\" ? options : {};\n    const force = opts.force === true;\n    const virtual = getInputGutterVirtualState();\n    const lineCount = Math.max(1, Number(state.inputLineCount) || 1);\n    const scrollTop = Number(els.inputText.scrollTop || 0) || 0;\n    const lineHeight = Math.max(12, Number(virtual.lineHeightPx) || getInputGutterLineHeightPx() || 18);\n    const visibleLines = Math.max(1, Math.ceil((Number(els.inputText.clientHeight) || 0) / lineHeight));\n    const overscanLines = Math.max(6, Math.ceil(visibleLines * 0.75));\n    const firstVisibleLine = Math.max(1, Math.floor(scrollTop / lineHeight) + 1);\n    const startLine = Math.max(1, firstVisibleLine - overscanLines);\n    const endLine = Math.min(lineCount, startLine + visibleLines + (overscanLines * 2) - 1);\n\n    const hasRangeChange = force\n      || !virtual.isInitialized\n      || startLine !== virtual.startLine\n      || endLine !== virtual.endLine\n      || lineCount !== virtual.lineCount;\n\n    virtual.lineCount = lineCount;\n    virtual.startLine = startLine;\n    virtual.endLine = endLine;\n    virtual.lineHeightPx = lineHeight;\n    virtual.overscanLines = overscanLines;\n    virtual.topPadPx = Math.max(0, Math.round((startLine - 1) * lineHeight));\n    virtual.bottomPadPx = Math.max(0, Math.round((lineCount - endLine) * lineHeight));\n    virtual.lastScrollTop = scrollTop;\n    virtual.isInitialized = true;\n\n    if (!hasRangeChange) {\n      els.inputGutterContent.style.transform = `translateY(${-scrollTop}px)`;\n      return;\n    }\n\n    state.inputGutterButtonsByLine = new Map();\n    const frag = document.createDocumentFragment();\n\n    const topSpacer = document.createElement(\"div\");\n    topSpacer.className = \"gutter-spacer\";\n    topSpacer.style.height = `${virtual.topPadPx}px`;\n    topSpacer.setAttribute(\"aria-hidden\", \"true\");\n    frag.appendChild(topSpacer);\n\n    for (let line = startLine; line <= endLine; line += 1) {\n      const row = document.createElement(\"div\");\n      row.className = \"gutter-line\";\n\n      const btn = document.createElement(\"button\");\n      btn.type = \"button\";\n      btn.className = \"gutter-jump\";\n      btn.textContent = \"↪\";\n      btn.hidden = true;\n      btn.setAttribute(\"data-line\", String(line));\n      row.appendChild(btn);\n\n      const num = document.createElement(\"span\");\n      num.className = \"gutter-num\";\n      num.textContent = String(line);\n      row.appendChild(num);\n\n      state.inputGutterButtonsByLine.set(line, btn);\n      frag.appendChild(row);\n    }\n\n    const bottomSpacer = document.createElement(\"div\");\n    bottomSpacer.className = \"gutter-spacer\";\n    bottomSpacer.style.height = `${virtual.bottomPadPx}px`;\n    bottomSpacer.setAttribute(\"aria-hidden\", \"true\");\n    frag.appendChild(bottomSpacer);\n\n    els.inputGutterContent.replaceChildren(frag);\n    els.inputGutterContent.style.transform = `translateY(${-scrollTop}px)`;\n    refreshInputGutterTargets();\n  }\n\n  function syncInputGutterScroll() {\n    scheduleInputGutterVirtualRender();\n  }\n\n  function rebuildInputGutter() {\n    if (!els.inputText || !els.inputGutterContent) {\n      return;\n    }\n\n    const trimmed = String(els.inputText.value || \"\").trim();\n    const isJsonLike = (trimmed.startsWith(\"{\") || trimmed.startsWith(\"[\")) && trimmed.length > 1;\n    state.inputMode = isJsonLike ? \"json\" : \"abap\";\n    state.inputLineCount = Math.max(1, countInputLines(els.inputText.value || \"\"));\n\n    const virtual = getInputGutterVirtualState();\n    virtual.lineHeightPx = getInputGutterLineHeightPx();\n    renderInputGutterWindow({ force: true });\n  }\n\n  function computeInputGutterTargetsForOutput() {\n    const targets = new Map();\n    const virtual = getOutputVirtualState();\n    if (virtual.lineTargetMap instanceof Map && virtual.lineTargetMap.size) {\n      for (const [line, target] of virtual.lineTargetMap.entries()) {\n        targets.set(line, target);\n      }\n      return targets;\n    }\n\n    if (!els.output) {\n      return targets;\n    }\n\n    const cards = els.output.querySelectorAll(\".card[data-id][data-line-start]\");\n    for (const card of Array.from(cards)) {\n      const line = Number(card.getAttribute(\"data-line-start\")) || 0;\n      const id = String(card.getAttribute(\"data-id\") || \"\");\n      if (!line || !id || targets.has(line)) {\n        continue;\n      }\n      targets.set(line, { kind: \"output\", id });\n    }\n    return targets;\n  }\n\n  function computeInputGutterTargetsForTemplate() {\n    const targets = new Map();\n    const virtual = getTemplateVirtualStateForOutput();\n    if (virtual.lineTargetMap instanceof Map && virtual.lineTargetMap.size) {\n      for (const [line, target] of virtual.lineTargetMap.entries()) {\n        targets.set(line, target);\n      }\n      return targets;\n    }\n\n    if (!els.templatePreviewOutput) {\n      return targets;\n    }\n\n    const blocks = els.templatePreviewOutput.querySelectorAll(\".template-block[data-template-index][data-line-start]\");\n    for (const block of Array.from(blocks)) {\n      const line = Number(block.getAttribute(\"data-line-start\")) || 0;\n      const index = String(block.getAttribute(\"data-template-index\") || \"\");\n      if (!line || !index || targets.has(line)) {\n        continue;\n      }\n      targets.set(line, { kind: \"template\", index });\n    }\n    return targets;\n  }\n\n  function renderOutput() {\n    setError(\"\");\n    const previousScrollTop = els.output ? (Number(els.output.scrollTop || 0) || 0) : 0;\n\n    if (!state.data || !Array.isArray(state.renderObjects)) {\n      resetOutputVirtualState();\n      setOutputMessage(\"No data loaded.\");\n      refreshInputGutterTargets();\n      return;\n    }\n\n    state.query = (els.searchInput.value || \"\").trim().toLowerCase();\n    state.type = els.typeFilter.value || \"\";\n    state.showRaw = Boolean(els.showRaw && els.showRaw.checked);\n    state.showKeywords = Boolean(els.showKeywords && els.showKeywords.checked);\n    state.showValues = Boolean(els.showValues && els.showValues.checked);\n    state.showExtras = Boolean(els.showExtras && els.showExtras.checked);\n\n    const filteredRoots = (state.renderObjects || [])\n      .map((obj) => filterTree(obj))\n      .filter(Boolean);\n\n    if (!filteredRoots.length) {\n      resetOutputVirtualState();\n      setOutputMessage(\"No matches.\");\n      refreshInputGutterTargets();\n      return;\n    }\n\n    initOutputVirtualWindow(filteredRoots, { preserveScroll: true, scrollTop: previousScrollTop });\n    if (state.selectedId) {\n      setSelectedCard(state.selectedId, { scroll: false, ensure: false });\n    }\n    refreshInputGutterTargets();\n  }\n\nwindow.AbapViewerModules.factories = window.AbapViewerModules.factories || {};\nwindow.AbapViewerModules.factories[\"04-output-render\"] = function registerOutputRender(runtime) {\n  const targetRuntime = runtime || (window.AbapViewerRuntime = window.AbapViewerRuntime || {});\n  targetRuntime.api = targetRuntime.api || {};\n  targetRuntime.api.renderOutput = renderOutput;\n  targetRuntime.api.buildAbapFlowXml = buildAbapFlowXml;\n  targetRuntime.api.setRightTab = setRightTab;\n  window.AbapViewerModules.parts[\"04-output-render\"] = true;\n};\nwindow.AbapViewerModules.factories[\"04-output-render\"](window.AbapViewerRuntime);\n\n";
-})(typeof globalThis !== "undefined" ? globalThis : (typeof self !== "undefined" ? self : this));
+window.AbapViewerModules = window.AbapViewerModules || {};
+window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
+
+  function isValueLikeEntryObject(value) {
+    if (!isPlainObjectRecord(value)) {
+      return false;
+    }
+    if (isDeclLikeObject(value) || isAbapStatementObject(value)) {
+      return false;
+    }
+    return (
+      hasValueLevelDescFields(value)
+      || Object.prototype.hasOwnProperty.call(value, "declRef")
+      || Object.prototype.hasOwnProperty.call(value, "value")
+      || Object.prototype.hasOwnProperty.call(value, "name")
+      || Object.prototype.hasOwnProperty.call(value, "label")
+    );
+  }
+
+  function isAssignmentLikeEntryObject(value) {
+    if (!isPlainObjectRecord(value)) {
+      return false;
+    }
+    if (isDeclLikeObject(value) || isAbapStatementObject(value)) {
+      return false;
+    }
+    const hasValueSignals = (
+      Object.prototype.hasOwnProperty.call(value, "value")
+      || Object.prototype.hasOwnProperty.call(value, "valueRef")
+      || Object.prototype.hasOwnProperty.call(value, "valueDecl")
+      || Object.prototype.hasOwnProperty.call(value, "originDecls")
+    );
+    if (!hasValueSignals) {
+      return false;
+    }
+    return (
+      Object.prototype.hasOwnProperty.call(value, "name")
+      || Object.prototype.hasOwnProperty.call(value, "value")
+      || Object.prototype.hasOwnProperty.call(value, "valueRef")
+    );
+  }
+
+  function isConditionClauseLikeObject(value) {
+    if (!isPlainObjectRecord(value)) {
+      return false;
+    }
+    return (
+      Object.prototype.hasOwnProperty.call(value, "leftOperand")
+      || Object.prototype.hasOwnProperty.call(value, "rightOperand")
+      || Object.prototype.hasOwnProperty.call(value, "comparisonOperator")
+    );
+  }
+
+  function normalizeEntryObjectForXml(value, keyHint, pathParts, ownerContext) {
+    if (!isPlainObjectRecord(value)) {
+      return value;
+    }
+    if (isDeclLikeObject(value) || isAbapStatementObject(value)) {
+      return value;
+    }
+
+    const pathKey = buildPathKeyFromParts(pathParts);
+    const pathLower = pathKey.toLowerCase();
+    const inValuesPath = pathLower.includes("/values/");
+    const inExtrasPath = pathLower.includes("/extras/");
+    const keyHintLower = String(keyHint || "").trim().toLowerCase();
+    const extrasItemLike = keyHintLower === "item";
+    const source = getDeclSourceContextFromObject(ownerContext);
+
+    let next = value;
+
+    if (inValuesPath && isValueLikeEntryObject(next)) {
+      next = ensureEntryDeclWithSynthetic(next, {
+        pathKey,
+        file: source.file,
+        lineStart: source.lineStart,
+        raw: source.raw,
+        role: "xml:value"
+      });
+    }
+
+    if (inExtrasPath && extrasItemLike) {
+      if (isConditionClauseLikeObject(next)) {
+        next = ensureConditionClauseDeclsWithSynthetic(next, {
+          pathKey,
+          file: source.file,
+          lineStart: source.lineStart,
+          raw: source.raw
+        });
+      }
+
+      if (isAssignmentLikeEntryObject(next)) {
+        next = ensureValueDeclWithSynthetic(next, {
+          pathKey,
+          file: source.file,
+          lineStart: source.lineStart,
+          raw: source.raw,
+          role: "xml:extras:value",
+          nameHint: String(keyHint || "value")
+        });
+      }
+
+      if (isValueLikeEntryObject(next)) {
+        next = ensureEntryDeclWithSynthetic(next, {
+          pathKey,
+          file: source.file,
+          lineStart: source.lineStart,
+          raw: source.raw,
+          role: "xml:extras"
+        });
+      }
+    }
+
+    return next;
+  }
+
+  function appendXmlValue(lines, keyHint, tagName, value, indent, pathParts, ownerContext) {
+    const pad = " ".repeat(indent);
+    const currentPathParts = Array.isArray(pathParts) ? pathParts : [];
+    const currentOwnerContext = ownerContext && typeof ownerContext === "object" ? ownerContext : null;
+
+    if (value === undefined) {
+      return;
+    }
+
+    if (value === null) {
+      lines.push(`${pad}<${tagName}/>`);
+      return;
+    }
+
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      lines.push(`${pad}<${tagName}>${escapeXmlText(String(value))}</${tagName}>`);
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      const itemTag = getArrayItemTagName(keyHint);
+      lines.push(`${pad}<${tagName}>`);
+      for (let index = 0; index < value.length; index += 1) {
+        const item = value[index];
+        const itemPathParts = currentPathParts.concat(`${itemTag}[${index + 1}]`);
+        appendXmlValue(lines, itemTag, itemTag, item, indent + 2, itemPathParts, currentOwnerContext);
+      }
+      lines.push(`${pad}</${tagName}>`);
+      return;
+    }
+
+    if (typeof value === "object") {
+      const nextOwnerContext = isAbapStatementObject(value) ? value : currentOwnerContext;
+      const normalizedValue = normalizeEntryObjectForXml(value, keyHint, currentPathParts, nextOwnerContext);
+      lines.push(`${pad}<${tagName}>`);
+
+      const valueIsDecl = isDeclObjectForXml(keyHint, normalizedValue);
+      let hasComputedFinalDesc = false;
+
+      if (valueIsDecl) {
+        const declDesc = getEffectiveDeclDesc(normalizedValue);
+        if (declDesc) {
+          lines.push(`${" ".repeat(indent + 2)}<desc>${escapeXmlText(declDesc)}</desc>`);
+        } else {
+          lines.push(`${" ".repeat(indent + 2)}<desc/>`);
+        }
+
+        const finalDeclDesc = getFinalDeclDesc(normalizedValue);
+        hasComputedFinalDesc = true;
+        if (finalDeclDesc) {
+          lines.push(`${" ".repeat(indent + 2)}<finalDesc>${escapeXmlText(finalDeclDesc)}</finalDesc>`);
+        } else {
+          lines.push(`${" ".repeat(indent + 2)}<finalDesc/>`);
+        }
+
+        const declName = getDeclDisplayName(normalizedValue) || getDeclTechName(normalizedValue);
+        lines.push(`${" ".repeat(indent + 2)}<name>${escapeXmlText(declName)}</name>`);
+      }
+
+      if (!valueIsDecl) {
+        let shouldEmitFinalDesc = false;
+        let finalDesc = "";
+        if (hasValueLevelDescFields(normalizedValue)) {
+          shouldEmitFinalDesc = true;
+          finalDesc = resolveValueLevelFinalDesc(normalizedValue);
+        } else if (isDeclLikeObject(normalizedValue.decl)) {
+          shouldEmitFinalDesc = true;
+          finalDesc = getFinalDeclDesc(normalizedValue.decl);
+        }
+
+        if (shouldEmitFinalDesc) {
+          hasComputedFinalDesc = true;
+          if (finalDesc) {
+            lines.push(`${" ".repeat(indent + 2)}<finalDesc>${escapeXmlText(finalDesc)}</finalDesc>`);
+          } else {
+            lines.push(`${" ".repeat(indent + 2)}<finalDesc/>`);
+          }
+        }
+      }
+
+      const preferredOrder = [
+        "id",
+        "parent",
+        "objectType",
+        "file",
+        "lineStart",
+        "comment",
+        "raw",
+        "keywords",
+        "values",
+        "extras",
+        "block",
+        "children"
+      ];
+
+      const keys = Object.keys(normalizedValue);
+      keys.sort((a, b) => {
+        const ai = preferredOrder.indexOf(a);
+        const bi = preferredOrder.indexOf(b);
+        if (ai !== -1 || bi !== -1) {
+          return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+        }
+        return a.localeCompare(b);
+      });
+
+      for (const key of keys) {
+        if (key === "desc" && valueIsDecl) {
+          // computed above
+          continue;
+        }
+        if (key === "name" && valueIsDecl) {
+          // computed above (normalized via settings)
+          continue;
+        }
+        if (key === "finalDesc" && hasComputedFinalDesc) {
+          continue;
+        }
+        const childTag = toXmlTagName(key);
+        appendXmlValue(
+          lines,
+          key,
+          childTag,
+          normalizedValue[key],
+          indent + 2,
+          currentPathParts.concat(key),
+          nextOwnerContext
+        );
+      }
+
+      lines.push(`${pad}</${tagName}>`);
+      return;
+    }
+
+    lines.push(`${pad}<${tagName}>${escapeXmlText(String(value))}</${tagName}>`);
+  }
+
+  function buildAbapFlowXml(data) {
+    const fileName = data && typeof data === "object" ? String(data.file || "") : "";
+    const objects = data && typeof data === "object" && Array.isArray(data.objects) ? data.objects : [];
+    const renderObjects = buildRenderableObjects(objects, RENDER_TREE_OPTIONS);
+    const exportRoots = buildXmlExportRoots(renderObjects);
+
+    const lines = ['<?xml version="1.0" encoding="UTF-8"?>', "<abapflowObjects>"];
+    if (fileName) {
+      lines.push(`  <file>${escapeXmlText(fileName)}</file>`);
+    }
+    lines.push("  <objects>");
+    for (let index = 0; index < exportRoots.length; index += 1) {
+      const obj = exportRoots[index];
+      appendXmlValue(lines, "object", "object", obj, 4, ["objects", `object[${index + 1}]`], obj);
+    }
+    lines.push("  </objects>");
+    lines.push("</abapflowObjects>");
+
+    return lines.join("\n");
+  }
+
+  function walkObjects(roots, visit) {
+    const stack = Array.isArray(roots) ? roots.slice().reverse() : [];
+    while (stack.length) {
+      const node = stack.pop();
+      if (!node) {
+        continue;
+      }
+      visit(node);
+      const children = Array.isArray(node.children) ? node.children : [];
+      for (let i = children.length - 1; i >= 0; i -= 1) {
+        stack.push(children[i]);
+      }
+    }
+  }
+
+  function collectDeclSearchTextFromExtras(extras) {
+    if (!extras || typeof extras !== "object") {
+      return "";
+    }
+
+    const decls = [];
+    const addDecl = (decl) => {
+      if (decl && typeof decl === "object") {
+        decls.push(decl);
+      }
+    };
+    const addDeclList = (list) => {
+      if (!Array.isArray(list)) {
+        return;
+      }
+      for (const decl of list) {
+        addDecl(decl);
+      }
+    };
+
+    const collectFromAssignmentSections = (obj, sections) => {
+      for (const sectionName of sections) {
+        const list = obj && Array.isArray(obj[sectionName]) ? obj[sectionName] : [];
+        for (const entry of list) {
+          addDeclList(entry && entry.originDecls);
+          addDecl(entry && entry.valueDecl);
+        }
+      }
+    };
+
+    if (extras.callFunction) {
+      collectFromAssignmentSections(extras.callFunction, ["exporting", "importing", "changing", "tables", "exceptions"]);
+    }
+
+    if (extras.callMethod) {
+      collectFromAssignmentSections(extras.callMethod, ["exporting", "importing", "changing", "receiving", "exceptions"]);
+    }
+
+    if (extras.performCall) {
+      for (const sectionName of ["using", "changing", "tables"]) {
+        const list = Array.isArray(extras.performCall[sectionName]) ? extras.performCall[sectionName] : [];
+        for (const entry of list) {
+          addDeclList(entry && entry.originDecls);
+          addDecl(entry && entry.valueDecl);
+        }
+
+      }
+    }
+
+    if (extras.form && Array.isArray(extras.form.params)) {
+      for (const param of extras.form.params) {
+        addDeclList(param && param.originDecls);
+      }
+    }
+
+    collectConditionDeclsFromExtras(extras, addDecl);
+
+    const seen = new Set();
+    const parts = [];
+    for (const decl of decls) {
+      const key = getDeclOverrideStorageKey(decl) || stringifyDecl(decl);
+      if (!key || seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      parts.push(String(decl.name || ""));
+      const desc = getEffectiveDeclDesc(decl);
+      if (desc) {
+        parts.push(desc);
+      }
+    }
+
+    return parts.filter(Boolean).join("\n");
+  }
+
+  function buildSearchIndex(objects) {
+    const map = new Map();
+    walkObjects(objects, (obj) => {
+      const id = normalizeId(obj && obj.id);
+      if (!id) {
+        return;
+      }
+
+      const keywordEntries = getKeywordEntries(obj);
+      const keywordsText = keywordEntries.length
+        ? keywordEntries.map((k) => `${k.text || ""} ${k.label || ""}`.trim()).join("\n")
+        : "";
+
+      const valueEntries = getValueEntries(obj);
+      const valuesText = valueEntries.length
+        ? valueEntries
+            .map((v) => {
+              const declText = stringifyDecl(v && v.decl);
+              const declDesc = getEffectiveDeclDesc(v && v.decl);
+              return [
+                v && v.name ? String(v.name) : "",
+                v && v.value ? String(v.value) : "",
+                v && v.label ? String(v.label) : "",
+                v && v.codeDesc ? String(v.codeDesc) : "",
+                v && v.declRef ? String(v.declRef) : "",
+                declText,
+                declDesc
+              ]
+                .filter(Boolean)
+                .join(" ");
+            })
+            .join("\n")
+        : "";
+
+      const extrasText = obj.extras && typeof obj.extras === "object" ? safeJson(obj.extras, false) : "";
+      const extrasDeclText = collectDeclSearchTextFromExtras(obj.extras);
+
+      const haystack = [
+        obj.objectType || "",
+        obj.raw || "",
+        obj.comment || "",
+        keywordsText,
+        valuesText,
+        extrasText,
+        extrasDeclText
+      ]
+        .filter(Boolean)
+        .join("\n")
+        .toLowerCase();
+
+      map.set(id, haystack);
+    });
+    return map;
+  }
+
+  function computeLineOffsets(text) {
+    const value = String(text || "");
+    const offsets = [0];
+    for (let i = 0; i < value.length; i += 1) {
+      if (value[i] === "\n") {
+        offsets.push(i + 1);
+      }
+    }
+    return offsets;
+  }
+
+  function getSelectionRangeForLines(text, lineStart, lineEnd) {
+    const value = String(text || "");
+    const offsets = state.inputLineOffsets.length ? state.inputLineOffsets : computeLineOffsets(value);
+    const start = Math.max(1, Number(lineStart) || 1);
+    const end = Math.max(start, Number(lineEnd) || start);
+    const startLineIndex = start - 1;
+    const endLineIndex = end - 1;
+    const startOffset = offsets[startLineIndex] ?? 0;
+    const endOffset = offsets[endLineIndex + 1] ?? value.length;
+    return { start: startOffset, end: Math.max(startOffset, endOffset) };
+  }
+
+  function selectCodeLines(lineStart, lineEnd) {
+    const text = els.inputText.value || "";
+    state.inputLineOffsets = computeLineOffsets(text);
+    const range = getSelectionRangeForLines(text, lineStart, lineEnd);
+    els.inputText.focus();
+    els.inputText.setSelectionRange(range.start, range.end);
+    syncInputGutterScroll();
+  }
+
+  function scrollElementInContainer(container, element, options) {
+    if (!container || !element || typeof container.scrollTop !== "number") {
+      return;
+    }
+
+    const opts = options && typeof options === "object" ? options : {};
+    const mode = String(opts.mode || "nearest").toLowerCase();
+    const padTop = Math.max(0, Number(opts.padTop) || 0);
+    const padBottom = Math.max(0, Number(opts.padBottom) || 0);
+    const behavior = opts.behavior === "smooth" ? "smooth" : "auto";
+
+    const containerRect = container.getBoundingClientRect();
+    const elementRect = element.getBoundingClientRect();
+    if (!containerRect || !elementRect || !Number.isFinite(containerRect.top) || !Number.isFinite(elementRect.top)) {
+      return;
+    }
+
+    const currentTop = Number(container.scrollTop || 0) || 0;
+    let nextTop = currentTop;
+
+    if (mode === "start") {
+      nextTop = currentTop + (elementRect.top - containerRect.top) - padTop;
+    } else if (mode === "center") {
+      nextTop = currentTop
+        + (elementRect.top + (elementRect.height / 2))
+        - (containerRect.top + (containerRect.height / 2));
+    } else {
+      const topLimit = containerRect.top + padTop;
+      const bottomLimit = containerRect.bottom - padBottom;
+      if (elementRect.top < topLimit) {
+        nextTop = currentTop + (elementRect.top - topLimit);
+      } else if (elementRect.bottom > bottomLimit) {
+        nextTop = currentTop + (elementRect.bottom - bottomLimit);
+      } else {
+        return;
+      }
+    }
+
+    const maxTop = Math.max(0, Number(container.scrollHeight || 0) - Number(container.clientHeight || 0));
+    const clampedTop = Math.max(0, Math.min(maxTop, Math.round(nextTop)));
+    if (Math.abs(clampedTop - currentTop) < 1) {
+      return;
+    }
+
+    if (typeof container.scrollTo === "function") {
+      container.scrollTo({ top: clampedTop, behavior });
+    } else {
+      container.scrollTop = clampedTop;
+    }
+  }
+
+  function setSelectedCard(id, options) {
+    const normalized = normalizeId(id);
+    if (!normalized) {
+      return;
+    }
+    const opts = options && typeof options === "object" ? options : {};
+    const shouldScroll = opts.scroll !== false;
+    const scrollMode = String(opts.scrollMode || "start").toLowerCase();
+
+    if (state.selectedId) {
+      const prev = els.output.querySelector(`[data-id="${escapeSelectorValue(state.selectedId)}"]`);
+      if (prev) {
+        prev.classList.remove("selected");
+      }
+    }
+
+    state.selectedId = normalized;
+    const next = els.output.querySelector(`[data-id="${escapeSelectorValue(normalized)}"]`);
+    if (next) {
+      next.classList.add("selected");
+      if (shouldScroll) {
+        scrollElementInContainer(els.output, next, { mode: scrollMode, padTop: 10, padBottom: 10 });
+      }
+    }
+  }
+
+  function setSelectedTemplateBlock(index, options) {
+    if (!els.templatePreviewOutput) {
+      return;
+    }
+
+    const opts = options && typeof options === "object" ? options : {};
+    const shouldScroll = opts.scroll !== false;
+    const scrollMode = String(opts.scrollMode || "start").toLowerCase();
+    const normalized = String(index === undefined || index === null ? "" : index).trim();
+    if (!normalized) {
+      return;
+    }
+
+    if (state.selectedTemplateIndex !== "") {
+      const prev = els.templatePreviewOutput.querySelector(
+        `.template-block[data-template-index="${escapeSelectorValue(state.selectedTemplateIndex)}"]`
+      );
+      if (prev) {
+        prev.classList.remove("selected");
+      }
+    }
+
+    state.selectedTemplateIndex = normalized;
+    const next = els.templatePreviewOutput.querySelector(
+      `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`
+    );
+    if (next) {
+      next.classList.add("selected");
+      if (shouldScroll) {
+        scrollElementInContainer(els.templatePreviewOutput, next, { mode: scrollMode, padTop: 10, padBottom: 10 });
+      }
+    }
+  }
+
+  function setSelectedDeclRow(declKey) {
+    const key = String(declKey || "").trim();
+    if (!key || !els.declDescTable) {
+      return;
+    }
+
+    if (state.selectedDeclKey) {
+      const prev = els.declDescTable.querySelector(`tr[data-decl-key="${escapeSelectorValue(state.selectedDeclKey)}"]`);
+      if (prev) {
+        prev.classList.remove("desc-selected");
+      }
+    }
+
+    state.selectedDeclKey = key;
+    const next = els.declDescTable.querySelector(`tr[data-decl-key="${escapeSelectorValue(key)}"]`);
+    if (next) {
+      next.classList.add("desc-selected");
+      scrollElementInContainer(els.declDescPanel, next, { mode: "nearest", padTop: 8, padBottom: 8 });
+    }
+  }
+
+  function countInputLines(value) {
+    const text = String(value || "");
+    if (!text) {
+      return 1;
+    }
+    return text.split("\n").length;
+  }
+
+  function syncInputGutterScroll() {
+    if (!els.inputText || !els.inputGutterContent) {
+      return;
+    }
+
+    const scrollTop = Number(els.inputText.scrollTop || 0) || 0;
+    els.inputGutterContent.style.transform = `translateY(${-scrollTop}px)`;
+  }
+
+  function rebuildInputGutter() {
+    if (!els.inputText || !els.inputGutterContent) {
+      return;
+    }
+
+    const trimmed = String(els.inputText.value || "").trim();
+    const isJsonLike = (trimmed.startsWith("{") || trimmed.startsWith("[")) && trimmed.length > 1;
+    state.inputMode = isJsonLike ? "json" : "abap";
+
+    const lineCount = Math.max(1, countInputLines(els.inputText.value || ""));
+    if (lineCount === state.inputLineCount && state.inputGutterButtonsByLine.size) {
+      syncInputGutterScroll();
+      refreshInputGutterTargets();
+      return;
+    }
+
+    state.inputLineCount = lineCount;
+    state.inputGutterButtonsByLine = new Map();
+
+    const frag = document.createDocumentFragment();
+    for (let line = 1; line <= lineCount; line += 1) {
+      const row = document.createElement("div");
+      row.className = "gutter-line";
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "gutter-jump";
+      btn.textContent = "↪";
+      btn.hidden = true;
+      btn.setAttribute("data-line", String(line));
+      row.appendChild(btn);
+
+      const num = document.createElement("span");
+      num.className = "gutter-num";
+      num.textContent = String(line);
+      row.appendChild(num);
+
+      state.inputGutterButtonsByLine.set(line, btn);
+      frag.appendChild(row);
+    }
+
+    els.inputGutterContent.replaceChildren(frag);
+    syncInputGutterScroll();
+    refreshInputGutterTargets();
+  }
+
+  function computeInputGutterTargetsForOutput() {
+    const targets = new Map();
+    if (!els.output) {
+      return targets;
+    }
+
+    const cards = els.output.querySelectorAll(".card[data-id][data-line-start]");
+    for (const card of Array.from(cards)) {
+      const line = Number(card.getAttribute("data-line-start")) || 0;
+      const id = String(card.getAttribute("data-id") || "");
+      if (!line || !id || targets.has(line)) {
+        continue;
+      }
+      targets.set(line, { kind: "output", id });
+    }
+
+    return targets;
+  }
+
+  function computeInputGutterTargetsForDescriptions() {
+    const targets = new Map();
+    if (!els.declDescTable) {
+      return targets;
+    }
+
+
+    const rows = els.declDescTable.querySelectorAll("tr[data-decl-key][data-line-start]");
+    for (const row of Array.from(rows)) {
+      const line = Number(row.getAttribute("data-line-start")) || 0;
+      const declKey = String(row.getAttribute("data-decl-key") || "");
+      if (!line || !declKey || targets.has(line)) {
+        continue;
+      }
+      targets.set(line, { kind: "descriptions", declKey });
+    }
+
+    return targets;
+  }
+
+  function computeInputGutterTargetsForTemplate() {
+    const targets = new Map();
+    if (!els.templatePreviewOutput) {
+      return targets;
+    }
+
+    const blocks = els.templatePreviewOutput.querySelectorAll(".template-block[data-template-index][data-line-start]");
+    for (const block of Array.from(blocks)) {
+      const line = Number(block.getAttribute("data-line-start")) || 0;
+      const index = String(block.getAttribute("data-template-index") || "");
+      if (!line || !index || targets.has(line)) {
+        continue;
+      }
+      targets.set(line, { kind: "template", index });
+    }
+
+    return targets;
+  }
+
+  function refreshInputGutterTargets() {
+    if (!els.inputGutterContent || !state.inputGutterButtonsByLine.size) {
+      return;
+    }
+
+    if (state.inputMode !== "abap") {
+      state.inputGutterTargetsByLine = new Map();
+      for (const btn of state.inputGutterButtonsByLine.values()) {
+        btn.hidden = true;
+      }
+      return;
+    }
+
+    let targets = new Map();
+    if (state.rightTab === "descriptions") {
+      targets = computeInputGutterTargetsForDescriptions();
+    } else if (state.rightTab === "output") {
+      targets = computeInputGutterTargetsForOutput();
+    } else if (state.rightTab === "template") {
+      targets = computeInputGutterTargetsForTemplate();
+    }
+
+    state.inputGutterTargetsByLine = targets;
+    const title = state.rightTab === "descriptions"
+      ? "Jump to Descriptions"
+      : (state.rightTab === "output"
+        ? "Jump to Output"
+        : (state.rightTab === "template" ? "Jump to Template" : ""));
+    for (const [line, btn] of state.inputGutterButtonsByLine.entries()) {
+      const target = targets.get(line);
+      btn.hidden = !target;
+      if (target) {
+        btn.title = title;
+        btn.setAttribute("aria-label", title);
+      }
+    }
+  }
+
+  function onInputGutterClick(ev) {
+    const target = ev && ev.target && typeof ev.target.closest === "function"
+      ? ev.target.closest("button.gutter-jump")
+      : null;
+    if (!target) {
+      return;
+    }
+
+    const line = Number(target.getAttribute("data-line")) || 0;
+    if (!line) {
+      return;
+    }
+
+    const jumpTarget = state.inputGutterTargetsByLine.get(line);
+    if (!jumpTarget) {
+      return;
+    }
+
+    if (state.rightTab === "output" && jumpTarget.kind === "output") {
+      setSelectedCard(jumpTarget.id, { scroll: true, scrollMode: "start" });
+      return;
+    }
+
+    if (state.rightTab === "template" && jumpTarget.kind === "template") {
+      setSelectedTemplateBlock(jumpTarget.index, { scroll: true, scrollMode: "start" });
+      return;
+    }
+
+    if (state.rightTab === "descriptions" && jumpTarget.kind === "descriptions") {
+      setSelectedDeclRow(jumpTarget.declKey);
+    }
+  }
+
+  function openJsonModal(value) {
+    openTextModal("Object JSON", safeJson(value, true));
+  }
+
+  function openTextModal(title, text) {
+    if (!els.editModal.hidden) {
+      closeEditModal();
+    }
+
+    if (els.jsonTitle) {
+      els.jsonTitle.textContent = title ? String(title) : "";
+    }
+
+    els.jsonPre.textContent = text ? String(text) : "";
+    els.jsonModal.hidden = false;
+  }
+
+  function closeJsonModal() {
+    els.jsonModal.hidden = true;
+    if (els.jsonTitle) {
+      els.jsonTitle.textContent = "Object JSON";
+    }
+    els.jsonPre.textContent = "";
+  }
+
+  async function copyJsonToClipboard() {
+    const text = els.jsonPre.textContent || "";
+    if (!text) {
+      return;
+    }
+
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+
+    const selection = window.getSelection();
+    if (!selection) {
+      return;
+    }
+    selection.removeAllRanges();
+    const range = document.createRange();
+    range.selectNodeContents(els.jsonPre);
+    selection.addRange(range);
+    document.execCommand("copy");
+    selection.removeAllRanges();
+  }
+
+  function stringifyDecl(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+
+    const techName = getDeclTechName(decl);
+    const displayName = getDeclDisplayName(decl);
+
+    const parts = [];
+    if (decl.objectType) {
+      parts.push(String(decl.objectType));
+    }
+    if (decl.scopeLabel) {
+      parts.push(`[${String(decl.scopeLabel)}]`);
+    }
+    if (displayName) {
+      parts.push(displayName);
+    }
+    if (techName && displayName && techName !== displayName) {
+      parts.push(`(${techName})`);
+    }
+    if (decl.file) {
+      parts.push(String(decl.file));
+    }
+    if (decl.lineStart) {
+      parts.push(`#${decl.lineStart}`);
+    }
+    return parts.join(" ");
+  }
+
+  function getDeclTechName(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+    return decl.name ? String(decl.name) : "";
+  }
+
+  function stripAngleBrackets(text) {
+    const trimmed = String(text || "").trim();
+    if (trimmed.startsWith("<") && trimmed.endsWith(">") && trimmed.length > 2) {
+      return trimmed.slice(1, -1);
+    }
+    return trimmed;
+  }
+
+  function stripDeclCategoryPrefix(text) {
+    const raw = String(text || "").trim();
+    if (!raw) {
+      return "";
+    }
+
+    const match = raw.match(
+      /^\s*(HẰNG|HANG|STRUCT|TABLE|RANGETABLE|BIẾN|BIEN|CỜ|CO|FIELDSYMBOL)\b\s*[:\-\[\]]*\s*/i
+    );
+    if (!match) {
+      return raw;
+    }
+
+    let rest = raw.slice(match[0].length).trim();
+    // If the prefix included an opening "[" (e.g. "BIẾN:[") then strip ONE trailing "]" (e.g. "...]")
+    // so "BIẾN:[desc]" -> "desc" instead of "desc]".
+    if (match[0].includes("[") && rest.endsWith("]")) {
+      rest = rest.slice(0, -1).trim();
+    }
+    return rest;
+  }
+
+  function isStructFieldDecl(decl) {
+    if (!decl || typeof decl !== "object") {
+      return false;
+    }
+    if (decl.objectType === "STRUCT_FIELD") {
+      return true;
+    }
+    return Boolean(decl.structName && decl.fieldPath);
+  }
+
+  function getDeclDisplayName(decl) {
+    const techName = getDeclTechName(decl);
+    if (!techName) {
+      return "";
+    }
+
+    if (isStructFieldDecl(decl)) {
+      return techName;
+    }
+
+    const desc = getEffectiveDeclDesc(decl);
+    const descTrimmed = String(desc || "").trim();
+    if (!descTrimmed) {
+      return techName;
+    }
+
+    const settings = state.settings || DEFAULT_SETTINGS;
+    if (settings.normalizeDeclDesc) {
+      return descTrimmed;
+    }
+
+    const bare = stripAngleBrackets(techName);
+    if (bare.length < 3) {
+      return techName;
+    }
+
+    const code = bare.slice(1, 3).toUpperCase();
+    const templates = settings.nameTemplatesByCode || DEFAULT_SETTINGS.nameTemplatesByCode;
+    const template = templates && Object.prototype.hasOwnProperty.call(templates, code) ? String(templates[code] || "") : "";
+    if (!template.trim()) {
+      return techName;
+    }
+
+    const strippedKnownPrefix = stripDeclCategoryPrefix(descTrimmed);
+    const normalizedDesc = stripDeclTemplateAffixes(strippedKnownPrefix, template);
+    const displayName = template.replace(/\{\{desc\}\}/g, normalizedDesc).trim();
+    return displayName || techName;
+  }
+
+  function buildDeclTitle(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+
+    const lines = [];
+    lines.push(stringifyDecl(decl));
+
+    const desc = getEffectiveDeclDesc(decl);
+    if (desc) {
+      lines.push(`Desc: ${desc}`);
+    }
+
+    if (decl.raw) {
+      lines.push(String(decl.raw));
+    }
+
+    return lines.filter(Boolean).join("\n");
+  }
+
+  function renderDeclNameCell(decl) {
+    const text = decl ? getDeclDisplayName(decl) : "";
+    const title = buildDeclTitle(decl);
+    const cell = el("td", { text, attrs: title ? { title } : {} });
+
+    if (decl && decl.lineStart) {
+      cell.style.cursor = "pointer";
+      cell.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        selectCodeLines(decl.lineStart, decl.lineStart);
+        if (decl.id) {
+          setSelectedCard(decl.id);
+        }
+      });
+    }
+
+    return cell;
+  }
+
+  function renderDeclDescCell(decl) {
+    const text = getEffectiveDeclDesc(decl);
+    const title = buildDeclTitle(decl);
+    const cell = el("td", { attrs: title ? { title } : {} });
+
+    const wrap = el("div", { className: "decl-desc" });
+    wrap.appendChild(el("div", { className: "decl-desc-text", text: text || "" }));
+
+    if (getDeclOverrideStorageKey(decl)) {
+      const btn = el("button", {
+        className: "icon-btn",
+        text: "✎",
+        attrs: {
+          type: "button",
+          title: "Edit decl description",
+          "aria-label": "Edit decl description"
+        }
+      });
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        editDeclDesc(decl);
+      });
+      wrap.appendChild(btn);
+    }
+
+    cell.appendChild(wrap);
+
+    return cell;
+
+  }
+
+  var PERFORM_TRACE_META_KEY_OUTPUT = "__abapPerformTraceBinding";
+
+  function getDeclRenderKey(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+    return (
+      getDeclKey(decl) ||
+      [
+        decl.objectType || "",
+        decl.scopeLabel || "",
+        decl.name || "",
+        decl.file || "",
+        decl.lineStart || ""
+      ].join("|")
+    );
+  }
+
+  function dedupeDecls(list) {
+    const output = [];
+    const seen = new Set();
+    for (const decl of list || []) {
+      if (!decl) {
+        continue;
+      }
+      const key = getDeclRenderKey(decl);
+      if (!key || seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      output.push(decl);
+    }
+    return output;
+  }
+
+  function getExpandedPerformBindingContext(obj) {
+    if (!obj || typeof obj !== "object") {
+      return null;
+    }
+    const bindingContext = obj[PERFORM_TRACE_META_KEY_OUTPUT];
+    if (!bindingContext || typeof bindingContext !== "object") {
+      return null;
+    }
+    if (!(bindingContext.byParamUpper instanceof Map)) {
+      return null;
+    }
+    return bindingContext;
+  }
+
+  function resolveExpandedPerformTraceDecls(obj, decl) {
+    if (!decl || typeof decl !== "object") {
+      return [];
+    }
+    if (String(decl.objectType || "").toUpperCase() !== "FORM_PARAM") {
+      return [];
+    }
+    const bindingContext = getExpandedPerformBindingContext(obj);
+    if (!bindingContext) {
+      return [];
+    }
+    const paramUpper = String(decl.name || "").trim().toUpperCase();
+    if (!paramUpper) {
+      return [];
+    }
+    const traceDecls = bindingContext.byParamUpper.get(paramUpper);
+    if (!Array.isArray(traceDecls) || !traceDecls.length) {
+      return [];
+    }
+    return dedupeDecls(traceDecls.filter((item) => item && typeof item === "object"));
+  }
+
+  function buildDeclTraceListForObject(obj, decl) {
+    const list = [];
+    if (decl && typeof decl === "object") {
+      list.push(decl);
+    }
+    const traceDecls = resolveExpandedPerformTraceDecls(obj, decl);
+    if (traceDecls.length) {
+      list.push(...traceDecls);
+    }
+    return dedupeDecls(list);
+  }
+
+  function getDeclListDisplayName(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+
+    const displayName = String(getDeclDisplayName(decl) || "").trim();
+    const descText = String(getEffectiveDeclDesc(decl) || "").trim();
+    if (
+      displayName &&
+      descText &&
+      displayName.localeCompare(descText, undefined, { sensitivity: "accent" }) === 0
+    ) {
+      const techName = String(getDeclTechName(decl) || "").trim();
+      if (techName) {
+        return techName;
+      }
+    }
+
+    return displayName || String(getDeclTechName(decl) || "").trim();
+  }
+
+  function renderDeclListCells(decls, fallbackDecl) {
+    const list = dedupeDecls(Array.isArray(decls) ? decls.filter(Boolean) : []);
+    const effectiveList = list.length ? list : dedupeDecls(fallbackDecl ? [fallbackDecl] : []);
+
+    const nameCell = el("td");
+    const descCell = el("td");
+
+    if (!effectiveList.length) {
+      return { nameCell, descCell };
+    }
+
+    const nameWrap = el("div");
+    const descWrap = el("div");
+
+    for (const decl of effectiveList) {
+      const nameLine = el("div", { text: getDeclListDisplayName(decl) });
+      const title = buildDeclTitle(decl);
+      if (title) {
+        nameLine.title = title;
+      }
+
+      if (decl && decl.lineStart) {
+        nameLine.style.cursor = "pointer";
+        nameLine.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          selectCodeLines(decl.lineStart, decl.lineStart);
+          if (decl.id) {
+            setSelectedCard(decl.id);
+          }
+        });
+      }
+
+      nameWrap.appendChild(nameLine);
+
+      const descLineWrap = el("div", { className: "decl-desc-line" });
+      const descLineText = el("div", { className: "decl-desc-text", text: getEffectiveDeclDesc(decl) || "" });
+      if (title) {
+        descLineText.title = title;
+      }
+      descLineWrap.appendChild(descLineText);
+
+      if (getDeclOverrideStorageKey(decl)) {
+        const btn = el("button", {
+          className: "icon-btn",
+          text: "✎",
+          attrs: {
+            type: "button",
+            title: "Edit decl description",
+            "aria-label": "Edit decl description"
+          }
+        });
+        btn.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          editDeclDesc(decl);
+        });
+        descLineWrap.appendChild(btn);
+      }
+
+      descWrap.appendChild(descLineWrap);
+    }
+
+    nameCell.appendChild(nameWrap);
+    descCell.appendChild(descWrap);
+    return { nameCell, descCell };
+  }
+
+  function matchesFilters(obj) {
+    const typeOk = !state.type || obj.objectType === state.type;
+    if (!typeOk) {
+      return false;
+    }
+
+    if (!state.query) {
+      return true;
+    }
+
+    const id = normalizeId(obj && obj.id);
+    const haystack = id ? state.haystackById.get(id) : "";
+    return haystack ? haystack.includes(state.query) : false;
+  }
+
+  function filterTree(obj) {
+    const children = Array.isArray(obj.children) ? obj.children : [];
+    const filteredChildren = [];
+    for (const child of children) {
+      const filtered = filterTree(child);
+      if (filtered) {
+        filteredChildren.push(filtered);
+      }
+    }
+
+    const selfMatches = matchesFilters(obj);
+    if (!selfMatches && !filteredChildren.length) {
+      return null;
+    }
+
+    return { obj, children: filteredChildren, selfMatches };
+  }
+
+  function el(tag, options) {
+    const node = document.createElement(tag);
+    if (options && options.className) {
+      node.className = options.className;
+    }
+    if (options && options.text !== undefined) {
+      node.textContent = options.text;
+    }
+    if (options && options.attrs) {
+      for (const [key, value] of Object.entries(options.attrs)) {
+        node.setAttribute(key, String(value));
+      }
+    }
+    return node;
+  }
+
+  function renderKeywords(obj) {
+    const keywords = getKeywordEntries(obj);
+    if (!keywords.length) {
+      return null;
+    }
+
+    const wrap = el("div");
+    for (const keyword of keywords) {
+      wrap.appendChild(
+        el("span", {
+          className: "pill",
+          text: keyword && keyword.text ? String(keyword.text) : "",
+          attrs: keyword && keyword.label ? { title: String(keyword.label) } : {}
+        })
+      );
+    }
+    return wrap;
+  }
+
+  function collectDeclsForValueEntry(obj, entry) {
+    const decls = [];
+    const addDecl = (decl) => {
+      if (decl && typeof decl === "object") {
+        decls.push(decl);
+      }
+    };
+    const addDeclWithTrace = (decl) => {
+      if (!decl || typeof decl !== "object") {
+        return;
+      }
+      const traceList = buildDeclTraceListForObject(obj, decl);
+      if (!traceList.length) {
+        addDecl(decl);
+        return;
+      }
+      for (const traceDecl of traceList) {
+        addDecl(traceDecl);
+      }
+    };
+
+    const normalizedEntry = ensureEntryDeclForOutput(obj, cloneValueEntryForOutput(entry));
+
+    addDeclWithTrace(normalizedEntry && normalizedEntry.decl);
+    addDeclWithTrace(normalizedEntry && normalizedEntry.valueDecl);
+    if (normalizedEntry && Array.isArray(normalizedEntry.originDecls)) {
+      for (const originDecl of normalizedEntry.originDecls) {
+        addDeclWithTrace(originDecl);
+      }
+    }
+
+    const extras = obj && obj.extras && typeof obj.extras === "object" ? obj.extras : null;
+    if (!extras) {
+      return dedupeDecls(decls);
+    }
+
+    const entryName = String(normalizedEntry && normalizedEntry.name ? normalizedEntry.name : "").trim().toLowerCase();
+    if (!entryName) {
+      return dedupeDecls(decls);
+    }
+
+    if (entryName === "condition" && extras.ifCondition) {
+      collectConditionDeclsFromClauses(extras.ifCondition.conditions, addDeclWithTrace);
+    } else if (entryName === "ifcondition" && extras.performCall) {
+      collectConditionDeclsFromClauses(extras.performCall.ifConditions, addDeclWithTrace);
+    } else if (entryName === "where") {
+      if (extras.select) {
+        collectConditionDeclsFromClauses(extras.select.whereConditions, addDeclWithTrace);
+      }
+      if (extras.loopAtItab) {
+        collectConditionDeclsFromClauses(extras.loopAtItab.conditions, addDeclWithTrace);
+      }
+      if (extras.modifyItab) {
+        collectConditionDeclsFromClauses(extras.modifyItab.conditions, addDeclWithTrace);
+      }
+      if (extras.deleteItab) {
+        collectConditionDeclsFromClauses(extras.deleteItab.conditions, addDeclWithTrace);
+      }
+    } else if (entryName === "having" && extras.select) {
+      collectConditionDeclsFromClauses(extras.select.havingConditions, addDeclWithTrace);
+    } else if ((entryName === "withkey" || entryName === "withtablekey") && extras.readTable) {
+      collectConditionDeclsFromClauses(extras.readTable.conditions, addDeclWithTrace);
+    }
+
+    return dedupeDecls(decls);
+  }
+
+  function isRawValueEntry(entry) {
+    const name = entry && entry.name ? String(entry.name).trim() : "";
+    return Boolean(name) && /raw$/i.test(name);
+  }
+
+  function makeSectionIndexName(sectionName, indexOneBased) {
+    return `${sectionName}[${indexOneBased}]`;
+  }
+
+  function makeParsedValueRow({
+    sectionName,
+    indexOneBased,
+    valueText,
+    baseEntry,
+    decl,
+    valueDecl,
+    originDecls,
+    valueRef
+  }) {
+    const row = {
+      name: makeSectionIndexName(sectionName, indexOneBased),
+      value: valueText ? String(valueText) : "",
+      label: baseEntry && baseEntry.label ? String(baseEntry.label) : sectionName,
+      userDesc: baseEntry && baseEntry.userDesc ? String(baseEntry.userDesc) : "",
+      codeDesc: baseEntry && baseEntry.codeDesc ? String(baseEntry.codeDesc) : ""
+    };
+
+    if (decl && typeof decl === "object") {
+      row.decl = decl;
+    }
+    if (valueDecl && typeof valueDecl === "object") {
+      row.valueDecl = valueDecl;
+    }
+    if (Array.isArray(originDecls) && originDecls.length) {
+      row.originDecls = originDecls.filter((item) => item && typeof item === "object");
+    }
+    if (valueRef) {
+      row.declRef = String(valueRef);
+    }
+
+    return row;
+  }
+
+  function buildParsedRowsFromPerformList(sectionName, list, baseEntry) {
+    const items = Array.isArray(list) ? list : [];
+    return items.map((item, index) => makeParsedValueRow({
+      sectionName,
+      indexOneBased: index + 1,
+      valueText: item && item.value ? String(item.value) : "",
+      baseEntry,
+      decl: item && item.valueDecl ? item.valueDecl : (baseEntry && baseEntry.decl ? baseEntry.decl : null),
+      valueDecl: item && item.valueDecl ? item.valueDecl : null,
+      originDecls: item && Array.isArray(item.originDecls) ? item.originDecls : [],
+      valueRef: item && item.valueRef ? String(item.valueRef) : ""
+    }));
+  }
+
+  function buildParsedRowsFromAssignments(sectionName, list, baseEntry) {
+    const items = Array.isArray(list) ? list : [];
+    return items.map((item, index) => {
+      const leftName = item && item.name ? String(item.name) : "";
+      const rightValue = item && item.value ? String(item.value) : "";
+      const valueText = leftName && rightValue
+        ? `${leftName} = ${rightValue}`
+        : (leftName || rightValue);
+      return makeParsedValueRow({
+        sectionName,
+        indexOneBased: index + 1,
+        valueText,
+        baseEntry,
+        decl: item && item.valueDecl ? item.valueDecl : (baseEntry && baseEntry.decl ? baseEntry.decl : null),
+        valueDecl: item && item.valueDecl ? item.valueDecl : null,
+        originDecls: item && Array.isArray(item.originDecls) ? item.originDecls : [],
+        valueRef: item && item.valueRef ? String(item.valueRef) : ""
+      });
+    });
+  }
+
+  function buildParsedRowsFromParams(sectionName, list, baseEntry) {
+    const items = Array.isArray(list) ? list : [];
+    return items.map((param, index) => {
+      const paramName = param && param.name ? String(param.name) : "";
+      const typingText = formatTyping(param && param.typing);
+      const valueText = [paramName, typingText].filter(Boolean).join(" ").trim();
+      const origins = param && Array.isArray(param.originDecls) ? param.originDecls : [];
+      return makeParsedValueRow({
+        sectionName,
+        indexOneBased: index + 1,
+        valueText,
+        baseEntry,
+        decl: origins.length ? origins[0] : (baseEntry && baseEntry.decl ? baseEntry.decl : null),
+        valueDecl: null,
+
+        originDecls: origins,
+        valueRef: ""
+      });
+    });
+  }
+
+  function buildParsedRowsFromExceptions(sectionName, list, baseEntry) {
+    const items = Array.isArray(list) ? list : [];
+    return items.map((item, index) => {
+      const name = item && item.name ? String(item.name) : "";
+      return makeParsedValueRow({
+        sectionName,
+        indexOneBased: index + 1,
+        valueText: name,
+        baseEntry,
+        decl: baseEntry && baseEntry.decl ? baseEntry.decl : null,
+        valueDecl: null,
+        originDecls: item && Array.isArray(item.originDecls) ? item.originDecls : [],
+        valueRef: ""
+      });
+    });
+  }
+
+  function buildParsedRowsForRawEntry(obj, baseEntry) {
+    if (!obj || !baseEntry) {
+      return [];
+    }
+
+    const extras = obj.extras && typeof obj.extras === "object" ? obj.extras : null;
+    if (!extras) {
+      return [];
+    }
+
+    const rawName = baseEntry.name ? String(baseEntry.name).trim().toLowerCase() : "";
+    if (!rawName) {
+      return [];
+    }
+
+    if (extras.performCall) {
+      const sectionMap = {
+        usingraw: "using",
+        changingraw: "changing",
+        tablesraw: "tables"
+      };
+      const sectionName = sectionMap[rawName];
+      if (sectionName) {
+        return buildParsedRowsFromPerformList(sectionName, extras.performCall[sectionName], baseEntry);
+      }
+    }
+
+    if (extras.callFunction) {
+      const sectionMap = {
+        exportingraw: "exporting",
+        importingraw: "importing",
+        changingraw: "changing",
+        tablesraw: "tables",
+        exceptionsraw: "exceptions"
+      };
+      const sectionName = sectionMap[rawName];
+      if (sectionName) {
+        return buildParsedRowsFromAssignments(sectionName, extras.callFunction[sectionName], baseEntry);
+      }
+    }
+
+    if (extras.callMethod) {
+      const sectionMap = {
+        exportingraw: "exporting",
+        importingraw: "importing",
+        changingraw: "changing",
+        receivingraw: "receiving",
+        exceptionsraw: "exceptions"
+      };
+      const sectionName = sectionMap[rawName];
+      if (sectionName) {
+        return buildParsedRowsFromAssignments(sectionName, extras.callMethod[sectionName], baseEntry);
+      }
+    }
+
+    if (extras.form) {
+      const paramsByRawName = {
+        usingraw: "USING",
+        changingraw: "CHANGING",
+        tablesraw: "TABLES"
+      };
+      if (Object.prototype.hasOwnProperty.call(paramsByRawName, rawName)) {
+        const sectionUpper = paramsByRawName[rawName];
+        const params = Array.isArray(extras.form.params)
+          ? extras.form.params.filter((param) => String(param && param.section ? param.section : "").toUpperCase() === sectionUpper)
+          : [];
+        return buildParsedRowsFromParams(sectionUpper.toLowerCase(), params, baseEntry);
+      }
+      if (rawName === "raisingraw") {
+        return buildParsedRowsFromExceptions("raising", extras.form.exceptions, baseEntry);
+      }
+    }
+
+    if (extras.methodSignature) {
+      const paramsByRawName = {
+        importingraw: "IMPORTING",
+        exportingraw: "EXPORTING",
+        changingraw: "CHANGING",
+        returningraw: "RETURNING"
+      };
+      if (Object.prototype.hasOwnProperty.call(paramsByRawName, rawName)) {
+        const sectionUpper = paramsByRawName[rawName];
+        const params = Array.isArray(extras.methodSignature.params)
+          ? extras.methodSignature.params.filter((param) => String(param && param.section ? param.section : "").toUpperCase() === sectionUpper)
+          : [];
+        return buildParsedRowsFromParams(sectionUpper.toLowerCase(), params, baseEntry);
+      }
+      if (rawName === "raisingraw") {
+        return buildParsedRowsFromExceptions("raising", extras.methodSignature.exceptions, baseEntry);
+      }
+    }
+
+    return [];
+  }
+
+  function cloneValueEntryForOutput(entry) {
+    if (!entry || typeof entry !== "object") {
+      return entry;
+    }
+    const out = { ...entry };
+    if (Array.isArray(entry.originDecls)) {
+      out.originDecls = entry.originDecls.slice();
+    }
+    return out;
+  }
+
+  function ensureEntryDeclForOutput(obj, entry) {
+    if (!entry || typeof entry !== "object") {
+      return entry;
+    }
+    const source = getDeclSourceContextFromObject(obj);
+    const entryName = String(entry.name || "value").trim() || "value";
+    return ensureEntryDeclWithSynthetic(entry, {
+      pathKey: buildPathKeyFromParts([buildObjectPathBase(obj), "values", entryName]),
+      file: source.file,
+      lineStart: source.lineStart,
+      raw: source.raw,
+      role: "value"
+    });
+  }
+
+  function buildRenderableValueEntries(obj) {
+    const values = getValueEntries(obj);
+    if (!values.length) {
+      return [];
+    }
+
+    const rows = [];
+    for (const entry of values) {
+      const rawRow = cloneValueEntryForOutput(entry);
+      if (!isRawValueEntry(entry)) {
+        rows.push(ensureEntryDeclForOutput(obj, rawRow));
+        continue;
+      }
+
+      const parsedRows = buildParsedRowsForRawEntry(obj, entry);
+      if (parsedRows.length) {
+        for (const parsedRow of parsedRows) {
+          rows.push(ensureEntryDeclForOutput(obj, cloneValueEntryForOutput(parsedRow)));
+        }
+      } else {
+        rows.push(ensureEntryDeclForOutput(obj, rawRow));
+      }
+    }
+
+    return rows;
+  }
+
+  function renderValues(obj) {
+    const values = buildRenderableValueEntries(obj);
+    if (!values.length) {
+      return null;
+    }
+
+    const table = el("table");
+    const thead = el("thead");
+    const headRow = el("tr");
+    for (const name of ["name", "value", "label", "codeDesc", "declName", "declDesc"]) {
+      headRow.appendChild(el("th", { text: name }));
+    }
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = el("tbody");
+    for (const entry of values) {
+      const row = el("tr");
+      const relatedDecls = collectDeclsForValueEntry(obj, entry);
+      const declListCells = renderDeclListCells(
+        relatedDecls.length ? relatedDecls : null,
+        relatedDecls.length ? null : entry && entry.decl
+      );
+      row.appendChild(el("td", { text: entry && entry.name ? String(entry.name) : "" }));
+      row.appendChild(el("td", { text: entry && entry.value ? String(entry.value) : "" }));
+      row.appendChild(el("td", { text: entry && entry.label ? String(entry.label) : "" }));
+      row.appendChild(el("td", { text: entry && entry.codeDesc ? String(entry.codeDesc) : "" }));
+      row.appendChild(declListCells.nameCell);
+      row.appendChild(declListCells.descCell);
+      tbody.appendChild(row);
+    }
+    table.appendChild(tbody);
+    return table;
+  }
+
+  function buildExtrasEntryPathKey(obj, extrasScope, sectionName, indexOneBased, itemKind) {
+    return buildPathKeyFromParts([
+      buildObjectPathBase(obj),
+      "extras",
+      extrasScope || "extras",
+      sectionName || "section",
+      `${itemKind || "item"}[${indexOneBased}]`
+    ]);
+  }
+
+  function normalizeExtrasEntryForOutput(obj, extrasScope, sectionName, indexOneBased, entry) {
+    if (!entry || typeof entry !== "object") {
+      return entry;
+    }
+
+    const source = getDeclSourceContextFromObject(obj);
+    const basePath = buildExtrasEntryPathKey(obj, extrasScope, sectionName, indexOneBased, "item");
+    let next = cloneValueEntryForOutput(entry);
+    next = ensureEntryDeclWithSynthetic(next, {
+      pathKey: basePath,
+      file: source.file,
+      lineStart: source.lineStart,
+      raw: source.raw,
+      role: `${extrasScope || "extras"}:${sectionName || "entry"}`
+    });
+    next = ensureValueDeclWithSynthetic(next, {
+      pathKey: basePath,
+      file: source.file,
+      lineStart: source.lineStart,
+      raw: source.raw,
+      role: `${extrasScope || "extras"}:${sectionName || "entry"}:value`,
+      nameHint: sectionName || "value"
+    });
+    return next;
+  }
+
+  function renderAssignmentTable(title, list, context) {
+    const items = Array.isArray(list) ? list : [];
+    if (!items.length) {
+      return null;
+    }
+
+    const obj = context && context.obj ? context.obj : null;
+    const extrasScope = context && context.extrasScope ? String(context.extrasScope) : "extras";
+
+    const section = el("div");
+    section.appendChild(el("div", { className: "muted", text: title }));
+
+    const table = el("table");
+    const thead = el("thead");
+    const headRow = el("tr");
+    for (const key of ["name", "value", "ref", "declName", "declDesc"]) {
+      headRow.appendChild(el("th", { text: key }));
+    }
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = el("tbody");
+    for (let index = 0; index < items.length; index += 1) {
+      const entry = items[index];
+      const normalizedEntry = normalizeExtrasEntryForOutput(obj, extrasScope, title, index + 1, entry);
+      const row = el("tr");
+      row.appendChild(el("td", { text: normalizedEntry && normalizedEntry.name ? String(normalizedEntry.name) : "" }));
+      row.appendChild(el("td", { text: normalizedEntry && normalizedEntry.value ? String(normalizedEntry.value) : "" }));
+      row.appendChild(el("td", { text: normalizedEntry && normalizedEntry.valueRef ? String(normalizedEntry.valueRef) : "" }));
+      const { nameCell, descCell } = renderDeclListCells(
+        normalizedEntry && normalizedEntry.originDecls,
+        normalizedEntry && normalizedEntry.valueDecl
+      );
+      row.appendChild(nameCell);
+      row.appendChild(descCell);
+      tbody.appendChild(row);
+    }
+    table.appendChild(tbody);
+    section.appendChild(table);
+    return section;
+  }
+
+  function renderValueListTable(title, list, context) {
+    const items = Array.isArray(list) ? list : [];
+    if (!items.length) {
+      return null;
+    }
+
+    const obj = context && context.obj ? context.obj : null;
+    const extrasScope = context && context.extrasScope ? String(context.extrasScope) : "extras";
+
+    const section = el("div");
+    section.appendChild(el("div", { className: "muted", text: title }));
+
+    const table = el("table");
+    const thead = el("thead");
+    const headRow = el("tr");
+    for (const key of ["value", "ref", "declName", "declDesc"]) {
+      headRow.appendChild(el("th", { text: key }));
+    }
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = el("tbody");
+    for (let index = 0; index < items.length; index += 1) {
+      const entry = items[index];
+      const normalizedEntry = normalizeExtrasEntryForOutput(obj, extrasScope, title, index + 1, entry);
+      const row = el("tr");
+      row.appendChild(el("td", { text: normalizedEntry && normalizedEntry.value ? String(normalizedEntry.value) : "" }));
+      row.appendChild(el("td", { text: normalizedEntry && normalizedEntry.valueRef ? String(normalizedEntry.valueRef) : "" }));
+      const { nameCell, descCell } = renderDeclListCells(
+        normalizedEntry && normalizedEntry.originDecls,
+        normalizedEntry && normalizedEntry.valueDecl
+      );
+      row.appendChild(nameCell);
+      row.appendChild(descCell);
+      tbody.appendChild(row);
+    }
+    table.appendChild(tbody);
+    section.appendChild(table);
+    return section;
+  }
+
+  function resolveConditionDeclForViewer(decl, refCandidate) {
+    if (decl && typeof decl === "object") {
+      return decl;
+    }
+
+    const ref = String(refCandidate || "").trim();
+    if (!ref) {
+      return null;
+    }
+
+
+    const decls = state.data && typeof state.data === "object" && Array.isArray(state.data.decls)
+      ? state.data.decls
+      : [];
+    if (!decls.length) {
+      return null;
+    }
+
+    const upperRef = ref.toUpperCase();
+    let matched = null;
+    for (const candidate of decls) {
+      if (!candidate || typeof candidate !== "object") {
+        continue;
+      }
+      const nameUpper = String(candidate.name || "").trim().toUpperCase();
+      if (!nameUpper || nameUpper !== upperRef) {
+        continue;
+      }
+
+      if (!matched) {
+        matched = candidate;
+      }
+
+      const scopeUpper = String(candidate.scopeLabel || "").trim().toUpperCase();
+      if (scopeUpper === "GLOBAL") {
+        return candidate;
+      }
+    }
+
+    return matched;
+  }
+
+  function renderConditionTable(title, clauses, context) {
+    const items = Array.isArray(clauses) ? clauses : [];
+    if (!items.length) {
+      return null;
+    }
+
+    const obj = context && context.obj ? context.obj : null;
+    const extrasScope = context && context.extrasScope ? String(context.extrasScope) : "extras";
+    const source = getDeclSourceContextFromObject(obj);
+
+    const section = el("div");
+    if (title) {
+      section.appendChild(el("div", { className: "muted", text: title }));
+    }
+
+    const table = el("table");
+    const thead = el("thead");
+    const headRow = el("tr");
+    for (const key of [
+      "leftOperand",
+      "operator",
+      "rightOperand",
+      "connector",
+      "leftRef",
+      "leftDeclName",
+      "leftDeclDesc",
+      "rightRef",
+      "rightDeclName",
+      "rightDeclDesc"
+    ]) {
+      headRow.appendChild(el("th", { text: key }));
+    }
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = el("tbody");
+    for (let index = 0; index < items.length; index += 1) {
+      const clause = items[index];
+      const clausePath = buildExtrasEntryPathKey(obj, extrasScope, title || "conditions", index + 1, "clause");
+      let normalizedClause = clause;
+      let leftRef = clause && clause.leftOperandRef ? String(clause.leftOperandRef) : "";
+      let rightRef = clause && clause.rightOperandRef ? String(clause.rightOperandRef) : "";
+      const row = el("tr");
+      const leftDecl = resolveConditionDeclForViewer(
+        clause && clause.leftOperandDecl ? clause.leftOperandDecl : null,
+        leftRef || (clause && clause.leftOperand ? clause.leftOperand : "")
+      );
+      const rightDecl = resolveConditionDeclForViewer(
+        clause && clause.rightOperandDecl ? clause.rightOperandDecl : null,
+        rightRef || (clause && clause.rightOperand ? clause.rightOperand : "")
+      );
+      let effectiveLeftDecl = leftDecl;
+      let effectiveRightDecl = rightDecl;
+
+      if (!effectiveLeftDecl || !effectiveRightDecl) {
+        normalizedClause = ensureConditionClauseDeclsWithSynthetic(clause, {
+          pathKey: clausePath,
+          file: source.file,
+          lineStart: source.lineStart,
+          raw: source.raw
+        });
+        leftRef = normalizedClause && normalizedClause.leftOperandRef ? String(normalizedClause.leftOperandRef) : leftRef;
+        rightRef = normalizedClause && normalizedClause.rightOperandRef ? String(normalizedClause.rightOperandRef) : rightRef;
+        if (!effectiveLeftDecl) {
+          effectiveLeftDecl = normalizedClause && normalizedClause.leftOperandDecl
+            ? normalizedClause.leftOperandDecl
+            : null;
+        }
+        if (!effectiveRightDecl) {
+          effectiveRightDecl = normalizedClause && normalizedClause.rightOperandDecl
+            ? normalizedClause.rightOperandDecl
+            : null;
+        }
+      }
+
+      row.appendChild(el("td", { text: normalizedClause && normalizedClause.leftOperand ? String(normalizedClause.leftOperand) : "" }));
+      row.appendChild(el("td", { text: normalizedClause && normalizedClause.comparisonOperator ? String(normalizedClause.comparisonOperator) : "" }));
+      row.appendChild(el("td", { text: normalizedClause && normalizedClause.rightOperand ? String(normalizedClause.rightOperand) : "" }));
+      row.appendChild(el("td", { text: normalizedClause && normalizedClause.logicalConnector ? String(normalizedClause.logicalConnector) : "" }));
+      row.appendChild(el("td", { text: leftRef }));
+
+      const leftTraceDecls = buildDeclTraceListForObject(obj, effectiveLeftDecl);
+      const leftDeclCells = renderDeclListCells(leftTraceDecls, effectiveLeftDecl);
+      row.appendChild(leftDeclCells.nameCell);
+      row.appendChild(leftDeclCells.descCell);
+
+      row.appendChild(el("td", { text: rightRef }));
+      const rightTraceDecls = buildDeclTraceListForObject(obj, effectiveRightDecl);
+      const rightDeclCells = renderDeclListCells(rightTraceDecls, effectiveRightDecl);
+      row.appendChild(rightDeclCells.nameCell);
+      row.appendChild(rightDeclCells.descCell);
+
+      tbody.appendChild(row);
+    }
+
+    table.appendChild(tbody);
+    section.appendChild(table);
+    return section;
+  }
+
+  function appendConditionSection(wrap, title, rawText, clauses, context) {
+    if (!wrap) {
+      return;
+    }
+
+    const raw = String(rawText || "").trim();
+    if (raw) {
+      wrap.appendChild(el("div", { className: "muted", text: raw }));
+    }
+
+    const table = renderConditionTable(title, clauses, context);
+    if (table) {
+      wrap.appendChild(table);
+    }
+  }
+
+  function renderParamsTable(title, params) {
+    const items = Array.isArray(params) ? params : [];
+    if (!items.length) {
+      return null;
+    }
+
+    const section = el("div");
+    section.appendChild(el("div", { className: "muted", text: title }));
+
+    const table = el("table");
+    const thead = el("thead");
+    const headRow = el("tr");
+    for (const key of ["section", "name", "typing", "doc", "declName", "declDesc"]) {
+      headRow.appendChild(el("th", { text: key }));
+    }
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = el("tbody");
+    for (const param of items) {
+      const row = el("tr");
+      row.appendChild(el("td", { text: param && param.section ? String(param.section) : "" }));
+      row.appendChild(el("td", { text: param && param.name ? String(param.name) : "" }));
+      const typingText = formatTyping(param && param.typing);
+      row.appendChild(el("td", { text: typingText }));
+      const docText = param && param.doc
+        ? [param.doc.direction || "", param.doc.text || ""].filter(Boolean).join(" ")
+        : "";
+      row.appendChild(el("td", { text: docText }));
+      const { nameCell, descCell } = renderDeclListCells(param && param.originDecls);
+      row.appendChild(nameCell);
+      row.appendChild(descCell);
+      tbody.appendChild(row);
+    }
+    table.appendChild(tbody);
+    section.appendChild(table);
+    return section;
+  }
+
+  function formatTyping(typing) {
+    if (!typing) {
+      return "";
+    }
+    if (typeof typing === "string") {
+      return typing;
+    }
+    if (Array.isArray(typing)) {
+      return typing.map((item) => formatTyping(item)).filter(Boolean).join(" ");
+    }
+    if (typeof typing === "object") {
+      const kind = typing.kind ? String(typing.kind) : "";
+      let value = "";
+
+      if (typeof typing.value === "string") {
+        value = typing.value;
+      } else if (typing.value && typeof typing.value === "object") {
+        if (typeof typing.value.value === "string") {
+          value = typing.value.value;
+        } else if (typeof typing.value.raw === "string") {
+          value = typing.value.raw;
+        } else if (typeof typing.value.name === "string") {
+          value = typing.value.name;
+        } else {
+          value = safeJson(typing.value, false);
+        }
+      } else if (typing.value !== undefined && typing.value !== null) {
+        value = String(typing.value);
+      }
+
+      return [kind, value].filter(Boolean).join(" ").trim();
+    }
+    return String(typing);
+  }
+
+  function renderNameList(title, items) {
+    const list = Array.isArray(items) ? items : [];
+    if (!list.length) {
+      return null;
+    }
+
+    const section = el("div");
+    section.appendChild(el("div", { className: "muted", text: title }));
+
+    const wrap = el("div");
+    for (const entry of list) {
+      wrap.appendChild(el("span", { className: "pill", text: entry && entry.name ? String(entry.name) : "" }));
+    }
+    section.appendChild(wrap);
+    return section;
+  }
+
+  function renderExtras(obj) {
+    const extras = obj.extras;
+    if (!extras || typeof extras !== "object") {
+      return null;
+    }
+
+    const wrap = el("div", { className: "extras" });
+    wrap.appendChild(el("div", { className: "muted", text: "Extras" }));
+
+    if (extras.form) {
+      const form = extras.form;
+      const titleParts = [form.name ? `FORM ${form.name}` : ""].filter(Boolean);
+      if (form.nameFromComment && form.nameFromComment !== form.name) {
+        titleParts.push(`(comment: ${form.nameFromComment})`);
+      }
+      if (titleParts.length) {
+        wrap.appendChild(el("div", { className: "muted", text: titleParts.join(" ") }));
+      }
+
+      const paramsTable = renderParamsTable("params", form.params);
+      if (paramsTable) {
+        wrap.appendChild(paramsTable);
+      }
+
+      const exceptions = renderNameList("exceptions", form.exceptions);
+      if (exceptions) {
+        wrap.appendChild(exceptions);
+      }
+
+      return wrap;
+    }
+
+    if (extras.methodSignature) {
+      const signature = extras.methodSignature;
+      if (signature.name) {
+        wrap.appendChild(el("div", { className: "muted", text: `METHOD ${signature.name}` }));
+      }
+
+      const paramsTable = renderParamsTable("params", signature.params);
+      if (paramsTable) {
+        wrap.appendChild(paramsTable);
+      }
+
+      const exceptions = renderNameList("exceptions", signature.exceptions);
+      if (exceptions) {
+        wrap.appendChild(exceptions);
+      }
+
+      return wrap;
+    }
+
+    if (extras.callFunction) {
+      const call = extras.callFunction;
+      wrap.appendChild(el("div", { className: "muted", text: call.name ? `CALL FUNCTION ${call.name}` : "CALL FUNCTION" }));
+      if (call.destination) {
+        wrap.appendChild(el("div", { className: "muted", text: `DESTINATION ${call.destination}` }));
+      }
+
+      for (const sectionName of ["exporting", "importing", "changing", "tables", "exceptions"]) {
+        const table = renderAssignmentTable(sectionName, call[sectionName], { obj, extrasScope: "callFunction" });
+        if (table) {
+          wrap.appendChild(table);
+        }
+      }
+
+      return wrap;
+    }
+
+    if (extras.callMethod) {
+      const call = extras.callMethod;
+      wrap.appendChild(el("div", { className: "muted", text: call.target ? `CALL METHOD ${call.target}` : "CALL METHOD" }));
+
+      for (const sectionName of ["exporting", "importing", "changing", "receiving", "exceptions"]) {
+        const table = renderAssignmentTable(sectionName, call[sectionName], { obj, extrasScope: "callMethod" });
+        if (table) {
+          wrap.appendChild(table);
+        }
+      }
+
+      return wrap;
+    }
+
+    if (extras.performCall) {
+      const call = extras.performCall;
+      wrap.appendChild(el("div", { className: "muted", text: call.form ? `PERFORM ${call.form}` : "PERFORM" }));
+      if (call.program) {
+        wrap.appendChild(el("div", { className: "muted", text: `IN PROGRAM ${call.program}` }));
+      }
+      appendConditionSection(
+        wrap,
+        "ifConditions",
+        call.ifCondition ? `IF ${call.ifCondition}` : "",
+        call.ifConditions,
+        { obj, extrasScope: "performCall" }
+      );
+
+      for (const sectionName of ["using", "changing", "tables"]) {
+        const table = renderValueListTable(sectionName, call[sectionName], { obj, extrasScope: "performCall" });
+        if (table) {
+
+          wrap.appendChild(table);
+        }
+      }
+
+      return wrap;
+    }
+
+    if (extras.ifCondition) {
+      const info = extras.ifCondition;
+      appendConditionSection(
+        wrap,
+        "conditions",
+        info.conditionRaw ? `IF ${info.conditionRaw}` : "",
+        info.conditions,
+        { obj, extrasScope: "ifCondition" }
+      );
+      return wrap;
+    }
+
+    if (extras.select) {
+      const info = extras.select;
+      appendConditionSection(
+        wrap,
+        "whereConditions",
+        info.whereRaw ? `WHERE ${info.whereRaw}` : "",
+        info.whereConditions,
+        { obj, extrasScope: "select.where" }
+      );
+      appendConditionSection(
+        wrap,
+        "havingConditions",
+        info.havingRaw ? `HAVING ${info.havingRaw}` : "",
+        info.havingConditions,
+        { obj, extrasScope: "select.having" }
+      );
+      return wrap;
+    }
+
+    if (extras.readTable) {
+      const info = extras.readTable;
+      const raw = info.withTableKeyRaw
+        ? `WITH TABLE KEY ${info.withTableKeyRaw}`
+        : (info.withKeyRaw ? `WITH KEY ${info.withKeyRaw}` : "");
+      appendConditionSection(wrap, "conditions", raw, info.conditions, { obj, extrasScope: "readTable" });
+      return wrap;
+    }
+
+    if (extras.loopAtItab) {
+      const info = extras.loopAtItab;
+      appendConditionSection(
+        wrap,
+        "conditions",
+        info.whereRaw ? `WHERE ${info.whereRaw}` : "",
+        info.conditions,
+        { obj, extrasScope: "loopAtItab" }
+      );
+      return wrap;
+    }
+
+    if (extras.modifyItab) {
+      const info = extras.modifyItab;
+      appendConditionSection(
+        wrap,
+        "conditions",
+        info.whereRaw ? `WHERE ${info.whereRaw}` : "",
+        info.conditions,
+        { obj, extrasScope: "modifyItab" }
+      );
+      return wrap;
+    }
+
+    if (extras.deleteItab) {
+      const info = extras.deleteItab;
+      appendConditionSection(
+        wrap,
+        "conditions",
+        info.whereRaw ? `WHERE ${info.whereRaw}` : "",
+        info.conditions,
+        { obj, extrasScope: "deleteItab" }
+      );
+      return wrap;
+    }
+
+    wrap.appendChild(el("pre", { text: safeJson(extras, true) }));
+    return wrap;
+  }
+
+  function renderMeta(obj) {
+    const parts = [];
+    if (obj.file) {
+      parts.push(String(obj.file));
+    }
+    if (obj.lineStart) {
+      parts.push(`line ${obj.lineStart}`);
+    }
+    if (obj.block && obj.block.lineEnd) {
+      parts.push(`end ${obj.block.lineEnd}`);
+    }
+    if (obj.id !== undefined && obj.id !== null) {
+      parts.push(`#${obj.id}`);
+    }
+    return parts.join(" • ");
+  }
+
+  function getObjectLabel(obj) {
+    for (const key of ["name", "target", "form"]) {
+      const value = getFirstValueFromValues(obj.values, key);
+      if (value) {
+        return value;
+      }
+    }
+
+    if (obj.extras && obj.extras.callFunction && obj.extras.callFunction.name) {
+      return String(obj.extras.callFunction.name);
+    }
+    if (obj.extras && obj.extras.callMethod && obj.extras.callMethod.target) {
+      return String(obj.extras.callMethod.target);
+    }
+    if (obj.extras && obj.extras.performCall && obj.extras.performCall.form) {
+      return String(obj.extras.performCall.form);
+    }
+    if (obj.extras && obj.extras.form && obj.extras.form.name) {
+      return String(obj.extras.form.name);
+    }
+    if (obj.extras && obj.extras.methodSignature && obj.extras.methodSignature.name) {
+      return String(obj.extras.methodSignature.name);
+    }
+
+    return "";
+  }
+
+  function renderNode(nodeInfo, options) {
+    const opts = options && typeof options === "object" ? options : {};
+    const includeChildren = opts.includeChildren !== false;
+    const depth = Math.max(0, Number(opts.depth) || 0);
+    const obj = nodeInfo.obj;
+    const id = normalizeId(obj.id);
+    const children = nodeInfo.children || [];
+
+    const cardAttrs = {};
+    if (id) {
+      cardAttrs["data-id"] = id;
+    }
+    if (obj && obj.lineStart) {
+      cardAttrs["data-line-start"] = String(obj.lineStart);
+    }
+
+    const card = el("div", {
+      className: `card${obj.block ? " block" : ""}${id && id === state.selectedId ? " selected" : ""}`,
+      attrs: Object.keys(cardAttrs).length ? cardAttrs : {}
+    });
+    card.setAttribute("data-depth", String(depth));
+    if (depth > 0) {
+      card.style.marginLeft = `${Math.min(144, depth * 14)}px`;
+    } else {
+      card.style.marginLeft = "";
+    }
+
+    const header = el("div", { className: "card-header" });
+    const label = getObjectLabel(obj);
+    const titleText = `${String(obj.objectType || "(unknown)")}${label ? ` ${label}` : ""}`;
+    const title = el("h3", { className: "card-title", text: titleText });
+
+    const meta = renderMeta(obj);
+    if (meta) {
+      title.appendChild(el("span", { className: "muted", text: `  (${meta})` }));
+    }
+
+    header.appendChild(title);
+
+    const actions = el("div", { className: "card-actions" });
+
+    const btnCode = el("button", { className: "btn-ghost", text: "Code" });
+    btnCode.type = "button";
+    btnCode.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      setSelectedCard(id);
+      const lineEnd = obj.block && obj.block.lineEnd ? obj.block.lineEnd : obj.lineStart;
+      selectCodeLines(obj.lineStart, lineEnd);
+    });
+    actions.appendChild(btnCode);
+
+    const btnJson = el("button", { className: "btn-ghost", text: "JSON" });
+    btnJson.type = "button";
+    btnJson.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      setSelectedCard(id);
+      openJsonModal(obj);
+    });
+    actions.appendChild(btnJson);
+
+    if (children.length && id) {
+      const isCollapsed = state.collapsedIds.has(id);
+      const btnCollapse = el("button", { className: "btn-ghost", text: isCollapsed ? "Expand" : "Collapse" });
+      btnCollapse.type = "button";
+      btnCollapse.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        if (state.collapsedIds.has(id)) {
+          state.collapsedIds.delete(id);
+        } else {
+          state.collapsedIds.add(id);
+        }
+        renderOutput();
+        setSelectedCard(id);
+      });
+      actions.appendChild(btnCollapse);
+    }
+
+    header.appendChild(actions);
+    card.appendChild(header);
+
+    if (obj.comment) {
+      card.appendChild(el("div", { className: "muted", text: String(obj.comment) }));
+    }
+
+    if (state.showKeywords) {
+      const kw = renderKeywords(obj);
+      if (kw) {
+        card.appendChild(kw);
+      }
+    }
+
+    if (state.showValues) {
+      const valuesTable = renderValues(obj);
+      if (valuesTable) {
+        card.appendChild(valuesTable);
+      }
+    }
+
+    if (state.showRaw && obj.raw) {
+      card.appendChild(el("div", { className: "raw", text: String(obj.raw) }));
+    }
+
+    if (state.showExtras) {
+      const extras = renderExtras(obj);
+      if (extras) {
+        card.appendChild(extras);
+      }
+    }
+
+    if (includeChildren && children.length && !state.collapsedIds.has(id)) {
+      const childWrap = el("div", { className: "children" });
+      for (const child of children) {
+        childWrap.appendChild(renderNode(child, { includeChildren: true, depth: depth + 1 }));
+      }
+      card.appendChild(childWrap);
+    }
+
+    card.addEventListener("click", () => setSelectedCard(id));
+    return card;
+  }
+
+  function populateTypeFilter(objects) {
+    const types = new Set();
+    walkObjects(objects, (obj) => {
+      if (obj && obj.objectType) {
+        types.add(String(obj.objectType));
+      }
+    });
+
+    const sorted = Array.from(types).sort((a, b) => a.localeCompare(b));
+    const current = els.typeFilter.value || "";
+
+    while (els.typeFilter.options.length > 1) {
+      els.typeFilter.remove(1);
+    }
+
+    for (const type of sorted) {
+      const opt = document.createElement("option");
+      opt.value = type;
+      opt.textContent = type;
+      els.typeFilter.appendChild(opt);
+    }
+
+    els.typeFilter.value = sorted.includes(current) ? current : "";
+  }
+
+  function renderOutput() {
+    const scrollTop = els.output.scrollTop;
+    setError("");
+
+    if (!state.data || !Array.isArray(state.renderObjects)) {
+      setOutputMessage("No data loaded.");
+      refreshInputGutterTargets();
+      return;
+    }
+
+    state.query = (els.searchInput.value || "").trim().toLowerCase();
+    state.type = els.typeFilter.value || "";
+    state.showRaw = Boolean(els.showRaw && els.showRaw.checked);
+    state.showKeywords = Boolean(els.showKeywords && els.showKeywords.checked);
+    state.showValues = Boolean(els.showValues && els.showValues.checked);
+    state.showExtras = Boolean(els.showExtras && els.showExtras.checked);
+
+    const filteredRoots = (state.renderObjects || [])
+      .map((obj) => filterTree(obj))
+      .filter(Boolean);
+
+    if (!filteredRoots.length) {
+      setOutputMessage("No matches.");
+      refreshInputGutterTargets();
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+    for (const root of filteredRoots) {
+      frag.appendChild(renderNode(root));
+    }
+
+    els.output.classList.remove("muted");
+    els.output.replaceChildren(frag);
+    els.output.scrollTop = scrollTop;
+
+    if (state.selectedId) {
+      setSelectedCard(state.selectedId, { scroll: false });
+    }
+
+    refreshInputGutterTargets();
+  }
+
+  function normalizeParsedJson(json) {
+    if (Array.isArray(json)) {
+      return { file: "", objects: json, decls: [] };
+    }
+    if (json && typeof json === "object" && Array.isArray(json.objects)) {
+      return {
+        file: String(json.file || ""),
+        objects: json.objects,
+        decls: Array.isArray(json.decls) ? json.decls : []
+      };
+    }
+    return null;
+  }
+
+  function getOutputVirtualState() {
+    if (!state.outputVirtual || typeof state.outputVirtual !== "object") {
+      state.outputVirtual = {
+        roots: [],
+        itemCount: 0,
+        start: 0,
+        end: 0,
+        lastScrollTop: 0,
+        scrollDir: "down",
+        pendingRaf: 0,
+        isAdjustingScroll: false,
+        avgItemHeight: 200,
+        idToRootIndex: new Map(),
+        lineTargetMap: new Map(),
+        isInitialized: false
+      };
+    }
+    if (!(state.outputVirtual.idToRootIndex instanceof Map)) {
+      state.outputVirtual.idToRootIndex = new Map();
+    }
+    if (!(state.outputVirtual.lineTargetMap instanceof Map)) {
+      state.outputVirtual.lineTargetMap = new Map();
+    }
+    return state.outputVirtual;
+  }
+
+  function getTemplateVirtualStateForOutput() {
+    if (!state.templateVirtual || typeof state.templateVirtual !== "object") {
+      state.templateVirtual = {
+        items: [],
+        itemCount: 0,
+        start: 0,
+        end: 0,
+        lastScrollTop: 0,
+        scrollDir: "down",
+        pendingRaf: 0,
+        isAdjustingScroll: false,
+        avgItemHeight: 140,
+        lineTargetMap: new Map(),
+        isInitialized: false
+      };
+    }
+    if (!(state.templateVirtual.lineTargetMap instanceof Map)) {
+      state.templateVirtual.lineTargetMap = new Map();
+    }
+    return state.templateVirtual;
+  }
+
+  function getInputGutterVirtualState() {
+    if (!state.inputGutterVirtual || typeof state.inputGutterVirtual !== "object") {
+      state.inputGutterVirtual = {
+        lineCount: 0,
+        startLine: 1,
+        endLine: 1,
+        lineHeightPx: 18,
+        topPadPx: 0,
+        bottomPadPx: 0,
+        pendingRaf: 0,
+        lastScrollTop: 0,
+        overscanLines: 6,
+        isInitialized: false
+      };
+    }
+    return state.inputGutterVirtual;
+  }
+
+  function getVirtualWindowConfig(container, avgItemHeight) {
+    const safeAvg = Math.max(1, Number(avgItemHeight) || 1);
+    const clientHeight = Math.max(0, Number(container && container.clientHeight) || 0);
+    const visibleEstimate = Math.max(1, Math.ceil(clientHeight / safeAvg));
+    const overscanCount = Math.max(2, Math.ceil(visibleEstimate * 0.5));
+    const batchCount = Math.max(4, Math.ceil(visibleEstimate * 0.5));
+    const targetCount = visibleEstimate + (overscanCount * 2);
+    const maxCount = targetCount + (batchCount * 2);
+    const edgeThresholdPx = Math.max(40, Math.round(clientHeight * 0.2));
+    return { visibleEstimate, overscanCount, batchCount, targetCount, maxCount, edgeThresholdPx };
+  }
+
+  function measureOuterHeight(node) {
+    if (!node || typeof node.getBoundingClientRect !== "function") {
+      return 0;
+    }
+    const rect = node.getBoundingClientRect();
+    let marginTop = 0;
+    let marginBottom = 0;
+    try {
+      const style = window.getComputedStyle(node);
+      marginTop = Number.parseFloat(style && style.marginTop ? style.marginTop : "0") || 0;
+      marginBottom = Number.parseFloat(style && style.marginBottom ? style.marginBottom : "0") || 0;
+    } catch {
+      // ignore
+    }
+    return Math.max(0, rect.height + marginTop + marginBottom);
+  }
+
+  function updateAverageItemHeight(virtualState, heights, minimum) {
+    const minValue = Math.max(1, Number(minimum) || 1);
+    const list = Array.isArray(heights) ? heights.filter((v) => Number(v) > 0) : [];
+    if (!list.length) {
+      return;
+    }
+    const sampleAvg = list.reduce((sum, value) => sum + Number(value || 0), 0) / list.length;
+    const prev = Math.max(minValue, Number(virtualState.avgItemHeight) || minValue);
+    const next = Math.max(minValue, ((prev * 0.8) + (sampleAvg * 0.2)));
+    virtualState.avgItemHeight = Math.round(next);
+  }
+
+  function buildOutputVirtualData(filteredRoots) {
+    const roots = Array.isArray(filteredRoots) ? filteredRoots : [];
+    const items = [];
+    const idToRootIndex = new Map();
+    const lineTargetMap = new Map();
+
+    const registerHiddenSubtree = (nodeInfo, anchorIndex) => {
+      if (!nodeInfo || typeof nodeInfo !== "object" || !nodeInfo.obj) {
+        return;
+      }
+      const obj = nodeInfo.obj;
+      const id = normalizeId(obj.id);
+      if (id && !idToRootIndex.has(id)) {
+        idToRootIndex.set(id, anchorIndex);
+      }
+      const line = Number(obj.lineStart) || 0;
+      if (line > 0 && id && !lineTargetMap.has(line)) {
+        lineTargetMap.set(line, { kind: "output", id });
+      }
+      const children = Array.isArray(nodeInfo.children) ? nodeInfo.children : [];
+      for (const child of children) {
+        registerHiddenSubtree(child, anchorIndex);
+      }
+    };
+
+    const walkVisible = (nodeInfo, depth) => {
+      if (!nodeInfo || typeof nodeInfo !== "object" || !nodeInfo.obj) {
+        return;
+      }
+      const obj = nodeInfo.obj;
+      const id = normalizeId(obj.id);
+      const itemIndex = items.length;
+      items.push({ nodeInfo, depth });
+
+      if (id) {
+        idToRootIndex.set(id, itemIndex);
+      }
+      const line = Number(obj.lineStart) || 0;
+      if (line > 0 && id && !lineTargetMap.has(line)) {
+        lineTargetMap.set(line, { kind: "output", id });
+      }
+
+      const children = Array.isArray(nodeInfo.children) ? nodeInfo.children : [];
+      if (!children.length) {
+        return;
+      }
+      if (id && state.collapsedIds.has(id)) {
+        for (const child of children) {
+          registerHiddenSubtree(child, itemIndex);
+        }
+        return;
+      }
+      for (const child of children) {
+        walkVisible(child, depth + 1);
+      }
+    };
+
+    for (const rootInfo of roots) {
+      walkVisible(rootInfo, 0);
+    }
+
+    return { items, idToRootIndex, lineTargetMap };
+  }
+
+  function buildOutputRootElement(item, itemIndex) {
+    const nodeInfo = item && item.nodeInfo ? item.nodeInfo : null;
+    if (!nodeInfo || !nodeInfo.obj) {
+      return null;
+    }
+    const depth = Math.max(0, Number(item && item.depth) || 0);
+    const node = renderNode(nodeInfo, { includeChildren: false, depth });
+    node.setAttribute("data-virtual-root-index", String(itemIndex));
+    node.setAttribute("data-virtual-item-index", String(itemIndex));
+    return node;
+  }
+
+  function getOutputEstimatedItemHeight(virtual) {
+    return Math.max(24, Number(virtual && virtual.avgItemHeight) || 200);
+  }
+
+  function computeOutputVirtualRangeFromScroll(scrollTop) {
+    const virtual = getOutputVirtualState();
+    const total = Number(virtual.itemCount) || 0;
+    if (!els.output || !total) {
+      return { start: 0, end: 0 };
+    }
+
+    const estimatedHeight = getOutputEstimatedItemHeight(virtual);
+    const metrics = getVirtualWindowConfig(els.output, estimatedHeight);
+    if (total <= metrics.targetCount) {
+      return { start: 0, end: total };
+    }
+
+    const top = Math.max(0, Number(scrollTop) || 0);
+    const firstVisible = Math.max(0, Math.floor(top / estimatedHeight));
+    let start = Math.max(0, firstVisible - metrics.overscanCount);
+    let end = Math.min(total, start + metrics.targetCount);
+    if ((end - start) < metrics.targetCount) {
+      start = Math.max(0, end - metrics.targetCount);
+    }
+
+    return { start, end };
+  }
+
+  function renderOutputVirtualInitialRange(options) {
+    if (!els.output) {
+      return;
+    }
+    const opts = options && typeof options === "object" ? options : {};
+    const virtual = getOutputVirtualState();
+    const items = Array.isArray(virtual.roots) ? virtual.roots : [];
+    const total = items.length;
+    const start = Math.max(0, Math.min(total, Number(virtual.start) || 0));
+    const end = Math.max(start, Math.min(total, Number(virtual.end) || 0));
+    const estimatedHeight = getOutputEstimatedItemHeight(virtual);
+
+    const frag = document.createDocumentFragment();
+    const topSpacer = document.createElement("div");
+    topSpacer.className = "virtual-spacer output-virtual-spacer-top";
+    topSpacer.style.height = String(Math.max(0, Math.round(start * estimatedHeight))) + "px";
+    topSpacer.setAttribute("aria-hidden", "true");
+    frag.appendChild(topSpacer);
+
+    const heights = [];
+    for (let index = start; index < end; index += 1) {
+      const elNode = buildOutputRootElement(items[index], index);
+      if (!elNode) {
+        continue;
+      }
+      frag.appendChild(elNode);
+      heights.push(measureOuterHeight(elNode));
+    }
+
+    const bottomSpacer = document.createElement("div");
+    bottomSpacer.className = "virtual-spacer output-virtual-spacer-bottom";
+    bottomSpacer.style.height = String(Math.max(0, Math.round((total - end) * estimatedHeight))) + "px";
+    bottomSpacer.setAttribute("aria-hidden", "true");
+    frag.appendChild(bottomSpacer);
+
+    els.output.classList.remove("muted");
+    els.output.replaceChildren(frag);
+    updateAverageItemHeight(virtual, heights, 80);
+
+    if (opts.preserveScroll) {
+      const maxTop = Math.max(0, Number(els.output.scrollHeight || 0) - Number(els.output.clientHeight || 0));
+      els.output.scrollTop = Math.max(0, Math.min(maxTop, Number(opts.scrollTop) || 0));
+    } else {
+      els.output.scrollTop = Math.max(0, Number(opts.scrollTop) || 0);
+    }
+
+    virtual.lastScrollTop = Number(els.output.scrollTop || 0) || 0;
+  }
+
+  function initOutputVirtualWindow(filteredRoots, options) {
+    const opts = options && typeof options === "object" ? options : {};
+    const virtual = getOutputVirtualState();
+    const roots = Array.isArray(filteredRoots) ? filteredRoots : [];
+
+    if (virtual.pendingRaf) {
+      cancelAnimationFrame(virtual.pendingRaf);
+      virtual.pendingRaf = 0;
+    }
+
+    const virtualData = buildOutputVirtualData(roots);
+    virtual.roots = virtualData.items;
+    virtual.itemCount = virtualData.items.length;
+    virtual.idToRootIndex = virtualData.idToRootIndex;
+    virtual.lineTargetMap = virtualData.lineTargetMap;
+    virtual.start = 0;
+    virtual.end = 0;
+    virtual.scrollDir = "down";
+    virtual.isAdjustingScroll = false;
+    virtual.isInitialized = virtual.itemCount > 0;
+
+    if (!virtual.itemCount) {
+      return;
+    }
+
+    const metrics = getVirtualWindowConfig(els.output, virtual.avgItemHeight);
+    const total = virtual.itemCount;
+    let start = 0;
+    let end = Math.min(total, metrics.targetCount);
+
+    const selectedRootIndex = state.selectedId && virtual.idToRootIndex.has(state.selectedId)
+      ? Number(virtual.idToRootIndex.get(state.selectedId))
+      : -1;
+    if (selectedRootIndex >= 0) {
+      start = Math.max(0, selectedRootIndex - Math.floor(metrics.targetCount / 2));
+      end = Math.min(total, start + metrics.targetCount);
+      if ((end - start) < metrics.targetCount) {
+        start = Math.max(0, end - metrics.targetCount);
+      }
+    } else if (opts.preserveScroll === true) {
+      const range = computeOutputVirtualRangeFromScroll(Number(opts.scrollTop) || 0);
+      start = range.start;
+      end = range.end;
+    }
+
+    virtual.start = start;
+    virtual.end = end;
+    renderOutputVirtualInitialRange({
+      preserveScroll: true,
+      scrollTop: opts.preserveScroll === true ? (Number(opts.scrollTop) || 0) : 0
+    });
+  }
+
+  function ensureOutputWindowContainsRootIndex(rootIndex) {
+    const index = Number(rootIndex);
+    if (!Number.isFinite(index) || index < 0 || !els.output) {
+      return false;
+    }
+    const virtual = getOutputVirtualState();
+    const total = Number(virtual.itemCount) || 0;
+    if (!virtual.isInitialized || total <= 0 || index >= total) {
+      return false;
+    }
+    if (index >= virtual.start && index < virtual.end) {
+      return true;
+    }
+
+    const metrics = getVirtualWindowConfig(els.output, virtual.avgItemHeight);
+    let start = Math.max(0, index - Math.floor(metrics.targetCount / 2));
+    let end = Math.min(total, start + metrics.targetCount);
+    if ((end - start) < metrics.targetCount) {
+      start = Math.max(0, end - metrics.targetCount);
+    }
+
+    virtual.start = start;
+    virtual.end = end;
+    const targetTop = Math.max(0, Math.round(start * getOutputEstimatedItemHeight(virtual)));
+    renderOutputVirtualInitialRange({ preserveScroll: false, scrollTop: targetTop });
+    return true;
+  }
+
+  function processOutputVirtualScrollFrame() {
+    if (!els.output) {
+      return;
+    }
+    const virtual = getOutputVirtualState();
+    const total = Number(virtual.itemCount) || 0;
+    if (!virtual.isInitialized || !total) {
+      return;
+    }
+
+    const currentTop = Number(els.output.scrollTop || 0) || 0;
+    const prevTop = Number(virtual.lastScrollTop || 0) || 0;
+    virtual.scrollDir = currentTop >= prevTop ? "down" : "up";
+    virtual.lastScrollTop = currentTop;
+
+    const range = computeOutputVirtualRangeFromScroll(currentTop);
+    if (range.start === virtual.start && range.end === virtual.end) {
+      return;
+    }
+
+    virtual.start = range.start;
+    virtual.end = range.end;
+    renderOutputVirtualInitialRange({ preserveScroll: true, scrollTop: currentTop });
+  }
+
+  function scheduleOutputVirtualScroll() {
+    const virtual = getOutputVirtualState();
+    if (virtual.pendingRaf) {
+      return;
+    }
+    virtual.pendingRaf = requestAnimationFrame(() => {
+      virtual.pendingRaf = 0;
+      processOutputVirtualScrollFrame();
+    });
+  }
+
+  function handleOutputVirtualScroll() {
+    scheduleOutputVirtualScroll();
+  }
+
+function resetOutputVirtualState() {
+    const virtual = getOutputVirtualState();
+    if (virtual.pendingRaf) {
+      cancelAnimationFrame(virtual.pendingRaf);
+      virtual.pendingRaf = 0;
+    }
+    virtual.roots = [];
+    virtual.itemCount = 0;
+    virtual.start = 0;
+    virtual.end = 0;
+    virtual.lastScrollTop = 0;
+    virtual.scrollDir = "down";
+    virtual.isAdjustingScroll = false;
+    virtual.idToRootIndex = new Map();
+    virtual.lineTargetMap = new Map();
+    virtual.isInitialized = false;
+  }
+
+  function setSelectedCard(id, options) {
+    const normalized = normalizeId(id);
+    if (!normalized) {
+      return;
+    }
+
+    const opts = options && typeof options === "object" ? options : {};
+    const shouldScroll = opts.scroll !== false;
+    const shouldEnsure = opts.ensure !== false;
+    const scrollMode = String(opts.scrollMode || "start").toLowerCase();
+
+    if (state.selectedId) {
+      const prev = els.output.querySelector(`[data-id="${escapeSelectorValue(state.selectedId)}"]`);
+      if (prev) {
+        prev.classList.remove("selected");
+      }
+    }
+
+    state.selectedId = normalized;
+    let next = els.output.querySelector(`[data-id="${escapeSelectorValue(normalized)}"]`);
+    if (!next && shouldEnsure) {
+      const virtual = getOutputVirtualState();
+      const rootIndex = virtual.idToRootIndex.has(normalized) ? Number(virtual.idToRootIndex.get(normalized)) : -1;
+      if (rootIndex >= 0) {
+        ensureOutputWindowContainsRootIndex(rootIndex);
+        next = els.output.querySelector(`[data-id="${escapeSelectorValue(normalized)}"]`);
+      }
+    }
+
+    if (next) {
+      next.classList.add("selected");
+      if (shouldScroll) {
+        scrollElementInContainer(els.output, next, { mode: scrollMode, padTop: 10, padBottom: 10 });
+      }
+    }
+  }
+
+  function setSelectedTemplateBlock(index, options) {
+    if (!els.templatePreviewOutput) {
+      return;
+    }
+
+    const opts = options && typeof options === "object" ? options : {};
+    const shouldScroll = opts.scroll !== false;
+    const shouldEnsure = opts.ensure !== false;
+    const scrollMode = String(opts.scrollMode || "start").toLowerCase();
+    const normalized = String(index === undefined || index === null ? "" : index).trim();
+    if (!normalized) {
+      return;
+    }
+
+    if (state.selectedTemplateIndex !== "") {
+      const prev = els.templatePreviewOutput.querySelector(
+        `.template-block[data-template-index="${escapeSelectorValue(state.selectedTemplateIndex)}"]`
+      );
+      if (prev) {
+        prev.classList.remove("selected");
+      }
+    }
+
+    state.selectedTemplateIndex = normalized;
+    let next = els.templatePreviewOutput.querySelector(
+      `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`
+    );
+    if (!next && shouldEnsure && typeof ensureTemplateWindowContainsIndex === "function") {
+      const targetIndex = Number(normalized);
+      if (Number.isFinite(targetIndex)) {
+        ensureTemplateWindowContainsIndex(targetIndex);
+        next = els.templatePreviewOutput.querySelector(
+          `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`
+        );
+      }
+    }
+
+    if (next) {
+      next.classList.add("selected");
+      if (shouldScroll) {
+        scrollElementInContainer(els.templatePreviewOutput, next, { mode: scrollMode, padTop: 10, padBottom: 10 });
+      }
+    }
+  }
+
+  function getInputGutterLineHeightPx() {
+    if (!els.inputText) {
+      return 18;
+    }
+    let lineHeight = 0;
+    try {
+      const style = window.getComputedStyle(els.inputText);
+      lineHeight = Number.parseFloat(style && style.lineHeight ? style.lineHeight : "0") || 0;
+    } catch {
+      // ignore
+    }
+    return Math.max(12, lineHeight || 18);
+  }
+
+  function scheduleInputGutterVirtualRender() {
+    const virtual = getInputGutterVirtualState();
+    if (virtual.pendingRaf) {
+      return;
+    }
+    virtual.pendingRaf = requestAnimationFrame(() => {
+      virtual.pendingRaf = 0;
+      renderInputGutterWindow({ force: false });
+    });
+  }
+
+  function renderInputGutterWindow(options) {
+    if (!els.inputText || !els.inputGutterContent) {
+      return;
+    }
+    const opts = options && typeof options === "object" ? options : {};
+    const force = opts.force === true;
+    const virtual = getInputGutterVirtualState();
+    const lineCount = Math.max(1, Number(state.inputLineCount) || 1);
+    const scrollTop = Number(els.inputText.scrollTop || 0) || 0;
+    const lineHeight = Math.max(12, Number(virtual.lineHeightPx) || getInputGutterLineHeightPx() || 18);
+    const visibleLines = Math.max(1, Math.ceil((Number(els.inputText.clientHeight) || 0) / lineHeight));
+    const overscanLines = Math.max(6, Math.ceil(visibleLines * 0.75));
+    const firstVisibleLine = Math.max(1, Math.floor(scrollTop / lineHeight) + 1);
+    const startLine = Math.max(1, firstVisibleLine - overscanLines);
+    const endLine = Math.min(lineCount, startLine + visibleLines + (overscanLines * 2) - 1);
+
+    const hasRangeChange = force
+      || !virtual.isInitialized
+      || startLine !== virtual.startLine
+      || endLine !== virtual.endLine
+      || lineCount !== virtual.lineCount;
+
+    virtual.lineCount = lineCount;
+    virtual.startLine = startLine;
+    virtual.endLine = endLine;
+    virtual.lineHeightPx = lineHeight;
+    virtual.overscanLines = overscanLines;
+    virtual.topPadPx = Math.max(0, Math.round((startLine - 1) * lineHeight));
+    virtual.bottomPadPx = Math.max(0, Math.round((lineCount - endLine) * lineHeight));
+    virtual.lastScrollTop = scrollTop;
+    virtual.isInitialized = true;
+
+    if (!hasRangeChange) {
+      els.inputGutterContent.style.transform = `translateY(${-scrollTop}px)`;
+      return;
+    }
+
+    state.inputGutterButtonsByLine = new Map();
+    const frag = document.createDocumentFragment();
+
+    const topSpacer = document.createElement("div");
+    topSpacer.className = "gutter-spacer";
+    topSpacer.style.height = `${virtual.topPadPx}px`;
+    topSpacer.setAttribute("aria-hidden", "true");
+    frag.appendChild(topSpacer);
+
+    for (let line = startLine; line <= endLine; line += 1) {
+      const row = document.createElement("div");
+      row.className = "gutter-line";
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "gutter-jump";
+      btn.textContent = "↪";
+      btn.hidden = true;
+      btn.setAttribute("data-line", String(line));
+      row.appendChild(btn);
+
+      const num = document.createElement("span");
+      num.className = "gutter-num";
+      num.textContent = String(line);
+      row.appendChild(num);
+
+      state.inputGutterButtonsByLine.set(line, btn);
+      frag.appendChild(row);
+    }
+
+    const bottomSpacer = document.createElement("div");
+    bottomSpacer.className = "gutter-spacer";
+    bottomSpacer.style.height = `${virtual.bottomPadPx}px`;
+    bottomSpacer.setAttribute("aria-hidden", "true");
+    frag.appendChild(bottomSpacer);
+
+    els.inputGutterContent.replaceChildren(frag);
+    els.inputGutterContent.style.transform = `translateY(${-scrollTop}px)`;
+    refreshInputGutterTargets();
+  }
+
+  function syncInputGutterScroll() {
+    scheduleInputGutterVirtualRender();
+  }
+
+  function rebuildInputGutter() {
+    if (!els.inputText || !els.inputGutterContent) {
+      return;
+    }
+
+    const trimmed = String(els.inputText.value || "").trim();
+    const isJsonLike = (trimmed.startsWith("{") || trimmed.startsWith("[")) && trimmed.length > 1;
+    state.inputMode = isJsonLike ? "json" : "abap";
+    state.inputLineCount = Math.max(1, countInputLines(els.inputText.value || ""));
+
+    const virtual = getInputGutterVirtualState();
+    virtual.lineHeightPx = getInputGutterLineHeightPx();
+    renderInputGutterWindow({ force: true });
+  }
+
+  function computeInputGutterTargetsForOutput() {
+    const targets = new Map();
+    const virtual = getOutputVirtualState();
+    if (virtual.lineTargetMap instanceof Map && virtual.lineTargetMap.size) {
+      for (const [line, target] of virtual.lineTargetMap.entries()) {
+        targets.set(line, target);
+      }
+      return targets;
+    }
+
+    if (!els.output) {
+      return targets;
+    }
+
+    const cards = els.output.querySelectorAll(".card[data-id][data-line-start]");
+    for (const card of Array.from(cards)) {
+      const line = Number(card.getAttribute("data-line-start")) || 0;
+      const id = String(card.getAttribute("data-id") || "");
+      if (!line || !id || targets.has(line)) {
+        continue;
+      }
+      targets.set(line, { kind: "output", id });
+    }
+    return targets;
+  }
+
+  function computeInputGutterTargetsForTemplate() {
+    const targets = new Map();
+    const virtual = getTemplateVirtualStateForOutput();
+    if (virtual.lineTargetMap instanceof Map && virtual.lineTargetMap.size) {
+      for (const [line, target] of virtual.lineTargetMap.entries()) {
+        targets.set(line, target);
+      }
+      return targets;
+    }
+
+    if (!els.templatePreviewOutput) {
+      return targets;
+    }
+
+    const blocks = els.templatePreviewOutput.querySelectorAll(".template-block[data-template-index][data-line-start]");
+    for (const block of Array.from(blocks)) {
+      const line = Number(block.getAttribute("data-line-start")) || 0;
+      const index = String(block.getAttribute("data-template-index") || "");
+      if (!line || !index || targets.has(line)) {
+        continue;
+      }
+      targets.set(line, { kind: "template", index });
+    }
+    return targets;
+  }
+
+  function renderOutput() {
+    setError("");
+    const previousScrollTop = els.output ? (Number(els.output.scrollTop || 0) || 0) : 0;
+
+    if (!state.data || !Array.isArray(state.renderObjects)) {
+      resetOutputVirtualState();
+      setOutputMessage("No data loaded.");
+      refreshInputGutterTargets();
+      return;
+    }
+
+    state.query = (els.searchInput.value || "").trim().toLowerCase();
+    state.type = els.typeFilter.value || "";
+    state.showRaw = Boolean(els.showRaw && els.showRaw.checked);
+    state.showKeywords = Boolean(els.showKeywords && els.showKeywords.checked);
+    state.showValues = Boolean(els.showValues && els.showValues.checked);
+    state.showExtras = Boolean(els.showExtras && els.showExtras.checked);
+
+    const filteredRoots = (state.renderObjects || [])
+      .map((obj) => filterTree(obj))
+      .filter(Boolean);
+
+    if (!filteredRoots.length) {
+      resetOutputVirtualState();
+      setOutputMessage("No matches.");
+      refreshInputGutterTargets();
+      return;
+    }
+
+    initOutputVirtualWindow(filteredRoots, { preserveScroll: true, scrollTop: previousScrollTop });
+    if (state.selectedId) {
+      setSelectedCard(state.selectedId, { scroll: false, ensure: false });
+    }
+    refreshInputGutterTargets();
+  }
+
+window.AbapViewerModules.factories = window.AbapViewerModules.factories || {};
+window.AbapViewerModules.factories["04-output-render"] = function registerOutputRender(runtime) {
+  const targetRuntime = runtime || (window.AbapViewerRuntime = window.AbapViewerRuntime || {});
+  targetRuntime.api = targetRuntime.api || {};
+  targetRuntime.api.renderOutput = renderOutput;
+  targetRuntime.api.buildAbapFlowXml = buildAbapFlowXml;
+  targetRuntime.api.setRightTab = setRightTab;
+  window.AbapViewerModules.parts["04-output-render"] = true;
+};
+window.AbapViewerModules.factories["04-output-render"](window.AbapViewerRuntime);

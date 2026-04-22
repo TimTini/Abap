@@ -1,10 +1,4300 @@
 "use strict";
 
-(function (root) {
-  const globalRoot = root || (typeof globalThis !== "undefined" ? globalThis : this);
-  const registry = globalRoot.__AbapSourceParts = globalRoot.__AbapSourceParts || {};
-  const targetKey = "viewer/app/01-core.js";
-  const partKey = "viewer/app/core/01-runtime-state.js";
-  const bucket = registry[targetKey] = registry[targetKey] || {};
-  bucket[partKey] = "\"use strict\";\n\nwindow.AbapViewerModules = window.AbapViewerModules || {};\nwindow.AbapViewerModules.parts = window.AbapViewerModules.parts || {};\nwindow.AbapViewerRuntime = window.AbapViewerRuntime || {};\nwindow.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};\n\n  const els = {\n    fileInput: document.getElementById(\"fileInput\"),\n    parseBtn: document.getElementById(\"parseBtn\"),\n    searchInput: document.getElementById(\"searchInput\"),\n    typeFilter: document.getElementById(\"typeFilter\"),\n    showRaw: document.getElementById(\"showRaw\"),\n    showKeywords: document.getElementById(\"showKeywords\"),\n    showValues: document.getElementById(\"showValues\"),\n    showExtras: document.getElementById(\"showExtras\"),\n    themeToggle: document.getElementById(\"themeToggle\"),\n    expandAllBtn: document.getElementById(\"expandAllBtn\"),\n    collapseAllBtn: document.getElementById(\"collapseAllBtn\"),\n    clearFiltersBtn: document.getElementById(\"clearFiltersBtn\"),\n    descBtn: document.getElementById(\"descBtn\"),\n    settingsBtn: document.getElementById(\"settingsBtn\"),\n    exportXmlBtn: document.getElementById(\"exportXmlBtn\"),\n    inputText: document.getElementById(\"inputText\"),\n    inputGutter: document.getElementById(\"inputGutter\"),\n    inputGutterContent: document.getElementById(\"inputGutterContent\"),\n    mainLayout: document.getElementById(\"mainLayout\"),\n    panelSplitter: document.getElementById(\"panelSplitter\"),\n    output: document.getElementById(\"output\"),\n    buildInfo: document.getElementById(\"buildInfo\"),\n    rightPanelTitle: document.getElementById(\"rightPanelTitle\"),\n    rightTabOutputBtn: document.getElementById(\"rightTabOutputBtn\"),\n    rightTabTemplateBtn: document.getElementById(\"rightTabTemplateBtn\"),\n    rightTabDescBtn: document.getElementById(\"rightTabDescBtn\"),\n    templatePreviewPanel: document.getElementById(\"templatePreviewPanel\"),\n    templateKeyMode: document.getElementById(\"templateKeyMode\"),\n    templateCopyTableOnly: document.getElementById(\"templateCopyTableOnly\"),\n    templateCopyAllBtn: document.getElementById(\"templateCopyAllBtn\"),\n    templateResetBtn: document.getElementById(\"templateResetBtn\"),\n    templateExportBtn: document.getElementById(\"templateExportBtn\"),\n    templateImportBtn: document.getElementById(\"templateImportBtn\"),\n    templateApplyBtn: document.getElementById(\"templateApplyBtn\"),\n    templateImportInput: document.getElementById(\"templateImportInput\"),\n    templateConfigError: document.getElementById(\"templateConfigError\"),\n    templateConfigJson: document.getElementById(\"templateConfigJson\"),\n    templatePreviewOutput: document.getElementById(\"templatePreviewOutput\"),\n    declDescJsonBtn: document.getElementById(\"declDescJsonBtn\"),\n    declDescPanel: document.getElementById(\"declDescPanel\"),\n    error: document.getElementById(\"error\"),\n    jsonModal: document.getElementById(\"jsonModal\"),\n    jsonTitle: document.getElementById(\"jsonTitle\"),\n    jsonPre: document.getElementById(\"jsonPre\"),\n    jsonCopyBtn: document.getElementById(\"jsonCopyBtn\"),\n    jsonCloseBtn: document.getElementById(\"jsonCloseBtn\"),\n    declDescSearch: document.getElementById(\"declDescSearch\"),\n    declDescMissingOnly: document.getElementById(\"declDescMissingOnly\"),\n    declDescTypes: document.getElementById(\"declDescTypes\"),\n    declDescSummary: document.getElementById(\"declDescSummary\"),\n    declDescTable: document.getElementById(\"declDescTable\"),\n    editModal: document.getElementById(\"editModal\"),\n    editLabel: document.getElementById(\"editLabel\"),\n    editHint: document.getElementById(\"editHint\"),\n    editSingleWrap: document.getElementById(\"editSingleWrap\"),\n    editDesc: document.getElementById(\"editDesc\"),\n    editStructWrap: document.getElementById(\"editStructWrap\"),\n    editStructDesc: document.getElementById(\"editStructDesc\"),\n    editItemDesc: document.getElementById(\"editItemDesc\"),\n    editSkipNormalize: document.getElementById(\"editSkipNormalize\"),\n    editSaveBtn: document.getElementById(\"editSaveBtn\"),\n    editClearBtn: document.getElementById(\"editClearBtn\"),\n    editCancelBtn: document.getElementById(\"editCancelBtn\"),\n    rulesBtn: document.getElementById(\"rulesBtn\"),\n    rulesModal: document.getElementById(\"rulesModal\"),\n    rulesSelect: document.getElementById(\"rulesSelect\"),\n    rulesTemplate: document.getElementById(\"rulesTemplate\"),\n    rulesError: document.getElementById(\"rulesError\"),\n    rulesJson: document.getElementById(\"rulesJson\"),\n    rulesNewBtn: document.getElementById(\"rulesNewBtn\"),\n    rulesSaveBtn: document.getElementById(\"rulesSaveBtn\"),\n    rulesDeleteBtn: document.getElementById(\"rulesDeleteBtn\"),\n    rulesDownloadBtn: document.getElementById(\"rulesDownloadBtn\"),\n    rulesCloseBtn: document.getElementById(\"rulesCloseBtn\"),\n    settingsModal: document.getElementById(\"settingsModal\"),\n    settingsNormalizeDesc: document.getElementById(\"settingsNormalizeDesc\"),\n    settingsDeclTypes: document.getElementById(\"settingsDeclTypes\"),\n    settingsStructTemplate: document.getElementById(\"settingsStructTemplate\"),\n    settingsNameTemplates: document.getElementById(\"settingsNameTemplates\"),\n    settingsSaveBtn: document.getElementById(\"settingsSaveBtn\"),\n    settingsResetBtn: document.getElementById(\"settingsResetBtn\"),\n    settingsCloseBtn: document.getElementById(\"settingsCloseBtn\")\n  };\n\n  const state = {\n    data: null,\n    renderObjects: [],\n    inputMode: \"abap\",\n    inputLineCount: 0,\n    inputGutterButtonsByLine: new Map(),\n    inputGutterTargetsByLine: new Map(),\n    theme: \"dark\",\n    query: \"\",\n    type: \"\",\n    showRaw: true,\n    showKeywords: true,\n    showValues: true,\n    showExtras: false,\n    rightTab: \"template\",\n    templateConfig: null,\n    templateConfigDraft: \"\",\n    templatePreviewCache: null,\n    collapsedIds: new Set(),\n    selectedId: \"\",\n    selectedTemplateIndex: \"\",\n    selectedDeclKey: \"\",\n    descOverrides: {},\n    descOverridesLegacy: {},\n    activeEdit: null,\n    haystackById: new Map(),\n    inputLineOffsets: [],\n    customRules: [],\n    activeRuleId: \"\",\n    settings: null,\n    layoutLeftPane: 48,\n    outputVirtual: {\n      roots: [],\n      itemCount: 0,\n      start: 0,\n      end: 0,\n      lastScrollTop: 0,\n      scrollDir: \"down\",\n      pendingRaf: 0,\n      isAdjustingScroll: false,\n      avgItemHeight: 200,\n      idToRootIndex: new Map(),\n      lineTargetMap: new Map(),\n      isInitialized: false\n    },\n    templateVirtual: {\n      items: [],\n      itemCount: 0,\n      start: 0,\n      end: 0,\n      lastScrollTop: 0,\n      scrollDir: \"down\",\n      pendingRaf: 0,\n      isAdjustingScroll: false,\n      avgItemHeight: 140,\n      lineTargetMap: new Map(),\n      isInitialized: false\n    },\n    inputGutterVirtual: {\n      lineCount: 0,\n      startLine: 1,\n      endLine: 1,\n      lineHeightPx: 18,\n      topPadPx: 0,\n      bottomPadPx: 0,\n      pendingRaf: 0,\n      lastScrollTop: 0,\n      overscanLines: 6,\n      isInitialized: false\n    }\n  };\n\n  const DESC_STORAGE_KEY_V2 = \"abap-parser-viewer.declDescOverrides.v2\";\n  const DESC_STORAGE_KEY_LEGACY_V1 = \"abap-parser-viewer.descOverrides.v1\";\n  const RULES_STORAGE_KEY_V1 = \"abap-parser-viewer.customConfigs.v1\";\n  const SETTINGS_STORAGE_KEY_V1 = \"abap-parser-viewer.settings.v1\";\n  const TEMPLATE_CONFIG_STORAGE_KEY_V1 = \"abap-parser-viewer.templateConfig.v1\";\n  const THEME_STORAGE_KEY_V1 = \"abap-parser-viewer.theme.v1\";\n  const LAYOUT_SPLIT_STORAGE_KEY_V1 = \"abap-parser-viewer.layoutSplit.v1\";\n  const LAYOUT_SPLIT_DEFAULT = 48;\n  const LAYOUT_SPLIT_MIN = 28;\n  const LAYOUT_SPLIT_MAX = 72;\n  const MOBILE_LAYOUT_QUERY = \"(max-width: 980px)\";\n  const RENDER_TREE_OPTIONS = Object.freeze({\n    expandPerformForms: true,\n    hideFormRoots: true,\n    maxExpandDepth: Number.POSITIVE_INFINITY\n  });\n\n  const DECL_TYPE_OPTIONS = [\n    \"DATA\",\n    \"TYPES\",\n    \"PARAMETERS\",\n    \"SELECT-OPTIONS\",\n    \"CONSTANTS\",\n    \"RANGES\",\n    \"STATICS\",\n    \"CLASS-DATA\",\n    \"FIELD-SYMBOLS\"\n  ];\n\n  const NAME_CODE_OPTIONS = [\n    { code: \"CN\", label: \"HẰNG\" },\n    { code: \"DS\", label: \"STRUCT\" },\n    { code: \"DT\", label: \"TABLE\" },\n    { code: \"DR\", label: \"RANGETABLE\" },\n    { code: \"DF\", label: \"BIẾN\" },\n    { code: \"FL\", label: \"CỜ\" },\n    { code: \"FS\", label: \"FIELDSYMBOL\" }\n  ];\n\n  const DEFAULT_SETTINGS = {\n    normalizeDeclDesc: true,\n    declFilterTypes: [\"DATA\", \"TYPES\", \"PARAMETERS\"],\n    structDescTemplate: \"{{struct}}-{{item}}\",\n    nameTemplatesByCode: {\n      CN: \"HẰNG:{{desc}}\",\n      DS: \"STRUCT:{{desc}}\",\n      DT: \"TABLE:{{desc}}\",\n      DR: \"RANGETABLE:{{desc}}\",\n      DF: \"BIẾN:{{desc}}\",\n      FL: \"CỜ:{{desc}}\",\n      FS: \"FIELDSYMBOL:{{desc}}\"\n    }\n  };\n\n  const SAMPLE_ABAP = [\n    \"REPORT zdeep_form_demo.\",\n    \"\",\n    \"*------------------------------------------------------------*\",\n    \"* Selection parameters\",\n    \"*------------------------------------------------------------*\",\n    \"PARAMETERS p_carrid TYPE sflight-carrid DEFAULT 'LH'.\",\n    \"PARAMETERS p_connid TYPE sflight-connid DEFAULT '0400'.\",\n    \"PARAMETERS p_limit  TYPE i DEFAULT 20.\",\n    \"\",\n    \"*------------------------------------------------------------*\",\n    \"* Local type declarations (declared structures)\",\n    \"*------------------------------------------------------------*\",\n    \"TYPES: BEGIN OF ty_flight,\",\n    \"         carrid    TYPE sflight-carrid,\",\n    \"         connid    TYPE sflight-connid,\",\n    \"         fldate    TYPE sflight-fldate,\",\n    \"         seatsmax  TYPE sflight-seatsmax,\",\n    \"         seatsocc  TYPE sflight-seatsocc,\",\n    \"         cityfrom  TYPE spfli-cityfrom,\",\n    \"         cityto    TYPE spfli-cityto,\",\n    \"       END OF ty_flight.\",\n    \"\",\n    \"TYPES: BEGIN OF ty_summary,\",\n    \"         total_count TYPE i,\",\n    \"         full_count  TYPE i,\",\n    \"         free_count  TYPE i,\",\n    \"         ratio_text  TYPE string,\",\n    \"       END OF ty_summary.\",\n    \"\",\n    \"*------------------------------------------------------------*\",\n    \"* Data declarations (variables)\",\n    \"*------------------------------------------------------------*\",\n    \"DATA gt_flights TYPE STANDARD TABLE OF ty_flight.\",\n    \"DATA gs_flight  TYPE ty_flight.\",\n    \"DATA gs_sum     TYPE ty_summary.\",\n    \"DATA gv_note    TYPE string.\",\n    \"DATA gv_depth   TYPE i VALUE 0.\",\n    \"DATA gv_ok      TYPE abap_bool VALUE abap_true.\",\n    \"\",\n    \"* Un-declared local structure via DDIC work area (TABLES)\",\n    \"TABLES sflight.\",\n    \"TABLES spfli.\",\n    \"\",\n    \"* Dynamic structure handle\",\n    \"FIELD-SYMBOLS <ls_dyn> TYPE any.\",\n    \"\",\n    \"START-OF-SELECTION.\",\n    \"  PERFORM frm_entry.\",\n    \"\",\n    \"*&---------------------------------------------------------------------*\",\n    \"*&      Form  FRM_ENTRY\",\n    \"*&---------------------------------------------------------------------*\",\n    \"FORM frm_entry.\",\n    \"  PERFORM frm_prepare_context.\",\n    \"  PERFORM frm_fetch_flights.\",\n    \"  PERFORM frm_object_mix.\",\n    \"  PERFORM frm_chain_lv1 USING 1.\",\n    \"  PERFORM frm_finalize.\",\n    \"ENDFORM.\",\n    \"\",\n    \"FORM frm_prepare_context.\",\n    \"  CLEAR: gt_flights, gs_sum, gv_note.\",\n    \"  gv_depth = 0.\",\n    \"\",\n    \"  IF p_limit IS INITIAL OR p_limit <= 0.\",\n    \"    p_limit = 20.\",\n    \"  ENDIF.\",\n    \"\",\n    \"  gv_note = |Input: { p_carrid }/{ p_connid }, limit={ p_limit }|.\",\n    \"ENDFORM.\",\n    \"\",\n    \"FORM frm_fetch_flights.\",\n    \"  SELECT a~carrid,\",\n    \"         a~connid,\",\n    \"         a~fldate,\",\n    \"         a~seatsmax,\",\n    \"         a~seatsocc,\",\n    \"         b~cityfrom,\",\n    \"         b~cityto\",\n    \"    FROM sflight AS a\",\n    \"    INNER JOIN spfli AS b\",\n    \"      ON b~carrid = a~carrid\",\n    \"     AND b~connid = a~connid\",\n    \"    INTO CORRESPONDING FIELDS OF TABLE @gt_flights\",\n    \"    UP TO @p_limit ROWS\",\n    \"    WHERE a~carrid = @p_carrid\",\n    \"      AND a~connid = @p_connid.\",\n    \"\",\n    \"  IF sy-subrc <> 0.\",\n    \"    gv_ok = abap_false.\",\n    \"    gv_note = |No flights found for { p_carrid }/{ p_connid }|.\",\n    \"    RETURN.\",\n    \"  ENDIF.\",\n    \"\",\n    \"  LOOP AT gt_flights INTO gs_flight.\",\n    \"    PERFORM frm_enrich_row CHANGING gs_flight.\",\n    \"    MODIFY gt_flights FROM gs_flight.\",\n    \"  ENDLOOP.\",\n    \"ENDFORM.\",\n    \"\",\n    \"FORM frm_enrich_row CHANGING cs_flight TYPE ty_flight.\",\n    \"  PERFORM frm_compute_availability USING cs_flight-seatsmax\",\n    \"                                        cs_flight-seatsocc\",\n    \"                                  CHANGING gv_note.\",\n    \"ENDFORM.\",\n    \"\",\n    \"FORM frm_compute_availability USING    iv_max  TYPE i\",\n    \"                                       iv_occ  TYPE i\",\n    \"                              CHANGING cv_text TYPE string.\",\n    \"  DATA lv_free TYPE i.\",\n    \"\",\n    \"  lv_free = iv_max - iv_occ.\",\n    \"  IF lv_free < 0.\",\n    \"    lv_free = 0.\",\n    \"  ENDIF.\",\n    \"\",\n    \"  cv_text = |free={ lv_free }|.\",\n    \"ENDFORM.\",\n    \"\",\n    \"FORM frm_chain_lv1 USING iv_level TYPE i.\",\n    \"  gv_depth = iv_level.\",\n    \"  IF gv_ok = abap_false.\",\n    \"    RETURN.\",\n    \"  ENDIF.\",\n    \"  PERFORM frm_chain_lv2 USING iv_level + 1.\",\n    \"ENDFORM.\",\n    \"\",\n    \"FORM frm_chain_lv2 USING iv_level TYPE i.\",\n    \"  gv_depth = iv_level.\",\n    \"  PERFORM frm_chain_lv3 USING iv_level + 1.\",\n    \"ENDFORM.\",\n    \"\",\n    \"FORM frm_chain_lv3 USING iv_level TYPE i.\",\n    \"  gv_depth = iv_level.\",\n    \"  PERFORM frm_chain_lv4 USING iv_level + 1.\",\n    \"ENDFORM.\",\n    \"\",\n    \"FORM frm_chain_lv4 USING iv_level TYPE i.\",\n    \"  gv_depth = iv_level.\",\n    \"  PERFORM frm_chain_lv5 USING iv_level + 1.\",\n    \"ENDFORM.\",\n    \"\",\n    \"FORM frm_chain_lv5 USING iv_level TYPE i.\",\n    \"  gv_depth = iv_level.\",\n    \"  PERFORM frm_analyze_flights.\",\n    \"ENDFORM.\",\n    \"\",\n    \"FORM frm_analyze_flights.\",\n    \"  DATA lv_occ_pct TYPE p LENGTH 5 DECIMALS 2.\",\n    \"\",\n    \"  CLEAR gs_sum.\",\n    \"  LOOP AT gt_flights INTO gs_flight.\",\n    \"    gs_sum-total_count = gs_sum-total_count + 1.\",\n    \"\",\n    \"    IF gs_flight-seatsocc >= gs_flight-seatsmax.\",\n    \"      gs_sum-full_count = gs_sum-full_count + 1.\",\n    \"    ELSE.\",\n    \"      gs_sum-free_count = gs_sum-free_count + 1.\",\n    \"    ENDIF.\",\n    \"\",\n    \"    IF gs_flight-seatsmax > 0.\",\n    \"      lv_occ_pct = gs_flight-seatsocc * 100 / gs_flight-seatsmax.\",\n    \"    ELSE.\",\n    \"      lv_occ_pct = 0.\",\n    \"    ENDIF.\",\n    \"\",\n    \"    PERFORM frm_branch_logic USING lv_occ_pct.\",\n    \"  ENDLOOP.\",\n    \"\",\n    \"  PERFORM frm_post_summary.\",\n    \"ENDFORM.\",\n    \"\",\n    \"FORM frm_branch_logic USING iv_occ_pct TYPE p.\",\n    \"  DATA lv_hot        TYPE abap_bool.\",\n    \"  DATA lv_match_conn TYPE abap_bool.\",\n    \"\",\n    \"  lv_hot = abap_false.\",\n    \"  lv_match_conn = abap_false.\",\n    \"\",\n    \"  IF iv_occ_pct >= 85.\",\n    \"    lv_hot = abap_true.\",\n    \"  ENDIF.\",\n    \"\",\n    \"  IF gs_flight-connid = p_connid.\",\n    \"    lv_match_conn = abap_true.\",\n    \"  ENDIF.\",\n    \"\",\n    \"  IF iv_occ_pct >= 95.\",\n    \"    gv_note = |Very busy flight|.\",\n    \"  ELSEIF iv_occ_pct >= 70.\",\n    \"    gv_note = |Normal occupancy|.\",\n    \"  ELSEIF iv_occ_pct IS INITIAL.\",\n    \"    gv_note = |No occupancy|.\",\n    \"  ELSE.\",\n    \"    gv_note = |Low occupancy|.\",\n    \"  ENDIF.\",\n    \"\",\n    \"  IF ( gs_flight-carrid = p_carrid AND lv_match_conn = abap_true )\",\n    \"     OR ( lv_hot = abap_true AND gv_ok = abap_true ).\",\n    \"    gv_note = |Array IF: matched route OR hot flight|.\",\n    \"  ELSEIF ( gs_flight-seatsmax > 0 AND gs_flight-seatsocc = 0 )\",\n    \"     OR ( gs_flight-cityfrom IS NOT INITIAL AND gs_flight-cityto IS NOT INITIAL ).\",\n    \"    gv_note = |Array IF: empty occupancy OR valid city pair|.\",\n    \"  ENDIF.\",\n    \"\",\n    \"  PERFORM frm_probe_ddic_structure.\",\n    \"ENDFORM.\",\n    \"\",\n    \"FORM frm_probe_ddic_structure.\",\n    \"  ASSIGN sflight TO <ls_dyn>.\",\n    \"  IF <ls_dyn> IS ASSIGNED.\",\n    \"    \\\" Here parser sees DDIC structure fields without local DATA declaration\",\n    \"    sflight-carrid = p_carrid.\",\n    \"    sflight-connid = p_connid.\",\n    \"  ENDIF.\",\n    \"ENDFORM.\",\n    \"\",\n    \"FORM frm_object_mix.\",\n    \"  DATA ls_tmp   TYPE ty_flight.\",\n    \"  DATA lv_found TYPE abap_bool VALUE abap_false.\",\n    \"  DATA lv_conn  TYPE sflight-connid.\",\n    \"  FIELD-SYMBOLS <ls_match> TYPE ty_flight.\",\n    \"\",\n    \"  CLEAR ls_tmp.\",\n    \"  ls_tmp-carrid = p_carrid.\",\n    \"  ls_tmp-connid = p_connid.\",\n    \"  ls_tmp-fldate = sy-datum.\",\n    \"  ls_tmp-seatsmax = 10.\",\n    \"  ls_tmp-seatsocc = 0.\",\n    \"  ls_tmp-cityfrom = 'HCM'.\",\n    \"  ls_tmp-cityto = 'HAN'.\",\n    \"  APPEND ls_tmp TO gt_flights.\",\n    \"\",\n    \"  lv_conn = p_connid.\",\n    \"  READ TABLE gt_flights INTO ls_tmp\",\n    \"    WITH KEY carrid = p_carrid\",\n    \"             connid = lv_conn.\",\n    \"  IF sy-subrc = 0 AND ls_tmp-seatsmax >= ls_tmp-seatsocc.\",\n    \"    lv_found = abap_true.\",\n    \"  ENDIF.\",\n    \"\",\n    \"  READ TABLE gt_flights ASSIGNING <ls_match>\",\n    \"    WITH KEY carrid = p_carrid\",\n    \"             connid = p_connid\",\n    \"             cityfrom = ls_tmp-cityfrom.\",\n    \"  IF <ls_match> IS ASSIGNED AND lv_found = abap_true.\",\n    \"    <ls_match>-cityto = ls_tmp-cityto.\",\n    \"  ENDIF.\",\n    \"\",\n    \"  LOOP AT gt_flights INTO ls_tmp\",\n    \"    WHERE carrid = p_carrid\",\n    \"      AND ( connid = p_connid OR connid = '0500' ).\",\n    \"    IF ls_tmp-seatsmax > 0 AND ls_tmp-seatsocc < ls_tmp-seatsmax.\",\n    \"      ls_tmp-seatsocc = ls_tmp-seatsocc + 1.\",\n    \"      MODIFY gt_flights FROM ls_tmp TRANSPORTING seatsocc\",\n    \"        WHERE carrid = ls_tmp-carrid\",\n    \"          AND connid = ls_tmp-connid\",\n    \"          AND fldate = ls_tmp-fldate.\",\n    \"    ENDIF.\",\n    \"  ENDLOOP.\",\n    \"\",\n    \"  SELECT SINGLE cityfrom cityto\",\n    \"    FROM spfli\",\n    \"    INTO (ls_tmp-cityfrom, ls_tmp-cityto)\",\n    \"    WHERE carrid = p_carrid\",\n    \"      AND connid = p_connid.\",\n    \"\",\n    \"  CASE lv_found.\",\n    \"    WHEN abap_true.\",\n    \"      gv_note = |Object mix: found route { p_carrid }/{ p_connid }|.\",\n    \"    WHEN OTHERS.\",\n    \"      gv_note = |Object mix: route not found|.\",\n    \"  ENDCASE.\",\n    \"\",\n    \"  DELETE gt_flights WHERE carrid = p_carrid AND connid = '0000'.\",\n    \"  SORT gt_flights BY carrid connid fldate.\",\n    \"ENDFORM.\",\n    \"\",\n    \"FORM frm_post_summary.\",\n    \"  DATA lv_ratio TYPE p LENGTH 5 DECIMALS 2.\",\n    \"\",\n    \"  IF gs_sum-total_count > 0.\",\n    \"    lv_ratio = gs_sum-full_count * 100 / gs_sum-total_count.\",\n    \"  ELSE.\",\n    \"    lv_ratio = 0.\",\n    \"  ENDIF.\",\n    \"\",\n    \"  gs_sum-ratio_text = |full={ gs_sum-full_count }/{ gs_sum-total_count } ({ lv_ratio }%)|.\",\n    \"ENDFORM.\",\n    \"\",\n    \"FORM frm_finalize.\",\n    \"  WRITE: / '===== DEEP FORM DEMO ====='.\",\n    \"  WRITE: / gv_note.\",\n    \"  WRITE: / 'Depth reached:', gv_depth.\",\n    \"  WRITE: / 'Total:', gs_sum-total_count,\",\n    \"           'Full:', gs_sum-full_count,\",\n    \"           'Free:', gs_sum-free_count.\",\n    \"  WRITE: / gs_sum-ratio_text.\",\n    \"ENDFORM.\",\n    \"\",\n  ].join(\"\\n\");\n\n  function createTemplateBaseStyle(background) {\n    return {\n      background: background || \"default\",\n      border: \"outside-thin\",\n      font: \"MS PGothic\",\n      \"font color\": \"#111111\",\n      \"font size\": 10,\n      \"font family\": \"default\",\n      bold: false,\n      italic: false,\n      underline: false,\n      merge: false,\n      align: \"left\",\n      valign: \"top\",\n      wrap: false\n    };\n  }\n\n  const TEMPLATE_PREVIEW_DEFAULT_OPTIONS = {\n    hideEmptyRows: true,\n    hideRowsWithoutValues: true,\n    expandMultilineRows: true,\n    squareCells: true,\n    squareCellSize: 18\n  };\n\n  function createGenericStatementTemplate(templateKey) {\n    const keyText = String(templateKey || \"\").trim();\n    return {\n      _options: { ...TEMPLATE_PREVIEW_DEFAULT_OPTIONS },\n      \"A1:G1\": createTemplateBaseStyle(\"#dbeef4\"),\n      A1: {\n        text: \"Câu lệnh\"\n      },\n      \"H1:AY1\": createTemplateBaseStyle(\"default\"),\n      H1: {\n        text: \"{keywords.stmt.text}{objectType}\"\n      },\n      \"A2:G2\": createTemplateBaseStyle(\"#dbeef4\"),\n      A2: {\n        text: \"Đối tượng\"\n      },\n      \"H2:AY2\": createTemplateBaseStyle(\"default\"),\n      H2: {\n        text: \"{values.name.finalDesc}{values.target.finalDesc}{values.form.finalDesc}{values.itab.finalDesc}{values.itabOrDbtab.finalDesc}\"\n      },\n      \"A3:G3\": createTemplateBaseStyle(\"#dbeef4\"),\n      A3: {\n        text: \"Nguồn / Đích\"\n      },\n      \"H3:AY3\": createTemplateBaseStyle(\"default\"),\n      H3: {\n        text: \"{values.into.finalDesc}{values.from.finalDesc}{values.index.value}\"\n      },\n      \"A4:G4\": createTemplateBaseStyle(\"#dbeef4\"),\n      A4: {\n        text: \"Điều kiện\"\n      },\n      \"H4:AY4\": createTemplateBaseStyle(\"default\"),\n      H4: {\n        text: \"{values.condition.finalDesc}{values.where.finalDesc}{values.withKey.finalDesc}{values.withTableKey.finalDesc}\"\n      },\n      \"A5:G5\": createTemplateBaseStyle(\"#dbeef4\"),\n      A5: {\n        text: \"Chi tiết\"\n      },\n      \"H5:AY5\": createTemplateBaseStyle(\"default\"),\n      H5: {\n        text: \"{extras}\"\n      },\n      \"A6:G6\": createTemplateBaseStyle(\"#dbeef4\"),\n      A6: {\n        text: \"Template key\"\n      },\n      \"H6:AY6\": createTemplateBaseStyle(\"default\"),\n      H6: {\n        text: keyText\n      }\n    };\n  }\n\n  const TEMPLATE_DEFAULT_CONFIG_V1 = {\n    version: 1,\n    templates: {\n      DEFAULT: {\n        _options: {\n          hideEmptyRows: true,\n          hideRowsWithoutValues: true,\n          expandMultilineRows: false\n        },\n        \"A1:F1\": {\n          background: \"mau xanh nhat\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        A1: {\n          text: \"{keywords.stmt.text}\"\n        },\n        \"G1:W1\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        G1: {\n          text: \"{values.name.finalDesc}\"\n        }\n      },\n      ASSIGNMENT: {\n        \"A1:F1\": {\n          background: \"mau xanh nhat\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        A1: {\n          text: \"Đích\"\n        },\n        \"A2:F2\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        A2: {\n          text: \"{values.target.decl.finalDesc}\"\n        },\n        \"G1:W1\": {\n          background: \"mau xanh nhat\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        G1: {\n          text: \"Nguồn\"\n        },\n        \"G2:W2\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        G2: {\n          text: \"{values.expr.decl.finalDesc}\"\n        }\n      },\n      CALL_FUNCTION: {\n        _options: {\n          hideEmptyRows: true,\n          hideRowsWithoutValues: true,\n          expandMultilineRows: true\n        },\n        \"A1:H1\": createTemplateBaseStyle(\"#dbeef4\"),\n        A1: {\n          text: \"Function Module\"\n        },\n        \"I1:BG1\": createTemplateBaseStyle(\"#ffffff\"),\n        I1: {\n          text: \"{values.name.finalDesc}\"\n        },\n        \"A2:H2\": createTemplateBaseStyle(\"#dbeef4\"),\n        A2: {\n          text: \"Exporting\"\n        },\n        \"I2:P2\": createTemplateBaseStyle(\"#ffffff\"),\n        I2: {\n          text: \"{extras.callFunction.exporting.name}\"\n        },\n        \"Q2:X2\": createTemplateBaseStyle(\"#ffffff\"),\n        Q2: {\n          text: \"=\"\n        },\n        \"Y2:BG2\": createTemplateBaseStyle(\"#ffffff\"),\n        Y2: {\n          text: \"{extras.callFunction.exporting.valueDecl.finalDesc}\"\n        },\n        \"A3:H3\": createTemplateBaseStyle(\"#dbeef4\"),\n        A3: {\n          text: \"Importing\"\n        },\n        \"I3:P3\": createTemplateBaseStyle(\"#ffffff\"),\n        I3: {\n          text: \"{extras.callFunction.importing.name}\"\n        },\n        \"Q3:X3\": createTemplateBaseStyle(\"#ffffff\"),\n        Q3: {\n          text: \"=\"\n        },\n        \"Y3:BG3\": createTemplateBaseStyle(\"#ffffff\"),\n        Y3: {\n          text: \"{extras.callFunction.importing.valueDecl.finalDesc}\"\n        },\n        \"A4:H4\": createTemplateBaseStyle(\"#dbeef4\"),\n        A4: {\n          text: \"Tables\"\n        },\n        \"I4:P4\": createTemplateBaseStyle(\"#ffffff\"),\n        I4: {\n          text: \"{extras.callFunction.tables.name}\"\n        },\n        \"Q4:X4\": createTemplateBaseStyle(\"#ffffff\"),\n        Q4: {\n          text: \"=\"\n        },\n        \"Y4:BG4\": createTemplateBaseStyle(\"#ffffff\"),\n        Y4: {\n          text: \"{extras.callFunction.tables.valueDecl.finalDesc}\"\n        },\n        \"A5:H5\": createTemplateBaseStyle(\"#dbeef4\"),\n        A5: {\n          text: \"Changing\"\n        },\n        \"I5:P5\": createTemplateBaseStyle(\"#ffffff\"),\n        I5: {\n          text: \"{extras.callFunction.changing.name}\"\n        },\n        \"Q5:X5\": createTemplateBaseStyle(\"#ffffff\"),\n        Q5: {\n          text: \"=\"\n        },\n        \"Y5:BG5\": createTemplateBaseStyle(\"#ffffff\"),\n        Y5: {\n          text: \"{extras.callFunction.changing.valueDecl.finalDesc}\"\n        },\n        \"A6:H6\": createTemplateBaseStyle(\"#dbeef4\"),\n        A6: {\n          text: \"Exceptions\"\n        },\n        \"I6:P6\": createTemplateBaseStyle(\"#ffffff\"),\n        I6: {\n          text: \"{extras.callFunction.exceptions.name}\"\n        },\n        \"Q6:X6\": createTemplateBaseStyle(\"#ffffff\"),\n        Q6: {\n          text: \"=\"\n        },\n        \"Y6:BG6\": createTemplateBaseStyle(\"#ffffff\"),\n        Y6: {\n          text: \"{extras.callFunction.exceptions.valueDecl.finalDesc}\"\n        }\n      },\n      APPEND: {\n        \"A1:G1\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        A1: {\n          text: \"Append\"\n        },\n        \"H1:Y1\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        H1: {\n          text: \"{values.what.decl.finalDesc}\"\n        },\n        \"Z1:AD1\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        Z1: {\n          text: \"To\"\n        },\n        \"AE1:AY1\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        AE1: {\n          text: \"{values.to.decl.finalDesc}\"\n        },\n        \"A2:G2\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        A2: {\n          text: \"{labels.sortedBy}\"\n        },\n        \"H2:AB2\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        H2: {\n          text: \"{extras}\"\n        }\n      },\n      READ_TABLE: {\n        _options: {\n          hideEmptyRows: true,\n          hideRowsWithoutValues: true,\n          expandMultilineRows: true\n        },\n        \"A1:G1\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        A1: {\n          text: \"ReadTable\"\n        },\n        \"H1:AB1\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        H1: {\n          text: \"{values.itab.decl.finalDesc}\"\n        },\n        \"A2:G2\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        A2: {\n          text: \"To\"\n        },\n        \"H2:AB2\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        H2: {\n          text: \"{values.into.decl.finalDesc}\"\n        },\n        \"A3:G3\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        A3: {\n          text: \"Điều kiện\"\n        },\n        \"H3:T3\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        H3: {\n          text: \"{extras.readTable.conditions.leftOperand}\"\n        },\n        \"U3:W3\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        U3: {\n          text: \"{extras.readTable.conditions.comparisonOperator}\"\n        },\n        \"X3:AR3\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        X3: {\n          text: \"{extras.readTable.conditions.rightOperandDecl.finalDesc}\"\n        },\n        \"A4:U4\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        A4: {\n          text: \"{keywords.binary-search.text}\"\n        }\n      },\n      MODIFY_ITAB: {\n        _options: {\n          hideEmptyRows: true,\n\n          hideRowsWithoutValues: true,\n          expandMultilineRows: true\n        },\n        \"A1:G1\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        A1: {\n          text: \"Modify Table\"\n        },\n        \"H1:AB1\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        H1: {\n          text: \"{values.itab.finalDesc}{values.itabOrDbtab.finalDesc}\"\n        },\n        \"A2:G2\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        A2: {\n          text: \"From\"\n        },\n        \"H2:AB2\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        H2: {\n          text: \"{values.from.finalDesc}\"\n        },\n        \"A3:G3\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        A3: {\n          text: \"Transporting / Index\"\n        },\n        \"H3:AB3\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        H3: {\n          text: \"{extras.modifyItab.transporting}{values.index.value}\"\n        },\n        \"A4:T4\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        A4: {\n          text: \"Điều kiện trái\"\n        },\n        \"U4:W4\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        U4: {\n          text: \"Điều kiện\"\n        },\n        \"X4:AD4\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        X4: {\n          text: \"Điều kiện phải\"\n        },\n        \"AE4:AY4\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        AE4: {\n          text: \"Logic connector\"\n        },\n        \"A5:T5\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        A5: {\n          text: \"{extras.modifyItab.conditions.leftOperandDecl.finalDesc}\"\n        },\n        \"U5:W5\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        U5: {\n          text: \"{extras.modifyItab.conditions.comparisonOperator}\"\n        },\n        \"X5:AD5\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        X5: {\n          text: \"{extras.modifyItab.conditions.rightOperandDecl.finalDesc}\"\n        },\n        \"AE5:AY5\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        AE5: {\n          text: \"{extras.modifyItab.conditions.logicalConnector}\"\n        }\n      },\n      DELETE_ITAB: {\n        _options: {\n          hideEmptyRows: true,\n          hideRowsWithoutValues: true,\n          expandMultilineRows: true\n        },\n        \"A1:G1\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        A1: {\n          text: \"Delete Table\"\n        },\n        \"H1:AB1\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        H1: {\n          text: \"{values.target.finalDesc}\"\n        },\n        \"A2:G2\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        A2: {\n          text: \"From / Index\"\n        },\n        \"H2:AB2\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        H2: {\n          text: \"{values.from.finalDesc}{values.index.value}\"\n        },\n        \"A3:T3\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        A3: {\n          text: \"Điều kiện trái\"\n        },\n        \"U3:W3\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        U3: {\n          text: \"Điều kiện\"\n        },\n        \"X3:AD3\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        X3: {\n          text: \"Điều kiện phải\"\n        },\n        \"AE3:AY3\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        AE3: {\n          text: \"Logic connector\"\n        },\n        \"A4:T4\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        A4: {\n          text: \"{extras.deleteItab.conditions.leftOperandDecl.finalDesc}\"\n        },\n        \"U4:W4\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        U4: {\n          text: \"{extras.deleteItab.conditions.comparisonOperator}\"\n        },\n        \"X4:AD4\": {\n          background: \"#ffffff\",\n\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        X4: {\n          text: \"{extras.deleteItab.conditions.rightOperandDecl.finalDesc}\"\n        },\n        \"AE4:AY4\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        AE4: {\n          text: \"{extras.deleteItab.conditions.logicalConnector}\"\n        }\n      },\n      LOOP_AT_ITAB: {\n        _options: {\n          hideEmptyRows: true,\n          hideRowsWithoutValues: true,\n          expandMultilineRows: true\n        },\n        \"A1:X1\": createTemplateBaseStyle(\"#dbeef4\"),\n        A1: {\n          text: \"Loop At\"\n        },\n        \"Y1:BA1\": createTemplateBaseStyle(\"#dbeef4\"),\n        Y1: {\n          text: \"Into\"\n        },\n        \"BB1:BG1\": createTemplateBaseStyle(\"#dbeef4\"),\n        BB1: {\n          text: \"Connection\"\n        },\n        \"A2:H2\": createTemplateBaseStyle(\"#dbeef4\"),\n        A2: {\n          text: \"Điều kiện\"\n        },\n        \"I2:V2\": createTemplateBaseStyle(\"#ffffff\"),\n        I2: {\n          text: \"{extras.loopAtItab.conditions.leftOperandDecl.finalDesc}\"\n        },\n        \"W2:X2\": createTemplateBaseStyle(\"#dbeef4\"),\n        W2: {\n          text: \"{extras.loopAtItab.conditions.comparisonOperator}\"\n        },\n        \"Y2:BA2\": createTemplateBaseStyle(\"#ffffff\"),\n        Y2: {\n          text: \"{extras.loopAtItab.conditions.rightOperandDecl.finalDesc}\"\n        },\n        \"BB2:BG2\": createTemplateBaseStyle(\"#ffffff\"),\n        BB2: {\n          text: \"{extras.loopAtItab.conditions.logicalConnector}\"\n        }\n      },\n      IF: {\n        _options: {\n          hideEmptyRows: true,\n          hideRowsWithoutValues: true,\n          expandMultilineRows: true\n        },\n        \"A1:T1\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        A1: {\n          text: \"Điều kiện trái\"\n        },\n        \"U1:W1\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        U1: {\n          text: \"Điều kiện\"\n        },\n        \"X1:AD1\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        X1: {\n          text: \"Điều kiện phải\"\n        },\n        \"AE1:AY1\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        AE1: {\n          text: \"Logic connector\"\n        },\n        \"A2:T2\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        A2: {\n          text: \"{extras.ifCondition.conditions.leftOperandDecl.finalDesc}\"\n        },\n        \"U2:W2\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        U2: {\n          text: \"{extras.ifCondition.conditions.comparisonOperator}\"\n        },\n        \"X2:AD2\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        X2: {\n          text: \"{extras.ifCondition.conditions.rightOperandDecl.finalDesc}\"\n        },\n        \"AE2:AY2\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        AE2: {\n          text: \"{extras.ifCondition.conditions.logicalConnector}\"\n        }\n      },\n      ELSEIF: {\n        _options: {\n          hideEmptyRows: true,\n          hideRowsWithoutValues: true,\n          expandMultilineRows: true\n        },\n        \"A1:T1\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        A1: {\n          text: \"Điều kiện trái\"\n        },\n        \"U1:W1\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        U1: {\n          text: \"Điều kiện\"\n        },\n        \"X1:AD1\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        X1: {\n          text: \"Điều kiện phải\"\n        },\n        \"AE1:AY1\": {\n          background: \"#dbeef4\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        AE1: {\n          text: \"Logic connector\"\n        },\n        \"A2:T2\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        A2: {\n          text: \"{extras.ifCondition.conditions.leftOperandDecl.finalDesc}\"\n        },\n        \"U2:W2\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        U2: {\n          text: \"{extras.ifCondition.conditions.comparisonOperator}\"\n        },\n        \"X2:AD2\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        X2: {\n          text: \"{extras.ifCondition.conditions.rightOperandDecl.finalDesc}\"\n        },\n        \"AE2:AY2\": {\n          background: \"#ffffff\",\n          border: \"outside-thin\",\n          font: \"MS PGothic\",\n          \"font color\": \"#111111\",\n          \"font size\": 10,\n          \"font family\": \"default\",\n          bold: false,\n          italic: false,\n          underline: false,\n          merge: false,\n          align: \"left\",\n          valign: \"top\",\n          wrap: false\n        },\n        AE2: {\n          text: \"{extras.ifCondition.conditions.logicalConnector}\"\n        }\n      },\n      PERFORM: {\n        _options: {\n          hideEmptyRows: true,\n          hideRowsWithoutValues: true,\n          expandMultilineRows: true\n        },\n        \"J1:X1\": createTemplateBaseStyle(\"#dbeef4\"),\n        J1: {\n          text: \"ID\"\n        },\n        \"Y1:BG1\": createTemplateBaseStyle(\"#dbeef4\"),\n        Y1: {\n          text: \"Text\"\n        },\n        \"A2:I2\": createTemplateBaseStyle(\"#dbeef4\"),\n        A2: {\n          text: \"Subroutine\"\n        },\n        \"J2:X2\": createTemplateBaseStyle(\"#ffffff\"),\n        J2: {\n          text: \"{values.form.decl.name}\"\n        },\n        \"Y2:BG2\": createTemplateBaseStyle(\"#ffffff\"),\n        Y2: {\n          text: \"{values.form.finalDesc}\"\n        },\n        \"A3:I3\": createTemplateBaseStyle(\"#dbeef4\"),\n        A3: {\n          text: \"Using\"\n        },\n        \"J3:X3\": createTemplateBaseStyle(\"#ffffff\"),\n        J3: {\n          text: \"{extras.performCall.using.valueDecl.name}\"\n        },\n        \"Y3:BG3\": createTemplateBaseStyle(\"#ffffff\"),\n        Y3: {\n          text: \"{extras.performCall.using.valueDecl.finalDesc}\"\n        },\n        \"A4:I4\": createTemplateBaseStyle(\"#dbeef4\"),\n        A4: {\n          text: \"Changing\"\n        },\n        \"J4:X4\": createTemplateBaseStyle(\"#ffffff\"),\n        J4: {\n          text: \"{extras.performCall.changing.valueDecl.name}\"\n        },\n        \"Y4:BG4\": createTemplateBaseStyle(\"#ffffff\"),\n        Y4: {\n          text: \"{extras.performCall.changing.valueDecl.finalDesc}\"\n        },\n        \"A5:I5\": createTemplateBaseStyle(\"#dbeef4\"),\n        A5: {\n          text: \"Tables\"\n        },\n        \"J5:X5\": createTemplateBaseStyle(\"#ffffff\"),\n        J5: {\n          text: \"{extras.performCall.tables.valueDecl.name}\"\n        },\n        \"Y5:BG5\": createTemplateBaseStyle(\"#ffffff\"),\n        Y5: {\n          text: \"{extras.performCall.tables.valueDecl.finalDesc}\"\n        },\n        \"A6:I6\": createTemplateBaseStyle(\"#dbeef4\"),\n        A6: {\n          text: \"Raising\"\n        },\n        \"J6:X6\": createTemplateBaseStyle(\"#ffffff\"),\n\n        J6: {\n          text: \"{extras.performCall.raising.name}\"\n        },\n        \"Y6:BG6\": createTemplateBaseStyle(\"#ffffff\"),\n        Y6: {\n          text: \"{extras.performCall.raising.valueDecl.finalDesc}\"\n        },\n        \"A7:I7\": createTemplateBaseStyle(\"#dbeef4\"),\n        A7: {\n          text: \"In Program\"\n        },\n        \"J7:X7\": createTemplateBaseStyle(\"#ffffff\"),\n        J7: {\n          text: \"{values.program.decl.name}\"\n        },\n        \"Y7:BG7\": createTemplateBaseStyle(\"#ffffff\"),\n        Y7: {\n          text: \"{values.program.finalDesc}\"\n        }\n      },\n      MESSAGE: {\n        _options: {\n          hideEmptyRows: true,\n          hideRowsWithoutValues: true,\n          expandMultilineRows: true\n        },\n        \"A1:I1\": createTemplateBaseStyle(\"#dbeef4\"),\n        A1: {\n          text: \"Message Class\"\n        },\n        \"J1:V1\": createTemplateBaseStyle(\"#ffffff\"),\n        J1: {\n          text: \"{values.messageClass.finalDesc}\"\n        },\n        \"W1:AB1\": createTemplateBaseStyle(\"#dbeef4\"),\n        W1: {\n          text: \"Message Number\"\n        },\n        \"AC1:AJ1\": createTemplateBaseStyle(\"#ffffff\"),\n        AC1: {\n          text: \"{values.messageNumber.finalDesc}\"\n        },\n        \"AK1:AQ1\": createTemplateBaseStyle(\"#dbeef4\"),\n        AK1: {\n          text: \"Message Type\"\n        },\n        \"AR1:AX1\": createTemplateBaseStyle(\"#ffffff\"),\n        AR1: {\n          text: \"{values.messageType.finalDesc}\"\n        },\n        \"AY1:BG1\": createTemplateBaseStyle(\"#dbeef4\"),\n        AY1: {\n          text: \"Display Like\"\n        },\n        \"BH1:BZ1\": createTemplateBaseStyle(\"#ffffff\"),\n        BH1: {\n          text: \"{values.displayLike.finalDesc}\"\n        },\n        \"A2:I2\": createTemplateBaseStyle(\"#dbeef4\"),\n        A2: {\n          text: \"Message Text &1\"\n        },\n        \"J2:BZ2\": createTemplateBaseStyle(\"#ffffff\"),\n        J2: {\n          text: \"{values.messageText1.finalDesc}\"\n        },\n        \"A3:I3\": createTemplateBaseStyle(\"#dbeef4\"),\n        A3: {\n          text: \"Message Text &2\"\n        },\n        \"J3:BZ3\": createTemplateBaseStyle(\"#ffffff\"),\n        J3: {\n          text: \"{values.messageText2.finalDesc}\"\n        },\n        \"A4:I4\": createTemplateBaseStyle(\"#dbeef4\"),\n        A4: {\n          text: \"Message Text &3\"\n        },\n        \"J4:BZ4\": createTemplateBaseStyle(\"#ffffff\"),\n        J4: {\n          text: \"{values.messageText3.finalDesc}\"\n        },\n        \"A5:I5\": createTemplateBaseStyle(\"#dbeef4\"),\n        A5: {\n          text: \"Message Text &4\"\n        },\n        \"J5:BZ5\": createTemplateBaseStyle(\"#ffffff\"),\n        J5: {\n          text: \"{values.messageText4.finalDesc}\"\n        },\n        \"A6:I6\": createTemplateBaseStyle(\"#dbeef4\"),\n        A6: {\n          text: \"Message Display\"\n        },\n        \"J6:BZ6\": createTemplateBaseStyle(\"#ffffff\"),\n        J6: {\n          text: \"{values.messageDisplay.finalDesc}\"\n        },\n        \"A7:I7\": createTemplateBaseStyle(\"#dbeef4\"),\n        A7: {\n          text: \"Đích lưu\"\n        },\n        \"J7:BZ7\": createTemplateBaseStyle(\"#ffffff\"),\n        J7: {\n          text: \"{values.messageDestination.finalDesc}\"\n        }\n      }\n    }\n  };\n\n  const TEMPLATE_GENERIC_KEYS = [\n    \"CALL_FUNCTION\",\n    \"CALL_METHOD\",\n    \"CALL_TRANSACTION\",\n    \"CASE\",\n    \"CATCH\",\n    \"CLASS\",\n    \"CLASS-DATA\",\n    \"CLASS-METHODS\",\n    \"CLEANUP\",\n    \"CLEAR\",\n    \"CONSTANTS\",\n    \"DATA\",\n    \"DO\",\n    \"ELSE\",\n    \"FIELD-SYMBOLS\",\n    \"FORM\",\n    \"INSERT_ITAB\",\n    \"LOOP_AT_ITAB\",\n    \"METHOD\",\n    \"METHODS\",\n    \"MOVE\",\n    \"MOVE-CORRESPONDING\",\n    \"PARAMETERS\",\n    \"PERFORM\",\n    \"RANGES\",\n    \"SELECT\",\n    \"SELECT-OPTIONS\",\n    \"SORT_ITAB\",\n    \"STATICS\",\n    \"TRY\",\n    \"TYPES\",\n    \"WHEN\"\n  ];\n\n  for (const key of TEMPLATE_GENERIC_KEYS) {\n    if (!Object.prototype.hasOwnProperty.call(TEMPLATE_DEFAULT_CONFIG_V1.templates, key)) {\n      TEMPLATE_DEFAULT_CONFIG_V1.templates[key] = createGenericStatementTemplate(key);\n    }\n  }\n\n  for (const templateDef of Object.values(TEMPLATE_DEFAULT_CONFIG_V1.templates)) {\n    if (!templateDef || typeof templateDef !== \"object\" || Array.isArray(templateDef)) {\n      continue;\n    }\n    const currentOptions = templateDef._options && typeof templateDef._options === \"object\" && !Array.isArray(templateDef._options)\n      ? templateDef._options\n      : {};\n    templateDef._options = { ...TEMPLATE_PREVIEW_DEFAULT_OPTIONS, ...currentOptions };\n  }\n\n  function setError(message) {\n    els.error.textContent = message ? String(message) : \"\";\n  }\n\n  function setOutputMessage(message) {\n    els.output.classList.add(\"muted\");\n    els.output.replaceChildren();\n    els.output.textContent = message || \"\";\n  }\n\n  function parseDateCandidate(value) {\n    const raw = String(value || \"\").trim();\n    if (!raw) {\n      return null;\n    }\n    const date = new Date(raw);\n    return Number.isNaN(date.getTime()) ? null : date;\n  }\n\n  function formatDateTime(value) {\n    const date = value instanceof Date ? value : parseDateCandidate(value);\n    if (!date) {\n      return \"\";\n    }\n    try {\n      return new Intl.DateTimeFormat(undefined, {\n        year: \"numeric\",\n        month: \"2-digit\",\n        day: \"2-digit\",\n        hour: \"2-digit\",\n        minute: \"2-digit\",\n        second: \"2-digit\"\n      }).format(date);\n    } catch {\n      return date.toLocaleString();\n    }\n  }\n\n  function getMetaContent(name) {\n    try {\n      const el = document.querySelector(`meta[name=\"${name}\"]`);\n      if (!el) {\n        return \"\";\n      }\n      return String(el.getAttribute(\"content\") || \"\").trim();\n    } catch {\n      return \"\";\n    }\n  }\n\n  function renderBuildInfo() {\n    if (!els.buildInfo) {\n      return;\n    }\n\n    const manualVersion = getMetaContent(\"abap-viewer-version\");\n    const manualUpdatedAt = getMetaContent(\"abap-viewer-updated-at\");\n    const manualNote = getMetaContent(\"abap-viewer-updated-note\");\n    const parsedManualDate = parseDateCandidate(manualUpdatedAt);\n    const fallbackDate = parseDateCandidate(document.lastModified);\n    const versionPrefix = manualVersion ? `${manualVersion} | ` : \"\";\n\n    if (manualUpdatedAt || manualVersion) {\n      const display = parsedManualDate ? formatDateTime(parsedManualDate) : manualUpdatedAt;\n      const updatedText = display || \"manual timestamp not set\";\n      els.buildInfo.textContent = `Updated: ${versionPrefix}${updatedText} (manual)`;\n      els.buildInfo.title = manualNote || \"Manual timestamp from <meta name=\\\"abap-viewer-updated-at\\\">.\";\n      return;\n    }\n\n    if (fallbackDate) {\n      els.buildInfo.textContent = `Updated: ${formatDateTime(fallbackDate)} (from document.lastModified)`;\n      els.buildInfo.title = \"No manual timestamp found. Showing document.lastModified.\";\n      return;\n    }\n\n    els.buildInfo.textContent = \"Updated: unknown\";\n    els.buildInfo.title = \"No manual timestamp and no document.lastModified available.\";\n  }\n\n  function normalizeId(id) {\n    if (id === null || id === undefined) {\n      return \"\";\n    }\n    return String(id);\n  }\n\n  function flattenEntryMap(map) {\n    if (!map || typeof map !== \"object\") {\n      return [];\n    }\n\n    const out = [];\n    for (const key of Object.keys(map)) {\n      const entryOrList = map[key];\n      if (Array.isArray(entryOrList)) {\n        for (const entry of entryOrList) {\n          if (entry && typeof entry === \"object\") {\n            out.push(entry);\n          }\n        }\n        continue;\n      }\n      if (entryOrList && typeof entryOrList === \"object\") {\n        out.push(entryOrList);\n      }\n    }\n    return out;\n  }\n\n  function getKeywordEntries(obj) {\n    if (!obj) {\n      return [];\n    }\n    if (Array.isArray(obj.keywords)) {\n      return obj.keywords;\n    }\n    return flattenEntryMap(obj.keywords);\n  }\n\n  function getValueEntries(obj) {\n    if (!obj) {\n      return [];\n    }\n    if (Array.isArray(obj.values)) {\n      return obj.values;\n    }\n    return flattenEntryMap(obj.values);\n  }\n\n  function getFirstValueFromValues(values, key) {\n    if (!values) {\n      return \"\";\n    }\n\n    if (Array.isArray(values)) {\n      const match = values.find((v) => v && v.name === key && v.value);\n      return match ? String(match.value) : \"\";\n    }\n\n    if (typeof values !== \"object\") {\n      return \"\";\n    }\n\n    const entryOrList = values[key];\n    const entry = Array.isArray(entryOrList) ? entryOrList[0] : entryOrList;\n    return entry && entry.value ? String(entry.value) : \"\";\n  }\n\n  function loadStorageObject(key) {\n    try {\n      const raw = localStorage.getItem(key);\n      if (!raw) {\n        return {};\n      }\n      const parsed = JSON.parse(raw);\n      return parsed && typeof parsed === \"object\" ? parsed : {};\n    } catch {\n      return {};\n    }\n  }\n\n  function loadDescOverrides() {\n    return loadStorageObject(DESC_STORAGE_KEY_V2);\n  }\n\n  function loadLegacyDescOverrides() {\n    return loadStorageObject(DESC_STORAGE_KEY_LEGACY_V1);\n  }\n\n  function saveDescOverrides() {\n    try {\n      localStorage.setItem(DESC_STORAGE_KEY_V2, JSON.stringify(state.descOverrides || {}));\n    } catch {\n      // ignore\n    }\n  }\n\n  function loadStorageArray(key) {\n    try {\n      const raw = localStorage.getItem(key);\n      if (!raw) {\n        return [];\n      }\n      const parsed = JSON.parse(raw);\n      return Array.isArray(parsed) ? parsed : [];\n    } catch {\n      return [];\n    }\n  }\n\n  function normalizeSettings(value) {\n    const input = value && typeof value === \"object\" && !Array.isArray(value) ? value : {};\n\n    const normalizeDeclDesc = typeof input.normalizeDeclDesc === \"boolean\"\n      ? input.normalizeDeclDesc\n      : DEFAULT_SETTINGS.normalizeDeclDesc;\n\n    const declFilterTypes = Array.isArray(input.declFilterTypes)\n      ? input.declFilterTypes\n          .map((t) => String(t || \"\").trim().toUpperCase())\n          .filter((t) => t && DECL_TYPE_OPTIONS.includes(t))\n      : [];\n\n    const structDescTemplate = typeof input.structDescTemplate === \"string\" && input.structDescTemplate.trim()\n      ? input.structDescTemplate\n      : DEFAULT_SETTINGS.structDescTemplate;\n\n    const nameTemplatesByCode = {};\n    const inputNameTemplates = input.nameTemplatesByCode && typeof input.nameTemplatesByCode === \"object\"\n      ? input.nameTemplatesByCode\n      : {};\n\n    for (const opt of NAME_CODE_OPTIONS) {\n      const code = opt.code;\n      const rawTemplate = Object.prototype.hasOwnProperty.call(inputNameTemplates, code)\n        ? inputNameTemplates[code]\n        : DEFAULT_SETTINGS.nameTemplatesByCode[code];\n\n      const template = typeof rawTemplate === \"string\" && rawTemplate.trim()\n        ? rawTemplate\n        : DEFAULT_SETTINGS.nameTemplatesByCode[code];\n\n      nameTemplatesByCode[code] = template;\n    }\n\n    return {\n      normalizeDeclDesc,\n      declFilterTypes: declFilterTypes.length ? declFilterTypes : DEFAULT_SETTINGS.declFilterTypes.slice(),\n      structDescTemplate,\n      nameTemplatesByCode\n    };\n  }\n\n  function loadSettings() {\n    return normalizeSettings(loadStorageObject(SETTINGS_STORAGE_KEY_V1));\n  }\n\n  function saveSettings(settings) {\n    try {\n      localStorage.setItem(SETTINGS_STORAGE_KEY_V1, JSON.stringify(settings || {}));\n    } catch {\n      // ignore\n    }\n  }\n\n  function setTemplateConfigError(message) {\n    if (!els.templateConfigError) {\n      return;\n    }\n    els.templateConfigError.textContent = message ? String(message) : \"\";\n  }\n\n  function setTemplatePreviewMessage(message) {\n    if (!els.templatePreviewOutput) {\n      return;\n    }\n    els.templatePreviewOutput.classList.add(\"muted\");\n    els.templatePreviewOutput.replaceChildren();\n    els.templatePreviewOutput.textContent = message || \"\";\n  }\n\n  function cloneJsonValue(value) {\n    try {\n      return JSON.parse(JSON.stringify(value));\n    } catch {\n      return null;\n    }\n  }\n\n  function getDefaultTemplateConfig() {\n    const cloned = cloneJsonValue(TEMPLATE_DEFAULT_CONFIG_V1);\n    return cloned && typeof cloned === \"object\" ? cloned : { version: 1, templates: {} };\n  }\n\n  function normalizeTemplateAliasToken(value) {\n    return String(value || \"\")\n      .trim()\n      .toLowerCase()\n      .normalize(\"NFD\")\n      .replace(/[\\u0300-\\u036f]/g, \"\")\n      .replace(/\\s+/g, \" \");\n  }\n\n\n  function parseCellRef(cellRef) {\n    const raw = String(cellRef || \"\").trim().toUpperCase();\n    const match = /^([A-Z]+)([1-9][0-9]*)$/.exec(raw);\n    if (!match) {\n      throw new Error(`Invalid cell ref \"${cellRef}\". Expected format like A1.`);\n    }\n\n    const letters = match[1];\n    const row = Number(match[2]) || 0;\n    let col = 0;\n    for (let i = 0; i < letters.length; i += 1) {\n      col = (col * 26) + (letters.charCodeAt(i) - 64);\n    }\n\n    if (!row || !col) {\n      throw new Error(`Invalid cell ref \"${cellRef}\".`);\n    }\n\n    return { row, col, raw };\n  }\n\n  function parseRangeKey(rangeKey) {\n    const raw = String(rangeKey || \"\").trim().toUpperCase();\n    if (!raw) {\n      throw new Error(\"Range key is empty.\");\n    }\n\n    const parts = raw.split(\":\").map((item) => item.trim()).filter(Boolean);\n    if (!parts.length || parts.length > 2) {\n      throw new Error(`Invalid range \"${rangeKey}\". Expected A1 or A1:B2.`);\n    }\n\n    const start = parseCellRef(parts[0]);\n    const end = parseCellRef(parts.length > 1 ? parts[1] : parts[0]);\n\n    return {\n      key: raw,\n      r1: Math.min(start.row, end.row),\n      c1: Math.min(start.col, end.col),\n      r2: Math.max(start.row, end.row),\n      c2: Math.max(start.col, end.col)\n    };\n  }\n\n  function isTemplateOptionConfigKey(rawKey) {\n    const key = String(rawKey || \"\").trim().toLowerCase();\n    if (!key) {\n      return false;\n    }\n    return (\n      key === \"_options\"\n      || key === \"options\"\n      || key === \"ranges\"\n      || key === \"compact\"\n      || key === \"hideemptyrows\"\n      || key === \"hiderowswithoutvalues\"\n      || key === \"expandmultilinerows\"\n      || key === \"removeemptyrows\"\n      || key === \"removeemptyrowsadvanced\"\n      || key === \"removeemptyrowsadv\"\n      || key === \"expandarrayrows\"\n      || key === \"arraytorows\"\n    );\n  }\n\n  function validateTemplateConfig(config) {\n    const errors = [];\n    if (!config || typeof config !== \"object\" || Array.isArray(config)) {\n      return { valid: false, errors: [\"Config must be a JSON object.\"] };\n    }\n\n    const version = Number(config.version);\n    if (version !== 1) {\n      errors.push(\"Config.version must be 1.\");\n    }\n\n    const templates = config.templates;\n    if (!templates || typeof templates !== \"object\" || Array.isArray(templates)) {\n      errors.push(\"Config.templates must be an object.\");\n      return { valid: false, errors };\n    }\n\n    const templateKeys = Object.keys(templates);\n    if (!templateKeys.length) {\n      errors.push(\"Config.templates must contain at least one template key.\");\n      return { valid: false, errors };\n    }\n\n    for (const templateKey of templateKeys) {\n      const templateDef = templates[templateKey];\n      if (!templateDef || typeof templateDef !== \"object\" || Array.isArray(templateDef)) {\n        errors.push(`templates.${templateKey} must be an object of range -> style.`);\n        continue;\n      }\n\n      const hasRangesObject = Object.prototype.hasOwnProperty.call(templateDef, \"ranges\");\n      const ranges = hasRangesObject ? templateDef.ranges : templateDef;\n      if (!ranges || typeof ranges !== \"object\" || Array.isArray(ranges)) {\n        errors.push(`templates.${templateKey}.ranges must be an object of range -> style.`);\n        continue;\n      }\n\n      const optionCandidates = [\"_options\", \"options\"];\n      for (const optKey of optionCandidates) {\n        if (!Object.prototype.hasOwnProperty.call(templateDef, optKey)) {\n          continue;\n        }\n        const optValue = templateDef[optKey];\n        if (!optValue || typeof optValue !== \"object\" || Array.isArray(optValue)) {\n          errors.push(`templates.${templateKey}.${optKey} must be an object.`);\n        }\n      }\n\n      for (const rangeKey of Object.keys(ranges)) {\n        if (isTemplateOptionConfigKey(rangeKey)) {\n          continue;\n        }\n        try {\n          parseRangeKey(rangeKey);\n        } catch (err) {\n          errors.push(`templates.${templateKey}.${rangeKey}: ${err && err.message ? err.message : err}`);\n        }\n\n        const cellConfig = ranges[rangeKey];\n        if (!cellConfig || typeof cellConfig !== \"object\" || Array.isArray(cellConfig)) {\n          errors.push(`templates.${templateKey}.${rangeKey} must be an object.`);\n        }\n      }\n    }\n\n    return { valid: errors.length === 0, errors };\n  }\n\n  function loadTemplateConfig() {\n    try {\n      const raw = localStorage.getItem(TEMPLATE_CONFIG_STORAGE_KEY_V1);\n      if (!raw) {\n        return getDefaultTemplateConfig();\n      }\n      const parsed = JSON.parse(raw);\n      const check = validateTemplateConfig(parsed);\n      if (!check.valid) {\n        return getDefaultTemplateConfig();\n      }\n      return parsed;\n    } catch {\n      return getDefaultTemplateConfig();\n    }\n  }\n\n  function saveTemplateConfig(config) {\n    try {\n      localStorage.setItem(TEMPLATE_CONFIG_STORAGE_KEY_V1, JSON.stringify(config || {}));\n    } catch {\n      // ignore\n    }\n  }\n\n  function normalizeTheme(value) {\n    return value === \"light\" ? \"light\" : \"dark\";\n  }\n\n  function loadTheme() {\n    try {\n      return normalizeTheme(localStorage.getItem(THEME_STORAGE_KEY_V1) || \"\");\n    } catch {\n      return \"dark\";\n    }\n  }\n\n  function applyTheme(nextTheme, { save } = {}) {\n    const normalized = normalizeTheme(nextTheme);\n    state.theme = normalized;\n    document.documentElement.setAttribute(\"data-theme\", normalized);\n\n    if (els.themeToggle) {\n      els.themeToggle.checked = normalized === \"dark\";\n    }\n\n    if (save === false) {\n      return;\n    }\n\n    try {\n      localStorage.setItem(THEME_STORAGE_KEY_V1, normalized);\n    } catch {\n      // ignore\n    }\n  }\n\n  function clampNumber(value, min, max) {\n    return Math.min(max, Math.max(min, value));\n  }\n\n  function normalizeLayoutSplit(value) {\n    const numeric = Number(value);\n    if (!Number.isFinite(numeric)) {\n      return LAYOUT_SPLIT_DEFAULT;\n    }\n    return clampNumber(numeric, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX);\n  }\n\n  function loadLayoutSplit() {\n    try {\n      return normalizeLayoutSplit(localStorage.getItem(LAYOUT_SPLIT_STORAGE_KEY_V1));\n    } catch {\n      return LAYOUT_SPLIT_DEFAULT;\n    }\n  }\n\n  function saveLayoutSplit(value) {\n    try {\n      localStorage.setItem(LAYOUT_SPLIT_STORAGE_KEY_V1, String(normalizeLayoutSplit(value)));\n    } catch {\n      // ignore\n    }\n  }\n\n  function updateSplitterAria(leftPercent) {\n    if (!els.panelSplitter) {\n      return;\n    }\n\n    const left = Math.round(leftPercent);\n    const right = Math.round(100 - leftPercent);\n    els.panelSplitter.setAttribute(\"aria-valuemin\", String(LAYOUT_SPLIT_MIN));\n    els.panelSplitter.setAttribute(\"aria-valuemax\", String(LAYOUT_SPLIT_MAX));\n    els.panelSplitter.setAttribute(\"aria-valuenow\", String(left));\n    els.panelSplitter.setAttribute(\"aria-valuetext\", `${left}% code, ${right}% output`);\n  }\n\n  function applyLayoutSplit(nextPercent, { save } = {}) {\n    const normalized = normalizeLayoutSplit(nextPercent);\n    state.layoutLeftPane = normalized;\n    document.documentElement.style.setProperty(\"--layout-left-pane\", `${normalized}%`);\n    updateSplitterAria(normalized);\n\n    if (save === false) {\n      return;\n    }\n\n    saveLayoutSplit(normalized);\n  }\n\n  function isCompactLayout() {\n    if (typeof window.matchMedia === \"function\") {\n      return window.matchMedia(MOBILE_LAYOUT_QUERY).matches;\n    }\n    return window.innerWidth <= 980;\n  }\n\n  function setLayoutResizing(active) {\n    if (!els.mainLayout) {\n      return;\n    }\n    els.mainLayout.classList.toggle(\"is-resizing\", Boolean(active));\n  }\n\n  function initLayoutSplitter() {\n    applyLayoutSplit(loadLayoutSplit(), { save: false });\n\n    if (!els.mainLayout || !els.panelSplitter) {\n      return;\n    }\n\n    let dragging = false;\n    let activePointerId = null;\n\n    function applySplitFromClientX(clientX) {\n      const layoutRect = els.mainLayout.getBoundingClientRect();\n      const splitterRect = els.panelSplitter.getBoundingClientRect();\n      const usableWidth = layoutRect.width - splitterRect.width;\n      if (usableWidth <= 0) {\n        return;\n      }\n\n      const leftWidth = clientX - layoutRect.left - (splitterRect.width / 2);\n      const leftPercent = (leftWidth / usableWidth) * 100;\n      applyLayoutSplit(leftPercent, { save: false });\n    }\n\n    function onPointerMove(ev) {\n      if (!dragging || isCompactLayout()) {\n        return;\n      }\n      applySplitFromClientX(ev.clientX);\n      ev.preventDefault();\n    }\n\n    function stopDragging() {\n      if (!dragging) {\n        return;\n      }\n      dragging = false;\n      setLayoutResizing(false);\n      if (activePointerId !== null && typeof els.panelSplitter.releasePointerCapture === \"function\") {\n        try {\n          els.panelSplitter.releasePointerCapture(activePointerId);\n        } catch {\n          // ignore\n        }\n      }\n      activePointerId = null;\n      saveLayoutSplit(state.layoutLeftPane);\n      window.removeEventListener(\"pointermove\", onPointerMove);\n      window.removeEventListener(\"pointerup\", stopDragging);\n      window.removeEventListener(\"pointercancel\", stopDragging);\n    }\n\n    els.panelSplitter.addEventListener(\"pointerdown\", (ev) => {\n      if (ev.button !== 0 || isCompactLayout()) {\n        return;\n      }\n\n      dragging = true;\n      activePointerId = ev.pointerId;\n      setLayoutResizing(true);\n\n      if (typeof els.panelSplitter.setPointerCapture === \"function\") {\n        try {\n          els.panelSplitter.setPointerCapture(ev.pointerId);\n        } catch {\n          // ignore\n        }\n      }\n\n      applySplitFromClientX(ev.clientX);\n      window.addEventListener(\"pointermove\", onPointerMove);\n      window.addEventListener(\"pointerup\", stopDragging);\n      window.addEventListener(\"pointercancel\", stopDragging);\n      ev.preventDefault();\n    });\n\n    els.panelSplitter.addEventListener(\"keydown\", (ev) => {\n      if (isCompactLayout()) {\n        return;\n      }\n      if (ev.key !== \"ArrowLeft\" && ev.key !== \"ArrowRight\") {\n        return;\n      }\n\n      const step = ev.shiftKey ? 5 : 2;\n      const delta = ev.key === \"ArrowRight\" ? step : -step;\n      applyLayoutSplit(state.layoutLeftPane + delta);\n      ev.preventDefault();\n    });\n\n    window.addEventListener(\"resize\", () => {\n      if (isCompactLayout()) {\n        setLayoutResizing(false);\n        return;\n      }\n      applyLayoutSplit(state.layoutLeftPane, { save: false });\n    });\n  }\n\n  function validateRuleConfig(config) {\n    if (!config || typeof config !== \"object\" || Array.isArray(config)) {\n      return \"Config must be a JSON object.\";\n    }\n\n    if (!config.object || typeof config.object !== \"string\") {\n      return \"Missing config.object (string).\";\n    }\n\n    if (!config.match || typeof config.match !== \"object\" || Array.isArray(config.match)) {\n      return \"Missing config.match (object).\";\n    }\n\n    const match = config.match;\n    const hasMatch =\n      (typeof match.startKeyword === \"string\" && match.startKeyword.trim()) ||\n      (typeof match.startPhrase === \"string\" && match.startPhrase.trim()) ||\n      (typeof match.type === \"string\" && match.type.trim());\n\n    if (!hasMatch) {\n      return \"match must include startKeyword, startPhrase, or type.\";\n    }\n\n    if (config.block !== undefined && config.block !== null) {\n      if (typeof config.block !== \"object\" || Array.isArray(config.block)) {\n        return \"block must be an object (or null).\";\n      }\n      if (typeof config.block.endKeyword !== \"string\" || !config.block.endKeyword.trim()) {\n        return \"block.endKeyword must be a non-empty string.\";\n      }\n    }\n\n    if (config.extras !== undefined && config.extras !== null) {\n      if (typeof config.extras !== \"object\" || Array.isArray(config.extras)) {\n        return \"extras must be an object (or null).\";\n      }\n      if (typeof config.extras.type !== \"string\" || !config.extras.type.trim()) {\n        return \"extras.type must be a non-empty string.\";\n      }\n    }\n\n    if (config.keywordLabels !== undefined && config.keywordLabels !== null) {\n      if (typeof config.keywordLabels !== \"object\" || Array.isArray(config.keywordLabels)) {\n        return \"keywordLabels must be an object.\";\n      }\n    }\n\n    if (config.keywordPhrases !== undefined && config.keywordPhrases !== null) {\n      if (typeof config.keywordPhrases !== \"object\" || Array.isArray(config.keywordPhrases)) {\n        return \"keywordPhrases must be an object.\";\n      }\n    }\n\n    if (config.captureRules !== undefined && config.captureRules !== null && !Array.isArray(config.captureRules)) {\n      return \"captureRules must be an array.\";\n    }\n\n    if (Array.isArray(config.captureRules)) {\n      for (const rule of config.captureRules) {\n        if (!rule || typeof rule !== \"object\" || Array.isArray(rule)) {\n          return \"Each captureRules[] item must be an object.\";\n        }\n        if (typeof rule.after !== \"string\" || !rule.after.trim()) {\n          return \"Each captureRules[] item must have after (string).\";\n        }\n        if (typeof rule.name !== \"string\" || !rule.name.trim()) {\n          return \"Each captureRules[] item must have name (string).\";\n        }\n      }\n    }\n\n    return \"\";\n  }\n\n  function generateRuleId() {\n    const time = Date.now();\n    const rand = Math.random().toString(16).slice(2, 10);\n    return `rule-${time}-${rand}`;\n  }\n\n  function normalizeCustomRules(list) {\n    const output = [];\n    const items = Array.isArray(list) ? list : [];\n\n    for (const item of items) {\n      if (!item || typeof item !== \"object\" || Array.isArray(item)) {\n\n        continue;\n      }\n\n      if (item.config && typeof item.config === \"object\" && !Array.isArray(item.config)) {\n        const id = item.id ? String(item.id) : generateRuleId();\n        output.push({ id, config: item.config });\n        continue;\n      }\n\n      if (typeof item.object === \"string\") {\n        output.push({ id: generateRuleId(), config: item });\n      }\n    }\n\n    return output;\n  }\n\n  function loadCustomRules() {\n    return normalizeCustomRules(loadStorageArray(RULES_STORAGE_KEY_V1));\n  }\n\n  function saveCustomRules() {\n    try {\n      localStorage.setItem(RULES_STORAGE_KEY_V1, JSON.stringify(state.customRules || []));\n    } catch {\n      // ignore\n    }\n  }\n\n  function setRulesError(message) {\n    if (!els.rulesError) {\n      return;\n    }\n    els.rulesError.textContent = message ? String(message) : \"\";\n  }\n\n  function getCustomConfigs() {\n    const output = [];\n    for (const rule of state.customRules || []) {\n      if (!rule || !rule.config) {\n        continue;\n      }\n      const error = validateRuleConfig(rule.config);\n      if (!error) {\n        output.push(rule.config);\n      }\n    }\n    return output;\n  }\n\n  function describeRuleOption(rule) {\n    if (!rule || !rule.config) {\n      return \"(invalid rule)\";\n    }\n\n    const objectType = rule.config.object ? String(rule.config.object) : \"RULE\";\n    const match = rule.config.match && typeof rule.config.match === \"object\" ? rule.config.match : {};\n    const summary = match.startPhrase\n      ? `startPhrase=${String(match.startPhrase)}`\n      : match.startKeyword\n        ? `startKeyword=${String(match.startKeyword)}`\n        : match.type\n          ? `type=${String(match.type)}`\n          : \"match=?\";\n\n    return `${objectType} (${summary})`;\n  }\n\n  function renderRulesSelect() {\n    if (!els.rulesSelect) {\n      return;\n    }\n\n    els.rulesSelect.replaceChildren();\n    els.rulesSelect.appendChild(el(\"option\", { text: \"(New rule)\", attrs: { value: \"\" } }));\n\n    for (const rule of state.customRules || []) {\n      const id = rule && rule.id ? String(rule.id) : \"\";\n      if (!id) {\n        continue;\n      }\n      els.rulesSelect.appendChild(\n        el(\"option\", {\n          text: describeRuleOption(rule),\n          attrs: { value: id }\n        })\n      );\n    }\n\n    els.rulesSelect.value = state.activeRuleId || \"\";\n  }\n\n  function selectRule(ruleId) {\n    const id = ruleId ? String(ruleId) : \"\";\n    state.activeRuleId = id;\n    setRulesError(\"\");\n\n    if (!els.rulesJson) {\n      return;\n    }\n\n    if (!id) {\n      els.rulesJson.value = \"\";\n      return;\n    }\n\n    const rule = (state.customRules || []).find((r) => r && String(r.id) === id) || null;\n    if (!rule || !rule.config) {\n      els.rulesJson.value = \"\";\n      return;\n    }\n\n    try {\n      els.rulesJson.value = JSON.stringify(rule.config, null, 2);\n    } catch {\n      els.rulesJson.value = \"\";\n    }\n  }\n\n  function createRuleTemplate(kind) {\n    const type = String(kind || \"startKeyword\");\n\n    if (type === \"assignment\") {\n      return {\n        object: \"ASSIGNMENT\",\n        match: { type: \"assignment\" },\n        keywordLabels: {\n          \"=\": \"assign\",\n          \"+=\": \"add-assign\",\n          \"-=\": \"sub-assign\",\n          \"*=\": \"mul-assign\",\n          \"/=\": \"div-assign\",\n          \"?=\": \"cast\"\n        },\n        keywordPhrases: {},\n        captureRules: []\n      };\n    }\n\n    if (type === \"startPhrase\") {\n      return {\n        object: \"MY_OBJECT\",\n        match: { startPhrase: \"MY PHRASE\" },\n        keywordLabels: {\n          MY: \"stmt\"\n        },\n        keywordPhrases: {\n          \"MY PHRASE\": \"my-phrase\"\n        },\n        captureRules: [\n          { after: \"MY PHRASE\", name: \"name\", label: \"name\" }\n        ]\n      };\n    }\n\n    return {\n      object: \"MY_OBJECT\",\n      match: { startKeyword: \"MYKEYWORD\" },\n      keywordLabels: {\n        MYKEYWORD: \"stmt\"\n      },\n      keywordPhrases: {},\n      captureRules: [\n        { after: \"MYKEYWORD\", name: \"name\", label: \"name\" }\n      ]\n    };\n  }\n\n  function startNewRule() {\n    state.activeRuleId = \"\";\n    if (els.rulesSelect) {\n      els.rulesSelect.value = \"\";\n    }\n\n    const kind = els.rulesTemplate ? els.rulesTemplate.value : \"startKeyword\";\n    const template = createRuleTemplate(kind);\n\n    if (els.rulesJson) {\n      els.rulesJson.value = JSON.stringify(template, null, 2);\n      els.rulesJson.focus();\n    }\n\n    setRulesError(\"\");\n  }\n\n  function readRuleFromEditor() {\n    const text = els.rulesJson ? els.rulesJson.value || \"\" : \"\";\n    const trimmed = text.trim();\n    if (!trimmed) {\n      return { config: null, error: \"Rule JSON is empty.\" };\n    }\n\n    try {\n      const parsed = JSON.parse(trimmed);\n      const config = parsed;\n      const error = validateRuleConfig(config);\n      if (error) {\n        return { config: null, error };\n      }\n      return { config, error: \"\" };\n    } catch (err) {\n      return { config: null, error: `JSON parse error: ${err && err.message ? err.message : err}` };\n    }\n  }\n\n  function saveRuleFromEditor() {\n    const { config, error } = readRuleFromEditor();\n    if (error) {\n      setRulesError(error);\n      return;\n    }\n\n    setRulesError(\"\");\n\n    if (state.activeRuleId) {\n      const target = (state.customRules || []).find((r) => r && String(r.id) === state.activeRuleId) || null;\n      if (target) {\n        target.config = config;\n      } else {\n        state.customRules.push({ id: state.activeRuleId, config });\n      }\n    } else {\n      const id = generateRuleId();\n      state.customRules.push({ id, config });\n      state.activeRuleId = id;\n    }\n\n    saveCustomRules();\n    renderRulesSelect();\n    if (els.rulesSelect) {\n      els.rulesSelect.value = state.activeRuleId || \"\";\n    }\n  }\n\n  function deleteActiveRule() {\n    if (!state.activeRuleId) {\n      setRulesError(\"Select a saved rule to delete.\");\n      return;\n    }\n\n    state.customRules = (state.customRules || []).filter((r) => r && String(r.id) !== state.activeRuleId);\n    state.activeRuleId = \"\";\n    saveCustomRules();\n    renderRulesSelect();\n    if (els.rulesJson) {\n      els.rulesJson.value = \"\";\n    }\n    setRulesError(\"\");\n  }\n\n  function downloadRuleFromEditor() {\n    const { config, error } = readRuleFromEditor();\n    if (error) {\n      setRulesError(error);\n      return;\n    }\n\n    setRulesError(\"\");\n\n    const fileBase = config && config.object ? String(config.object).trim() : \"rule\";\n    const fileName = `${fileBase}.json`;\n    const content = JSON.stringify(config, null, 2);\n\n    try {\n      const blob = new Blob([content], { type: \"application/json\" });\n      const url = URL.createObjectURL(blob);\n      const a = document.createElement(\"a\");\n      a.href = url;\n      a.download = fileName;\n      document.body.appendChild(a);\n      a.click();\n      a.remove();\n      URL.revokeObjectURL(url);\n    } catch (err) {\n      setRulesError(`Download failed: ${err && err.message ? err.message : err}`);\n    }\n  }\n\n  function openRulesModal() {\n    if (!els.rulesModal) {\n      return;\n    }\n\n    if (!els.jsonModal.hidden) {\n      closeJsonModal();\n    }\n    if (!els.editModal.hidden) {\n      closeEditModal();\n    }\n\n    renderRulesSelect();\n    if (state.activeRuleId) {\n      selectRule(state.activeRuleId);\n    } else if (els.rulesJson && !els.rulesJson.value.trim()) {\n      startNewRule();\n    }\n\n    els.rulesModal.hidden = false;\n  }\n\n  function closeRulesModal() {\n    if (!els.rulesModal) {\n      return;\n    }\n\n    els.rulesModal.hidden = true;\n    setRulesError(\"\");\n  }\n\n  function renderSettingsModalUi() {\n    if (!els.settingsModal) {\n      return;\n    }\n\n    const settings = state.settings || loadSettings();\n    state.settings = settings;\n\n    if (els.settingsNormalizeDesc) {\n      els.settingsNormalizeDesc.checked = Boolean(settings.normalizeDeclDesc);\n    }\n\n    if (els.settingsDeclTypes) {\n      els.settingsDeclTypes.replaceChildren();\n      for (const type of DECL_TYPE_OPTIONS) {\n        const label = document.createElement(\"label\");\n        label.className = \"toggle\";\n\n        const input = document.createElement(\"input\");\n        input.type = \"checkbox\";\n        input.value = type;\n        input.checked = Array.isArray(settings.declFilterTypes) && settings.declFilterTypes.includes(type);\n\n        label.appendChild(input);\n        label.appendChild(document.createTextNode(type));\n        els.settingsDeclTypes.appendChild(label);\n      }\n    }\n\n    if (els.settingsStructTemplate) {\n      els.settingsStructTemplate.value = settings.structDescTemplate || DEFAULT_SETTINGS.structDescTemplate;\n    }\n\n    if (els.settingsNameTemplates) {\n      els.settingsNameTemplates.replaceChildren();\n\n      const table = document.createElement(\"table\");\n      const thead = document.createElement(\"thead\");\n      const headRow = document.createElement(\"tr\");\n      for (const title of [\"code\", \"label\", \"template\"]) {\n        const th = document.createElement(\"th\");\n        th.textContent = title;\n        headRow.appendChild(th);\n      }\n      thead.appendChild(headRow);\n      table.appendChild(thead);\n\n      const tbody = document.createElement(\"tbody\");\n      for (const opt of NAME_CODE_OPTIONS) {\n        const tr = document.createElement(\"tr\");\n\n        const codeCell = document.createElement(\"td\");\n        codeCell.textContent = opt.code;\n        tr.appendChild(codeCell);\n\n        const labelCell = document.createElement(\"td\");\n        labelCell.textContent = opt.label;\n        tr.appendChild(labelCell);\n\n        const tplCell = document.createElement(\"td\");\n        const input = document.createElement(\"input\");\n        input.type = \"text\";\n        input.style.width = \"100%\";\n        input.setAttribute(\"data-code\", opt.code);\n        input.value = (settings.nameTemplatesByCode && settings.nameTemplatesByCode[opt.code])\n          ? String(settings.nameTemplatesByCode[opt.code] || \"\")\n          : String(DEFAULT_SETTINGS.nameTemplatesByCode[opt.code] || \"\");\n\n        tplCell.appendChild(input);\n        tr.appendChild(tplCell);\n\n        tbody.appendChild(tr);\n      }\n      table.appendChild(tbody);\n\n      els.settingsNameTemplates.appendChild(table);\n    }\n  }\n\n  function openSettingsModal() {\n    if (!els.settingsModal) {\n      return;\n    }\n\n    if (!els.jsonModal.hidden) {\n      closeJsonModal();\n    }\n    if (!els.editModal.hidden) {\n      closeEditModal();\n    }\n    if (els.rulesModal && !els.rulesModal.hidden) {\n      closeRulesModal();\n    }\n\n    renderSettingsModalUi();\n    els.settingsModal.hidden = false;\n  }\n\n  function closeSettingsModal() {\n    if (!els.settingsModal) {\n      return;\n    }\n    els.settingsModal.hidden = true;\n  }\n\nwindow.AbapViewerModules.factories = window.AbapViewerModules.factories || {};\nwindow.AbapViewerModules.factories[\"01-core\"] = function registerCore(runtime) {\n  const targetRuntime = runtime || (window.AbapViewerRuntime = window.AbapViewerRuntime || {});\n  targetRuntime.api = targetRuntime.api || {};\n  targetRuntime.els = els;\n  targetRuntime.state = state;\n  targetRuntime.constants = {\n    DESC_STORAGE_KEY_V2,\n    DESC_STORAGE_KEY_LEGACY_V1,\n    RULES_STORAGE_KEY_V1,\n    SETTINGS_STORAGE_KEY_V1,\n    TEMPLATE_CONFIG_STORAGE_KEY_V1,\n    THEME_STORAGE_KEY_V1,\n    LAYOUT_SPLIT_STORAGE_KEY_V1,\n    LAYOUT_SPLIT_DEFAULT,\n    LAYOUT_SPLIT_MIN,\n    LAYOUT_SPLIT_MAX,\n    MOBILE_LAYOUT_QUERY,\n    RENDER_TREE_OPTIONS,\n    DECL_TYPE_OPTIONS,\n    NAME_CODE_OPTIONS,\n    DEFAULT_SETTINGS,\n    TEMPLATE_DEFAULT_CONFIG_V1,\n    SAMPLE_ABAP\n  };\n  window.AbapViewerModules.parts[\"01-core\"] = true;\n};\nwindow.AbapViewerModules.factories[\"01-core\"](window.AbapViewerRuntime);\n\n";
-})(typeof globalThis !== "undefined" ? globalThis : (typeof self !== "undefined" ? self : this));
+window.AbapViewerModules = window.AbapViewerModules || {};
+window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
+window.AbapViewerRuntime = window.AbapViewerRuntime || {};
+window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
+
+  const els = {
+    fileInput: document.getElementById("fileInput"),
+    parseBtn: document.getElementById("parseBtn"),
+    searchInput: document.getElementById("searchInput"),
+    typeFilter: document.getElementById("typeFilter"),
+    showRaw: document.getElementById("showRaw"),
+    showKeywords: document.getElementById("showKeywords"),
+    showValues: document.getElementById("showValues"),
+    showExtras: document.getElementById("showExtras"),
+    themeToggle: document.getElementById("themeToggle"),
+    expandAllBtn: document.getElementById("expandAllBtn"),
+    collapseAllBtn: document.getElementById("collapseAllBtn"),
+    clearFiltersBtn: document.getElementById("clearFiltersBtn"),
+    descBtn: document.getElementById("descBtn"),
+    settingsBtn: document.getElementById("settingsBtn"),
+    exportXmlBtn: document.getElementById("exportXmlBtn"),
+    inputText: document.getElementById("inputText"),
+    inputGutter: document.getElementById("inputGutter"),
+    inputGutterContent: document.getElementById("inputGutterContent"),
+    mainLayout: document.getElementById("mainLayout"),
+    panelSplitter: document.getElementById("panelSplitter"),
+    output: document.getElementById("output"),
+    buildInfo: document.getElementById("buildInfo"),
+    rightPanelTitle: document.getElementById("rightPanelTitle"),
+    rightTabOutputBtn: document.getElementById("rightTabOutputBtn"),
+    rightTabTemplateBtn: document.getElementById("rightTabTemplateBtn"),
+    rightTabDescBtn: document.getElementById("rightTabDescBtn"),
+    templatePreviewPanel: document.getElementById("templatePreviewPanel"),
+    templateKeyMode: document.getElementById("templateKeyMode"),
+    templateCopyTableOnly: document.getElementById("templateCopyTableOnly"),
+    templateCopyAllBtn: document.getElementById("templateCopyAllBtn"),
+    templateResetBtn: document.getElementById("templateResetBtn"),
+    templateExportBtn: document.getElementById("templateExportBtn"),
+    templateImportBtn: document.getElementById("templateImportBtn"),
+    templateApplyBtn: document.getElementById("templateApplyBtn"),
+    templateImportInput: document.getElementById("templateImportInput"),
+    templateConfigError: document.getElementById("templateConfigError"),
+    templateConfigJson: document.getElementById("templateConfigJson"),
+    templatePreviewOutput: document.getElementById("templatePreviewOutput"),
+    declDescJsonBtn: document.getElementById("declDescJsonBtn"),
+    declDescPanel: document.getElementById("declDescPanel"),
+    error: document.getElementById("error"),
+    jsonModal: document.getElementById("jsonModal"),
+    jsonTitle: document.getElementById("jsonTitle"),
+    jsonPre: document.getElementById("jsonPre"),
+    jsonCopyBtn: document.getElementById("jsonCopyBtn"),
+    jsonCloseBtn: document.getElementById("jsonCloseBtn"),
+    declDescSearch: document.getElementById("declDescSearch"),
+    declDescMissingOnly: document.getElementById("declDescMissingOnly"),
+    declDescTypes: document.getElementById("declDescTypes"),
+    declDescSummary: document.getElementById("declDescSummary"),
+    declDescTable: document.getElementById("declDescTable"),
+    editModal: document.getElementById("editModal"),
+    editLabel: document.getElementById("editLabel"),
+    editHint: document.getElementById("editHint"),
+    editSingleWrap: document.getElementById("editSingleWrap"),
+    editDesc: document.getElementById("editDesc"),
+    editStructWrap: document.getElementById("editStructWrap"),
+    editStructDesc: document.getElementById("editStructDesc"),
+    editItemDesc: document.getElementById("editItemDesc"),
+    editSkipNormalize: document.getElementById("editSkipNormalize"),
+    editSaveBtn: document.getElementById("editSaveBtn"),
+    editClearBtn: document.getElementById("editClearBtn"),
+    editCancelBtn: document.getElementById("editCancelBtn"),
+    rulesBtn: document.getElementById("rulesBtn"),
+    rulesModal: document.getElementById("rulesModal"),
+    rulesSelect: document.getElementById("rulesSelect"),
+    rulesTemplate: document.getElementById("rulesTemplate"),
+    rulesError: document.getElementById("rulesError"),
+    rulesJson: document.getElementById("rulesJson"),
+    rulesNewBtn: document.getElementById("rulesNewBtn"),
+    rulesSaveBtn: document.getElementById("rulesSaveBtn"),
+    rulesDeleteBtn: document.getElementById("rulesDeleteBtn"),
+    rulesDownloadBtn: document.getElementById("rulesDownloadBtn"),
+    rulesCloseBtn: document.getElementById("rulesCloseBtn"),
+    settingsModal: document.getElementById("settingsModal"),
+    settingsNormalizeDesc: document.getElementById("settingsNormalizeDesc"),
+    settingsDeclTypes: document.getElementById("settingsDeclTypes"),
+    settingsStructTemplate: document.getElementById("settingsStructTemplate"),
+    settingsNameTemplates: document.getElementById("settingsNameTemplates"),
+    settingsSaveBtn: document.getElementById("settingsSaveBtn"),
+    settingsResetBtn: document.getElementById("settingsResetBtn"),
+    settingsCloseBtn: document.getElementById("settingsCloseBtn")
+  };
+
+  const state = {
+    data: null,
+    renderObjects: [],
+    inputMode: "abap",
+    inputLineCount: 0,
+    inputGutterButtonsByLine: new Map(),
+    inputGutterTargetsByLine: new Map(),
+    theme: "dark",
+    query: "",
+    type: "",
+    showRaw: true,
+    showKeywords: true,
+    showValues: true,
+    showExtras: false,
+    rightTab: "template",
+    templateConfig: null,
+    templateConfigDraft: "",
+    templatePreviewCache: null,
+    collapsedIds: new Set(),
+    selectedId: "",
+    selectedTemplateIndex: "",
+    selectedDeclKey: "",
+    descOverrides: {},
+    descOverridesLegacy: {},
+    activeEdit: null,
+    haystackById: new Map(),
+    inputLineOffsets: [],
+    customRules: [],
+    activeRuleId: "",
+    settings: null,
+    layoutLeftPane: 48,
+    outputVirtual: {
+      roots: [],
+      itemCount: 0,
+      start: 0,
+      end: 0,
+      lastScrollTop: 0,
+      scrollDir: "down",
+      pendingRaf: 0,
+      isAdjustingScroll: false,
+      avgItemHeight: 200,
+      idToRootIndex: new Map(),
+      lineTargetMap: new Map(),
+      isInitialized: false
+    },
+    templateVirtual: {
+      items: [],
+      itemCount: 0,
+      start: 0,
+      end: 0,
+      lastScrollTop: 0,
+      scrollDir: "down",
+      pendingRaf: 0,
+      isAdjustingScroll: false,
+      avgItemHeight: 140,
+      lineTargetMap: new Map(),
+      isInitialized: false
+    },
+    inputGutterVirtual: {
+      lineCount: 0,
+      startLine: 1,
+      endLine: 1,
+      lineHeightPx: 18,
+      topPadPx: 0,
+      bottomPadPx: 0,
+      pendingRaf: 0,
+      lastScrollTop: 0,
+      overscanLines: 6,
+      isInitialized: false
+    }
+  };
+
+  const DESC_STORAGE_KEY_V2 = "abap-parser-viewer.declDescOverrides.v2";
+  const DESC_STORAGE_KEY_LEGACY_V1 = "abap-parser-viewer.descOverrides.v1";
+  const RULES_STORAGE_KEY_V1 = "abap-parser-viewer.customConfigs.v1";
+  const SETTINGS_STORAGE_KEY_V1 = "abap-parser-viewer.settings.v1";
+  const TEMPLATE_CONFIG_STORAGE_KEY_V1 = "abap-parser-viewer.templateConfig.v1";
+  const THEME_STORAGE_KEY_V1 = "abap-parser-viewer.theme.v1";
+  const LAYOUT_SPLIT_STORAGE_KEY_V1 = "abap-parser-viewer.layoutSplit.v1";
+  const LAYOUT_SPLIT_DEFAULT = 48;
+  const LAYOUT_SPLIT_MIN = 28;
+  const LAYOUT_SPLIT_MAX = 72;
+  const MOBILE_LAYOUT_QUERY = "(max-width: 980px)";
+  const RENDER_TREE_OPTIONS = Object.freeze({
+    expandPerformForms: true,
+    hideFormRoots: true,
+    maxExpandDepth: Number.POSITIVE_INFINITY
+  });
+
+  const DECL_TYPE_OPTIONS = [
+    "DATA",
+    "TYPES",
+    "PARAMETERS",
+    "SELECT-OPTIONS",
+    "CONSTANTS",
+    "RANGES",
+    "STATICS",
+    "CLASS-DATA",
+    "FIELD-SYMBOLS"
+  ];
+
+  const NAME_CODE_OPTIONS = [
+    { code: "CN", label: "HẰNG" },
+    { code: "DS", label: "STRUCT" },
+    { code: "DT", label: "TABLE" },
+    { code: "DR", label: "RANGETABLE" },
+    { code: "DF", label: "BIẾN" },
+    { code: "FL", label: "CỜ" },
+    { code: "FS", label: "FIELDSYMBOL" }
+  ];
+
+  const DEFAULT_SETTINGS = {
+    normalizeDeclDesc: true,
+    declFilterTypes: ["DATA", "TYPES", "PARAMETERS"],
+    structDescTemplate: "{{struct}}-{{item}}",
+    nameTemplatesByCode: {
+      CN: "HẰNG:{{desc}}",
+      DS: "STRUCT:{{desc}}",
+      DT: "TABLE:{{desc}}",
+      DR: "RANGETABLE:{{desc}}",
+      DF: "BIẾN:{{desc}}",
+      FL: "CỜ:{{desc}}",
+      FS: "FIELDSYMBOL:{{desc}}"
+    }
+  };
+
+  const SAMPLE_ABAP = [
+    "REPORT zflight_report_full_comment NO STANDARD PAGE HEADING.",
+    "",
+    "TYPE-POOLS abap.",
+    "",
+    "TABLES: sflight,      \"Bảng chuyến bay trong DDIC",
+    "        spfli,        \"Bảng tuyến bay trong DDIC",
+    "        scarr.        \"Bảng hãng hàng không trong DDIC",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Hằng số dùng chung",
+    "*---------------------------------------------------------------------*",
+    "CONSTANTS:",
+    "  gc_true         TYPE abap_bool VALUE abap_true,  \"Giá trị boolean đúng",
+    "  gc_false        TYPE abap_bool VALUE abap_false, \"Giá trị boolean sai",
+    "  gc_default_max  TYPE i         VALUE 20,         \"Số dòng mặc định tối đa",
+    "  gc_status_full  TYPE string    VALUE 'FULL',     \"Trạng thái hết ghế",
+    "  gc_status_busy  TYPE string    VALUE 'BUSY',     \"Trạng thái gần đầy ghế",
+    "  gc_status_open  TYPE string    VALUE 'OPEN',     \"Trạng thái còn ghế",
+    "  gc_status_empty TYPE string    VALUE 'EMPTY'.    \"Trạng thái chưa có khách",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Màn hình chọn dữ liệu",
+    "*---------------------------------------------------------------------*",
+    "SELECTION-SCREEN BEGIN OF BLOCK b01 WITH FRAME TITLE text-t01.",
+    "PARAMETERS:",
+    "  p_carrid TYPE sflight-carrid DEFAULT 'LH',   \"Mã hãng bay đầu vào",
+    "  p_connid TYPE sflight-connid DEFAULT '0400', \"Mã tuyến/chuyến bay đầu vào",
+    "  p_max    TYPE i               DEFAULT 20,    \"Số dòng tối đa cần lấy",
+    "  p_add    AS CHECKBOX          DEFAULT 'X',   \"Cờ thêm dòng dữ liệu test",
+    "  p_dbg    AS CHECKBOX          DEFAULT space. \"Cờ bật output debug",
+    "SELECT-OPTIONS:",
+    "  so_date FOR sflight-fldate.                  \"Khoảng ngày chuyến bay cần lọc",
+    "SELECTION-SCREEN END OF BLOCK b01.",
+    "",
+    "SELECTION-SCREEN BEGIN OF BLOCK b02 WITH FRAME TITLE text-t02.",
+    "PARAMETERS:",
+    "  p_cityfr TYPE spfli-cityfrom,                \"Thành phố đi cần lọc",
+    "  p_cityto TYPE spfli-cityto.                  \"Thành phố đến cần lọc",
+    "SELECTION-SCREEN END OF BLOCK b02.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Kiểu dữ liệu cục bộ",
+    "*---------------------------------------------------------------------*",
+    "TYPES: BEGIN OF ty_flight,",
+    "         carrid      TYPE sflight-carrid,         \"Mã hãng hàng không",
+    "         carrname    TYPE scarr-carrname,         \"Tên hãng hàng không",
+    "         connid      TYPE sflight-connid,         \"Mã chuyến/tuyến bay",
+    "         fldate      TYPE sflight-fldate,         \"Ngày bay",
+    "         price       TYPE sflight-price,          \"Giá vé",
+    "         currency    TYPE sflight-currency,       \"Loại tiền",
+    "         planetype   TYPE sflight-planetype,      \"Loại máy bay",
+    "         seatsmax    TYPE sflight-seatsmax,       \"Tổng số ghế",
+    "         seatsocc    TYPE sflight-seatsocc,       \"Số ghế đã đặt",
+    "         paymentsum  TYPE sflight-paymentsum,     \"Tổng tiền thu được",
+    "         cityfrom    TYPE spfli-cityfrom,         \"Thành phố đi",
+    "         cityto      TYPE spfli-cityto,           \"Thành phố đến",
+    "         countryfr   TYPE spfli-countryfr,        \"Quốc gia đi",
+    "         countryto   TYPE spfli-countryto,        \"Quốc gia đến",
+    "         free_seats  TYPE i,                      \"Số ghế còn trống",
+    "         occ_pct     TYPE p LENGTH 5 DECIMALS 2,  \"Tỷ lệ lấp đầy ghế",
+    "         status_text TYPE string,                 \"Trạng thái chuyến bay",
+    "         note_text   TYPE string,                 \"Ghi chú bổ sung cho dòng",
+    "       END OF ty_flight.",
+    "",
+    "TYPES ty_t_flight TYPE STANDARD TABLE OF ty_flight WITH DEFAULT KEY. \"Bảng nội bộ chứa danh sách chuyến bay",
+    "",
+    "TYPES: BEGIN OF ty_summary,",
+    "         total_count    TYPE i,                   \"Tổng số dòng report",
+    "         full_count     TYPE i,                   \"Số chuyến bay đầy ghế",
+    "         busy_count     TYPE i,                   \"Số chuyến bay gần đầy",
+    "         open_count     TYPE i,                   \"Số chuyến bay còn ghế",
+    "         empty_count    TYPE i,                   \"Số chuyến bay chưa có khách",
+    "         total_seatsmax TYPE i,                   \"Tổng số ghế tối đa",
+    "         total_seatsocc TYPE i,                   \"Tổng số ghế đã đặt",
+    "         avg_occ_pct    TYPE p LENGTH 7 DECIMALS 2, \"Tỷ lệ lấp đầy trung bình",
+    "         busiest_route  TYPE string,              \"Tuyến bay đông nhất",
+    "         summary_text   TYPE string,              \"Chuỗi mô tả tóm tắt",
+    "       END OF ty_summary.",
+    "",
+    "TYPES: BEGIN OF ty_city_stat,",
+    "         cityfrom TYPE spfli-cityfrom, \"Thành phố đi dùng làm khóa thống kê",
+    "         flights  TYPE i,              \"Số chuyến bay theo thành phố đi",
+    "       END OF ty_city_stat.",
+    "",
+    "TYPES: BEGIN OF ty_light_flight,",
+    "         carrid   TYPE sflight-carrid, \"Mã hãng bay",
+    "         connid   TYPE sflight-connid, \"Mã chuyến bay",
+    "         fldate   TYPE sflight-fldate, \"Ngày bay",
+    "         cityfrom TYPE spfli-cityfrom, \"Thành phố đi",
+    "         cityto   TYPE spfli-cityto,   \"Thành phố đến",
+    "       END OF ty_light_flight.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Biến toàn cục",
+    "*---------------------------------------------------------------------*",
+    "DATA:",
+    "  gt_flights        TYPE ty_t_flight, \"Bảng dữ liệu chính của report chuyến bay",
+    "  gt_flights_backup TYPE ty_t_flight, \"Bảng sao lưu dữ liệu trước khi chỉnh sửa",
+    "  gt_log            TYPE STANDARD TABLE OF string WITH DEFAULT KEY, \"Danh sách log kỹ thuật",
+    "",
+    "  gs_flight         TYPE ty_flight,   \"Work area toàn cục cho một dòng flight",
+    "  gs_summary        TYPE ty_summary,  \"Cấu trúc tổng hợp số liệu cuối report",
+    "",
+    "  gv_ok             TYPE abap_bool VALUE abap_true,  \"Cờ báo xử lý thành công",
+    "  gv_rows           TYPE i,                           \"Số dòng hiện có trong bảng kết quả",
+    "  gv_message        TYPE string,                      \"Thông điệp trạng thái toàn cục",
+    "  gv_weekday_text   TYPE string,                      \"Tên thứ trong tuần dạng text",
+    "  gv_depth          TYPE i VALUE 0,                   \"Biến minh họa độ sâu xử lý",
+    "  gv_found          TYPE abap_bool VALUE abap_false.  \"Cờ báo đã tìm thấy dữ liệu",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Field-symbol và data reference",
+    "*---------------------------------------------------------------------*",
+    "FIELD-SYMBOLS:",
+    "  <fs_any>    TYPE any,       \"Field-symbol generic cho ASSIGN động",
+    "  <fs_flight> TYPE ty_flight, \"Field-symbol trỏ tới một dòng flight",
+    "  <fs_comp>   TYPE any.       \"Field-symbol trỏ tới component động",
+    "",
+    "DATA:",
+    "  lr_data TYPE REF TO data,      \"Reference generic tới object dữ liệu động",
+    "  lr_line TYPE REF TO ty_flight. \"Reference tới một dòng flight",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* INITIALIZATION",
+    "*---------------------------------------------------------------------*",
+    "INITIALIZATION.",
+    "  text-t01 = 'Main Filters'.",
+    "  text-t02 = 'Optional City Filters'.",
+    "",
+    "  IF so_date[] IS INITIAL.",
+    "    so_date-sign   = 'I'.",
+    "    so_date-option = 'BT'.",
+    "    so_date-low    = sy-datum.",
+    "    so_date-high   = sy-datum + 30.",
+    "    APPEND so_date.",
+    "  ENDIF.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* AT SELECTION-SCREEN",
+    "*---------------------------------------------------------------------*",
+    "AT SELECTION-SCREEN.",
+    "  PERFORM frm_validate_input.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* START-OF-SELECTION",
+    "*---------------------------------------------------------------------*",
+    "START-OF-SELECTION.",
+    "  PERFORM frm_init.",
+    "  PERFORM frm_fetch_flights.",
+    "  PERFORM frm_copy_backup.",
+    "  PERFORM frm_add_manual_row.",
+    "  PERFORM frm_enrich_flights.",
+    "  PERFORM frm_select_single_examples.",
+    "  PERFORM frm_read_examples.",
+    "  PERFORM frm_loop_examples.",
+    "  PERFORM frm_collect_examples.",
+    "  PERFORM frm_move_corresponding_examples.",
+    "  PERFORM frm_string_examples.",
+    "  PERFORM frm_modify_examples.",
+    "  PERFORM frm_delete_sort_examples.",
+    "  PERFORM frm_dynamic_examples.",
+    "  PERFORM frm_reference_examples.",
+    "  PERFORM frm_case_do_while_examples.",
+    "  PERFORM frm_call_function_examples.",
+    "",
+    "  \" Chuỗi PERFORM lồng sâu để test tracer/provenance",
+    "  PERFORM frm_deep_chain_entry",
+    "    USING    p_carrid",
+    "             p_connid",
+    "    CHANGING gv_message.",
+    "",
+    "  PERFORM frm_build_summary.",
+    "  PERFORM frm_cleanup_examples.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* END-OF-SELECTION",
+    "*---------------------------------------------------------------------*",
+    "END-OF-SELECTION.",
+    "  PERFORM frm_output_report.",
+    "  PERFORM frm_output_log.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Kiểm tra input",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_validate_input.",
+    "  IF p_max IS INITIAL OR p_max <= 0.",
+    "    MESSAGE 'Maximum row count must be > 0' TYPE 'E'.",
+    "  ENDIF.",
+    "",
+    "  IF p_cityfr IS NOT INITIAL",
+    "     AND p_cityto IS NOT INITIAL",
+    "     AND p_cityfr = p_cityto.",
+    "    MESSAGE 'Departure city and destination city cannot be the same' TYPE 'E'.",
+    "  ENDIF.",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Khởi tạo dữ liệu",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_init.",
+    "  CLEAR:",
+    "    gs_flight,",
+    "    gs_summary,",
+    "    gv_message,",
+    "    gv_weekday_text,",
+    "    gv_rows,",
+    "    gv_depth,",
+    "    gv_found.",
+    "",
+    "  REFRESH:",
+    "    gt_flights,",
+    "    gt_flights_backup,",
+    "    gt_log.",
+    "",
+    "  gv_ok = gc_true.",
+    "  gv_message = 'Initialization finished'.",
+    "",
+    "  APPEND |[INIT] Program started at { sy-datum } { sy-uzeit }| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Lấy dữ liệu chuyến bay từ DB",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_fetch_flights.",
+    "",
+    "  SELECT",
+    "    a~carrid,",
+    "    c~carrname,",
+    "    a~connid,",
+    "    a~fldate,",
+    "    a~price,",
+    "    a~currency,",
+    "    a~planetype,",
+    "    a~seatsmax,",
+    "    a~seatsocc,",
+    "    a~paymentsum,",
+    "    b~cityfrom,",
+    "    b~cityto,",
+    "    b~countryfr,",
+    "    b~countryto",
+    "    FROM sflight AS a",
+    "    INNER JOIN spfli AS b",
+    "      ON b~carrid = a~carrid",
+    "     AND b~connid = a~connid",
+    "    INNER JOIN scarr AS c",
+    "      ON c~carrid = a~carrid",
+    "    INTO CORRESPONDING FIELDS OF TABLE @gt_flights",
+    "    UP TO @p_max ROWS",
+    "    WHERE a~carrid = @p_carrid",
+    "      AND a~connid = @p_connid",
+    "      AND a~fldate IN @so_date.",
+    "",
+    "  IF sy-subrc <> 0.",
+    "    gv_ok = gc_false.",
+    "    gv_message = |No DB rows for airline { p_carrid } / connection { p_connid }|.",
+    "    APPEND gv_message TO gt_log.",
+    "    RETURN.",
+    "  ENDIF.",
+    "",
+    "  IF p_cityfr IS NOT INITIAL.",
+    "    DELETE gt_flights WHERE cityfrom <> p_cityfr.",
+    "  ENDIF.",
+    "",
+    "  IF p_cityto IS NOT INITIAL.",
+    "    DELETE gt_flights WHERE cityto <> p_cityto.",
+    "  ENDIF.",
+    "",
+    "  DESCRIBE TABLE gt_flights LINES gv_rows.",
+    "  gv_message = |Fetched { gv_rows } row(s) from database|.",
+    "  APPEND gv_message TO gt_log.",
+    "",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Sao lưu dữ liệu",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_copy_backup.",
+    "  gt_flights_backup = gt_flights.",
+    "  APPEND |[BACKUP] Backup table created| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Thêm một dòng dữ liệu test",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_add_manual_row.",
+    "  DATA:",
+    "    ls_manual TYPE ty_flight. \"Dòng flight thêm thủ công để test",
+    "",
+    "  CHECK p_add = gc_true.",
+    "",
+    "  CLEAR ls_manual.",
+    "",
+    "  ls_manual-carrid      = p_carrid.",
+    "  ls_manual-carrname    = 'MANUAL AIR'.",
+    "  ls_manual-connid      = p_connid.",
+    "  ls_manual-fldate      = sy-datum + 1.",
+    "  ls_manual-price       = '199.99'.",
+    "  ls_manual-currency    = 'USD'.",
+    "  ls_manual-planetype   = 'A320'.",
+    "  ls_manual-seatsmax    = 180.",
+    "  ls_manual-seatsocc    = 90.",
+    "  ls_manual-paymentsum  = '9999.99'.",
+    "",
+    "  IF p_cityfr IS INITIAL.",
+    "    ls_manual-cityfrom = 'HCM'.",
+    "  ELSE.",
+    "    ls_manual-cityfrom = p_cityfr.",
+    "  ENDIF.",
+    "",
+    "  IF p_cityto IS INITIAL.",
+    "    ls_manual-cityto = 'HAN'.",
+    "  ELSE.",
+    "    ls_manual-cityto = p_cityto.",
+    "  ENDIF.",
+    "",
+    "  ls_manual-countryfr = 'VN'.",
+    "  ls_manual-countryto = 'VN'.",
+    "  ls_manual-note_text = 'Inserted manually in program'.",
+    "",
+    "  APPEND ls_manual TO gt_flights.",
+    "  APPEND |[APPEND] Manual row added| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Tính toán thêm cho từng dòng flight",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_enrich_flights.",
+    "  DATA:",
+    "    lv_occ_pct TYPE p LENGTH 5 DECIMALS 2, \"Tỷ lệ lấp đầy ghế của dòng hiện tại",
+    "    lv_free    TYPE i.                     \"Số ghế còn trống của dòng hiện tại",
+    "",
+    "  LOOP AT gt_flights INTO gs_flight.",
+    "",
+    "    CLEAR: lv_occ_pct, lv_free.",
+    "",
+    "    lv_free = gs_flight-seatsmax - gs_flight-seatsocc.",
+    "    IF lv_free < 0.",
+    "      lv_free = 0.",
+    "    ENDIF.",
+    "",
+    "    IF gs_flight-seatsmax > 0.",
+    "      lv_occ_pct = gs_flight-seatsocc * 100 / gs_flight-seatsmax.",
+    "    ELSE.",
+    "      lv_occ_pct = 0.",
+    "    ENDIF.",
+    "",
+    "    gs_flight-free_seats = lv_free.",
+    "    gs_flight-occ_pct    = lv_occ_pct.",
+    "",
+    "    IF gs_flight-seatsmax = 0 AND gs_flight-seatsocc = 0.",
+    "      gs_flight-status_text = gc_status_empty.",
+    "    ELSEIF gs_flight-seatsocc >= gs_flight-seatsmax.",
+    "      gs_flight-status_text = gc_status_full.",
+    "    ELSEIF gs_flight-occ_pct >= 85.",
+    "      gs_flight-status_text = gc_status_busy.",
+    "    ELSE.",
+    "      gs_flight-status_text = gc_status_open.",
+    "    ENDIF.",
+    "",
+    "    gs_flight-note_text =",
+    "      |Route { gs_flight-cityfrom } -> { gs_flight-cityto }, occ={ gs_flight-occ_pct }%|.",
+    "",
+    "    MODIFY gt_flights FROM gs_flight.",
+    "  ENDLOOP.",
+    "",
+    "  APPEND |[ENRICH] Occupancy and status calculated| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Ví dụ SELECT SINGLE",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_select_single_examples.",
+    "  DATA:",
+    "    lv_cityfrom TYPE spfli-cityfrom, \"Thành phố đi lấy từ SPFLI",
+    "    lv_cityto   TYPE spfli-cityto,   \"Thành phố đến lấy từ SPFLI",
+    "    lv_carrname TYPE scarr-carrname. \"Tên hãng bay lấy từ SCARR",
+    "",
+    "  SELECT SINGLE cityfrom, cityto",
+    "    FROM spfli",
+    "    INTO (@lv_cityfrom, @lv_cityto)",
+    "    WHERE carrid = @p_carrid",
+    "      AND connid = @p_connid.",
+    "",
+    "  IF sy-subrc = 0.",
+    "    APPEND |[SELECT SINGLE] Route { lv_cityfrom } -> { lv_cityto }| TO gt_log.",
+    "  ELSE.",
+    "    APPEND |[SELECT SINGLE] No SPFLI row found| TO gt_log.",
+    "  ENDIF.",
+    "",
+    "  SELECT SINGLE carrname",
+    "    FROM scarr",
+    "    INTO @lv_carrname",
+    "    WHERE carrid = @p_carrid.",
+    "",
+    "  IF sy-subrc = 0.",
+    "    APPEND |[SELECT SINGLE] Airline name = { lv_carrname }| TO gt_log.",
+    "  ENDIF.",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Ví dụ READ TABLE",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_read_examples.",
+    "  DATA:",
+    "    ls_found TYPE ty_flight, \"Dòng flight tìm được từ bảng nội bộ",
+    "    lv_index TYPE sy-tabix.  \"Chỉ số dòng đọc được trong internal table",
+    "",
+    "  CLEAR: ls_found, lv_index.",
+    "  gv_found = gc_false.",
+    "",
+    "  READ TABLE gt_flights INTO ls_found",
+    "    WITH KEY carrid = p_carrid",
+    "             connid = p_connid.",
+    "  IF sy-subrc = 0.",
+    "    gv_found = gc_true.",
+    "    APPEND |[READ] Found by key INTO: { ls_found-carrid }/{ ls_found-connid }| TO gt_log.",
+    "  ELSE.",
+    "    APPEND |[READ] Not found by key INTO| TO gt_log.",
+    "  ENDIF.",
+    "",
+    "  READ TABLE gt_flights ASSIGNING <fs_flight>",
+    "    WITH KEY carrid = p_carrid",
+    "             connid = p_connid.",
+    "  IF sy-subrc = 0 AND <fs_flight> IS ASSIGNED.",
+    "    <fs_flight>-note_text = |Updated via field-symbol|.",
+    "    APPEND |[READ] Found by key ASSIGNING| TO gt_log.",
+    "  ENDIF.",
+    "",
+    "  READ TABLE gt_flights INTO ls_found INDEX 1.",
+    "  IF sy-subrc = 0.",
+    "    lv_index = sy-tabix.",
+    "    APPEND |[READ] Row 1 exists at sy-tabix={ lv_index }| TO gt_log.",
+    "  ENDIF.",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Ví dụ LOOP AT",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_loop_examples.",
+    "  DATA:",
+    "    lv_counter TYPE i VALUE 0. \"Bộ đếm số lần lặp qua bảng flight",
+    "",
+    "  LOOP AT gt_flights INTO gs_flight.",
+    "    lv_counter = lv_counter + 1.",
+    "",
+    "    IF p_dbg = gc_true.",
+    "      WRITE: / '[DBG-LOOP-INTO]', lv_counter, gs_flight-carrid, gs_flight-connid.",
+    "    ENDIF.",
+    "  ENDLOOP.",
+    "",
+    "  LOOP AT gt_flights ASSIGNING <fs_flight>.",
+    "    IF <fs_flight>-free_seats = 0.",
+    "      <fs_flight>-note_text = |No free seat left|.",
+    "    ENDIF.",
+    "  ENDLOOP.",
+    "",
+    "  LOOP AT gt_flights INTO gs_flight",
+    "    WHERE carrid = p_carrid",
+    "      AND connid = p_connid.",
+    "    gv_depth = gv_depth + 1.",
+    "  ENDLOOP.",
+    "",
+    "  APPEND |[LOOP] Different LOOP variants executed| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Ví dụ COLLECT",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_collect_examples.",
+    "  DATA:",
+    "    lt_city_stat TYPE STANDARD TABLE OF ty_city_stat WITH DEFAULT KEY, \"Bảng thống kê theo cityfrom",
+    "    ls_city_stat TYPE ty_city_stat.                                     \"Dòng thống kê theo cityfrom",
+    "",
+    "  LOOP AT gt_flights INTO gs_flight.",
+    "    CLEAR ls_city_stat.",
+    "    ls_city_stat-cityfrom = gs_flight-cityfrom.",
+    "    ls_city_stat-flights  = 1.",
+    "    COLLECT ls_city_stat INTO lt_city_stat.",
+    "  ENDLOOP.",
+    "",
+    "  APPEND |[COLLECT] Aggregation by departure city executed| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Ví dụ MOVE-CORRESPONDING",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_move_corresponding_examples.",
+    "  DATA:",
+    "    ls_src TYPE ty_flight,       \"Nguồn dữ liệu đầy đủ",
+    "    ls_dst TYPE ty_light_flight. \"Đích dữ liệu rút gọn",
+    "",
+    "  READ TABLE gt_flights INTO ls_src INDEX 1.",
+    "  IF sy-subrc = 0.",
+    "    MOVE-CORRESPONDING ls_src TO ls_dst.",
+    "    APPEND |[MOVE-CORRESPONDING] First row mapped to light structure| TO gt_log.",
+    "  ENDIF.",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Ví dụ xử lý chuỗi",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_string_examples.",
+    "  DATA:",
+    "    lv_route_text TYPE string, \"Chuỗi mô tả tuyến bay",
+    "    lv_upper_text TYPE string, \"Chuỗi tuyến bay sau khi đổi sang chữ hoa",
+    "    lv_token1     TYPE string, \"Phần chuỗi thứ nhất sau khi tách",
+    "    lv_token2     TYPE string. \"Phần chuỗi thứ hai sau khi tách",
+    "",
+    "  READ TABLE gt_flights INTO gs_flight INDEX 1.",
+    "  IF sy-subrc <> 0.",
+    "    RETURN.",
+    "  ENDIF.",
+    "",
+    "  CONCATENATE gs_flight-cityfrom gs_flight-cityto INTO lv_route_text SEPARATED BY '-'.",
+    "  lv_upper_text = lv_route_text.",
+    "",
+    "  TRANSLATE lv_upper_text TO UPPER CASE.",
+    "  CONDENSE lv_upper_text.",
+    "",
+    "  SPLIT lv_route_text AT '-' INTO lv_token1 lv_token2.",
+    "",
+    "  APPEND |[STRING] route={ lv_route_text }, upper={ lv_upper_text }| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Ví dụ MODIFY",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_modify_examples.",
+    "  DATA:",
+    "    ls_local TYPE ty_flight, \"Dòng flight local để sửa dữ liệu",
+    "    lv_idx   TYPE sy-tabix.  \"Chỉ số dòng hiện tại",
+    "",
+    "  lv_idx = 0.",
+    "",
+    "  LOOP AT gt_flights INTO ls_local.",
+    "    lv_idx = sy-tabix.",
+    "",
+    "    IF ls_local-status_text = gc_status_open.",
+    "      ls_local-note_text = |Open flight reviewed|.",
+    "      MODIFY gt_flights FROM ls_local INDEX lv_idx.",
+    "    ENDIF.",
+    "  ENDLOOP.",
+    "",
+    "  LOOP AT gt_flights INTO ls_local.",
+    "    IF ls_local-free_seats > 0 AND ls_local-free_seats < 5.",
+    "      ls_local-status_text = 'LAST SEATS'.",
+    "      ls_local-note_text   = 'Very few seats left'.",
+    "",
+    "      MODIFY gt_flights FROM ls_local TRANSPORTING status_text note_text",
+    "        WHERE carrid = ls_local-carrid",
+    "          AND connid = ls_local-connid",
+    "          AND fldate = ls_local-fldate.",
+    "    ENDIF.",
+    "  ENDLOOP.",
+    "",
+    "  APPEND |[MODIFY] Internal table rows changed| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Ví dụ DELETE / SORT / DESCRIBE TABLE",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_delete_sort_examples.",
+    "  DELETE gt_flights WHERE carrid IS INITIAL.",
+    "  DELETE gt_flights WHERE seatsmax < seatsocc.",
+    "",
+    "  SORT gt_flights BY carrid connid fldate cityfrom cityto.",
+    "",
+    "  DESCRIBE TABLE gt_flights LINES gv_rows.",
+    "",
+    "  APPEND |[DELETE/SORT] Rows after cleanup={ gv_rows }| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Ví dụ ASSIGN / ASSIGN COMPONENT",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_dynamic_examples.",
+    "  DATA:",
+    "    ls_dyn      TYPE ty_flight, \"Dòng flight tạm dùng trong xử lý dynamic",
+    "    lv_compname TYPE string.    \"Tên component dùng trong ASSIGN COMPONENT",
+    "",
+    "  READ TABLE gt_flights INTO ls_dyn INDEX 1.",
+    "  IF sy-subrc <> 0.",
+    "    APPEND |[DYNAMIC] No first row available| TO gt_log.",
+    "    RETURN.",
+    "  ENDIF.",
+    "",
+    "  ASSIGN ls_dyn TO <fs_any>.",
+    "  IF <fs_any> IS ASSIGNED.",
+    "    APPEND |[DYNAMIC] Generic structure assigned| TO gt_log.",
+    "  ENDIF.",
+    "",
+    "  lv_compname = 'CITYFROM'.",
+    "  ASSIGN COMPONENT lv_compname OF STRUCTURE ls_dyn TO <fs_comp>.",
+    "  IF sy-subrc = 0 AND <fs_comp> IS ASSIGNED.",
+    "    APPEND |[DYNAMIC] Component { lv_compname } = { <fs_comp> }| TO gt_log.",
+    "  ENDIF.",
+    "",
+    "  lv_compname = 'STATUS_TEXT'.",
+    "  ASSIGN COMPONENT lv_compname OF STRUCTURE ls_dyn TO <fs_comp>.",
+    "  IF sy-subrc = 0 AND <fs_comp> IS ASSIGNED.",
+    "    <fs_comp> = 'DYNAMIC-UPDATED'.",
+    "    APPEND |[DYNAMIC] Component STATUS_TEXT updated dynamically| TO gt_log.",
+    "  ENDIF.",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Ví dụ data reference",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_reference_examples.",
+    "  DATA:",
+    "    ls_ref_row TYPE ty_flight. \"Dòng tạm để lấy reference kiểu ty_flight",
+    "",
+    "  CREATE DATA lr_data LIKE gt_flights.",
+    "  ASSIGN lr_data->* TO <fs_any>.",
+    "  IF <fs_any> IS ASSIGNED.",
+    "    APPEND |[REF] Anonymous object for table created| TO gt_log.",
+    "  ENDIF.",
+    "",
+    "  READ TABLE gt_flights INTO ls_ref_row INDEX 1.",
+    "  IF sy-subrc = 0.",
+    "    GET REFERENCE OF ls_ref_row INTO lr_line.",
+    "    IF lr_line IS BOUND.",
+    "      lr_line->note_text = |Changed through data reference|.",
+    "      APPEND |[REF] Typed reference to local row obtained| TO gt_log.",
+    "    ENDIF.",
+    "  ENDIF.",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Ví dụ CASE / DO / WHILE / CHECK / CONTINUE / EXIT",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_case_do_while_examples.",
+    "  DATA:",
+    "    lv_do    TYPE i VALUE 0, \"Biến đếm cho vòng DO",
+    "    lv_while TYPE i VALUE 1, \"Biến đếm cho vòng WHILE",
+    "    lv_text  TYPE string.    \"Chuỗi mô tả trạng thái vòng lặp",
+    "",
+    "  DO 5 TIMES.",
+    "    lv_do = lv_do + 1.",
+    "",
+    "    CASE lv_do.",
+    "      WHEN 1.",
+    "        lv_text = 'First iteration'.",
+    "      WHEN 2 OR 3.",
+    "        lv_text = 'Middle iteration'.",
+    "      WHEN 4.",
+    "        CONTINUE.",
+    "      WHEN OTHERS.",
+    "        lv_text = 'Last iteration'.",
+    "    ENDCASE.",
+    "",
+    "    IF p_dbg = gc_true.",
+    "      WRITE: / '[DBG-DO]', lv_do, lv_text.",
+    "    ENDIF.",
+    "  ENDDO.",
+    "",
+    "  WHILE lv_while <= 3.",
+    "    lv_while = lv_while + 1.",
+    "    IF p_dbg = gc_true.",
+    "      WRITE: / '[DBG-WHILE]', lv_while.",
+    "    ENDIF.",
+    "  ENDWHILE.",
+    "",
+    "  LOOP AT gt_flights INTO gs_flight.",
+    "    CHECK gs_flight-carrid = p_carrid.",
+    "",
+    "    IF gs_flight-status_text = gc_status_full.",
+    "      CONTINUE.",
+    "    ENDIF.",
+    "",
+    "    IF gs_flight-free_seats > 300.",
+    "      EXIT.",
+    "    ENDIF.",
+    "  ENDLOOP.",
+    "",
+    "  APPEND |[FLOW] Control flow examples executed| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Ví dụ CALL FUNCTION",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_call_function_examples.",
+    "  DATA:",
+    "    lv_day TYPE i. \"Số thứ trong tuần trả về từ function module",
+    "",
+    "  CALL FUNCTION 'DATE_COMPUTE_DAY'",
+    "    EXPORTING",
+    "      date = sy-datum",
+    "    IMPORTING",
+    "      day  = lv_day",
+    "    EXCEPTIONS",
+    "      OTHERS = 1.",
+    "",
+    "  IF sy-subrc <> 0.",
+    "    gv_weekday_text = 'Unknown day'.",
+    "    APPEND |[FUNC] DATE_COMPUTE_DAY failed| TO gt_log.",
+    "    RETURN.",
+    "  ENDIF.",
+    "",
+    "  CASE lv_day.",
+    "    WHEN 1.",
+    "      gv_weekday_text = 'Monday'.",
+    "    WHEN 2.",
+    "      gv_weekday_text = 'Tuesday'.",
+    "    WHEN 3.",
+    "      gv_weekday_text = 'Wednesday'.",
+    "    WHEN 4.",
+    "      gv_weekday_text = 'Thursday'.",
+    "    WHEN 5.",
+    "      gv_weekday_text = 'Friday'.",
+    "    WHEN 6.",
+    "      gv_weekday_text = 'Saturday'.",
+    "    WHEN 7.",
+    "      gv_weekday_text = 'Sunday'.",
+    "    WHEN OTHERS.",
+    "      gv_weekday_text = 'Unknown'.",
+    "  ENDCASE.",
+    "",
+    "  APPEND |[FUNC] Weekday determined: { gv_weekday_text }| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Chuỗi PERFORM lồng sâu để test tracer / provenance",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_deep_chain_entry USING    iv_carrid TYPE sflight-carrid  \"Mã hãng bay đầu vào cho chuỗi xử lý sâu",
+    "                                  iv_connid TYPE sflight-connid  \"Mã connection đầu vào cho chuỗi xử lý sâu",
+    "                         CHANGING cv_message TYPE string.         \"Thông điệp trả về sau khi xử lý chuỗi sâu",
+    "",
+    "  DATA:",
+    "    lv_level      TYPE i VALUE 1, \"Mức độ hiện tại của chuỗi PERFORM",
+    "    lv_found      TYPE abap_bool, \"Cờ báo có tìm thấy dữ liệu trong chuỗi sâu",
+    "    lv_local_text TYPE string.    \"Thông điệp cục bộ để truyền qua các tầng",
+    "",
+    "  gv_depth = 0.",
+    "  lv_found = abap_false.",
+    "  lv_local_text = |Deep entry for { iv_carrid }/{ iv_connid }|.",
+    "",
+    "  APPEND |[DEEP-01] Enter frm_deep_chain_entry| TO gt_log.",
+    "",
+    "  PERFORM frm_deep_chain_lvl01",
+    "    USING    iv_carrid",
+    "             iv_connid",
+    "             lv_level",
+    "    CHANGING lv_found",
+    "             lv_local_text.",
+    "",
+    "  IF lv_found = abap_true.",
+    "    cv_message = |Deep chain success: { lv_local_text }|.",
+    "  ELSE.",
+    "    cv_message = |Deep chain completed without exact hit: { lv_local_text }|.",
+    "  ENDIF.",
+    "",
+    "  APPEND |[DEEP-01] Leave frm_deep_chain_entry| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "FORM frm_deep_chain_lvl01 USING    iv_carrid TYPE sflight-carrid  \"Mã hãng bay truyền xuống tầng 1",
+    "                                  iv_connid TYPE sflight-connid  \"Mã connection truyền xuống tầng 1",
+    "                                  iv_level  TYPE i               \"Mức hiện tại của chain",
+    "                         CHANGING cv_found  TYPE abap_bool       \"Cờ tìm thấy dữ liệu",
+    "                                  cv_text   TYPE string.         \"Thông điệp truyền qua các tầng",
+    "",
+    "  DATA:",
+    "    lv_next_level TYPE i, \"Mức kế tiếp của chain",
+    "    lv_rows       TYPE i. \"Số dòng hiện có trong bảng kết quả",
+    "",
+    "  gv_depth = iv_level.",
+    "  lv_next_level = iv_level + 1.",
+    "",
+    "  DESCRIBE TABLE gt_flights LINES lv_rows.",
+    "  cv_text = |L1 rows={ lv_rows }|.",
+    "",
+    "  APPEND |[DEEP-02] Level 1 entered| TO gt_log.",
+    "",
+    "  PERFORM frm_deep_chain_lvl02",
+    "    USING    iv_carrid",
+    "             iv_connid",
+    "             lv_next_level",
+    "             lv_rows",
+    "    CHANGING cv_found",
+    "             cv_text.",
+    "",
+    "  APPEND |[DEEP-02] Level 1 finished| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "FORM frm_deep_chain_lvl02 USING    iv_carrid TYPE sflight-carrid  \"Mã hãng bay truyền xuống tầng 2",
+    "                                  iv_connid TYPE sflight-connid  \"Mã connection truyền xuống tầng 2",
+    "                                  iv_level  TYPE i               \"Mức hiện tại của chain",
+    "                                  iv_rows   TYPE i               \"Số dòng hiện có ở thời điểm gọi",
+    "                         CHANGING cv_found  TYPE abap_bool       \"Cờ tìm thấy dữ liệu",
+    "                                  cv_text   TYPE string.         \"Thông điệp truyền qua các tầng",
+    "",
+    "  DATA:",
+    "    ls_found TYPE ty_flight, \"Dòng flight tìm được ở tầng 2",
+    "    lv_next  TYPE i.         \"Mức kế tiếp của chain",
+    "",
+    "  gv_depth = iv_level.",
+    "  lv_next = iv_level + 1.",
+    "",
+    "  CLEAR ls_found.",
+    "",
+    "  READ TABLE gt_flights INTO ls_found",
+    "    WITH KEY carrid = iv_carrid",
+    "             connid = iv_connid.",
+    "",
+    "  IF sy-subrc = 0.",
+    "    cv_found = abap_true.",
+    "    cv_text = |L2 hit { ls_found-carrid }/{ ls_found-connid }|.",
+    "  ELSE.",
+    "    cv_text = |L2 no-hit rows={ iv_rows }|.",
+    "  ENDIF.",
+    "",
+    "  APPEND |[DEEP-03] Level 2 read executed| TO gt_log.",
+    "",
+    "  PERFORM frm_deep_chain_lvl03",
+    "    USING    iv_carrid",
+    "             iv_connid",
+    "             lv_next",
+    "             ls_found",
+    "    CHANGING cv_found",
+    "             cv_text.",
+    "",
+    "  APPEND |[DEEP-03] Level 2 finished| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "FORM frm_deep_chain_lvl03 USING    iv_carrid TYPE sflight-carrid  \"Mã hãng bay truyền xuống tầng 3",
+    "                                  iv_connid TYPE sflight-connid  \"Mã connection truyền xuống tầng 3",
+    "                                  iv_level  TYPE i               \"Mức hiện tại của chain",
+    "                                  is_found  TYPE ty_flight       \"Dòng tìm được từ tầng trước",
+    "                         CHANGING cv_found  TYPE abap_bool       \"Cờ tìm thấy dữ liệu",
+    "                                  cv_text   TYPE string.         \"Thông điệp truyền qua các tầng",
+    "",
+    "  DATA:",
+    "    lv_next      TYPE i,                      \"Mức kế tiếp của chain",
+    "    lv_occ_local TYPE p LENGTH 5 DECIMALS 2, \"Occupancy cục bộ",
+    "    lv_free      TYPE i.                     \"Số ghế trống cục bộ",
+    "",
+    "  gv_depth = iv_level.",
+    "  lv_next = iv_level + 1.",
+    "",
+    "  IF is_found-seatsmax > 0.",
+    "    lv_occ_local = is_found-seatsocc * 100 / is_found-seatsmax.",
+    "  ELSE.",
+    "    lv_occ_local = 0.",
+    "  ENDIF.",
+    "",
+    "  lv_free = is_found-seatsmax - is_found-seatsocc.",
+    "  IF lv_free < 0.",
+    "    lv_free = 0.",
+    "  ENDIF.",
+    "",
+    "  IF cv_found = abap_true.",
+    "    cv_text = |L3 occ={ lv_occ_local } free={ lv_free }|.",
+    "  ELSE.",
+    "    cv_text = |L3 skipped metrics|.",
+    "  ENDIF.",
+    "",
+    "  APPEND |[DEEP-04] Level 3 metrics computed| TO gt_log.",
+    "",
+    "  PERFORM frm_deep_chain_lvl04",
+    "    USING    iv_carrid",
+    "             iv_connid",
+    "             lv_next",
+    "             lv_occ_local",
+    "             lv_free",
+    "    CHANGING cv_found",
+    "             cv_text.",
+    "",
+    "  APPEND |[DEEP-04] Level 3 finished| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "FORM frm_deep_chain_lvl04 USING    iv_carrid   TYPE sflight-carrid  \"Mã hãng bay truyền xuống tầng 4",
+    "                                  iv_connid   TYPE sflight-connid  \"Mã connection truyền xuống tầng 4",
+    "                                  iv_level    TYPE i               \"Mức hiện tại của chain",
+    "                                  iv_occ_pct  TYPE p               \"Occupancy truyền từ tầng 3",
+    "                                  iv_free     TYPE i               \"Số ghế trống truyền từ tầng 3",
+    "                         CHANGING cv_found    TYPE abap_bool       \"Cờ tìm thấy dữ liệu",
+    "                                  cv_text     TYPE string.         \"Thông điệp truyền qua các tầng",
+    "",
+    "  DATA:",
+    "    lv_next       TYPE i,      \"Mức kế tiếp của chain",
+    "    lv_status     TYPE string, \"Trạng thái cục bộ tính từ occupancy",
+    "    lv_match_text TYPE string. \"Chuỗi mô tả kết quả so khớp",
+    "",
+    "  gv_depth = iv_level.",
+    "  lv_next = iv_level + 1.",
+    "",
+    "  IF iv_occ_pct >= 100.",
+    "    lv_status = gc_status_full.",
+    "  ELSEIF iv_occ_pct >= 85.",
+    "    lv_status = gc_status_busy.",
+    "  ELSEIF iv_occ_pct IS INITIAL.",
+    "    lv_status = gc_status_empty.",
+    "  ELSE.",
+    "    lv_status = gc_status_open.",
+    "  ENDIF.",
+    "",
+    "  IF cv_found = abap_true.",
+    "    lv_match_text = |matched { iv_carrid }/{ iv_connid }|.",
+    "  ELSE.",
+    "    lv_match_text = |not-matched { iv_carrid }/{ iv_connid }|.",
+    "  ENDIF.",
+    "",
+    "  cv_text = |L4 status={ lv_status }, free={ iv_free }, { lv_match_text }|.",
+    "",
+    "  APPEND |[DEEP-05] Level 4 status built| TO gt_log.",
+    "",
+    "  PERFORM frm_deep_chain_lvl05",
+    "    USING    iv_level",
+    "             lv_next",
+    "             lv_status",
+    "    CHANGING cv_found",
+    "             cv_text.",
+    "",
+    "  APPEND |[DEEP-05] Level 4 finished| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "FORM frm_deep_chain_lvl05 USING    iv_level      TYPE i        \"Mức hiện tại trước khi vào tầng 5",
+    "                                  iv_next_level TYPE i        \"Mức kế tiếp của chain",
+    "                                  iv_status     TYPE string   \"Trạng thái truyền từ tầng 4",
+    "                         CHANGING cv_found      TYPE abap_bool \"Cờ tìm thấy dữ liệu",
+    "                                  cv_text       TYPE string.  \"Thông điệp truyền qua các tầng",
+    "",
+    "  DATA:",
+    "    lv_local_count TYPE i,         \"Số dòng đếm được trong vòng LOOP ở tầng 5",
+    "    lv_has_busy    TYPE abap_bool. \"Cờ báo có dòng BUSY",
+    "",
+    "  gv_depth = iv_next_level.",
+    "  lv_local_count = 0.",
+    "  lv_has_busy = abap_false.",
+    "",
+    "  LOOP AT gt_flights INTO gs_flight.",
+    "    lv_local_count = lv_local_count + 1.",
+    "",
+    "    IF gs_flight-status_text = gc_status_busy.",
+    "      lv_has_busy = abap_true.",
+    "    ENDIF.",
+    "  ENDLOOP.",
+    "",
+    "  IF lv_has_busy = abap_true.",
+    "    cv_text = |L5 rows={ lv_local_count }, busy-exists, status-in={ iv_status }|.",
+    "  ELSE.",
+    "    cv_text = |L5 rows={ lv_local_count }, no-busy, status-in={ iv_status }|.",
+    "  ENDIF.",
+    "",
+    "  APPEND |[DEEP-06] Level 5 loop analyzed| TO gt_log.",
+    "",
+    "  PERFORM frm_deep_chain_lvl06",
+    "    USING    iv_next_level",
+    "             lv_local_count",
+    "    CHANGING cv_found",
+    "             cv_text.",
+    "",
+    "  APPEND |[DEEP-06] Level 5 finished| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "FORM frm_deep_chain_lvl06 USING    iv_level TYPE i               \"Mức hiện tại của tầng 6",
+    "                                  iv_count TYPE i               \"Số dòng đếm được từ tầng 5",
+    "                         CHANGING cv_found TYPE abap_bool       \"Cờ tìm thấy dữ liệu",
+    "                                  cv_text  TYPE string.         \"Thông điệp truyền qua các tầng",
+    "",
+    "  DATA:",
+    "    lv_next_level TYPE i,      \"Mức kế tiếp của chain",
+    "    lv_first_city TYPE string. \"Tên thành phố đi của dòng đầu tiên",
+    "",
+    "  gv_depth = iv_level.",
+    "  lv_next_level = iv_level + 1.",
+    "  CLEAR lv_first_city.",
+    "",
+    "  READ TABLE gt_flights ASSIGNING <fs_flight> INDEX 1.",
+    "  IF sy-subrc = 0 AND <fs_flight> IS ASSIGNED.",
+    "    lv_first_city = <fs_flight>-cityfrom.",
+    "  ENDIF.",
+    "",
+    "  cv_text = |L6 count={ iv_count }, first-city={ lv_first_city }|.",
+    "",
+    "  APPEND |[DEEP-07] Level 6 first-row inspected| TO gt_log.",
+    "",
+    "  PERFORM frm_deep_chain_lvl07",
+    "    USING    lv_next_level",
+    "             lv_first_city",
+    "    CHANGING cv_found",
+    "             cv_text.",
+    "",
+    "  APPEND |[DEEP-07] Level 6 finished| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "FORM frm_deep_chain_lvl07 USING    iv_level      TYPE i        \"Mức hiện tại của tầng 7",
+    "                                  iv_first_city TYPE string   \"Thành phố đi của dòng đầu tiên",
+    "                         CHANGING cv_found      TYPE abap_bool \"Cờ tìm thấy dữ liệu",
+    "                                  cv_text       TYPE string.  \"Thông điệp truyền qua các tầng",
+    "",
+    "  DATA:",
+    "    lv_next_level TYPE i,         \"Mức kế tiếp của chain",
+    "    lv_compname   TYPE string,    \"Tên component dùng cho ASSIGN COMPONENT",
+    "    ls_dyn        TYPE ty_flight. \"Dòng tạm dùng trong xử lý động",
+    "",
+    "  gv_depth = iv_level.",
+    "  lv_next_level = iv_level + 1.",
+    "  lv_compname = 'CITYTO'.",
+    "",
+    "  READ TABLE gt_flights INTO ls_dyn INDEX 1.",
+    "  IF sy-subrc = 0.",
+    "    ASSIGN COMPONENT lv_compname OF STRUCTURE ls_dyn TO <fs_comp>.",
+    "    IF sy-subrc = 0 AND <fs_comp> IS ASSIGNED.",
+    "      cv_text = |L7 first { iv_first_city } -> { <fs_comp> }|.",
+    "    ELSE.",
+    "      cv_text = |L7 component not assigned|.",
+    "    ENDIF.",
+    "  ELSE.",
+    "    cv_text = |L7 no first row|.",
+    "  ENDIF.",
+    "",
+    "  APPEND |[DEEP-08] Level 7 dynamic component checked| TO gt_log.",
+    "",
+    "  PERFORM frm_deep_chain_lvl08",
+    "    USING    lv_next_level",
+    "             cv_text",
+    "    CHANGING cv_found",
+    "             cv_text.",
+    "",
+    "  APPEND |[DEEP-08] Level 7 finished| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "FORM frm_deep_chain_lvl08 USING    iv_level TYPE i               \"Mức hiện tại của tầng 8",
+    "                                  iv_text  TYPE string          \"Thông điệp đầu vào của tầng 8",
+    "                         CHANGING cv_found TYPE abap_bool       \"Cờ tìm thấy dữ liệu",
+    "                                  cv_text  TYPE string.         \"Thông điệp truyền qua các tầng",
+    "",
+    "  DATA:",
+    "    lv_day TYPE i,      \"Số thứ trong tuần từ function module",
+    "    lv_tmp TYPE string. \"Chuỗi tạm để ghép log đầu ra",
+    "",
+    "  gv_depth = iv_level.",
+    "  lv_tmp = iv_text.",
+    "",
+    "  CALL FUNCTION 'DATE_COMPUTE_DAY'",
+    "    EXPORTING",
+    "      date = sy-datum",
+    "    IMPORTING",
+    "      day  = lv_day",
+    "    EXCEPTIONS",
+    "      OTHERS = 1.",
+    "",
+    "  IF sy-subrc = 0.",
+    "    cv_text = |L8 day={ lv_day }, prev=[{ lv_tmp }]|.",
+    "  ELSE.",
+    "    cv_text = |L8 FM failed, prev=[{ lv_tmp }]|.",
+    "  ENDIF.",
+    "",
+    "  APPEND |[DEEP-09] Level 8 function call done| TO gt_log.",
+    "",
+    "  PERFORM frm_deep_chain_lvl09",
+    "    USING    iv_level + 1",
+    "             lv_day",
+    "    CHANGING cv_found",
+    "             cv_text.",
+    "",
+    "  APPEND |[DEEP-09] Level 8 finished| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "FORM frm_deep_chain_lvl09 USING    iv_level TYPE i               \"Mức hiện tại của tầng 9",
+    "                                  iv_day   TYPE i               \"Số thứ trong tuần truyền từ tầng 8",
+    "                         CHANGING cv_found TYPE abap_bool       \"Cờ tìm thấy dữ liệu",
+    "                                  cv_text  TYPE string.         \"Thông điệp truyền qua các tầng",
+    "",
+    "  DATA:",
+    "    lv_loop TYPE i,      \"Biến đếm vòng DO ở tầng 9",
+    "    lv_tag  TYPE string. \"Tag mô tả kết quả vòng DO",
+    "",
+    "  gv_depth = iv_level.",
+    "  lv_tag = space.",
+    "  lv_loop = 0.",
+    "",
+    "  DO 3 TIMES.",
+    "    lv_loop = lv_loop + 1.",
+    "",
+    "    CASE lv_loop.",
+    "      WHEN 1.",
+    "        lv_tag = 'FIRST'.",
+    "      WHEN 2.",
+    "        lv_tag = 'SECOND'.",
+    "      WHEN OTHERS.",
+    "        lv_tag = 'LAST'.",
+    "    ENDCASE.",
+    "  ENDDO.",
+    "",
+    "  cv_text = |L9 day={ iv_day }, tag={ lv_tag }|.",
+    "",
+    "  APPEND |[DEEP-10] Level 9 loop/case complete| TO gt_log.",
+    "",
+    "  PERFORM frm_deep_chain_lvl10",
+    "    USING    iv_level + 1",
+    "             lv_tag",
+    "    CHANGING cv_found",
+    "             cv_text.",
+    "",
+    "  APPEND |[DEEP-10] Level 9 finished| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "FORM frm_deep_chain_lvl10 USING    iv_level TYPE i               \"Mức hiện tại của tầng 10",
+    "                                  iv_tag   TYPE string          \"Tag truyền từ tầng 9",
+    "                         CHANGING cv_found TYPE abap_bool       \"Cờ tìm thấy dữ liệu",
+    "                                  cv_text  TYPE string.         \"Thông điệp trả về cuối chain",
+    "",
+    "  DATA:",
+    "    lv_done_text TYPE string. \"Thông điệp kết thúc chuỗi PERFORM",
+    "",
+    "  gv_depth = iv_level.",
+    "",
+    "  IF cv_found = abap_true.",
+    "    lv_done_text = |DONE with hit, tag={ iv_tag }|.",
+    "  ELSE.",
+    "    lv_done_text = |DONE without hit, tag={ iv_tag }|.",
+    "  ENDIF.",
+    "",
+    "  cv_text = |L10 { lv_done_text }|.",
+    "",
+    "  APPEND |[DEEP-11] Level 10 finished chain| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Tính summary",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_build_summary.",
+    "  DATA:",
+    "    lv_total_occ TYPE p LENGTH 9 DECIMALS 2, \"Tổng occupancy để tính average",
+    "    lv_max_occ   TYPE p LENGTH 5 DECIMALS 2, \"Occupancy lớn nhất tìm được",
+    "    lv_route     TYPE string.                \"Chuỗi mô tả tuyến bay đông nhất",
+    "",
+    "  CLEAR:",
+    "    gs_summary,",
+    "    lv_total_occ,",
+    "    lv_max_occ,",
+    "    lv_route.",
+    "",
+    "  LOOP AT gt_flights INTO gs_flight.",
+    "",
+    "    gs_summary-total_count    = gs_summary-total_count + 1.",
+    "    gs_summary-total_seatsmax = gs_summary-total_seatsmax + gs_flight-seatsmax.",
+    "    gs_summary-total_seatsocc = gs_summary-total_seatsocc + gs_flight-seatsocc.",
+    "    lv_total_occ              = lv_total_occ + gs_flight-occ_pct.",
+    "",
+    "    IF gs_flight-status_text = gc_status_full.",
+    "      gs_summary-full_count = gs_summary-full_count + 1.",
+    "    ELSEIF gs_flight-status_text = gc_status_busy.",
+    "      gs_summary-busy_count = gs_summary-busy_count + 1.",
+    "    ELSEIF gs_flight-status_text = gc_status_empty.",
+    "      gs_summary-empty_count = gs_summary-empty_count + 1.",
+    "    ELSE.",
+    "      gs_summary-open_count = gs_summary-open_count + 1.",
+    "    ENDIF.",
+    "",
+    "    IF gs_flight-occ_pct > lv_max_occ.",
+    "      lv_max_occ = gs_flight-occ_pct.",
+    "      lv_route = |{ gs_flight-carrid }/{ gs_flight-connid } { gs_flight-cityfrom }->{ gs_flight-cityto }|.",
+    "    ENDIF.",
+    "",
+    "  ENDLOOP.",
+    "",
+    "  IF gs_summary-total_count > 0.",
+    "    gs_summary-avg_occ_pct = lv_total_occ / gs_summary-total_count.",
+    "  ELSE.",
+    "    gs_summary-avg_occ_pct = 0.",
+    "  ENDIF.",
+    "",
+    "  gs_summary-busiest_route = lv_route.",
+    "  gs_summary-summary_text =",
+    "    |Rows={ gs_summary-total_count }, Full={ gs_summary-full_count }, Busy={ gs_summary-busy_count }, Open={ gs_summary-open_count }, Empty={ gs_summary-empty_count }|.",
+    "",
+    "  APPEND |[SUMMARY] Summary built| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Ví dụ CLEAR / REFRESH / FREE",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_cleanup_examples.",
+    "  DATA:",
+    "    lt_temp TYPE ty_t_flight, \"Bảng tạm để minh họa REFRESH/FREE",
+    "    ls_temp TYPE ty_flight.   \"Dòng tạm để minh họa APPEND/CLEAR",
+    "",
+    "  CLEAR ls_temp.",
+    "  ls_temp-carrid = p_carrid.",
+    "  ls_temp-connid = p_connid.",
+    "  APPEND ls_temp TO lt_temp.",
+    "",
+    "  REFRESH lt_temp.",
+    "  FREE lt_temp.",
+    "",
+    "  APPEND |[CLEANUP] CLEAR/REFRESH/FREE executed| TO gt_log.",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* In report chính",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_output_report.",
+    "",
+    "  ULINE.",
+    "  WRITE: / 'FLIGHT REPORT DEMO - DETAILED'.",
+    "  ULINE.",
+    "",
+    "  WRITE: / 'Airline       :', p_carrid,",
+    "           / 'Connection    :', p_connid,",
+    "           / 'Date range    :', so_date-low, '->', so_date-high,",
+    "           / 'Today         :', sy-datum,",
+    "           / 'Weekday       :', gv_weekday_text,",
+    "           / 'Rows          :', gv_rows,",
+    "           / 'Depth         :', gv_depth,",
+    "           / 'Status        :', gv_message.",
+    "  SKIP.",
+    "",
+    "  IF gv_ok = gc_false.",
+    "    WRITE: / 'No rows selected from database.'.",
+    "    RETURN.",
+    "  ENDIF.",
+    "",
+    "  WRITE: / 'CARR',",
+    "           8  'NAME',",
+    "           30 'CONN',",
+    "           38 'DATE',",
+    "           50 'FROM',",
+    "           63 'TO',",
+    "           76 'MAX',",
+    "           84 'OCC',",
+    "           92 'FREE',",
+    "           100 'OCC%',",
+    "           110 'STATUS',",
+    "           126 'NOTE'.",
+    "  ULINE.",
+    "",
+    "  LOOP AT gt_flights INTO gs_flight.",
+    "    WRITE: / gs_flight-carrid,",
+    "             8   gs_flight-carrname,",
+    "             30  gs_flight-connid,",
+    "             38  gs_flight-fldate,",
+    "             50  gs_flight-cityfrom,",
+    "             63  gs_flight-cityto,",
+    "             76  gs_flight-seatsmax,",
+    "             84  gs_flight-seatsocc,",
+    "             92  gs_flight-free_seats,",
+    "             100 gs_flight-occ_pct,",
+    "             110 gs_flight-status_text,",
+    "             126 gs_flight-note_text.",
+    "  ENDLOOP.",
+    "",
+    "  SKIP.",
+    "  ULINE.",
+    "  WRITE: / 'SUMMARY'.",
+    "  ULINE.",
+    "",
+    "  WRITE: / 'Total rows          :', gs_summary-total_count,",
+    "           / 'Full flights        :', gs_summary-full_count,",
+    "           / 'Busy flights        :', gs_summary-busy_count,",
+    "           / 'Open flights        :', gs_summary-open_count,",
+    "           / 'Empty flights       :', gs_summary-empty_count,",
+    "           / 'Total seats max     :', gs_summary-total_seatsmax,",
+    "           / 'Total seats occupied:', gs_summary-total_seatsocc,",
+    "           / 'Average occupancy   :', gs_summary-avg_occ_pct,",
+    "           / 'Busiest route       :', gs_summary-busiest_route,",
+    "           / 'Summary text        :', gs_summary-summary_text.",
+    "",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* In technical log",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_output_log.",
+    "  DATA:",
+    "    lv_log TYPE string. \"Một dòng log kỹ thuật để in ra màn hình",
+    "",
+    "  SKIP 2.",
+    "  ULINE.",
+    "  WRITE: / 'TECHNICAL LOG'.",
+    "  ULINE.",
+    "",
+    "  LOOP AT gt_log INTO lv_log.",
+    "    WRITE: / lv_log.",
+    "  ENDLOOP.",
+    "",
+    "ENDFORM."
+  ].join("\n");
+
+  function createTemplateBaseStyle(background) {
+    return {
+      background: background || "default",
+      border: "outside-thin",
+      font: "MS PGothic",
+      "font color": "#111111",
+      "font size": 10,
+      "font family": "default",
+      bold: false,
+      italic: false,
+      underline: false,
+      merge: false,
+      align: "left",
+      valign: "top",
+      wrap: false
+    };
+  }
+
+  const TEMPLATE_PREVIEW_DEFAULT_OPTIONS = {
+    hideEmptyRows: true,
+    hideRowsWithoutValues: true,
+    expandMultilineRows: true,
+    squareCells: true,
+    squareCellSize: 18
+  };
+
+  function createGenericStatementTemplate(templateKey) {
+    const keyText = String(templateKey || "").trim();
+    return {
+      _options: { ...TEMPLATE_PREVIEW_DEFAULT_OPTIONS },
+      "A1:G1": createTemplateBaseStyle("#dbeef4"),
+      A1: {
+        text: "Câu lệnh"
+      },
+      "H1:AY1": createTemplateBaseStyle("default"),
+      H1: {
+        text: "{keywords.stmt.text}{objectType}"
+      },
+      "A2:G2": createTemplateBaseStyle("#dbeef4"),
+      A2: {
+        text: "Đối tượng"
+      },
+      "H2:AY2": createTemplateBaseStyle("default"),
+      H2: {
+        text: "{values.name.finalDesc}{values.target.finalDesc}{values.form.finalDesc}{values.itab.finalDesc}{values.itabOrDbtab.finalDesc}"
+      },
+      "A3:G3": createTemplateBaseStyle("#dbeef4"),
+      A3: {
+        text: "Nguồn / Đích"
+      },
+      "H3:AY3": createTemplateBaseStyle("default"),
+      H3: {
+        text: "{values.into.finalDesc}{values.from.finalDesc}{values.index.value}"
+      },
+      "A4:G4": createTemplateBaseStyle("#dbeef4"),
+      A4: {
+        text: "Điều kiện"
+      },
+      "H4:AY4": createTemplateBaseStyle("default"),
+      H4: {
+        text: "{values.condition.finalDesc}{values.where.finalDesc}{values.withKey.finalDesc}{values.withTableKey.finalDesc}"
+      },
+      "A5:G5": createTemplateBaseStyle("#dbeef4"),
+      A5: {
+        text: "Chi tiết"
+      },
+      "H5:AY5": createTemplateBaseStyle("default"),
+      H5: {
+        text: "{extras}"
+      },
+      "A6:G6": createTemplateBaseStyle("#dbeef4"),
+      A6: {
+        text: "Template key"
+      },
+      "H6:AY6": createTemplateBaseStyle("default"),
+      H6: {
+        text: keyText
+      }
+    };
+  }
+
+  const TEMPLATE_DEFAULT_CONFIG_V1 = {
+    version: 1,
+    templates: {
+      DEFAULT: {
+        _options: {
+          hideEmptyRows: true,
+          hideRowsWithoutValues: true,
+          expandMultilineRows: false
+        },
+        "A1:F1": {
+          background: "mau xanh nhat",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A1: {
+          text: "{keywords.stmt.text}"
+        },
+        "G1:W1": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        G1: {
+          text: "{values.name.finalDesc}"
+        }
+      },
+      ASSIGNMENT: {
+        "A1:F1": {
+          background: "mau xanh nhat",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A1: {
+          text: "Đích"
+        },
+        "A2:F2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A2: {
+          text: "{values.target.decl.finalDesc}"
+        },
+        "G1:W1": {
+          background: "mau xanh nhat",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        G1: {
+          text: "Nguồn"
+        },
+        "G2:W2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        G2: {
+          text: "{values.expr.decl.finalDesc}"
+        }
+      },
+      CALL_FUNCTION: {
+        _options: {
+          hideEmptyRows: true,
+          hideRowsWithoutValues: true,
+          expandMultilineRows: true
+        },
+        "A1:H1": createTemplateBaseStyle("#dbeef4"),
+        A1: {
+          text: "Function Module"
+        },
+        "I1:BG1": createTemplateBaseStyle("#ffffff"),
+        I1: {
+          text: "{values.name.finalDesc}"
+        },
+        "A2:H2": createTemplateBaseStyle("#dbeef4"),
+        A2: {
+          text: "Exporting"
+        },
+        "I2:P2": createTemplateBaseStyle("#ffffff"),
+        I2: {
+          text: "{extras.callFunction.exporting.name}"
+        },
+        "Q2:X2": createTemplateBaseStyle("#ffffff"),
+        Q2: {
+          text: "="
+        },
+        "Y2:BG2": createTemplateBaseStyle("#ffffff"),
+        Y2: {
+          text: "{extras.callFunction.exporting.valueDecl.finalDesc}"
+        },
+        "A3:H3": createTemplateBaseStyle("#dbeef4"),
+        A3: {
+          text: "Importing"
+        },
+        "I3:P3": createTemplateBaseStyle("#ffffff"),
+        I3: {
+          text: "{extras.callFunction.importing.name}"
+        },
+        "Q3:X3": createTemplateBaseStyle("#ffffff"),
+        Q3: {
+          text: "="
+        },
+        "Y3:BG3": createTemplateBaseStyle("#ffffff"),
+        Y3: {
+          text: "{extras.callFunction.importing.valueDecl.finalDesc}"
+        },
+        "A4:H4": createTemplateBaseStyle("#dbeef4"),
+        A4: {
+          text: "Tables"
+        },
+        "I4:P4": createTemplateBaseStyle("#ffffff"),
+        I4: {
+          text: "{extras.callFunction.tables.name}"
+        },
+        "Q4:X4": createTemplateBaseStyle("#ffffff"),
+        Q4: {
+          text: "="
+        },
+        "Y4:BG4": createTemplateBaseStyle("#ffffff"),
+        Y4: {
+          text: "{extras.callFunction.tables.valueDecl.finalDesc}"
+        },
+        "A5:H5": createTemplateBaseStyle("#dbeef4"),
+        A5: {
+          text: "Changing"
+        },
+        "I5:P5": createTemplateBaseStyle("#ffffff"),
+        I5: {
+          text: "{extras.callFunction.changing.name}"
+        },
+        "Q5:X5": createTemplateBaseStyle("#ffffff"),
+        Q5: {
+          text: "="
+        },
+        "Y5:BG5": createTemplateBaseStyle("#ffffff"),
+        Y5: {
+          text: "{extras.callFunction.changing.valueDecl.finalDesc}"
+        },
+        "A6:H6": createTemplateBaseStyle("#dbeef4"),
+        A6: {
+          text: "Exceptions"
+        },
+        "I6:P6": createTemplateBaseStyle("#ffffff"),
+        I6: {
+          text: "{extras.callFunction.exceptions.name}"
+        },
+        "Q6:X6": createTemplateBaseStyle("#ffffff"),
+        Q6: {
+          text: "="
+        },
+        "Y6:BG6": createTemplateBaseStyle("#ffffff"),
+        Y6: {
+          text: "{extras.callFunction.exceptions.valueDecl.finalDesc}"
+        }
+      },
+      APPEND: {
+        "A1:G1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A1: {
+          text: "Append"
+        },
+        "H1:Y1": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        H1: {
+          text: "{values.what.decl.finalDesc}"
+        },
+        "Z1:AD1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        Z1: {
+          text: "To"
+        },
+        "AE1:AY1": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        AE1: {
+          text: "{values.to.decl.finalDesc}"
+        },
+        "A2:G2": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A2: {
+          text: "{labels.sortedBy}"
+        },
+        "H2:AB2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        H2: {
+          text: "{extras}"
+        }
+      },
+      READ_TABLE: {
+        _options: {
+          hideEmptyRows: true,
+          hideRowsWithoutValues: true,
+          expandMultilineRows: true
+        },
+        "A1:G1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A1: {
+          text: "ReadTable"
+        },
+        "H1:AB1": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        H1: {
+          text: "{values.itab.decl.finalDesc}"
+        },
+        "A2:G2": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A2: {
+          text: "To"
+        },
+        "H2:AB2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        H2: {
+          text: "{values.into.decl.finalDesc}"
+        },
+        "A3:G3": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A3: {
+          text: "Điều kiện"
+        },
+        "H3:T3": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        H3: {
+          text: "{extras.readTable.conditions.leftOperand}"
+        },
+        "U3:W3": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        U3: {
+          text: "{extras.readTable.conditions.comparisonOperator}"
+        },
+        "X3:AR3": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        X3: {
+          text: "{extras.readTable.conditions.rightOperandDecl.finalDesc}"
+        },
+        "A4:U4": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A4: {
+          text: "{keywords.binary-search.text}"
+        }
+      },
+      MODIFY_ITAB: {
+        _options: {
+          hideEmptyRows: true,
+
+          hideRowsWithoutValues: true,
+          expandMultilineRows: true
+        },
+        "A1:G1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A1: {
+          text: "Modify Table"
+        },
+        "H1:AB1": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        H1: {
+          text: "{values.itab.finalDesc}{values.itabOrDbtab.finalDesc}"
+        },
+        "A2:G2": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A2: {
+          text: "From"
+        },
+        "H2:AB2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        H2: {
+          text: "{values.from.finalDesc}"
+        },
+        "A3:G3": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A3: {
+          text: "Transporting / Index"
+        },
+        "H3:AB3": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        H3: {
+          text: "{extras.modifyItab.transporting}{values.index.value}"
+        },
+        "A4:T4": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A4: {
+          text: "Điều kiện trái"
+        },
+        "U4:W4": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        U4: {
+          text: "Điều kiện"
+        },
+        "X4:AD4": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        X4: {
+          text: "Điều kiện phải"
+        },
+        "AE4:AY4": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        AE4: {
+          text: "Logic connector"
+        },
+        "A5:T5": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A5: {
+          text: "{extras.modifyItab.conditions.leftOperandDecl.finalDesc}"
+        },
+        "U5:W5": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        U5: {
+          text: "{extras.modifyItab.conditions.comparisonOperator}"
+        },
+        "X5:AD5": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        X5: {
+          text: "{extras.modifyItab.conditions.rightOperandDecl.finalDesc}"
+        },
+        "AE5:AY5": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        AE5: {
+          text: "{extras.modifyItab.conditions.logicalConnector}"
+        }
+      },
+      DELETE_ITAB: {
+        _options: {
+          hideEmptyRows: true,
+          hideRowsWithoutValues: true,
+          expandMultilineRows: true
+        },
+        "A1:G1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A1: {
+          text: "Delete Table"
+        },
+        "H1:AB1": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        H1: {
+          text: "{values.target.finalDesc}"
+        },
+        "A2:G2": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A2: {
+          text: "From / Index"
+        },
+        "H2:AB2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        H2: {
+          text: "{values.from.finalDesc}{values.index.value}"
+        },
+        "A3:T3": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A3: {
+          text: "Điều kiện trái"
+        },
+        "U3:W3": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        U3: {
+          text: "Điều kiện"
+        },
+        "X3:AD3": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        X3: {
+          text: "Điều kiện phải"
+        },
+        "AE3:AY3": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        AE3: {
+          text: "Logic connector"
+        },
+        "A4:T4": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A4: {
+          text: "{extras.deleteItab.conditions.leftOperandDecl.finalDesc}"
+        },
+        "U4:W4": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        U4: {
+          text: "{extras.deleteItab.conditions.comparisonOperator}"
+        },
+        "X4:AD4": {
+          background: "#ffffff",
+
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        X4: {
+          text: "{extras.deleteItab.conditions.rightOperandDecl.finalDesc}"
+        },
+        "AE4:AY4": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        AE4: {
+          text: "{extras.deleteItab.conditions.logicalConnector}"
+        }
+      },
+      LOOP_AT_ITAB: {
+        _options: {
+          hideEmptyRows: true,
+          hideRowsWithoutValues: true,
+          expandMultilineRows: true
+        },
+        "A1:X1": createTemplateBaseStyle("#dbeef4"),
+        A1: {
+          text: "Loop At"
+        },
+        "Y1:BA1": createTemplateBaseStyle("#dbeef4"),
+        Y1: {
+          text: "Into"
+        },
+        "BB1:BG1": createTemplateBaseStyle("#dbeef4"),
+        BB1: {
+          text: "Connection"
+        },
+        "A2:H2": createTemplateBaseStyle("#dbeef4"),
+        A2: {
+          text: "Điều kiện"
+        },
+        "I2:V2": createTemplateBaseStyle("#ffffff"),
+        I2: {
+          text: "{extras.loopAtItab.conditions.leftOperandDecl.finalDesc}"
+        },
+        "W2:X2": createTemplateBaseStyle("#dbeef4"),
+        W2: {
+          text: "{extras.loopAtItab.conditions.comparisonOperator}"
+        },
+        "Y2:BA2": createTemplateBaseStyle("#ffffff"),
+        Y2: {
+          text: "{extras.loopAtItab.conditions.rightOperandDecl.finalDesc}"
+        },
+        "BB2:BG2": createTemplateBaseStyle("#ffffff"),
+        BB2: {
+          text: "{extras.loopAtItab.conditions.logicalConnector}"
+        }
+      },
+      IF: {
+        _options: {
+          hideEmptyRows: true,
+          hideRowsWithoutValues: true,
+          expandMultilineRows: true
+        },
+        "A1:T1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A1: {
+          text: "Điều kiện trái"
+        },
+        "U1:W1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        U1: {
+          text: "Điều kiện"
+        },
+        "X1:AD1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        X1: {
+          text: "Điều kiện phải"
+        },
+        "AE1:AY1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        AE1: {
+          text: "Logic connector"
+        },
+        "A2:T2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A2: {
+          text: "{extras.ifCondition.conditions.leftOperandDecl.finalDesc}"
+        },
+        "U2:W2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        U2: {
+          text: "{extras.ifCondition.conditions.comparisonOperator}"
+        },
+        "X2:AD2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        X2: {
+          text: "{extras.ifCondition.conditions.rightOperandDecl.finalDesc}"
+        },
+        "AE2:AY2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        AE2: {
+          text: "{extras.ifCondition.conditions.logicalConnector}"
+        }
+      },
+      ELSEIF: {
+        _options: {
+          hideEmptyRows: true,
+          hideRowsWithoutValues: true,
+          expandMultilineRows: true
+        },
+        "A1:T1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A1: {
+          text: "Điều kiện trái"
+        },
+        "U1:W1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        U1: {
+          text: "Điều kiện"
+        },
+        "X1:AD1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        X1: {
+          text: "Điều kiện phải"
+        },
+        "AE1:AY1": {
+          background: "#dbeef4",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        AE1: {
+          text: "Logic connector"
+        },
+        "A2:T2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        A2: {
+          text: "{extras.ifCondition.conditions.leftOperandDecl.finalDesc}"
+        },
+        "U2:W2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        U2: {
+          text: "{extras.ifCondition.conditions.comparisonOperator}"
+        },
+        "X2:AD2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        X2: {
+          text: "{extras.ifCondition.conditions.rightOperandDecl.finalDesc}"
+        },
+        "AE2:AY2": {
+          background: "#ffffff",
+          border: "outside-thin",
+          font: "MS PGothic",
+          "font color": "#111111",
+          "font size": 10,
+          "font family": "default",
+          bold: false,
+          italic: false,
+          underline: false,
+          merge: false,
+          align: "left",
+          valign: "top",
+          wrap: false
+        },
+        AE2: {
+          text: "{extras.ifCondition.conditions.logicalConnector}"
+        }
+      },
+      PERFORM: {
+        _options: {
+          hideEmptyRows: true,
+          hideRowsWithoutValues: true,
+          expandMultilineRows: true
+        },
+        "J1:X1": createTemplateBaseStyle("#dbeef4"),
+        J1: {
+          text: "ID"
+        },
+        "Y1:BG1": createTemplateBaseStyle("#dbeef4"),
+        Y1: {
+          text: "Text"
+        },
+        "A2:I2": createTemplateBaseStyle("#dbeef4"),
+        A2: {
+          text: "Subroutine"
+        },
+        "J2:X2": createTemplateBaseStyle("#ffffff"),
+        J2: {
+          text: "{values.form.decl.name}"
+        },
+        "Y2:BG2": createTemplateBaseStyle("#ffffff"),
+        Y2: {
+          text: "{values.form.finalDesc}"
+        },
+        "A3:I3": createTemplateBaseStyle("#dbeef4"),
+        A3: {
+          text: "Using"
+        },
+        "J3:X3": createTemplateBaseStyle("#ffffff"),
+        J3: {
+          text: "{extras.performCall.using.valueDecl.name}"
+        },
+        "Y3:BG3": createTemplateBaseStyle("#ffffff"),
+        Y3: {
+          text: "{extras.performCall.using.valueDecl.finalDesc}"
+        },
+        "A4:I4": createTemplateBaseStyle("#dbeef4"),
+        A4: {
+          text: "Changing"
+        },
+        "J4:X4": createTemplateBaseStyle("#ffffff"),
+        J4: {
+          text: "{extras.performCall.changing.valueDecl.name}"
+        },
+        "Y4:BG4": createTemplateBaseStyle("#ffffff"),
+        Y4: {
+          text: "{extras.performCall.changing.valueDecl.finalDesc}"
+        },
+        "A5:I5": createTemplateBaseStyle("#dbeef4"),
+        A5: {
+          text: "Tables"
+        },
+        "J5:X5": createTemplateBaseStyle("#ffffff"),
+        J5: {
+          text: "{extras.performCall.tables.valueDecl.name}"
+        },
+        "Y5:BG5": createTemplateBaseStyle("#ffffff"),
+        Y5: {
+          text: "{extras.performCall.tables.valueDecl.finalDesc}"
+        },
+        "A6:I6": createTemplateBaseStyle("#dbeef4"),
+        A6: {
+          text: "Raising"
+        },
+        "J6:X6": createTemplateBaseStyle("#ffffff"),
+
+        J6: {
+          text: "{extras.performCall.raising.name}"
+        },
+        "Y6:BG6": createTemplateBaseStyle("#ffffff"),
+        Y6: {
+          text: "{extras.performCall.raising.valueDecl.finalDesc}"
+        },
+        "A7:I7": createTemplateBaseStyle("#dbeef4"),
+        A7: {
+          text: "In Program"
+        },
+        "J7:X7": createTemplateBaseStyle("#ffffff"),
+        J7: {
+          text: "{values.program.decl.name}"
+        },
+        "Y7:BG7": createTemplateBaseStyle("#ffffff"),
+        Y7: {
+          text: "{values.program.finalDesc}"
+        }
+      },
+      MESSAGE: {
+        _options: {
+          hideEmptyRows: true,
+          hideRowsWithoutValues: true,
+          expandMultilineRows: true
+        },
+        "A1:I1": createTemplateBaseStyle("#dbeef4"),
+        A1: {
+          text: "Message Class"
+        },
+        "J1:V1": createTemplateBaseStyle("#ffffff"),
+        J1: {
+          text: "{values.messageClass.finalDesc}"
+        },
+        "W1:AB1": createTemplateBaseStyle("#dbeef4"),
+        W1: {
+          text: "Message Number"
+        },
+        "AC1:AJ1": createTemplateBaseStyle("#ffffff"),
+        AC1: {
+          text: "{values.messageNumber.finalDesc}"
+        },
+        "AK1:AQ1": createTemplateBaseStyle("#dbeef4"),
+        AK1: {
+          text: "Message Type"
+        },
+        "AR1:AX1": createTemplateBaseStyle("#ffffff"),
+        AR1: {
+          text: "{values.messageType.finalDesc}"
+        },
+        "AY1:BG1": createTemplateBaseStyle("#dbeef4"),
+        AY1: {
+          text: "Display Like"
+        },
+        "BH1:BZ1": createTemplateBaseStyle("#ffffff"),
+        BH1: {
+          text: "{values.displayLike.finalDesc}"
+        },
+        "A2:I2": createTemplateBaseStyle("#dbeef4"),
+        A2: {
+          text: "Message Text &1"
+        },
+        "J2:BZ2": createTemplateBaseStyle("#ffffff"),
+        J2: {
+          text: "{values.messageText1.finalDesc}"
+        },
+        "A3:I3": createTemplateBaseStyle("#dbeef4"),
+        A3: {
+          text: "Message Text &2"
+        },
+        "J3:BZ3": createTemplateBaseStyle("#ffffff"),
+        J3: {
+          text: "{values.messageText2.finalDesc}"
+        },
+        "A4:I4": createTemplateBaseStyle("#dbeef4"),
+        A4: {
+          text: "Message Text &3"
+        },
+        "J4:BZ4": createTemplateBaseStyle("#ffffff"),
+        J4: {
+          text: "{values.messageText3.finalDesc}"
+        },
+        "A5:I5": createTemplateBaseStyle("#dbeef4"),
+        A5: {
+          text: "Message Text &4"
+        },
+        "J5:BZ5": createTemplateBaseStyle("#ffffff"),
+        J5: {
+          text: "{values.messageText4.finalDesc}"
+        },
+        "A6:I6": createTemplateBaseStyle("#dbeef4"),
+        A6: {
+          text: "Message Display"
+        },
+        "J6:BZ6": createTemplateBaseStyle("#ffffff"),
+        J6: {
+          text: "{values.messageDisplay.finalDesc}"
+        },
+        "A7:I7": createTemplateBaseStyle("#dbeef4"),
+        A7: {
+          text: "Đích lưu"
+        },
+        "J7:BZ7": createTemplateBaseStyle("#ffffff"),
+        J7: {
+          text: "{values.messageDestination.finalDesc}"
+        }
+      }
+    }
+  };
+
+  const TEMPLATE_GENERIC_KEYS = [
+    "CALL_FUNCTION",
+    "CALL_METHOD",
+    "CALL_TRANSACTION",
+    "CASE",
+    "CATCH",
+    "CLASS",
+    "CLASS-DATA",
+    "CLASS-METHODS",
+    "CLEANUP",
+    "CLEAR",
+    "CONSTANTS",
+    "DATA",
+    "DO",
+    "ELSE",
+    "FIELD-SYMBOLS",
+    "FORM",
+    "INSERT_ITAB",
+    "LOOP_AT_ITAB",
+    "METHOD",
+    "METHODS",
+    "MOVE",
+    "MOVE-CORRESPONDING",
+    "PARAMETERS",
+    "PERFORM",
+    "RANGES",
+    "SELECT",
+    "SELECT-OPTIONS",
+    "SORT_ITAB",
+    "STATICS",
+    "TRY",
+    "TYPES",
+    "WHEN"
+  ];
+
+  for (const key of TEMPLATE_GENERIC_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(TEMPLATE_DEFAULT_CONFIG_V1.templates, key)) {
+      TEMPLATE_DEFAULT_CONFIG_V1.templates[key] = createGenericStatementTemplate(key);
+    }
+  }
+
+  for (const templateDef of Object.values(TEMPLATE_DEFAULT_CONFIG_V1.templates)) {
+    if (!templateDef || typeof templateDef !== "object" || Array.isArray(templateDef)) {
+      continue;
+    }
+    const currentOptions = templateDef._options && typeof templateDef._options === "object" && !Array.isArray(templateDef._options)
+      ? templateDef._options
+      : {};
+    templateDef._options = { ...TEMPLATE_PREVIEW_DEFAULT_OPTIONS, ...currentOptions };
+  }
+
+  function setError(message) {
+    els.error.textContent = message ? String(message) : "";
+  }
+
+  function setOutputMessage(message) {
+    els.output.classList.add("muted");
+    els.output.replaceChildren();
+    els.output.textContent = message || "";
+  }
+
+  function parseDateCandidate(value) {
+    const raw = String(value || "").trim();
+    if (!raw) {
+      return null;
+    }
+    const date = new Date(raw);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  function formatDateTime(value) {
+    const date = value instanceof Date ? value : parseDateCandidate(value);
+    if (!date) {
+      return "";
+    }
+    try {
+      return new Intl.DateTimeFormat(undefined, {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+      }).format(date);
+    } catch {
+      return date.toLocaleString();
+    }
+  }
+
+  function getMetaContent(name) {
+    try {
+      const el = document.querySelector(`meta[name="${name}"]`);
+      if (!el) {
+        return "";
+      }
+      return String(el.getAttribute("content") || "").trim();
+    } catch {
+      return "";
+    }
+  }
+
+  function renderBuildInfo() {
+    if (!els.buildInfo) {
+      return;
+    }
+
+    const manualVersion = getMetaContent("abap-viewer-version");
+    const manualUpdatedAt = getMetaContent("abap-viewer-updated-at");
+    const manualNote = getMetaContent("abap-viewer-updated-note");
+    const parsedManualDate = parseDateCandidate(manualUpdatedAt);
+    const fallbackDate = parseDateCandidate(document.lastModified);
+    const versionPrefix = manualVersion ? `${manualVersion} | ` : "";
+
+    if (manualUpdatedAt || manualVersion) {
+      const display = parsedManualDate ? formatDateTime(parsedManualDate) : manualUpdatedAt;
+      const updatedText = display || "manual timestamp not set";
+      els.buildInfo.textContent = `Updated: ${versionPrefix}${updatedText} (manual)`;
+      els.buildInfo.title = manualNote || "Manual timestamp from <meta name=\"abap-viewer-updated-at\">.";
+      return;
+    }
+
+    if (fallbackDate) {
+      els.buildInfo.textContent = `Updated: ${formatDateTime(fallbackDate)} (from document.lastModified)`;
+      els.buildInfo.title = "No manual timestamp found. Showing document.lastModified.";
+      return;
+    }
+
+    els.buildInfo.textContent = "Updated: unknown";
+    els.buildInfo.title = "No manual timestamp and no document.lastModified available.";
+  }
+
+  function normalizeId(id) {
+    if (id === null || id === undefined) {
+      return "";
+    }
+    return String(id);
+  }
+
+  function flattenEntryMap(map) {
+    if (!map || typeof map !== "object") {
+      return [];
+    }
+
+    const out = [];
+    for (const key of Object.keys(map)) {
+      const entryOrList = map[key];
+      if (Array.isArray(entryOrList)) {
+        for (const entry of entryOrList) {
+          if (entry && typeof entry === "object") {
+            out.push(entry);
+          }
+        }
+        continue;
+      }
+      if (entryOrList && typeof entryOrList === "object") {
+        out.push(entryOrList);
+      }
+    }
+    return out;
+  }
+
+  function getKeywordEntries(obj) {
+    if (!obj) {
+      return [];
+    }
+    if (Array.isArray(obj.keywords)) {
+      return obj.keywords;
+    }
+    return flattenEntryMap(obj.keywords);
+  }
+
+  function getValueEntries(obj) {
+    if (!obj) {
+      return [];
+    }
+    if (Array.isArray(obj.values)) {
+      return obj.values;
+    }
+    return flattenEntryMap(obj.values);
+  }
+
+  function getFirstValueFromValues(values, key) {
+    if (!values) {
+      return "";
+    }
+
+    if (Array.isArray(values)) {
+      const match = values.find((v) => v && v.name === key && v.value);
+      return match ? String(match.value) : "";
+    }
+
+    if (typeof values !== "object") {
+      return "";
+    }
+
+    const entryOrList = values[key];
+    const entry = Array.isArray(entryOrList) ? entryOrList[0] : entryOrList;
+    return entry && entry.value ? String(entry.value) : "";
+  }
+
+  function loadStorageObject(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) {
+        return {};
+      }
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function loadDescOverrides() {
+    return loadStorageObject(DESC_STORAGE_KEY_V2);
+  }
+
+  function loadLegacyDescOverrides() {
+    return loadStorageObject(DESC_STORAGE_KEY_LEGACY_V1);
+  }
+
+  function saveDescOverrides() {
+    try {
+      localStorage.setItem(DESC_STORAGE_KEY_V2, JSON.stringify(state.descOverrides || {}));
+    } catch {
+      // ignore
+    }
+  }
+
+  function loadStorageArray(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) {
+        return [];
+      }
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function normalizeSettings(value) {
+    const input = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+
+    const normalizeDeclDesc = typeof input.normalizeDeclDesc === "boolean"
+      ? input.normalizeDeclDesc
+      : DEFAULT_SETTINGS.normalizeDeclDesc;
+
+    const declFilterTypes = Array.isArray(input.declFilterTypes)
+      ? input.declFilterTypes
+          .map((t) => String(t || "").trim().toUpperCase())
+          .filter((t) => t && DECL_TYPE_OPTIONS.includes(t))
+      : [];
+
+    const structDescTemplate = typeof input.structDescTemplate === "string" && input.structDescTemplate.trim()
+      ? input.structDescTemplate
+      : DEFAULT_SETTINGS.structDescTemplate;
+
+    const nameTemplatesByCode = {};
+    const inputNameTemplates = input.nameTemplatesByCode && typeof input.nameTemplatesByCode === "object"
+      ? input.nameTemplatesByCode
+      : {};
+
+    for (const opt of NAME_CODE_OPTIONS) {
+      const code = opt.code;
+      const rawTemplate = Object.prototype.hasOwnProperty.call(inputNameTemplates, code)
+        ? inputNameTemplates[code]
+        : DEFAULT_SETTINGS.nameTemplatesByCode[code];
+
+      const template = typeof rawTemplate === "string" && rawTemplate.trim()
+        ? rawTemplate
+        : DEFAULT_SETTINGS.nameTemplatesByCode[code];
+
+      nameTemplatesByCode[code] = template;
+    }
+
+    return {
+      normalizeDeclDesc,
+      declFilterTypes: declFilterTypes.length ? declFilterTypes : DEFAULT_SETTINGS.declFilterTypes.slice(),
+      structDescTemplate,
+      nameTemplatesByCode
+    };
+  }
+
+  function loadSettings() {
+    return normalizeSettings(loadStorageObject(SETTINGS_STORAGE_KEY_V1));
+  }
+
+  function saveSettings(settings) {
+    try {
+      localStorage.setItem(SETTINGS_STORAGE_KEY_V1, JSON.stringify(settings || {}));
+    } catch {
+      // ignore
+    }
+  }
+
+  function setTemplateConfigError(message) {
+    if (!els.templateConfigError) {
+      return;
+    }
+    els.templateConfigError.textContent = message ? String(message) : "";
+  }
+
+  function setTemplatePreviewMessage(message) {
+    if (!els.templatePreviewOutput) {
+      return;
+    }
+    els.templatePreviewOutput.classList.add("muted");
+    els.templatePreviewOutput.replaceChildren();
+    els.templatePreviewOutput.textContent = message || "";
+  }
+
+  function cloneJsonValue(value) {
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch {
+      return null;
+    }
+  }
+
+  function getDefaultTemplateConfig() {
+    const cloned = cloneJsonValue(TEMPLATE_DEFAULT_CONFIG_V1);
+    return cloned && typeof cloned === "object" ? cloned : { version: 1, templates: {} };
+  }
+
+  function normalizeTemplateAliasToken(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ");
+  }
+
+
+  function parseCellRef(cellRef) {
+    const raw = String(cellRef || "").trim().toUpperCase();
+    const match = /^([A-Z]+)([1-9][0-9]*)$/.exec(raw);
+    if (!match) {
+      throw new Error(`Invalid cell ref "${cellRef}". Expected format like A1.`);
+    }
+
+    const letters = match[1];
+    const row = Number(match[2]) || 0;
+    let col = 0;
+    for (let i = 0; i < letters.length; i += 1) {
+      col = (col * 26) + (letters.charCodeAt(i) - 64);
+    }
+
+    if (!row || !col) {
+      throw new Error(`Invalid cell ref "${cellRef}".`);
+    }
+
+    return { row, col, raw };
+  }
+
+  function parseRangeKey(rangeKey) {
+    const raw = String(rangeKey || "").trim().toUpperCase();
+    if (!raw) {
+      throw new Error("Range key is empty.");
+    }
+
+    const parts = raw.split(":").map((item) => item.trim()).filter(Boolean);
+    if (!parts.length || parts.length > 2) {
+      throw new Error(`Invalid range "${rangeKey}". Expected A1 or A1:B2.`);
+    }
+
+    const start = parseCellRef(parts[0]);
+    const end = parseCellRef(parts.length > 1 ? parts[1] : parts[0]);
+
+    return {
+      key: raw,
+      r1: Math.min(start.row, end.row),
+      c1: Math.min(start.col, end.col),
+      r2: Math.max(start.row, end.row),
+      c2: Math.max(start.col, end.col)
+    };
+  }
+
+  function isTemplateOptionConfigKey(rawKey) {
+    const key = String(rawKey || "").trim().toLowerCase();
+    if (!key) {
+      return false;
+    }
+    return (
+      key === "_options"
+      || key === "options"
+      || key === "ranges"
+      || key === "compact"
+      || key === "hideemptyrows"
+      || key === "hiderowswithoutvalues"
+      || key === "expandmultilinerows"
+      || key === "removeemptyrows"
+      || key === "removeemptyrowsadvanced"
+      || key === "removeemptyrowsadv"
+      || key === "expandarrayrows"
+      || key === "arraytorows"
+    );
+  }
+
+  function validateTemplateConfig(config) {
+    const errors = [];
+    if (!config || typeof config !== "object" || Array.isArray(config)) {
+      return { valid: false, errors: ["Config must be a JSON object."] };
+    }
+
+    const version = Number(config.version);
+    if (version !== 1) {
+      errors.push("Config.version must be 1.");
+    }
+
+    const templates = config.templates;
+    if (!templates || typeof templates !== "object" || Array.isArray(templates)) {
+      errors.push("Config.templates must be an object.");
+      return { valid: false, errors };
+    }
+
+    const templateKeys = Object.keys(templates);
+    if (!templateKeys.length) {
+      errors.push("Config.templates must contain at least one template key.");
+      return { valid: false, errors };
+    }
+
+    for (const templateKey of templateKeys) {
+      const templateDef = templates[templateKey];
+      if (!templateDef || typeof templateDef !== "object" || Array.isArray(templateDef)) {
+        errors.push(`templates.${templateKey} must be an object of range -> style.`);
+        continue;
+      }
+
+      const hasRangesObject = Object.prototype.hasOwnProperty.call(templateDef, "ranges");
+      const ranges = hasRangesObject ? templateDef.ranges : templateDef;
+      if (!ranges || typeof ranges !== "object" || Array.isArray(ranges)) {
+        errors.push(`templates.${templateKey}.ranges must be an object of range -> style.`);
+        continue;
+      }
+
+      const optionCandidates = ["_options", "options"];
+      for (const optKey of optionCandidates) {
+        if (!Object.prototype.hasOwnProperty.call(templateDef, optKey)) {
+          continue;
+        }
+        const optValue = templateDef[optKey];
+        if (!optValue || typeof optValue !== "object" || Array.isArray(optValue)) {
+          errors.push(`templates.${templateKey}.${optKey} must be an object.`);
+        }
+      }
+
+      for (const rangeKey of Object.keys(ranges)) {
+        if (isTemplateOptionConfigKey(rangeKey)) {
+          continue;
+        }
+        try {
+          parseRangeKey(rangeKey);
+        } catch (err) {
+          errors.push(`templates.${templateKey}.${rangeKey}: ${err && err.message ? err.message : err}`);
+        }
+
+        const cellConfig = ranges[rangeKey];
+        if (!cellConfig || typeof cellConfig !== "object" || Array.isArray(cellConfig)) {
+          errors.push(`templates.${templateKey}.${rangeKey} must be an object.`);
+        }
+      }
+    }
+
+    return { valid: errors.length === 0, errors };
+  }
+
+  function loadTemplateConfig() {
+    try {
+      const raw = localStorage.getItem(TEMPLATE_CONFIG_STORAGE_KEY_V1);
+      if (!raw) {
+        return getDefaultTemplateConfig();
+      }
+      const parsed = JSON.parse(raw);
+      const check = validateTemplateConfig(parsed);
+      if (!check.valid) {
+        return getDefaultTemplateConfig();
+      }
+      return parsed;
+    } catch {
+      return getDefaultTemplateConfig();
+    }
+  }
+
+  function saveTemplateConfig(config) {
+    try {
+      localStorage.setItem(TEMPLATE_CONFIG_STORAGE_KEY_V1, JSON.stringify(config || {}));
+    } catch {
+      // ignore
+    }
+  }
+
+  function normalizeTheme(value) {
+    return value === "light" ? "light" : "dark";
+  }
+
+  function loadTheme() {
+    try {
+      return normalizeTheme(localStorage.getItem(THEME_STORAGE_KEY_V1) || "");
+    } catch {
+      return "dark";
+    }
+  }
+
+  function applyTheme(nextTheme, { save } = {}) {
+    const normalized = normalizeTheme(nextTheme);
+    state.theme = normalized;
+    document.documentElement.setAttribute("data-theme", normalized);
+
+    if (els.themeToggle) {
+      els.themeToggle.checked = normalized === "dark";
+    }
+
+    if (save === false) {
+      return;
+    }
+
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY_V1, normalized);
+    } catch {
+      // ignore
+    }
+  }
+
+  function clampNumber(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function normalizeLayoutSplit(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return LAYOUT_SPLIT_DEFAULT;
+    }
+    return clampNumber(numeric, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX);
+  }
+
+  function loadLayoutSplit() {
+    try {
+      return normalizeLayoutSplit(localStorage.getItem(LAYOUT_SPLIT_STORAGE_KEY_V1));
+    } catch {
+      return LAYOUT_SPLIT_DEFAULT;
+    }
+  }
+
+  function saveLayoutSplit(value) {
+    try {
+      localStorage.setItem(LAYOUT_SPLIT_STORAGE_KEY_V1, String(normalizeLayoutSplit(value)));
+    } catch {
+      // ignore
+    }
+  }
+
+  function updateSplitterAria(leftPercent) {
+    if (!els.panelSplitter) {
+      return;
+    }
+
+    const left = Math.round(leftPercent);
+    const right = Math.round(100 - leftPercent);
+    els.panelSplitter.setAttribute("aria-valuemin", String(LAYOUT_SPLIT_MIN));
+    els.panelSplitter.setAttribute("aria-valuemax", String(LAYOUT_SPLIT_MAX));
+    els.panelSplitter.setAttribute("aria-valuenow", String(left));
+    els.panelSplitter.setAttribute("aria-valuetext", `${left}% code, ${right}% output`);
+  }
+
+  function applyLayoutSplit(nextPercent, { save } = {}) {
+    const normalized = normalizeLayoutSplit(nextPercent);
+    state.layoutLeftPane = normalized;
+    document.documentElement.style.setProperty("--layout-left-pane", `${normalized}%`);
+    updateSplitterAria(normalized);
+
+    if (save === false) {
+      return;
+    }
+
+    saveLayoutSplit(normalized);
+  }
+
+  function isCompactLayout() {
+    if (typeof window.matchMedia === "function") {
+      return window.matchMedia(MOBILE_LAYOUT_QUERY).matches;
+    }
+    return window.innerWidth <= 980;
+  }
+
+  function setLayoutResizing(active) {
+    if (!els.mainLayout) {
+      return;
+    }
+    els.mainLayout.classList.toggle("is-resizing", Boolean(active));
+  }
+
+  function initLayoutSplitter() {
+    applyLayoutSplit(loadLayoutSplit(), { save: false });
+
+    if (!els.mainLayout || !els.panelSplitter) {
+      return;
+    }
+
+    let dragging = false;
+    let activePointerId = null;
+
+    function applySplitFromClientX(clientX) {
+      const layoutRect = els.mainLayout.getBoundingClientRect();
+      const splitterRect = els.panelSplitter.getBoundingClientRect();
+      const usableWidth = layoutRect.width - splitterRect.width;
+      if (usableWidth <= 0) {
+        return;
+      }
+
+      const leftWidth = clientX - layoutRect.left - (splitterRect.width / 2);
+      const leftPercent = (leftWidth / usableWidth) * 100;
+      applyLayoutSplit(leftPercent, { save: false });
+    }
+
+    function onPointerMove(ev) {
+      if (!dragging || isCompactLayout()) {
+        return;
+      }
+      applySplitFromClientX(ev.clientX);
+      ev.preventDefault();
+    }
+
+    function stopDragging() {
+      if (!dragging) {
+        return;
+      }
+      dragging = false;
+      setLayoutResizing(false);
+      if (activePointerId !== null && typeof els.panelSplitter.releasePointerCapture === "function") {
+        try {
+          els.panelSplitter.releasePointerCapture(activePointerId);
+        } catch {
+          // ignore
+        }
+      }
+      activePointerId = null;
+      saveLayoutSplit(state.layoutLeftPane);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", stopDragging);
+      window.removeEventListener("pointercancel", stopDragging);
+    }
+
+    els.panelSplitter.addEventListener("pointerdown", (ev) => {
+      if (ev.button !== 0 || isCompactLayout()) {
+        return;
+      }
+
+      dragging = true;
+      activePointerId = ev.pointerId;
+      setLayoutResizing(true);
+
+      if (typeof els.panelSplitter.setPointerCapture === "function") {
+        try {
+          els.panelSplitter.setPointerCapture(ev.pointerId);
+        } catch {
+          // ignore
+        }
+      }
+
+      applySplitFromClientX(ev.clientX);
+      window.addEventListener("pointermove", onPointerMove);
+      window.addEventListener("pointerup", stopDragging);
+      window.addEventListener("pointercancel", stopDragging);
+      ev.preventDefault();
+    });
+
+    els.panelSplitter.addEventListener("keydown", (ev) => {
+      if (isCompactLayout()) {
+        return;
+      }
+      if (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight") {
+        return;
+      }
+
+      const step = ev.shiftKey ? 5 : 2;
+      const delta = ev.key === "ArrowRight" ? step : -step;
+      applyLayoutSplit(state.layoutLeftPane + delta);
+      ev.preventDefault();
+    });
+
+    window.addEventListener("resize", () => {
+      if (isCompactLayout()) {
+        setLayoutResizing(false);
+        return;
+      }
+      applyLayoutSplit(state.layoutLeftPane, { save: false });
+    });
+  }
+
+  function validateRuleConfig(config) {
+    if (!config || typeof config !== "object" || Array.isArray(config)) {
+      return "Config must be a JSON object.";
+    }
+
+    if (!config.object || typeof config.object !== "string") {
+      return "Missing config.object (string).";
+    }
+
+    if (!config.match || typeof config.match !== "object" || Array.isArray(config.match)) {
+      return "Missing config.match (object).";
+    }
+
+    const match = config.match;
+    const hasMatch =
+      (typeof match.startKeyword === "string" && match.startKeyword.trim()) ||
+      (typeof match.startPhrase === "string" && match.startPhrase.trim()) ||
+      (typeof match.type === "string" && match.type.trim());
+
+    if (!hasMatch) {
+      return "match must include startKeyword, startPhrase, or type.";
+    }
+
+    if (config.block !== undefined && config.block !== null) {
+      if (typeof config.block !== "object" || Array.isArray(config.block)) {
+        return "block must be an object (or null).";
+      }
+      if (typeof config.block.endKeyword !== "string" || !config.block.endKeyword.trim()) {
+        return "block.endKeyword must be a non-empty string.";
+      }
+    }
+
+    if (config.extras !== undefined && config.extras !== null) {
+      if (typeof config.extras !== "object" || Array.isArray(config.extras)) {
+        return "extras must be an object (or null).";
+      }
+      if (typeof config.extras.type !== "string" || !config.extras.type.trim()) {
+        return "extras.type must be a non-empty string.";
+      }
+    }
+
+    if (config.keywordLabels !== undefined && config.keywordLabels !== null) {
+      if (typeof config.keywordLabels !== "object" || Array.isArray(config.keywordLabels)) {
+        return "keywordLabels must be an object.";
+      }
+    }
+
+    if (config.keywordPhrases !== undefined && config.keywordPhrases !== null) {
+      if (typeof config.keywordPhrases !== "object" || Array.isArray(config.keywordPhrases)) {
+        return "keywordPhrases must be an object.";
+      }
+    }
+
+    if (config.captureRules !== undefined && config.captureRules !== null && !Array.isArray(config.captureRules)) {
+      return "captureRules must be an array.";
+    }
+
+    if (Array.isArray(config.captureRules)) {
+      for (const rule of config.captureRules) {
+        if (!rule || typeof rule !== "object" || Array.isArray(rule)) {
+          return "Each captureRules[] item must be an object.";
+        }
+        if (typeof rule.after !== "string" || !rule.after.trim()) {
+          return "Each captureRules[] item must have after (string).";
+        }
+        if (typeof rule.name !== "string" || !rule.name.trim()) {
+          return "Each captureRules[] item must have name (string).";
+        }
+      }
+    }
+
+    return "";
+  }
+
+  function generateRuleId() {
+    const time = Date.now();
+    const rand = Math.random().toString(16).slice(2, 10);
+    return `rule-${time}-${rand}`;
+  }
+
+  function normalizeCustomRules(list) {
+    const output = [];
+    const items = Array.isArray(list) ? list : [];
+
+    for (const item of items) {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+
+        continue;
+      }
+
+      if (item.config && typeof item.config === "object" && !Array.isArray(item.config)) {
+        const id = item.id ? String(item.id) : generateRuleId();
+        output.push({ id, config: item.config });
+        continue;
+      }
+
+      if (typeof item.object === "string") {
+        output.push({ id: generateRuleId(), config: item });
+      }
+    }
+
+    return output;
+  }
+
+  function loadCustomRules() {
+    return normalizeCustomRules(loadStorageArray(RULES_STORAGE_KEY_V1));
+  }
+
+  function saveCustomRules() {
+    try {
+      localStorage.setItem(RULES_STORAGE_KEY_V1, JSON.stringify(state.customRules || []));
+    } catch {
+      // ignore
+    }
+  }
+
+  function setRulesError(message) {
+    if (!els.rulesError) {
+      return;
+    }
+    els.rulesError.textContent = message ? String(message) : "";
+  }
+
+  function getCustomConfigs() {
+    const output = [];
+    for (const rule of state.customRules || []) {
+      if (!rule || !rule.config) {
+        continue;
+      }
+      const error = validateRuleConfig(rule.config);
+      if (!error) {
+        output.push(rule.config);
+      }
+    }
+    return output;
+  }
+
+  function describeRuleOption(rule) {
+    if (!rule || !rule.config) {
+      return "(invalid rule)";
+    }
+
+    const objectType = rule.config.object ? String(rule.config.object) : "RULE";
+    const match = rule.config.match && typeof rule.config.match === "object" ? rule.config.match : {};
+    const summary = match.startPhrase
+      ? `startPhrase=${String(match.startPhrase)}`
+      : match.startKeyword
+        ? `startKeyword=${String(match.startKeyword)}`
+        : match.type
+          ? `type=${String(match.type)}`
+          : "match=?";
+
+    return `${objectType} (${summary})`;
+  }
+
+  function renderRulesSelect() {
+    if (!els.rulesSelect) {
+      return;
+    }
+
+    els.rulesSelect.replaceChildren();
+    els.rulesSelect.appendChild(el("option", { text: "(New rule)", attrs: { value: "" } }));
+
+    for (const rule of state.customRules || []) {
+      const id = rule && rule.id ? String(rule.id) : "";
+      if (!id) {
+        continue;
+      }
+      els.rulesSelect.appendChild(
+        el("option", {
+          text: describeRuleOption(rule),
+          attrs: { value: id }
+        })
+      );
+    }
+
+    els.rulesSelect.value = state.activeRuleId || "";
+  }
+
+  function selectRule(ruleId) {
+    const id = ruleId ? String(ruleId) : "";
+    state.activeRuleId = id;
+    setRulesError("");
+
+    if (!els.rulesJson) {
+      return;
+    }
+
+    if (!id) {
+      els.rulesJson.value = "";
+      return;
+    }
+
+    const rule = (state.customRules || []).find((r) => r && String(r.id) === id) || null;
+    if (!rule || !rule.config) {
+      els.rulesJson.value = "";
+      return;
+    }
+
+    try {
+      els.rulesJson.value = JSON.stringify(rule.config, null, 2);
+    } catch {
+      els.rulesJson.value = "";
+    }
+  }
+
+  function createRuleTemplate(kind) {
+    const type = String(kind || "startKeyword");
+
+    if (type === "assignment") {
+      return {
+        object: "ASSIGNMENT",
+        match: { type: "assignment" },
+        keywordLabels: {
+          "=": "assign",
+          "+=": "add-assign",
+          "-=": "sub-assign",
+          "*=": "mul-assign",
+          "/=": "div-assign",
+          "?=": "cast"
+        },
+        keywordPhrases: {},
+        captureRules: []
+      };
+    }
+
+    if (type === "startPhrase") {
+      return {
+        object: "MY_OBJECT",
+        match: { startPhrase: "MY PHRASE" },
+        keywordLabels: {
+          MY: "stmt"
+        },
+        keywordPhrases: {
+          "MY PHRASE": "my-phrase"
+        },
+        captureRules: [
+          { after: "MY PHRASE", name: "name", label: "name" }
+        ]
+      };
+    }
+
+    return {
+      object: "MY_OBJECT",
+      match: { startKeyword: "MYKEYWORD" },
+      keywordLabels: {
+        MYKEYWORD: "stmt"
+      },
+      keywordPhrases: {},
+      captureRules: [
+        { after: "MYKEYWORD", name: "name", label: "name" }
+      ]
+    };
+  }
+
+  function startNewRule() {
+    state.activeRuleId = "";
+    if (els.rulesSelect) {
+      els.rulesSelect.value = "";
+    }
+
+    const kind = els.rulesTemplate ? els.rulesTemplate.value : "startKeyword";
+    const template = createRuleTemplate(kind);
+
+    if (els.rulesJson) {
+      els.rulesJson.value = JSON.stringify(template, null, 2);
+      els.rulesJson.focus();
+    }
+
+    setRulesError("");
+  }
+
+  function readRuleFromEditor() {
+    const text = els.rulesJson ? els.rulesJson.value || "" : "";
+    const trimmed = text.trim();
+    if (!trimmed) {
+      return { config: null, error: "Rule JSON is empty." };
+    }
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      const config = parsed;
+      const error = validateRuleConfig(config);
+      if (error) {
+        return { config: null, error };
+      }
+      return { config, error: "" };
+    } catch (err) {
+      return { config: null, error: `JSON parse error: ${err && err.message ? err.message : err}` };
+    }
+  }
+
+  function saveRuleFromEditor() {
+    const { config, error } = readRuleFromEditor();
+    if (error) {
+      setRulesError(error);
+      return;
+    }
+
+    setRulesError("");
+
+    if (state.activeRuleId) {
+      const target = (state.customRules || []).find((r) => r && String(r.id) === state.activeRuleId) || null;
+      if (target) {
+        target.config = config;
+      } else {
+        state.customRules.push({ id: state.activeRuleId, config });
+      }
+    } else {
+      const id = generateRuleId();
+      state.customRules.push({ id, config });
+      state.activeRuleId = id;
+    }
+
+    saveCustomRules();
+    renderRulesSelect();
+    if (els.rulesSelect) {
+      els.rulesSelect.value = state.activeRuleId || "";
+    }
+  }
+
+  function deleteActiveRule() {
+    if (!state.activeRuleId) {
+      setRulesError("Select a saved rule to delete.");
+      return;
+    }
+
+    state.customRules = (state.customRules || []).filter((r) => r && String(r.id) !== state.activeRuleId);
+    state.activeRuleId = "";
+    saveCustomRules();
+    renderRulesSelect();
+    if (els.rulesJson) {
+      els.rulesJson.value = "";
+    }
+    setRulesError("");
+  }
+
+  function downloadRuleFromEditor() {
+    const { config, error } = readRuleFromEditor();
+    if (error) {
+      setRulesError(error);
+      return;
+    }
+
+    setRulesError("");
+
+    const fileBase = config && config.object ? String(config.object).trim() : "rule";
+    const fileName = `${fileBase}.json`;
+    const content = JSON.stringify(config, null, 2);
+
+    try {
+      const blob = new Blob([content], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setRulesError(`Download failed: ${err && err.message ? err.message : err}`);
+    }
+  }
+
+  function openRulesModal() {
+    if (!els.rulesModal) {
+      return;
+    }
+
+    if (!els.jsonModal.hidden) {
+      closeJsonModal();
+    }
+    if (!els.editModal.hidden) {
+      closeEditModal();
+    }
+
+    renderRulesSelect();
+    if (state.activeRuleId) {
+      selectRule(state.activeRuleId);
+    } else if (els.rulesJson && !els.rulesJson.value.trim()) {
+      startNewRule();
+    }
+
+    els.rulesModal.hidden = false;
+  }
+
+  function closeRulesModal() {
+    if (!els.rulesModal) {
+      return;
+    }
+
+    els.rulesModal.hidden = true;
+    setRulesError("");
+  }
+
+  function renderSettingsModalUi() {
+    if (!els.settingsModal) {
+      return;
+    }
+
+    const settings = state.settings || loadSettings();
+    state.settings = settings;
+
+    if (els.settingsNormalizeDesc) {
+      els.settingsNormalizeDesc.checked = Boolean(settings.normalizeDeclDesc);
+    }
+
+    if (els.settingsDeclTypes) {
+      els.settingsDeclTypes.replaceChildren();
+      for (const type of DECL_TYPE_OPTIONS) {
+        const label = document.createElement("label");
+        label.className = "toggle";
+
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.value = type;
+        input.checked = Array.isArray(settings.declFilterTypes) && settings.declFilterTypes.includes(type);
+
+        label.appendChild(input);
+        label.appendChild(document.createTextNode(type));
+        els.settingsDeclTypes.appendChild(label);
+      }
+    }
+
+    if (els.settingsStructTemplate) {
+      els.settingsStructTemplate.value = settings.structDescTemplate || DEFAULT_SETTINGS.structDescTemplate;
+    }
+
+    if (els.settingsNameTemplates) {
+      els.settingsNameTemplates.replaceChildren();
+
+      const table = document.createElement("table");
+      const thead = document.createElement("thead");
+      const headRow = document.createElement("tr");
+      for (const title of ["code", "label", "template"]) {
+        const th = document.createElement("th");
+        th.textContent = title;
+        headRow.appendChild(th);
+      }
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+      for (const opt of NAME_CODE_OPTIONS) {
+        const tr = document.createElement("tr");
+
+        const codeCell = document.createElement("td");
+        codeCell.textContent = opt.code;
+        tr.appendChild(codeCell);
+
+        const labelCell = document.createElement("td");
+        labelCell.textContent = opt.label;
+        tr.appendChild(labelCell);
+
+        const tplCell = document.createElement("td");
+        const input = document.createElement("input");
+        input.type = "text";
+        input.style.width = "100%";
+        input.setAttribute("data-code", opt.code);
+        input.value = (settings.nameTemplatesByCode && settings.nameTemplatesByCode[opt.code])
+          ? String(settings.nameTemplatesByCode[opt.code] || "")
+          : String(DEFAULT_SETTINGS.nameTemplatesByCode[opt.code] || "");
+
+        tplCell.appendChild(input);
+        tr.appendChild(tplCell);
+
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+
+      els.settingsNameTemplates.appendChild(table);
+    }
+  }
+
+  function openSettingsModal() {
+    if (!els.settingsModal) {
+      return;
+    }
+
+    if (!els.jsonModal.hidden) {
+      closeJsonModal();
+    }
+    if (!els.editModal.hidden) {
+      closeEditModal();
+    }
+    if (els.rulesModal && !els.rulesModal.hidden) {
+      closeRulesModal();
+    }
+
+    renderSettingsModalUi();
+    els.settingsModal.hidden = false;
+  }
+
+  function closeSettingsModal() {
+    if (!els.settingsModal) {
+      return;
+    }
+    els.settingsModal.hidden = true;
+  }
+
+window.AbapViewerModules.factories = window.AbapViewerModules.factories || {};
+window.AbapViewerModules.factories["01-core"] = function registerCore(runtime) {
+  const targetRuntime = runtime || (window.AbapViewerRuntime = window.AbapViewerRuntime || {});
+  targetRuntime.api = targetRuntime.api || {};
+  targetRuntime.els = els;
+  targetRuntime.state = state;
+  targetRuntime.constants = {
+    DESC_STORAGE_KEY_V2,
+    DESC_STORAGE_KEY_LEGACY_V1,
+    RULES_STORAGE_KEY_V1,
+    SETTINGS_STORAGE_KEY_V1,
+    TEMPLATE_CONFIG_STORAGE_KEY_V1,
+    THEME_STORAGE_KEY_V1,
+    LAYOUT_SPLIT_STORAGE_KEY_V1,
+    LAYOUT_SPLIT_DEFAULT,
+    LAYOUT_SPLIT_MIN,
+    LAYOUT_SPLIT_MAX,
+    MOBILE_LAYOUT_QUERY,
+    RENDER_TREE_OPTIONS,
+    DECL_TYPE_OPTIONS,
+    NAME_CODE_OPTIONS,
+    DEFAULT_SETTINGS,
+    TEMPLATE_DEFAULT_CONFIG_V1,
+    SAMPLE_ABAP
+  };
+  window.AbapViewerModules.parts["01-core"] = true;
+};
+window.AbapViewerModules.factories["01-core"](window.AbapViewerRuntime);

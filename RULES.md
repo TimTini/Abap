@@ -5,6 +5,10 @@ File này mô tả:
 - Các field/struct có thể xuất hiện trong JSON/XML output
 - Lưu ý tương thích với Excel VBA (`excel/modAbapTemplateTool.bas`)
 
+Lưu ý:
+- `RULES.md` tập trung vào rule config và parse/output cơ bản.
+- Runtime object model, canonical template paths, coverage so với ABAP docs chính thức, và hướng cấu trúc lại xem tại `docs/ABAP_OBJECT_MODEL.md`.
+
 ## 1) Rule nằm ở đâu?
 
 ### Built-in rules (chuẩn, dùng cho CLI + Viewer)

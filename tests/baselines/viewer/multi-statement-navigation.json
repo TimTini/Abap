@@ -1,0 +1,60 @@
+{
+  "errorText": "",
+  "rightTab": "template",
+  "dataSummary": {
+    "objectCount": 4,
+    "declCount": 2,
+    "renderObjectCount": 4,
+    "firstObjectTypes": [
+      "DATA",
+      "DATA",
+      "ASSIGNMENT",
+      "ASSIGNMENT"
+    ]
+  },
+  "input": {
+    "lineCount": 5,
+    "selectionStart": 80,
+    "selectionEnd": 80,
+    "selectionStartLine": 5,
+    "selectionEndLine": 5,
+    "selectedText": ""
+  },
+  "selectedState": {
+    "selectedId": "",
+    "selectedTemplateIndex": "",
+    "selectedDeclKey": ""
+  },
+  "outputCards": [],
+  "templateBlocks": [
+    {
+      "index": "0",
+      "lineStart": 3,
+      "selected": false,
+      "textPreview": "Câu lệnh |  |  |  |  | "
+    },
+    {
+      "index": "1",
+      "lineStart": 3,
+      "selected": false,
+      "textPreview": "Câu lệnh |  |  |  |  | "
+    },
+    {
+      "index": "2",
+      "lineStart": 4,
+      "selected": false,
+      "textPreview": "Đích |  |  |  |  | "
+    },
+    {
+      "index": "3",
+      "lineStart": 4,
+      "selected": false,
+      "textPreview": "Đích |  |  |  |  | "
+    }
+  ],
+  "descriptionSummary": "",
+  "descriptionRows": [],
+  "outputLineTargets": [],
+  "templateLineTargets": [],
+  "traceDecls": []
+}

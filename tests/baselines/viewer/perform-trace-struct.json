@@ -1,0 +1,144 @@
+{
+  "errorText": "",
+  "rightTab": "template",
+  "dataSummary": {
+    "objectCount": 10,
+    "declCount": 8,
+    "renderObjectCount": 9,
+    "firstObjectTypes": [
+      "TYPES",
+      "TYPES",
+      "TYPES",
+      "TYPES",
+      "DATA",
+      "PARAMETERS",
+      "ASSIGNMENT",
+      "ASSIGNMENT",
+      "PERFORM"
+    ]
+  },
+  "input": {
+    "lineCount": 21,
+    "selectionStart": 425,
+    "selectionEnd": 425,
+    "selectionStartLine": 21,
+    "selectionEndLine": 21,
+    "selectedText": ""
+  },
+  "selectedState": {
+    "selectedId": "",
+    "selectedTemplateIndex": "",
+    "selectedDeclKey": ""
+  },
+  "outputCards": [],
+  "templateBlocks": [
+    {
+      "index": "0",
+      "lineStart": 3,
+      "selected": false,
+      "textPreview": "Câu lệnh |  |  |  |  | "
+    },
+    {
+      "index": "1",
+      "lineStart": 4,
+      "selected": false,
+      "textPreview": "Câu lệnh |  |  |  |  | "
+    },
+    {
+      "index": "2",
+      "lineStart": 5,
+      "selected": false,
+      "textPreview": "Câu lệnh |  |  |  |  | "
+    },
+    {
+      "index": "3",
+      "lineStart": 6,
+      "selected": false,
+      "textPreview": "Câu lệnh |  |  |  |  | "
+    },
+    {
+      "index": "4",
+      "lineStart": 8,
+      "selected": false,
+      "textPreview": "Câu lệnh |  |  |  |  | "
+    },
+    {
+      "index": "5",
+      "lineStart": 9,
+      "selected": false,
+      "textPreview": "Câu lệnh |  |  |  |  | "
+    },
+    {
+      "index": "6",
+      "lineStart": 12,
+      "selected": false,
+      "textPreview": "Đích |  |  |  |  | "
+    },
+    {
+      "index": "7",
+      "lineStart": 13,
+      "selected": false,
+      "textPreview": "Đích |  |  |  |  | "
+    },
+    {
+      "index": "8",
+      "lineStart": 14,
+      "selected": false,
+      "textPreview": " |  |  |  |  | "
+    },
+    {
+      "index": "9",
+      "lineStart": 17,
+      "selected": false,
+      "textPreview": "Điều kiện trái |  |  |  |  | "
+    },
+    {
+      "index": "10",
+      "lineStart": 18,
+      "selected": false,
+      "textPreview": "Đích |  |  |  |  | "
+    }
+  ],
+  "descriptionSummary": "",
+  "descriptionRows": [],
+  "outputLineTargets": [],
+  "templateLineTargets": [],
+  "traceDecls": [
+    {
+      "objectType": "STRUCT_FIELD",
+      "name": "is_ctx-uname",
+      "file": "input.abap",
+      "lineStart": 17,
+      "raw": "FORM frm_outer USING is_ctx TYPE ty_ctx.",
+      "comment": "",
+      "scopeLabel": "FORM:FRM_OUTER",
+      "scopeType": "FORM",
+      "scopeName": "frm_outer",
+      "structName": "is_ctx",
+      "structObjectType": "FORM_PARAM",
+      "structLineStart": 16,
+      "fieldPath": "uname",
+      "traceFile": "input.abap",
+      "traceLineStart": 17,
+      "synthetic": true
+    },
+    {
+      "objectType": "STRUCT_FIELD",
+      "name": "is_ctx-city",
+      "file": "input.abap",
+      "lineStart": 18,
+      "raw": "FORM frm_outer USING is_ctx TYPE ty_ctx.",
+      "comment": "",
+      "scopeLabel": "FORM:FRM_OUTER",
+      "scopeType": "FORM",
+      "scopeName": "frm_outer",
+      "structName": "is_ctx",
+      "structObjectType": "FORM_PARAM",
+      "structLineStart": 16,
+      "fieldPath": "city",
+      "traceFile": "input.abap",
+      "traceLineStart": 18,
+      "synthetic": true
+    }
+  ]
+}

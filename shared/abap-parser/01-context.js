@@ -1,10 +1,508 @@
-"use strict";
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) {
+    module.exports = factory();
+    return;
+  }
 
-(function (root) {
-  const globalRoot = root || (typeof globalThis !== "undefined" ? globalThis : this);
-  const registry = globalRoot.__AbapSourceParts = globalRoot.__AbapSourceParts || {};
-  const targetKey = "shared/abap-parser.js";
-  const partKey = "shared/abap-parser/01-context.js";
-  const bucket = registry[targetKey] = registry[targetKey] || {};
-  bucket[partKey] = "(function (root, factory) {\n  if (typeof module === \"object\" && module.exports) {\n    module.exports = factory();\n    return;\n  }\n\n  root.AbapParser = factory();\n})(typeof globalThis !== \"undefined\" ? globalThis : (typeof self !== \"undefined\" ? self : this), function () {\n  \"use strict\";\n\n  class AbapObject {\n    constructor({\n      id = null,\n      parent = null,\n      objectType,\n      file,\n      lineStart,\n      raw,\n      block = null,\n      extras = null,\n      comment,\n      keywords,\n      values,\n      children = []\n    }) {\n      this.id = id;\n      this.parent = parent;\n      this.objectType = objectType;\n      this.file = file;\n      this.lineStart = lineStart;\n      this.raw = raw;\n      this.block = block;\n      this.extras = extras;\n      this.comment = comment;\n      if (keywords && Object.keys(keywords).length) {\n        this.keywords = keywords;\n      }\n      if (values && Object.keys(values).length) {\n        this.values = values;\n      }\n      this.children = children;\n    }\n  }\n\n  const registeredConfigs = [];\n\n  function registerConfig(config) {\n    registeredConfigs.push(normalizeConfig(config));\n  }\n\n  function getConfigs() {\n    return registeredConfigs.slice();\n  }\n\n  function normalizeConfig(config) {\n    const normalized = {\n      ...config,\n      match: config.match || {},\n      block: config.block || null,\n      keywordLabels: normalizeMapKeys(config.keywordLabels),\n      keywordPhrases: normalizeMapKeys(config.keywordPhrases),\n      captureRules: normalizeCaptureRules(config.captureRules),\n      valueDescriptions: normalizeValueDescriptions(config.valueDescriptions)\n    };\n\n    if (normalized.match.startKeyword) {\n      normalized.match.startKeyword = String(normalized.match.startKeyword).toUpperCase();\n    }\n\n    if (normalized.match.startPhrase) {\n      normalized.match.startTokens = String(normalized.match.startPhrase)\n        .trim()\n        .toUpperCase()\n        .split(/\\s+/)\n        .filter(Boolean);\n    } else {\n      normalized.match.startTokens = [];\n    }\n\n    if (normalized.block && normalized.block.endKeyword) {\n      normalized.block = {\n        ...normalized.block,\n        endKeyword: String(normalized.block.endKeyword).toUpperCase()\n      };\n    }\n\n    return normalized;\n  }\n\n  function normalizeMapKeys(map) {\n    if (!map) {\n      return {};\n    }\n\n    const output = {};\n    for (const key of Object.keys(map)) {\n      output[String(key).toUpperCase()] = map[key];\n    }\n    return output;\n  }\n\n  function normalizeCaptureRules(rules) {\n    if (!Array.isArray(rules)) {\n      return [];\n    }\n\n    return rules.map((rule) => {\n      const after = rule.after || \"\";\n      const afterTokens = String(after)\n        .trim()\n        .toUpperCase()\n        .split(/\\s+/)\n        .filter(Boolean);\n\n      const stopTokensUpper = Array.isArray(rule.stopTokens)\n        ? rule.stopTokens\n            .map((token) => String(token).trim().toUpperCase())\n            .filter(Boolean)\n        : [];\n\n      return {\n        ...rule,\n        afterTokens,\n        capture: rule.capture || \"next\",\n        stopTokensUpper\n      };\n    });\n  }\n\n  function normalizeValueDescriptions(desc) {\n    if (!desc) {\n      return {};\n    }\n\n    const output = {};\n    for (const key of Object.keys(desc)) {\n      output[key] = normalizeMapKeys(desc[key]);\n    }\n    return output;\n  }\n\n  function parseAbapText(content, configs, fileName) {\n    const lines = String(content || \"\").split(/\\r?\\n/);\n    const statements = collectStatements(lines);\n    const list = Array.isArray(configs) ? configs : registeredConfigs;\n    const objects = parseStatements(statements, list, fileName || \"\");\n\n    const decls = attachDeclarationRefs({ statements, objects, fileName: fileName || \"\" });\n\n    return {\n      file: fileName || \"\",\n      objects,\n      decls\n    };\n  }\n\n  function pickPreferredStatementComment(statementBuffer) {\n    if (!statementBuffer || typeof statementBuffer !== \"object\") {\n      return \"\";\n    }\n\n    const lineEntries = Array.isArray(statementBuffer.lineEntries) ? statementBuffer.lineEntries : [];\n    for (const entry of lineEntries) {\n      const inline = entry && typeof entry.comment === \"string\" ? entry.comment.trim() : \"\";\n      if (inline) {\n        return inline;\n      }\n    }\n\n    const leading = Array.isArray(statementBuffer.leadingCommentLines) ? statementBuffer.leadingCommentLines : [];\n    if (leading.length !== 1) {\n      return \"\";\n    }\n\n    const candidate = leading[0];\n    const text = candidate && typeof candidate.text === \"string\" ? candidate.text.trim() : \"\";\n    const line = candidate ? Number(candidate.line || 0) || 0 : 0;\n    const lineStart = Number(statementBuffer.lineStart || 0) || 0;\n\n    if (!text || !lineStart || line !== lineStart - 1) {\n      return \"\";\n    }\n\n    return text;\n  }\n\n  function collectStatements(lines) {\n    const statements = [];\n    let current = null;\n    let pendingComments = [];\n\n    for (let index = 0; index < lines.length; index += 1) {\n      const lineNumber = index + 1;\n      const rawLine = lines[index];\n      const trimmed = rawLine.trim();\n\n      if (!trimmed) {\n        if (!current) {\n          pendingComments = [];\n        }\n        continue;\n      }\n\n      if (isCommentLine(trimmed)) {\n        const commentText = normalizeComment(trimmed);\n        if (commentText) {\n          if (current) {\n            current.comments.push(commentText);\n          } else {\n            pendingComments.push({ line: lineNumber, text: commentText });\n          }\n        } else if (!current) {\n          // Decorative comment-only lines behave like blank separators.\n          pendingComments = [];\n        }\n        continue;\n      }\n\n      const { code, comment } = splitCodeAndInlineComment(rawLine);\n      const codeTrim = code.trim();\n\n      if (!codeTrim) {\n        if (comment) {\n          pendingComments.push({ line: lineNumber, text: comment });\n        } else if (!current) {\n          // Decorative inline-only comment (e.g. `\"----\"`) is treated as blank.\n          pendingComments = [];\n        }\n        continue;\n      }\n\n      if (!current) {\n        const leadingCommentLines = pendingComments.slice();\n        const leadingComments = leadingCommentLines\n          .map((entry) => (entry && typeof entry.text === \"string\" ? entry.text : \"\"))\n          .filter(Boolean);\n\n        current = {\n          lineStart: lineNumber,\n          rawParts: [],\n          comments: leadingComments.slice(),\n          leadingComments,\n          leadingCommentLines,\n          lineEntries: []\n        };\n        pendingComments = [];\n      }\n\n      current.rawParts.push(codeTrim);\n      if (comment) {\n        current.comments.push(comment);\n      }\n      current.lineEntries.push({ line: lineNumber, code: codeTrim, comment: comment || \"\" });\n\n      if (codeTrim.endsWith(\".\")) {\n        const raw = current.rawParts.join(\" \").replace(/\\s+/g, \" \").trim();\n        const commentText = pickPreferredStatementComment(current);\n\n        statements.push({\n          lineStart: current.lineStart,\n          raw,\n          comment: commentText,\n          commentLines: current.comments.filter(Boolean),\n          leadingComments: current.leadingComments ? current.leadingComments.slice() : [],\n          lineEntries: current.lineEntries.slice()\n        });\n\n        current = null;\n      }\n    }\n\n    return statements;\n  }\n\n  function isCommentLine(trimmedLine) {\n    return trimmedLine.startsWith(\"*\") || trimmedLine.startsWith('\"');\n  }\n\n  function normalizeComment(trimmedLine) {\n    const normalizeText = (text) => {\n      const trimmed = String(text || \"\").trim();\n      if (!trimmed) {\n        return \"\";\n      }\n\n      // Treat separator-only comment content as empty.\n      if (\n        !/[A-Za-z0-9\\u00C0-\\u024F\\u1E00-\\u1EFF]/.test(trimmed) &&\n        /^[\\s*&\\-_=~#|\\\\/.:;,+(){}\\[\\]<>]+$/.test(trimmed)\n      ) {\n        return \"\";\n      }\n\n      return trimmed;\n    };\n\n    if (trimmedLine.startsWith(\"*\") || trimmedLine.startsWith('\"')) {\n      return normalizeText(trimmedLine.slice(1));\n    }\n    return normalizeText(trimmedLine);\n  }\n\n  function splitCodeAndInlineComment(line) {\n    const text = String(line || \"\");\n    let inSingleQuote = false;\n    let inPipe = false;\n\n    for (let index = 0; index < text.length; index += 1) {\n      const char = text[index];\n      const next = index + 1 < text.length ? text[index + 1] : \"\";\n\n      if (char === \"'\" && !inPipe) {\n        if (inSingleQuote && next === \"'\") {\n          index += 1;\n          continue;\n        }\n        inSingleQuote = !inSingleQuote;\n        continue;\n      }\n\n      if (char === \"|\" && !inSingleQuote) {\n        if (inPipe && next === \"|\") {\n          index += 1;\n          continue;\n        }\n        inPipe = !inPipe;\n        continue;\n      }\n\n      if (char === '\"' && !inSingleQuote && !inPipe) {\n        const code = text.slice(0, index);\n        const comment = normalizeComment(text.slice(index + 1));\n        return { code, comment };\n      }\n    }\n\n    return { code: text, comment: \"\" };\n  }\n\n  function parseStatements(statements, configs, fileName) {\n    const roots = [];\n    const stack = [];\n    let nextId = 1;\n\n    for (const statement of statements) {\n      const statementStart = getStatementStartKeyword(statement.raw);\n      const currentFrame = stack.length ? stack[stack.length - 1] : null;\n\n      if (currentFrame && statementStart === currentFrame.endKeyword) {\n        currentFrame.node.block.endRaw = statement.raw;\n        currentFrame.node.block.lineEnd = statement.lineStart;\n        stack.pop();\n        continue;\n      }\n\n      const parentId = currentFrame ? currentFrame.node.id : null;\n      const parsedList = parseStatement(statement, configs, fileName, parentId, () => nextId++);\n      if (!parsedList || !parsedList.length) {\n        continue;\n      }\n\n      const targetList = currentFrame ? currentFrame.node.children : roots;\n      for (const node of parsedList) {\n        targetList.push(node);\n        if (node.block && node.block.endKeyword) {\n          stack.push({ node, endKeyword: node.block.endKeyword });\n        }\n      }\n    }\n\n    return roots;\n  }\n\n  function getStatementStartKeyword(raw) {\n    const tokens = tokenize(raw);\n    if (!tokens.length) {\n      return \"\";\n    }\n    return tokens[0].upper;\n  }\n\n  function parseStatement(statement, configs, fileName, parentId, nextId) {\n    const tokens = tokenize(statement.raw);\n    if (tokens.length === 0) {\n      return null;\n    }\n\n    for (const config of configs) {\n      if (!matchesConfig(tokens, config, statement.raw)) {\n        continue;\n      }\n\n";
-})(typeof globalThis !== "undefined" ? globalThis : (typeof self !== "undefined" ? self : this));
+  root.AbapParser = factory();
+})(typeof globalThis !== "undefined" ? globalThis : (typeof self !== "undefined" ? self : this), function () {
+  "use strict";
+
+  class AbapObject {
+    constructor({
+      id = null,
+      parent = null,
+      objectType,
+      file,
+      lineStart,
+      raw,
+      block = null,
+      extras = null,
+      comment,
+      keywords,
+      values,
+      children = []
+    }) {
+      this.id = id;
+      this.parent = parent;
+      this.objectType = objectType;
+      this.file = file;
+      this.lineStart = lineStart;
+      this.raw = raw;
+      this.block = block;
+      this.extras = extras;
+      this.comment = comment;
+      if (keywords && Object.keys(keywords).length) {
+        this.keywords = keywords;
+      }
+      if (values && Object.keys(values).length) {
+        this.values = values;
+      }
+      this.children = children;
+    }
+  }
+
+  const registeredConfigs = [];
+
+  function registerConfig(config) {
+    registeredConfigs.push(normalizeConfig(config));
+  }
+
+  function getConfigs() {
+    return registeredConfigs.slice();
+  }
+
+  function normalizeConfig(config) {
+    const normalized = {
+      ...config,
+      match: config.match || {},
+      block: config.block || null,
+      keywordLabels: normalizeMapKeys(config.keywordLabels),
+      keywordPhrases: normalizeMapKeys(config.keywordPhrases),
+      captureRules: normalizeCaptureRules(config.captureRules),
+      valueDescriptions: normalizeValueDescriptions(config.valueDescriptions)
+    };
+
+    if (normalized.match.startKeyword) {
+      normalized.match.startKeyword = String(normalized.match.startKeyword).toUpperCase();
+    }
+
+    if (normalized.match.startPhrase) {
+      normalized.match.startTokens = String(normalized.match.startPhrase)
+        .trim()
+        .toUpperCase()
+        .split(/\s+/)
+        .filter(Boolean);
+    } else {
+      normalized.match.startTokens = [];
+    }
+
+    if (normalized.block && normalized.block.endKeyword) {
+      normalized.block = {
+        ...normalized.block,
+        endKeyword: String(normalized.block.endKeyword).toUpperCase()
+      };
+    }
+
+    return normalized;
+  }
+
+  function normalizeMapKeys(map) {
+    if (!map) {
+      return {};
+    }
+
+    const output = {};
+    for (const key of Object.keys(map)) {
+      output[String(key).toUpperCase()] = map[key];
+    }
+    return output;
+  }
+
+  function normalizeCaptureRules(rules) {
+    if (!Array.isArray(rules)) {
+      return [];
+    }
+
+    return rules.map((rule) => {
+      const after = rule.after || "";
+      const afterTokens = String(after)
+        .trim()
+        .toUpperCase()
+        .split(/\s+/)
+        .filter(Boolean);
+
+      const stopTokensUpper = Array.isArray(rule.stopTokens)
+        ? rule.stopTokens
+            .map((token) => String(token).trim().toUpperCase())
+            .filter(Boolean)
+        : [];
+
+      return {
+        ...rule,
+        afterTokens,
+        capture: rule.capture || "next",
+        stopTokensUpper
+      };
+    });
+  }
+
+  function normalizeValueDescriptions(desc) {
+    if (!desc) {
+      return {};
+    }
+
+    const output = {};
+    for (const key of Object.keys(desc)) {
+      output[key] = normalizeMapKeys(desc[key]);
+    }
+    return output;
+  }
+
+  function parseAbapText(content, configs, fileName) {
+    const lines = String(content || "").split(/\r?\n/);
+    const statements = collectStatements(lines);
+    const list = Array.isArray(configs) ? configs : registeredConfigs;
+    const objects = parseStatements(statements, list, fileName || "");
+
+    const decls = attachDeclarationRefs({ statements, objects, fileName: fileName || "" });
+
+    return {
+      file: fileName || "",
+      objects,
+      decls
+    };
+  }
+
+  function pickPreferredStatementComment(statementBuffer) {
+    if (!statementBuffer || typeof statementBuffer !== "object") {
+      return "";
+    }
+
+    const lineEntries = Array.isArray(statementBuffer.lineEntries) ? statementBuffer.lineEntries : [];
+    for (const entry of lineEntries) {
+      const inline = entry && typeof entry.comment === "string" ? entry.comment.trim() : "";
+      if (inline) {
+        return inline;
+      }
+    }
+
+    const leading = Array.isArray(statementBuffer.leadingCommentLines) ? statementBuffer.leadingCommentLines : [];
+    if (leading.length !== 1) {
+      return "";
+    }
+
+    const candidate = leading[0];
+    const text = candidate && typeof candidate.text === "string" ? candidate.text.trim() : "";
+    const line = candidate ? Number(candidate.line || 0) || 0 : 0;
+    const lineStart = Number(statementBuffer.lineStart || 0) || 0;
+
+    if (!text || !lineStart || line !== lineStart - 1) {
+      return "";
+    }
+
+    return text;
+  }
+
+  function collectStatements(lines) {
+    const statements = [];
+    let current = null;
+    let pendingComments = [];
+
+    function createStatementBuffer(lineNumber) {
+      const leadingCommentLines = pendingComments.slice();
+      const leadingComments = leadingCommentLines
+        .map((entry) => (entry && typeof entry.text === "string" ? entry.text : ""))
+        .filter(Boolean);
+
+      pendingComments = [];
+      return {
+        lineStart: lineNumber,
+        rawParts: [],
+        comments: leadingComments.slice(),
+        leadingComments,
+        leadingCommentLines,
+        lineEntries: []
+      };
+    }
+
+    function finalizeCurrentStatement() {
+      if (!current) {
+        return;
+      }
+
+      const raw = current.rawParts.join(" ").replace(/\s+/g, " ").trim();
+      if (!raw) {
+        current = null;
+        return;
+      }
+
+      const commentText = pickPreferredStatementComment(current);
+      const firstEntry = current.lineEntries.length ? current.lineEntries[0] : null;
+      const segmentIndex = firstEntry && Number.isFinite(Number(firstEntry.segmentIndex))
+        ? Math.max(0, Math.floor(Number(firstEntry.segmentIndex)))
+        : null;
+      const statement = {
+        lineStart: current.lineStart,
+        raw,
+        comment: commentText,
+        commentLines: current.comments.filter(Boolean),
+        leadingComments: current.leadingComments ? current.leadingComments.slice() : [],
+        lineEntries: current.lineEntries.slice()
+      };
+      if (segmentIndex !== null) {
+        statement.segmentIndex = segmentIndex;
+      }
+      statements.push(statement);
+
+      current = null;
+    }
+
+    function splitCodeIntoStatementSegments(codeText) {
+      const source = String(codeText || "");
+      const segments = [];
+      let inSingleQuote = false;
+      let inPipe = false;
+      let inBacktick = false;
+      let segmentStart = 0;
+
+      for (let index = 0; index < source.length; index += 1) {
+        const char = source[index];
+        const next = index + 1 < source.length ? source[index + 1] : "";
+        const prev = index > 0 ? source[index - 1] : "";
+
+        if (char === "'" && !inPipe && !inBacktick) {
+          if (inSingleQuote && next === "'") {
+            index += 1;
+            continue;
+          }
+          inSingleQuote = !inSingleQuote;
+          continue;
+        }
+
+        if (char === "|" && !inSingleQuote && !inBacktick) {
+          if (inPipe && next === "|") {
+            index += 1;
+            continue;
+          }
+          inPipe = !inPipe;
+          continue;
+        }
+
+        if (char === "`" && !inSingleQuote && !inPipe) {
+          if (inBacktick && next === "`") {
+            index += 1;
+            continue;
+          }
+          inBacktick = !inBacktick;
+          continue;
+        }
+
+        if (char !== "." || inSingleQuote || inPipe || inBacktick) {
+          continue;
+        }
+
+        if (/\d/.test(prev) && /\d/.test(next)) {
+          continue;
+        }
+
+        const statementText = source.slice(segmentStart, index + 1).trim();
+        if (statementText) {
+          segments.push({ code: statementText, terminated: true });
+        }
+        segmentStart = index + 1;
+      }
+
+      const trailing = source.slice(segmentStart).trim();
+      if (trailing) {
+        segments.push({ code: trailing, terminated: false });
+      }
+
+      return segments;
+    }
+
+    for (let index = 0; index < lines.length; index += 1) {
+      const lineNumber = index + 1;
+      const rawLine = lines[index];
+      const trimmed = rawLine.trim();
+
+      if (!trimmed) {
+        if (!current) {
+          pendingComments = [];
+        }
+        continue;
+      }
+
+      if (isCommentLine(trimmed)) {
+        const commentText = normalizeComment(trimmed);
+        if (commentText) {
+          if (current) {
+            current.comments.push(commentText);
+          } else {
+            pendingComments.push({ line: lineNumber, text: commentText });
+          }
+        } else if (!current) {
+          // Decorative comment-only lines behave like blank separators.
+          pendingComments = [];
+        }
+        continue;
+      }
+
+      const { code, comment } = splitCodeAndInlineComment(rawLine);
+      const segments = splitCodeIntoStatementSegments(code);
+
+      if (!segments.length) {
+        if (comment) {
+          pendingComments.push({ line: lineNumber, text: comment });
+        } else if (!current) {
+          // Decorative inline-only comment (e.g. `"----"`) is treated as blank.
+          pendingComments = [];
+        }
+        continue;
+      }
+
+      for (let segmentIndex = 0; segmentIndex < segments.length; segmentIndex += 1) {
+        const segment = segments[segmentIndex];
+        const codeTrim = String(segment && segment.code ? segment.code : "").trim();
+        if (!codeTrim) {
+          continue;
+        }
+
+        if (!current) {
+          current = createStatementBuffer(lineNumber);
+        }
+
+        const entryComment = segmentIndex === (segments.length - 1) ? comment : "";
+        current.rawParts.push(codeTrim);
+        if (entryComment) {
+          current.comments.push(entryComment);
+        }
+        current.lineEntries.push({
+          line: lineNumber,
+          code: codeTrim,
+          comment: entryComment || "",
+          segmentIndex: segmentIndex
+        });
+
+        if (segment.terminated) {
+          finalizeCurrentStatement();
+        }
+      }
+    }
+
+    return statements;
+  }
+
+  function isCommentLine(trimmedLine) {
+    return trimmedLine.startsWith("*") || trimmedLine.startsWith('"');
+  }
+
+  function normalizeComment(trimmedLine) {
+    const normalizeText = (text) => {
+      const trimmed = String(text || "").trim();
+      if (!trimmed) {
+        return "";
+      }
+
+      // Treat separator-only comment content as empty.
+      if (
+        !/[A-Za-z0-9\u00C0-\u024F\u1E00-\u1EFF]/.test(trimmed) &&
+        /^[\s*&\-_=~#|\\/.:;,+(){}\[\]<>]+$/.test(trimmed)
+      ) {
+        return "";
+      }
+
+      return trimmed;
+    };
+
+    if (trimmedLine.startsWith("*") || trimmedLine.startsWith('"')) {
+      return normalizeText(trimmedLine.slice(1));
+    }
+    return normalizeText(trimmedLine);
+  }
+
+  function splitCodeAndInlineComment(line) {
+    const text = String(line || "");
+    let inSingleQuote = false;
+    let inPipe = false;
+    let inBacktick = false;
+
+    for (let index = 0; index < text.length; index += 1) {
+      const char = text[index];
+      const next = index + 1 < text.length ? text[index + 1] : "";
+
+      if (char === "'" && !inPipe && !inBacktick) {
+        if (inSingleQuote && next === "'") {
+          index += 1;
+          continue;
+        }
+        inSingleQuote = !inSingleQuote;
+        continue;
+      }
+
+      if (char === "|" && !inSingleQuote && !inBacktick) {
+        if (inPipe && next === "|") {
+          index += 1;
+          continue;
+        }
+        inPipe = !inPipe;
+        continue;
+      }
+
+      if (char === "`" && !inSingleQuote && !inPipe) {
+        if (inBacktick && next === "`") {
+          index += 1;
+          continue;
+        }
+        inBacktick = !inBacktick;
+        continue;
+      }
+
+      if (char === '"' && !inSingleQuote && !inPipe && !inBacktick) {
+        const code = text.slice(0, index);
+        const comment = normalizeComment(text.slice(index + 1));
+        return { code, comment };
+      }
+    }
+
+    return { code: text, comment: "" };
+  }
+
+  function parseStatements(statements, configs, fileName) {
+    const roots = [];
+    const stack = [];
+    let nextId = 1;
+
+    for (const statement of statements) {
+      const statementStart = getStatementStartKeyword(statement.raw);
+      const currentFrame = stack.length ? stack[stack.length - 1] : null;
+
+      if (currentFrame && statementStart === currentFrame.endKeyword) {
+        currentFrame.node.block.endRaw = statement.raw;
+        currentFrame.node.block.lineEnd = statement.lineStart;
+        stack.pop();
+        continue;
+      }
+
+      const parentId = currentFrame ? currentFrame.node.id : null;
+      const parsedList = parseStatement(statement, configs, fileName, parentId, () => nextId++);
+      if (!parsedList || !parsedList.length) {
+        continue;
+      }
+
+      const targetList = currentFrame ? currentFrame.node.children : roots;
+      const statementSegmentIndex = Number.isFinite(Number(statement.segmentIndex))
+        ? Math.max(0, Math.floor(Number(statement.segmentIndex)))
+        : null;
+      for (const node of parsedList) {
+        if (statementSegmentIndex !== null && node && typeof node === "object" && node.segmentIndex === undefined) {
+          node.segmentIndex = statementSegmentIndex;
+        }
+        targetList.push(node);
+        if (node.block && node.block.endKeyword) {
+          stack.push({ node, endKeyword: node.block.endKeyword });
+        }
+      }
+    }
+
+    return roots;
+  }
+
+  function getStatementStartKeyword(raw) {
+    const tokens = tokenize(raw);
+    if (!tokens.length) {
+      return "";
+    }
+    return tokens[0].upper;
+  }
+
+  function parseStatement(statement, configs, fileName, parentId, nextId) {
+    const tokens = tokenize(statement.raw);
+    if (tokens.length === 0) {
+      return null;
+    }
+
+    for (const config of configs) {
+      if (!matchesConfig(tokens, config, statement.raw)) {
+        continue;
+      }

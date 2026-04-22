@@ -26,6 +26,7 @@ Workflow:
   - `node scripts/build-viewer-configs.js`
 - Viewer consumes the generated files: `viewer/configs.generated/*.js`
 - Guide: `RULES.md`
+- Object model and canonical path guide: `docs/ABAP_OBJECT_MODEL.md`
 
 ## CLI (optional)
 - Parse ABAP file to JSON:

@@ -1,10 +1,392 @@
-"use strict";
 
-(function (root) {
-  const globalRoot = root || (typeof globalThis !== "undefined" ? globalThis : this);
-  const registry = globalRoot.__AbapSourceParts = globalRoot.__AbapSourceParts || {};
-  const targetKey = "shared/abap-parser.js";
-  const partKey = "shared/abap-parser/04-parse-core.js";
-  const bucket = registry[targetKey] = registry[targetKey] || {};
-  bucket[partKey] = "\n        if (!stack.length || !current) {\n          continue;\n        }\n\n        const fieldName = extractStructFieldName(segment);\n        if (!fieldName) {\n          continue;\n        }\n\n        const prefix = currentNestedPrefix();\n        const path = prefix ? `${prefix}-${fieldName}` : fieldName;\n        addField(path, { lineStart, raw: segment, comment: String(comment || \"\").trim() });\n      }\n    }\n\n    return defs;\n  }\n\n  function parseStructMarker(segment) {\n    const text = String(segment || \"\");\n    const beginMatch = text.match(/\\bBEGIN\\s+OF\\s+([A-Za-z_][A-Za-z0-9_]*)/i);\n    if (beginMatch) {\n      return { kind: \"BEGIN\", name: beginMatch[1] };\n    }\n\n    const endMatch = text.match(/\\bEND\\s+OF\\s+([A-Za-z_][A-Za-z0-9_]*)/i);\n    if (endMatch) {\n      return { kind: \"END\", name: endMatch[1] };\n    }\n\n    return null;\n  }\n\n  function extractStructFieldName(segment) {\n    const text = String(segment || \"\").trim();\n    if (!text) {\n      return \"\";\n    }\n\n    const match = text.match(/^([A-Za-z_][A-Za-z0-9_]*)/);\n    if (!match) {\n      return \"\";\n    }\n\n    const candidate = match[1] || \"\";\n    const upper = candidate.toUpperCase();\n    if ([\"BEGIN\", \"END\", \"INCLUDE\"].includes(upper)) {\n      return \"\";\n    }\n\n    return normalizeIdentifierCandidate(candidate) || \"\";\n  }\n\n  function resolveStructDefByContext(typeUpper, context, typeStructDefsByScope) {\n    if (!typeUpper || !typeStructDefsByScope) {\n      return null;\n    }\n\n    const procMap = context && context.procId ? typeStructDefsByScope.get(context.procId) : null;\n    if (procMap && procMap.has(typeUpper)) {\n      return procMap.get(typeUpper);\n    }\n\n    const classMap = context && context.classDefId ? typeStructDefsByScope.get(context.classDefId) : null;\n    if (classMap && classMap.has(typeUpper)) {\n      return classMap.get(typeUpper);\n    }\n\n    const globalMap = typeStructDefsByScope.get(0);\n    if (globalMap && globalMap.has(typeUpper)) {\n      return globalMap.get(typeUpper);\n    }\n\n    return null;\n  }\n\n  function getStructTypeCandidateFromDeclObject(obj) {\n    if (!obj) {\n      return \"\";\n    }\n\n    const type = getFirstValue(obj.values, \"type\");\n    const like = getFirstValue(obj.values, \"like\");\n    const structure = getFirstValue(obj.values, \"structure\");\n\n    const candidate = type || like || structure;\n    const normalized = normalizeIdentifierCandidate(candidate);\n    return normalized || \"\";\n  }\n\n  function patchDeclComment(declByScope, scopeId, nameUpper, comment) {\n    const trimmed = String(comment || \"\").trim();\n    if (!declByScope || !declByScope.has(scopeId)) {\n      return;\n    }\n\n    const scopeMap = declByScope.get(scopeId);\n    if (!scopeMap || !scopeMap.has(nameUpper)) {\n      return;\n    }\n\n    const decl = scopeMap.get(nameUpper);\n    if (decl && String(decl.comment || \"\").trim() !== trimmed) {\n      decl.comment = trimmed;\n    }\n  }\n\n  function attachStructFieldDecls({\n    allObjects,\n    idToObject,\n    declByScope,\n    scopeInfoById,\n    procedureBlocks,\n    classBlocks,\n    classInfo,\n    fileName,\n    structDefs\n  }) {\n    const dataByScope = structDefs && structDefs.dataByScope ? structDefs.dataByScope : new Map();\n    const typeByScope = structDefs && structDefs.typeByScope ? structDefs.typeByScope : new Map();\n\n    // 1) DATA inline structs: create `${var}-${field}` decls with per-field comments.\n    for (const [scopeId, defsByName] of dataByScope.entries()) {\n      const scopeInfo = scopeInfoById.get(scopeId) || buildFallbackScopeInfo(scopeId);\n\n      for (const def of defsByName.values()) {\n        if (!def || !def.name || !def.nameUpper) {\n          continue;\n        }\n\n        patchDeclComment(declByScope, scopeId, def.nameUpper, def.comment || \"\");\n\n        for (const field of def.fields.values()) {\n          const fullName = `${def.name}-${field.path}`;\n          addDecl(declByScope, scopeId, fullName, {\n            id: null,\n            objectType: \"STRUCT_FIELD\",\n            name: fullName,\n            file: fileName || \"\",\n            lineStart: field.lineStart || null,\n            raw: field.raw || \"\",\n            comment: field.comment || \"\",\n            scopeId,\n            scopeLabel: scopeInfo.scopeLabel,\n            scopeType: scopeInfo.scopeType,\n            scopeName: scopeInfo.scopeName,\n            structName: def.name,\n            fieldPath: field.path,\n            structObjectType: def.kind || \"DATA\",\n            structLineStart: def.lineStart || null,\n            structRaw: def.rawStart || \"\",\n            structComment: def.comment || \"\"\n          });\n        }\n      }\n    }\n\n    // 2) Typed declarations: `DATA ls_s TYPE ty_s.` -> create `ls_s-field` from `TYPES ... BEGIN OF ty_s`.\n    for (const obj of allObjects || []) {\n      if (!obj || !obj.objectType || !obj.values) {\n        continue;\n      }\n\n      const structMeta = obj.extras && typeof obj.extras === \"object\" ? obj.extras.structDef : null;\n      if (structMeta && structMeta.isDecl === false) {\n        continue;\n      }\n\n      const declName = getFirstValue(obj.values, \"name\");\n      const normalizedDeclName = normalizeIdentifierCandidate(declName);\n      if (!normalizedDeclName) {\n        continue;\n      }\n\n      const scopeId = getDeclarationScopeId(obj, idToObject, procedureBlocks, classBlocks);\n      const scopeInfo = scopeInfoById.get(scopeId) || buildFallbackScopeInfo(scopeId);\n\n      // Skip if already an inline DATA struct in the same scope (DATA wins; addDecl also protects).\n      const dataScopeMap = dataByScope.get(scopeId);\n      if (dataScopeMap && dataScopeMap.has(normalizedDeclName.toUpperCase())) {\n        continue;\n      }\n\n      const typeName = getStructTypeCandidateFromDeclObject(obj);\n      if (!typeName) {\n        continue;\n      }\n\n      const typeUpper = typeName.toUpperCase();\n      const context = buildResolveContext(obj, idToObject, declByScope, classInfo);\n      const typeDef = resolveStructDefByContext(typeUpper, context, typeByScope);\n      if (!typeDef) {\n        continue;\n      }\n\n      patchDeclComment(declByScope, typeDef.scopeId || scopeId, typeUpper, typeDef.comment || \"\");\n\n      for (const field of typeDef.fields.values()) {\n        const fullName = `${normalizedDeclName}-${field.path}`;\n        addDecl(declByScope, scopeId, fullName, {\n          id: null,\n          objectType: \"STRUCT_FIELD\",\n          name: fullName,\n          file: fileName || \"\",\n          lineStart: field.lineStart || null,\n          raw: field.raw || \"\",\n          comment: field.comment || \"\",\n          scopeId,\n          scopeLabel: scopeInfo.scopeLabel,\n          scopeType: scopeInfo.scopeType,\n          scopeName: scopeInfo.scopeName,\n          structName: normalizedDeclName,\n          fieldPath: field.path,\n          structObjectType: obj.objectType || \"DATA\",\n          structId: obj.id || null,\n          structLineStart: obj.lineStart || null,\n          structRaw: obj.raw || \"\",\n          structComment: obj.comment || \"\",\n          structTypeName: typeDef.name || typeName,\n          structTypeLineStart: typeDef.lineStart || null,\n          structTypeRaw: typeDef.rawStart || \"\",\n          structTypeComment: typeDef.comment || \"\"\n        });\n      }\n    }\n  }\n\n  function collectAllObjects(roots) {\n    const list = [];\n    for (const root of roots || []) {\n      walkObject(root, list);\n    }\n    return list;\n  }\n\n  function walkObject(node, list) {\n    if (!node) {\n      return;\n    }\n\n    list.push(node);\n    if (Array.isArray(node.children)) {\n      for (const child of node.children) {\n        walkObject(child, list);\n      }\n    }\n  }\n\n  function buildClassInfo(allObjects) {\n    const byName = new Map();\n    for (const obj of allObjects) {\n      if (!obj || obj.objectType !== \"CLASS\") {\n        continue;\n      }\n      const className = getFirstValue(obj.values, \"name\");\n      if (!className) {\n        continue;\n      }\n      const classNameUpper = className.toUpperCase();\n      const kind = classifyClassBlock(obj.raw || \"\");\n      if (!byName.has(classNameUpper)) {\n        byName.set(classNameUpper, { definition: null, implementation: null });\n      }\n      const entry = byName.get(classNameUpper);\n      if (kind === \"DEFINITION\") {\n        entry.definition = obj;\n      } else if (kind === \"IMPLEMENTATION\") {\n        entry.implementation = obj;\n      }\n    }\n\n    const methodParamsByClassAndName = new Map();\n    for (const [classNameUpper, entry] of byName.entries()) {\n      const classDef = entry.definition;\n      if (!classDef || !Array.isArray(classDef.children)) {\n        continue;\n      }\n\n      for (const child of classDef.children) {\n        if (!child || ![\"METHODS\", \"CLASS-METHODS\"].includes(child.objectType)) {\n          continue;\n        }\n\n        const methodName = getFirstValue(child.values, \"name\");\n        if (!methodName) {\n          continue;\n        }\n\n        const signature = child.extras && child.extras.methodSignature ? child.extras.methodSignature : null;\n        const params = signature && Array.isArray(signature.params) ? signature.params : [];\n        const paramsByNameUpper = new Map();\n\n        for (const param of params) {\n          if (!param || !param.name) {\n            continue;\n          }\n          paramsByNameUpper.set(param.name.toUpperCase(), {\n            id: child.id,\n            objectType: \"METHOD_PARAM\",\n            name: param.name,\n            file: child.file || \"\",\n            lineStart: child.lineStart || null,\n            raw: child.raw || \"\",\n            comment: \"\",\n            scopeId: child.id,\n            scopeLabel: `METHODSIG:${classNameUpper}=>${methodName.toUpperCase()}`,\n            scopeType: \"METHODSIG\",\n            scopeName: methodName\n          });\n        }\n\n        methodParamsByClassAndName.set(`${classNameUpper}:${methodName.toUpperCase()}`, {\n          classNameUpper,\n          methodNameUpper: methodName.toUpperCase(),\n          paramsByNameUpper,\n          signatureId: child.id\n        });\n      }\n    }\n\n    return {\n      byName,\n      methodParamsByClassAndName\n    };\n  }\n\n  function classifyClassBlock(raw) {\n    const upper = String(raw || \"\").toUpperCase();\n    if (upper.includes(\" DEFINITION\")) {\n      return \"DEFINITION\";\n    }\n    if (upper.includes(\" IMPLEMENTATION\")) {\n      return \"IMPLEMENTATION\";\n    }\n    return \"\";\n  }\n\n  function getFirstValue(values, name) {\n    if (!values) {\n      return \"\";\n    }\n\n    if (Array.isArray(values)) {\n      for (const entry of values) {\n        if (entry && entry.name === name) {\n          return entry.value || \"\";\n        }\n      }\n      return \"\";\n    }\n\n    if (typeof values !== \"object\") {\n      return \"\";\n    }\n\n    const entryOrList = values[name];\n    if (!entryOrList) {\n      return \"\";\n    }\n\n    const entry = Array.isArray(entryOrList) ? entryOrList[0] : entryOrList;\n    return entry && entry.value ? entry.value || \"\" : \"\";\n  }\n\n  function ensureScopeMap(declByScope, scopeId) {\n    if (!declByScope.has(scopeId)) {\n      declByScope.set(scopeId, new Map());\n    }\n  }\n\n  function addDecl(declByScope, scopeId, name, declInfo) {\n    const normalized = normalizeIdentifierCandidate(name);\n    if (!normalized) {\n      return;\n    }\n    const upper = normalized.toUpperCase();\n    ensureScopeMap(declByScope, scopeId);\n    const map = declByScope.get(scopeId);\n    if (!map.has(upper)) {\n      map.set(upper, declInfo);\n    }\n  }\n\n  function getDeclarationScopeId(obj, idToObject, procedureBlocks, classBlocks) {\n    if (!obj) {\n      return 0;\n    }\n    const procId = getProcedureScopeId(obj, idToObject);\n    if (procId) {\n      return procId;\n    }\n";
-})(typeof globalThis !== "undefined" ? globalThis : (typeof self !== "undefined" ? self : this));
+        if (!stack.length || !current) {
+          continue;
+        }
+
+        const fieldName = extractStructFieldName(segment);
+        if (!fieldName) {
+          continue;
+        }
+
+        const prefix = currentNestedPrefix();
+        const path = prefix ? `${prefix}-${fieldName}` : fieldName;
+        addField(path, { lineStart, raw: segment, comment: String(comment || "").trim() });
+      }
+    }
+
+    return defs;
+  }
+
+  function parseStructMarker(segment) {
+    const text = String(segment || "");
+    const beginMatch = text.match(/\bBEGIN\s+OF\s+([A-Za-z_][A-Za-z0-9_]*)/i);
+    if (beginMatch) {
+      return { kind: "BEGIN", name: beginMatch[1] };
+    }
+
+    const endMatch = text.match(/\bEND\s+OF\s+([A-Za-z_][A-Za-z0-9_]*)/i);
+    if (endMatch) {
+      return { kind: "END", name: endMatch[1] };
+    }
+
+    return null;
+  }
+
+  function extractStructFieldName(segment) {
+    const text = String(segment || "").trim();
+    if (!text) {
+      return "";
+    }
+
+    const match = text.match(/^([A-Za-z_][A-Za-z0-9_]*)/);
+    if (!match) {
+      return "";
+    }
+
+    const candidate = match[1] || "";
+    const upper = candidate.toUpperCase();
+    if (["BEGIN", "END", "INCLUDE"].includes(upper)) {
+      return "";
+    }
+
+    return normalizeIdentifierCandidate(candidate) || "";
+  }
+
+  function resolveStructDefByContext(typeUpper, context, typeStructDefsByScope) {
+    if (!typeUpper || !typeStructDefsByScope) {
+      return null;
+    }
+
+    const procMap = context && context.procId ? typeStructDefsByScope.get(context.procId) : null;
+    if (procMap && procMap.has(typeUpper)) {
+      return procMap.get(typeUpper);
+    }
+
+    const classMap = context && context.classDefId ? typeStructDefsByScope.get(context.classDefId) : null;
+    if (classMap && classMap.has(typeUpper)) {
+      return classMap.get(typeUpper);
+    }
+
+    const globalMap = typeStructDefsByScope.get(0);
+    if (globalMap && globalMap.has(typeUpper)) {
+      return globalMap.get(typeUpper);
+    }
+
+    return null;
+  }
+
+  function getStructTypeCandidateFromDeclObject(obj) {
+    if (!obj) {
+      return "";
+    }
+
+    const type = getFirstValue(obj.values, "type");
+    const like = getFirstValue(obj.values, "like");
+    const structure = getFirstValue(obj.values, "structure");
+
+    const candidate = type || like || structure;
+    const normalized = normalizeIdentifierCandidate(candidate);
+    return normalized || "";
+  }
+
+  function patchDeclComment(declByScope, scopeId, nameUpper, comment) {
+    const trimmed = String(comment || "").trim();
+    if (!declByScope || !declByScope.has(scopeId)) {
+      return;
+    }
+
+    const scopeMap = declByScope.get(scopeId);
+    if (!scopeMap || !scopeMap.has(nameUpper)) {
+      return;
+    }
+
+    const decl = scopeMap.get(nameUpper);
+    if (decl && String(decl.comment || "").trim() !== trimmed) {
+      decl.comment = trimmed;
+    }
+  }
+
+  function attachStructFieldDecls({
+    allObjects,
+    idToObject,
+    declByScope,
+    scopeInfoById,
+    procedureBlocks,
+    classBlocks,
+    classInfo,
+    fileName,
+    structDefs
+  }) {
+    const dataByScope = structDefs && structDefs.dataByScope ? structDefs.dataByScope : new Map();
+    const typeByScope = structDefs && structDefs.typeByScope ? structDefs.typeByScope : new Map();
+
+    // 1) DATA inline structs: create `${var}-${field}` decls with per-field comments.
+    for (const [scopeId, defsByName] of dataByScope.entries()) {
+      const scopeInfo = scopeInfoById.get(scopeId) || buildFallbackScopeInfo(scopeId);
+
+      for (const def of defsByName.values()) {
+        if (!def || !def.name || !def.nameUpper) {
+          continue;
+        }
+
+        patchDeclComment(declByScope, scopeId, def.nameUpper, def.comment || "");
+
+        for (const field of def.fields.values()) {
+          const fullName = `${def.name}-${field.path}`;
+          addDecl(declByScope, scopeId, fullName, {
+            id: null,
+            objectType: "STRUCT_FIELD",
+            name: fullName,
+            file: fileName || "",
+            lineStart: field.lineStart || null,
+            raw: field.raw || "",
+            comment: field.comment || "",
+            scopeId,
+            scopeLabel: scopeInfo.scopeLabel,
+            scopeType: scopeInfo.scopeType,
+            scopeName: scopeInfo.scopeName,
+            structName: def.name,
+            fieldPath: field.path,
+            structObjectType: def.kind || "DATA",
+            structLineStart: def.lineStart || null,
+            structRaw: def.rawStart || "",
+            structComment: def.comment || ""
+          });
+        }
+      }
+    }
+
+    // 2) Typed declarations: `DATA ls_s TYPE ty_s.` -> create `ls_s-field` from `TYPES ... BEGIN OF ty_s`.
+    for (const obj of allObjects || []) {
+      if (!obj || !obj.objectType || !obj.values) {
+        continue;
+      }
+
+      const structMeta = obj.extras && typeof obj.extras === "object" ? obj.extras.structDef : null;
+      if (structMeta && structMeta.isDecl === false) {
+        continue;
+      }
+
+      const declName = getFirstValue(obj.values, "name");
+      const normalizedDeclName = normalizeIdentifierCandidate(declName);
+      if (!normalizedDeclName) {
+        continue;
+      }
+
+      const scopeId = getDeclarationScopeId(obj, idToObject, procedureBlocks, classBlocks);
+      const scopeInfo = scopeInfoById.get(scopeId) || buildFallbackScopeInfo(scopeId);
+
+      // Skip if already an inline DATA struct in the same scope (DATA wins; addDecl also protects).
+      const dataScopeMap = dataByScope.get(scopeId);
+      if (dataScopeMap && dataScopeMap.has(normalizedDeclName.toUpperCase())) {
+        continue;
+      }
+
+      const typeName = getStructTypeCandidateFromDeclObject(obj);
+      if (!typeName) {
+        continue;
+      }
+
+      const typeUpper = typeName.toUpperCase();
+      const context = buildResolveContext(obj, idToObject, declByScope, classInfo);
+      const typeDef = resolveStructDefByContext(typeUpper, context, typeByScope);
+      if (!typeDef) {
+        continue;
+      }
+
+      patchDeclComment(declByScope, typeDef.scopeId || scopeId, typeUpper, typeDef.comment || "");
+
+      for (const field of typeDef.fields.values()) {
+        const fullName = `${normalizedDeclName}-${field.path}`;
+        addDecl(declByScope, scopeId, fullName, {
+          id: null,
+          objectType: "STRUCT_FIELD",
+          name: fullName,
+          file: fileName || "",
+          lineStart: field.lineStart || null,
+          raw: field.raw || "",
+          comment: field.comment || "",
+          scopeId,
+          scopeLabel: scopeInfo.scopeLabel,
+          scopeType: scopeInfo.scopeType,
+          scopeName: scopeInfo.scopeName,
+          structName: normalizedDeclName,
+          fieldPath: field.path,
+          structObjectType: obj.objectType || "DATA",
+          structId: obj.id || null,
+          structLineStart: obj.lineStart || null,
+          structRaw: obj.raw || "",
+          structComment: obj.comment || "",
+          structTypeName: typeDef.name || typeName,
+          structTypeLineStart: typeDef.lineStart || null,
+          structTypeRaw: typeDef.rawStart || "",
+          structTypeComment: typeDef.comment || ""
+        });
+      }
+    }
+  }
+
+  function collectAllObjects(roots) {
+    const list = [];
+    for (const root of roots || []) {
+      walkObject(root, list);
+    }
+    return list;
+  }
+
+  function walkObject(node, list) {
+    if (!node) {
+      return;
+    }
+
+    list.push(node);
+    if (Array.isArray(node.children)) {
+      for (const child of node.children) {
+        walkObject(child, list);
+      }
+    }
+  }
+
+  function buildClassInfo(allObjects) {
+    const byName = new Map();
+    for (const obj of allObjects) {
+      if (!obj || obj.objectType !== "CLASS") {
+        continue;
+      }
+      const className = getFirstValue(obj.values, "name");
+      if (!className) {
+        continue;
+      }
+      const classNameUpper = className.toUpperCase();
+      const kind = classifyClassBlock(obj.raw || "");
+      if (!byName.has(classNameUpper)) {
+        byName.set(classNameUpper, { definition: null, implementation: null });
+      }
+      const entry = byName.get(classNameUpper);
+      if (kind === "DEFINITION") {
+        entry.definition = obj;
+      } else if (kind === "IMPLEMENTATION") {
+        entry.implementation = obj;
+      }
+    }
+
+    const methodParamsByClassAndName = new Map();
+    for (const [classNameUpper, entry] of byName.entries()) {
+      const classDef = entry.definition;
+      if (!classDef || !Array.isArray(classDef.children)) {
+        continue;
+      }
+
+      for (const child of classDef.children) {
+        if (!child || !["METHODS", "CLASS-METHODS"].includes(child.objectType)) {
+          continue;
+        }
+
+        const methodName = getFirstValue(child.values, "name");
+        if (!methodName) {
+          continue;
+        }
+
+        const signature = child.extras && child.extras.methodSignature ? child.extras.methodSignature : null;
+        const params = signature && Array.isArray(signature.params) ? signature.params : [];
+        const paramsByNameUpper = new Map();
+
+        for (const param of params) {
+          if (!param || !param.name) {
+            continue;
+          }
+          paramsByNameUpper.set(param.name.toUpperCase(), {
+            id: child.id,
+            objectType: "METHOD_PARAM",
+            name: param.name,
+            file: child.file || "",
+            lineStart: child.lineStart || null,
+            raw: child.raw || "",
+            comment: "",
+            scopeId: child.id,
+            scopeLabel: `METHODSIG:${classNameUpper}=>${methodName.toUpperCase()}`,
+            scopeType: "METHODSIG",
+            scopeName: methodName
+          });
+        }
+
+        methodParamsByClassAndName.set(`${classNameUpper}:${methodName.toUpperCase()}`, {
+          classNameUpper,
+          methodNameUpper: methodName.toUpperCase(),
+          paramsByNameUpper,
+          signatureId: child.id
+        });
+      }
+    }
+
+    return {
+      byName,
+      methodParamsByClassAndName
+    };
+  }
+
+  function classifyClassBlock(raw) {
+    const upper = String(raw || "").toUpperCase();
+    if (upper.includes(" DEFINITION")) {
+      return "DEFINITION";
+    }
+    if (upper.includes(" IMPLEMENTATION")) {
+      return "IMPLEMENTATION";
+    }
+    return "";
+  }
+
+  function getFirstValue(values, name) {
+    if (!values) {
+      return "";
+    }
+
+    if (Array.isArray(values)) {
+      for (const entry of values) {
+        if (entry && entry.name === name) {
+          return entry.value || "";
+        }
+      }
+      return "";
+    }
+
+    if (typeof values !== "object") {
+      return "";
+    }
+
+    const entryOrList = values[name];
+    if (!entryOrList) {
+      return "";
+    }
+
+    const entry = Array.isArray(entryOrList) ? entryOrList[0] : entryOrList;
+    return entry && entry.value ? entry.value || "" : "";
+  }
+
+  function ensureScopeMap(declByScope, scopeId) {
+    if (!declByScope.has(scopeId)) {
+      declByScope.set(scopeId, new Map());
+    }
+  }
+
+  function addDecl(declByScope, scopeId, name, declInfo) {
+    const normalized = normalizeIdentifierCandidate(name);
+    if (!normalized) {
+      return;
+    }
+    const upper = normalized.toUpperCase();
+    ensureScopeMap(declByScope, scopeId);
+    const map = declByScope.get(scopeId);
+    if (!map.has(upper)) {
+      map.set(upper, declInfo);
+    }
+  }
+
+  function getDeclarationScopeId(obj, idToObject, procedureBlocks, classBlocks) {
+    if (!obj) {
+      return 0;
+    }
+    const procId = getProcedureScopeId(obj, idToObject);
+    if (procId) {
+      return procId;
+    }

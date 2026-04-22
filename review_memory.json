@@ -1,0 +1,207 @@
+{
+  "review_meta": {
+    "version": "1.0",
+    "review_scope": "template config, template preview, square-cell layout, parser tách câu lệnh, contract tests",
+    "review_target": "viewer/app/05-main.js, viewer/app/template/01-path-resolver.js, viewer/index.html, shared/abap-parser/01-context.js, shared/abap-parser/09-public-api.js, tests/parser-regression.js, tests/viewer-contracts.js",
+    "review_time": "2026-03-29T19:16:44+07:00",
+    "language": "vi",
+    "summary_status": "pass_with_risk",
+    "release_decision": "Có thể release nhưng có rủi ro cần chấp nhận"
+  },
+  "final_summary": {
+    "short_conclusion": "Các finding chính đã sửa; ô template vuông giữ height cố định và để text overflow hiển thị thay vì bị che; parser và viewer contract test đều qua; còn rủi ro legacy nhỏ cần theo dõi.",
+    "top_blockers": [],
+    "top_logic_issues": [],
+    "top_uiux_issues": [],
+    "top_improvements": []
+  },
+  "findings": [
+    {
+      "id": "logic-001",
+      "status": "fixed",
+      "type": "loi_rui_ro",
+      "severity": "nghiem_trong",
+      "title": "Nhập JSON template bị chặn trước khi chuẩn hóa",
+      "location": {
+        "file": "viewer/app/05-main.js",
+        "line": "929-945",
+        "function": "syncJsonToDraft",
+        "component": "Template config modal",
+        "screen": "Template > JSON"
+      },
+      "problem": "JSON nhập vào được validate trước khi chạy bước chuẩn hóa/di trú giá trị cũ. Các luồng load và restore khác lại normalize trước, nên config cũ có thể bị từ chối riêng ở đường import.",
+      "plain_explanation": "Người dùng mở file cấu hình cũ có thể bị báo lỗi và không nạp được, dù app vốn có bước tự đổi dữ liệu cũ sang dạng mới.",
+      "why_it_matters": "Đây là lỗi tương thích ngược: cấu hình đã lưu hoặc chia sẻ trước đó có thể không dùng lại được, preview cũng có thể bị chặn.",
+      "impact": "Mất khả năng import config cũ; preview bị blank; người dùng phải sửa JSON thủ công hoặc xoá cấu hình.",
+      "suggested_fix": "Chuẩn hóa payload trước rồi mới validate. Nếu normalize làm đổi dữ liệu, lưu lại bản đã chuẩn hóa và báo rõ cho người dùng.",
+      "priority": "sua_ngay",
+      "block_release": "khong",
+      "confidence": "cao",
+      "assumptions": [
+        "Người dùng có thể import hoặc khôi phục config cũ từ bản trước."
+      ],
+      "needs_verification": false,
+      "recheck_after_fix": [
+        "Import JSON cũ có alias màu hoặc shape cũ vẫn nạp được.",
+        "Template preview không còn bị chặn bởi config migrated."
+      ],
+      "tags": [
+        "compatibility",
+        "import",
+        "template-config"
+      ],
+      "history": [
+        "2026-03-29: fixed normalize-before-validate cho đường import JSON."
+      ]
+    },
+    {
+      "id": "parser-001",
+      "status": "fixed",
+      "type": "loi_rui_ro",
+      "severity": "trung_binh",
+      "title": "Không nhận backtick literal khi tách câu lệnh",
+      "location": {
+        "file": "shared/abap-parser/09-public-api.js",
+        "line": "9",
+        "function": "tokenize",
+        "component": "Tokenizer và statement splitter",
+        "screen": "Parser"
+      },
+      "problem": "Tokenizer và bộ tách câu lệnh chỉ bảo vệ chuỗi dạng '...' và |...|. Nếu ABAP đầu vào có literal dạng backtick, dấu chấm hoặc dấu nháy kép bên trong có thể bị hiểu nhầm là kết thúc câu lệnh hoặc comment.",
+      "plain_explanation": "Nếu người dùng dán đoạn ABAP có chuỗi dùng dấu backtick, bộ tách câu lệnh có thể cắt nhầm thành nhiều mẩu nhỏ.",
+      "why_it_matters": "Parse sai sẽ kéo theo sai tree, sai vị trí dòng, sai mapping description/template và sai export.",
+      "impact": "Câu lệnh bị tách sai, output lệch, các chức năng dựa trên parse cũng sai theo.",
+      "suggested_fix": "Nếu dialect mục tiêu có backtick literal, hãy dạy tokenizer và splitCodeIntoStatementSegments nhận dạng nó. Thêm test có dấu chấm và dấu nháy kép bên trong chuỗi.",
+      "priority": "sua_som",
+      "block_release": "khong",
+      "confidence": "cao",
+      "assumptions": [
+        "ABAP đầu vào thực tế có thể chứa literal kiểu backtick."
+      ],
+      "needs_verification": false,
+      "recheck_after_fix": [
+        "ABAP có backtick literal vẫn tạo đúng một statement.",
+        "Dấu chấm trong backtick không làm split nhầm."
+      ],
+      "tags": [
+        "parser",
+        "string-literal",
+        "edge-case"
+      ],
+      "history": [
+        "2026-03-29: fixed backtick literal parsing và thêm regression test."
+      ]
+    },
+    {
+      "id": "uiux-001",
+      "status": "fixed",
+      "type": "ui_ux",
+      "severity": "trung_binh",
+      "title": "Một click đã mở chế độ sửa ô template",
+      "location": {
+        "file": "viewer/app/template/01-path-resolver.js",
+        "line": "383-393",
+        "function": "buildTemplateBlockElement",
+        "component": "Template preview cell",
+        "screen": "Template preview"
+      },
+      "problem": "Ô template đang được gắn vai trò nút bấm và mở modal sửa ngay khi click một lần. Với khu vực xem trước, thao tác này rất dễ gây sửa nhầm khi người dùng chỉ muốn nhìn hoặc copy nội dung.",
+      "plain_explanation": "Người dùng chỉ muốn xem nhưng lại có thể vô tình mở chế độ sửa khi bấm vào ô.",
+      "why_it_matters": "Một click nhầm có thể đưa người dùng vào màn hình sửa, làm họ đổi sai ô hoặc mất thời gian thoát ra.",
+      "impact": "Dễ sửa nhầm, nhất là trên ô dày đặc hoặc trên màn hình chạm tay.",
+      "suggested_fix": "Đổi sang double-click hoặc một nút Edit riêng. Nếu vẫn giữ single-click, cần tách rõ chế độ xem và chế độ sửa để tránh nhầm.",
+      "priority": "sua_som",
+      "block_release": "khong",
+      "confidence": "cao",
+      "assumptions": [],
+      "needs_verification": false,
+      "recheck_after_fix": [
+        "Click thường không còn mở modal sửa.",
+        "Người dùng vẫn có đường sửa rõ ràng và dễ hiểu."
+      ],
+      "tags": [
+        "uiux",
+        "template",
+        "editing"
+      ],
+      "history": [
+        "2026-03-29: fixed template preview để chỉ mở editor bằng double-click."
+      ]
+    },
+    {
+      "id": "uiux-002",
+      "status": "fixed",
+      "type": "ui_ux",
+      "severity": "cao",
+      "title": "Ô template vuông bị kéo lệch kích thước và che chữ trong browser",
+      "location": {
+        "file": "viewer/app/template/01-path-resolver.js",
+        "line": "337-433",
+        "function": "renderTemplateTable runtime patch",
+        "component": "Template preview table",
+        "screen": "Template preview"
+      },
+      "problem": "Ô template được đặt width và height bằng nhau ở style, nhưng browser vẫn kéo cột rộng hơn vì bảng giữ min-width 100%. Ngoài ra style từ cell config được spread sau cùng nên có thể đè mất white-space, overflow và padding của chế độ ô vuông. Khi text nằm trực tiếp trong td, việc chỉ bỏ overflow hidden ở td vẫn chưa đủ ổn định để hiện chữ đúng như mong muốn.",
+      "plain_explanation": "Nhìn trong code tưởng là ô vuông rồi, nhưng khi render thật thì cột vẫn bị kéo to ra. Chỉ bỏ hidden ở ô chưa đủ; cần tách phần chữ ra khỏi box của ô để ô vẫn vuông mà chữ dài vẫn hiện ra.",
+      "why_it_matters": "Template preview không phản ánh đúng layout người dùng mong muốn; người dùng Nhật muốn ô vuông sẽ thấy kết quả sai trực tiếp trên màn hình.",
+      "impact": "Ô trong cùng một table có độ rộng khác nhau; text dài bị che; preview gây hiểu nhầm khi chỉnh template.",
+      "suggested_fix": "Trong square mode, bỏ min-width 100% của table; ép lại width và height sau khi merge cell.style; giữ td là ô vuông cố định. Đưa text vào inner wrapper riêng với overflow visible, nowrap, clip, pointer-events none để chữ dài tràn ra hiển thị mà không làm ô cao lên và không chặn tương tác edit.",
+      "priority": "sua_ngay",
+      "block_release": "khong",
+      "confidence": "cao",
+      "assumptions": [],
+      "needs_verification": false,
+      "recheck_after_fix": [
+        "Template table không còn min-width 100% trong square mode.",
+        "Ô không merge giữ height bằng width.",
+        "Ô không còn overflow hidden hoặc text-overflow ellipsis ở phần text wrapper.",
+        "Text dài tràn ra hiển thị thay vì làm ô cao thêm.",
+        "Inner wrapper không chặn double-click edit của ô."
+      ],
+      "tags": [
+        "uiux",
+        "template",
+        "layout",
+        "square-cells"
+      ],
+      "history": [
+        "2026-03-29: fixed table stretch và ép square-cell rules sau cell.style; thêm contract test cho min-width, padding, nowrap, overflow.",
+        "2026-03-29: đã thử đổi square cell sang min-height + wrap để text dài không bị hidden.",
+        "2026-03-29: revert auto-height; giữ ô vuông cố định và cho text overflow visible qua inner wrapper.",
+        "2026-03-29: bài học giữ lại: chỉ bỏ overflow hidden ở td là chưa đủ; cách ổn định là khóa td vuông cố định và cho text overflow ở wrapper con."
+      ]
+    }
+  ],
+  "logic_issues": [],
+  "inconsistencies": [],
+  "ui_ux_issues": [],
+  "improvements": [
+    "Giữ normalize-before-validate cho mọi luồng import template config.",
+    "Giữ regression test cho backtick literal và import legacy JSON.",
+    "Giữ template preview ở double-click để tránh sửa nhầm.",
+    "Giữ square-cell layout test để tránh table stretch quay lại."
+  ],
+  "must_fix_now": [],
+  "missing_tests": [],
+  "remaining_risks": [
+    "Có thể còn các dạng config cũ khác chưa được normalize cùng một chỗ.",
+    "Có thể còn kiểu literal ABAP khác chưa có test parser."
+  ],
+  "open_assumptions": [
+    "ABAP đầu vào thực tế có dùng backtick literal.",
+    "Người dùng có nhu cầu import lại config cũ hoặc file JSON được chia sẻ từ bản trước."
+  ],
+  "recheck_items": [],
+  "copy_message_to_dev": [
+    "Giữ normalize-before-validate cho mọi luồng import template config.",
+    "Không mở editor template bằng single-click.",
+    "Duy trì regression test cho backtick literal và import legacy JSON."
+  ],
+  "raw_labels": {
+    "has_logic_bug": false,
+    "has_data_risk": false,
+    "has_security_risk": false,
+    "has_uiux_risk": false,
+    "has_release_blocker": false
+  }
+}

@@ -1,10 +1,2551 @@
 "use strict";
 
-(function (root) {
-  const globalRoot = root || (typeof globalThis !== "undefined" ? globalThis : this);
-  const registry = globalRoot.__AbapSourceParts = globalRoot.__AbapSourceParts || {};
-  const targetKey = "viewer/app/02-descriptions.js";
-  const partKey = "viewer/app/descriptions/01-normalize-and-desc.js";
-  const bucket = registry[targetKey] = registry[targetKey] || {};
-  bucket[partKey] = "\"use strict\";\n\nwindow.AbapViewerModules = window.AbapViewerModules || {};\nwindow.AbapViewerModules.parts = window.AbapViewerModules.parts || {};\n\n  function collectConditionDeclsFromClauses(clauses, addDecl) {\n    const list = Array.isArray(clauses) ? clauses : [];\n    for (const clause of list) {\n      if (!clause || typeof clause !== \"object\") {\n        continue;\n      }\n      addDecl(clause.leftOperandDecl);\n      addDecl(clause.rightOperandDecl);\n    }\n  }\n\n  function collectConditionDeclsFromExtras(extras, addDecl) {\n    if (!extras || typeof extras !== \"object\" || typeof addDecl !== \"function\") {\n      return;\n    }\n\n    if (extras.ifCondition) {\n      collectConditionDeclsFromClauses(extras.ifCondition.conditions, addDecl);\n    }\n\n    if (extras.performCall) {\n      collectConditionDeclsFromClauses(extras.performCall.ifConditions, addDecl);\n    }\n\n    if (extras.select) {\n      collectConditionDeclsFromClauses(extras.select.whereConditions, addDecl);\n      collectConditionDeclsFromClauses(extras.select.havingConditions, addDecl);\n    }\n\n    for (const key of [\"readTable\", \"loopAtItab\", \"modifyItab\", \"deleteItab\"]) {\n      if (extras[key]) {\n        collectConditionDeclsFromClauses(extras[key].conditions, addDecl);\n      }\n    }\n  }\n\n  function getDeclsForDescriptionsModal() {\n    if (state.data && typeof state.data === \"object\" && Array.isArray(state.data.decls)) {\n      return state.data.decls;\n    }\n\n    const decls = [];\n    const seen = new Set();\n\n    const addDecl = (decl) => {\n      if (!decl || typeof decl !== \"object\") {\n        return;\n      }\n      const key = getDeclOverrideStorageKey(decl) || stringifyDecl(decl);\n      if (!key || seen.has(key)) {\n        return;\n      }\n      seen.add(key);\n      decls.push(decl);\n    };\n\n    walkObjects(state.data && Array.isArray(state.data.objects) ? state.data.objects : [], (obj) => {\n      for (const value of getValueEntries(obj)) {\n        addDecl(value && value.decl);\n      }\n\n      const extras = obj && obj.extras && typeof obj.extras === \"object\" ? obj.extras : null;\n      if (!extras) {\n        return;\n      }\n\n      const collectFromAssignmentSections = (container, sections) => {\n        for (const sectionName of sections) {\n          const list = container && Array.isArray(container[sectionName]) ? container[sectionName] : [];\n          for (const entry of list) {\n            const origin = entry && Array.isArray(entry.originDecls) ? entry.originDecls : [];\n            for (const originDecl of origin) {\n              addDecl(originDecl);\n            }\n            addDecl(entry && entry.valueDecl);\n          }\n        }\n      };\n\n      if (extras.callFunction) {\n        collectFromAssignmentSections(extras.callFunction, [\"exporting\", \"importing\", \"changing\", \"tables\", \"exceptions\"]);\n      }\n\n      if (extras.callMethod) {\n        collectFromAssignmentSections(extras.callMethod, [\"exporting\", \"importing\", \"changing\", \"receiving\", \"exceptions\"]);\n      }\n\n      if (extras.performCall) {\n        for (const sectionName of [\"using\", \"changing\", \"tables\"]) {\n          const list = Array.isArray(extras.performCall[sectionName]) ? extras.performCall[sectionName] : [];\n          for (const entry of list) {\n            const origin = entry && Array.isArray(entry.originDecls) ? entry.originDecls : [];\n            for (const originDecl of origin) {\n              addDecl(originDecl);\n            }\n            addDecl(entry && entry.valueDecl);\n          }\n        }\n      }\n\n      if (extras.form && Array.isArray(extras.form.params)) {\n        for (const param of extras.form.params) {\n          const origin = param && Array.isArray(param.originDecls) ? param.originDecls : [];\n          for (const originDecl of origin) {\n            addDecl(originDecl);\n          }\n        }\n      }\n\n      collectConditionDeclsFromExtras(extras, addDecl);\n    });\n\n    return decls;\n  }\n\n  function getDeclCodeDesc(decl) {\n    const source = getSourceDeclDesc(decl);\n    if (source) {\n      return source;\n    }\n    return getBaseDeclDesc(decl);\n  }\n\n  function renderDeclDescCellLines({ structText, itemText }) {\n    const wrap = document.createElement(\"div\");\n    const structLine = document.createElement(\"div\");\n    const structLabel = document.createElement(\"span\");\n    structLabel.className = \"muted\";\n    structLabel.textContent = \"Struct: \";\n    structLine.appendChild(structLabel);\n    structLine.appendChild(document.createTextNode(structText || \"\"));\n    wrap.appendChild(structLine);\n\n    const itemLine = document.createElement(\"div\");\n    const itemLabel = document.createElement(\"span\");\n    itemLabel.className = \"muted\";\n    itemLabel.textContent = \"Item: \";\n    itemLine.appendChild(itemLabel);\n    itemLine.appendChild(document.createTextNode(itemText || \"\"));\n    wrap.appendChild(itemLine);\n\n    return wrap;\n  }\n\n  function renderDeclDescPanelUi() {\n    if (!els.declDescPanel) {\n      return;\n    }\n\n    const settings = state.settings || loadSettings();\n    state.settings = settings;\n\n    if (els.declDescTypes) {\n      els.declDescTypes.replaceChildren();\n      for (const type of DECL_TYPE_OPTIONS) {\n        const label = document.createElement(\"label\");\n        label.className = \"toggle\";\n\n        const input = document.createElement(\"input\");\n        input.type = \"checkbox\";\n        input.value = type;\n        input.checked = Array.isArray(settings.declFilterTypes) && settings.declFilterTypes.includes(type);\n        input.addEventListener(\"change\", () => {\n          const selected = [];\n          const inputs = els.declDescTypes ? els.declDescTypes.querySelectorAll(\"input[type=checkbox]\") : [];\n          for (const checkbox of Array.from(inputs)) {\n            if (checkbox.checked) {\n              selected.push(String(checkbox.value || \"\").trim().toUpperCase());\n            }\n          }\n          state.settings = normalizeSettings({ ...settings, declFilterTypes: selected });\n          saveSettings(state.settings);\n          renderDeclDescPanelUi();\n        });\n\n        label.appendChild(input);\n        label.appendChild(document.createTextNode(type));\n        els.declDescTypes.appendChild(label);\n      }\n    }\n\n    const decls = getDeclsForDescriptionsModal();\n    const types = new Set((state.settings && Array.isArray(state.settings.declFilterTypes))\n      ? state.settings.declFilterTypes\n      : DEFAULT_SETTINGS.declFilterTypes);\n\n    const query = els.declDescSearch ? String(els.declDescSearch.value || \"\").trim().toLowerCase() : \"\";\n    const missingOnly = Boolean(els.declDescMissingOnly && els.declDescMissingOnly.checked);\n\n    const rows = [];\n    let totalRows = 0;\n    let missingRows = 0;\n\n    for (const decl of decls) {\n      if (!decl || typeof decl !== \"object\" || !decl.objectType || !decl.name) {\n        continue;\n      }\n\n      const objectType = String(decl.objectType || \"\").trim().toUpperCase();\n      if (objectType === \"STRUCT_FIELD\") {\n        const structType = String(decl.structObjectType || \"\").trim().toUpperCase();\n        if (structType && !types.has(structType)) {\n          continue;\n        }\n      } else if (!types.has(objectType)) {\n        continue;\n      }\n\n      totalRows += 1;\n\n      const techName = getDeclTechName(decl);\n      const scopeLabel = String(decl.scopeLabel || \"\");\n\n      const isStructField = isStructFieldDecl(decl);\n      if (!isStructField) {\n        const codeDescRaw = String(getDeclCodeDesc(decl) || \"\");\n        const userEntry = getDeclOverrideEntry(decl);\n        const userDescRaw = userEntry.text ? String(userEntry.text) : \"\";\n\n        const codeDesc = settings.normalizeDeclDesc ? normalizeDeclDescText(decl, codeDescRaw) : codeDescRaw;\n        const userDesc = (!settings.normalizeDeclDesc || userEntry.noNormalize)\n          ? userDescRaw\n          : normalizeDeclDescText(decl, userDescRaw);\n\n        const missing = !codeDescRaw.trim() && !userDescRaw.trim();\n        if (missing) {\n          missingRows += 1;\n        }\n        if (missingOnly && !missing) {\n          continue;\n        }\n\n        const haystack = [\n          objectType,\n          scopeLabel,\n          techName,\n          codeDescRaw,\n          userDescRaw,\n          codeDesc,\n          userDesc\n        ]\n          .filter(Boolean)\n          .join(\"\\n\")\n          .toLowerCase();\n\n        if (query && !haystack.includes(query)) {\n          continue;\n        }\n\n        rows.push({\n          decl,\n          objectType,\n          scopeLabel,\n          techName,\n          missing,\n          codeDesc,\n          userDesc\n        });\n        continue;\n      }\n\n      const structDecl = buildStructDeclFromFieldDecl(decl);\n      const structCodeRaw = structDecl ? String(getDeclCodeDesc(structDecl) || \"\") : \"\";\n      const structUserRaw = structDecl ? String(getDeclOverrideDesc(structDecl) || \"\") : \"\";\n      const itemCodeRaw = String(getDeclCodeDesc(decl) || \"\");\n      const itemEntry = getDeclOverrideEntry(decl);\n      const itemUserRaw = itemEntry.text ? String(itemEntry.text) : \"\";\n\n      const structCode = structDecl && settings.normalizeDeclDesc ? normalizeDeclDescText(structDecl, structCodeRaw) : structCodeRaw;\n      const structUser = structDecl && settings.normalizeDeclDesc ? normalizeDeclDescText(structDecl, structUserRaw) : structUserRaw;\n      const itemCode = settings.normalizeDeclDesc ? normalizeDeclDescText(decl, itemCodeRaw) : itemCodeRaw;\n      const itemUser = (!settings.normalizeDeclDesc || itemEntry.noNormalize)\n        ? itemUserRaw\n        : normalizeDeclDescText(decl, itemUserRaw);\n\n      const structMissing = !structCodeRaw.trim() && !structUserRaw.trim();\n      const itemMissing = !itemCodeRaw.trim() && !itemUserRaw.trim();\n      const missing = structMissing || itemMissing;\n      if (missing) {\n        missingRows += 1;\n      }\n      if (missingOnly && !missing) {\n        continue;\n      }\n\n      const haystack = [\n        objectType,\n        scopeLabel,\n        techName,\n        structCodeRaw,\n        structUserRaw,\n        itemCodeRaw,\n        itemUserRaw,\n        structCode,\n        structUser,\n        itemCode,\n        itemUser\n      ]\n        .filter(Boolean)\n        .join(\"\\n\")\n        .toLowerCase();\n\n      if (query && !haystack.includes(query)) {\n        continue;\n      }\n\n      rows.push({\n        decl,\n        objectType,\n        scopeLabel,\n        techName,\n        missing,\n        structMissing,\n        itemMissing,\n        structCode,\n        structUser,\n        itemCode,\n        itemUser\n      });\n    }\n\n    rows.sort((a, b) => {\n      const scopeCmp = String(a.scopeLabel || \"\").localeCompare(String(b.scopeLabel || \"\"));\n      if (scopeCmp) {\n        return scopeCmp;\n      }\n      const typeCmp = String(a.objectType || \"\").localeCompare(String(b.objectType || \"\"));\n      if (typeCmp) {\n        return typeCmp;\n      }\n      return String(a.techName || \"\").localeCompare(String(b.techName || \"\"));\n    });\n\n    if (els.declDescSummary) {\n      const shown = rows.length;\n      els.declDescSummary.textContent = `Showing ${shown} of ${totalRows} decls • Missing: ${missingRows}`;\n    }\n\n    if (!els.declDescTable) {\n      refreshInputGutterTargets();\n      return;\n    }\n\n    if (!state.data || !Array.isArray(state.data.objects)) {\n      els.declDescTable.replaceChildren(el(\"div\", { className: \"muted\", text: \"No data loaded. Click Render first.\" }));\n      refreshInputGutterTargets();\n      return;\n    }\n\n    const table = document.createElement(\"table\");\n    const thead = document.createElement(\"thead\");\n    const headRow = document.createElement(\"tr\");\n    for (const title of [\"type\", \"scope\", \"technical id\", \"code desc\", \"user desc\", \"\"]) {\n      const th = document.createElement(\"th\");\n      th.textContent = title;\n      headRow.appendChild(th);\n    }\n    thead.appendChild(headRow);\n    table.appendChild(thead);\n\n    const tbody = document.createElement(\"tbody\");\n    for (const row of rows) {\n      const tr = document.createElement(\"tr\");\n      const declKey = getDeclOverrideStorageKey(row.decl);\n      if (declKey) {\n        tr.setAttribute(\"data-decl-key\", declKey);\n        if (declKey === state.selectedDeclKey) {\n          tr.classList.add(\"desc-selected\");\n        }\n      }\n      if (row.decl && row.decl.lineStart) {\n        tr.setAttribute(\"data-line-start\", String(row.decl.lineStart));\n      }\n\n      const typeCell = document.createElement(\"td\");\n      typeCell.textContent = row.objectType || \"\";\n      tr.appendChild(typeCell);\n\n      const scopeCell = document.createElement(\"td\");\n      scopeCell.textContent = row.scopeLabel || \"\";\n      tr.appendChild(scopeCell);\n\n      const idCell = document.createElement(\"td\");\n      const idWrap = document.createElement(\"div\");\n      const idLine = document.createElement(\"div\");\n      idLine.textContent = row.techName || \"\";\n      const title = buildDeclTitle(row.decl);\n      if (title) {\n        idLine.title = title;\n      }\n      if (row.decl && row.decl.lineStart) {\n        idLine.style.cursor = \"pointer\";\n        idLine.addEventListener(\"click\", (ev) => {\n          ev.stopPropagation();\n          selectCodeLines(row.decl.lineStart, row.decl.lineStart);\n          if (row.decl.id) {\n            setSelectedCard(row.decl.id);\n          }\n        });\n      }\n      idWrap.appendChild(idLine);\n\n      if (row.objectType === \"STRUCT_FIELD\") {\n        const pills = document.createElement(\"div\");\n        if (row.structMissing) {\n          pills.appendChild(el(\"span\", { className: \"pill\", text: \"struct missing\" }));\n        }\n        if (row.itemMissing) {\n          pills.appendChild(el(\"span\", { className: \"pill\", text: \"item missing\" }));\n        }\n        if (pills.childNodes.length) {\n          idWrap.appendChild(pills);\n        }\n      } else if (row.missing) {\n        idWrap.appendChild(el(\"span\", { className: \"pill\", text: \"missing\" }));\n      }\n\n      idCell.appendChild(idWrap);\n      tr.appendChild(idCell);\n\n      const codeCell = document.createElement(\"td\");\n      if (row.objectType === \"STRUCT_FIELD\") {\n        codeCell.appendChild(renderDeclDescCellLines({ structText: row.structCode || \"\", itemText: row.itemCode || \"\" }));\n      } else {\n        codeCell.textContent = row.codeDesc || \"\";\n      }\n      tr.appendChild(codeCell);\n\n      const userCell = document.createElement(\"td\");\n      if (row.objectType === \"STRUCT_FIELD\") {\n        userCell.appendChild(renderDeclDescCellLines({ structText: row.structUser || \"\", itemText: row.itemUser || \"\" }));\n      } else {\n        userCell.textContent = row.userDesc || \"\";\n      }\n      tr.appendChild(userCell);\n\n      const actionCell = document.createElement(\"td\");\n      const btn = el(\"button\", {\n        className: \"icon-btn\",\n        text: \"✎\",\n        attrs: { type: \"button\", title: \"Edit description\", \"aria-label\": \"Edit description\" }\n      });\n      btn.addEventListener(\"click\", (ev) => {\n        ev.stopPropagation();\n        editDeclDesc(row.decl);\n      });\n      actionCell.appendChild(btn);\n      tr.appendChild(actionCell);\n\n      tbody.appendChild(tr);\n    }\n    table.appendChild(tbody);\n\n    els.declDescTable.replaceChildren(table);\n    refreshInputGutterTargets();\n  }\n\n  function setRightTab(nextTab) {\n    const tab = nextTab === \"descriptions\"\n      ? \"descriptions\"\n      : (nextTab === \"template\" ? \"template\" : \"output\");\n    state.rightTab = tab;\n\n    const showDescriptions = tab === \"descriptions\";\n    const showTemplate = tab === \"template\";\n    const showOutput = tab === \"output\";\n    if (els.output) {\n      els.output.hidden = !showOutput;\n    }\n    if (els.templatePreviewPanel) {\n      els.templatePreviewPanel.hidden = !showTemplate;\n    }\n    if (els.declDescPanel) {\n      els.declDescPanel.hidden = !showDescriptions;\n    }\n\n    if (els.rightPanelTitle) {\n      els.rightPanelTitle.textContent = showDescriptions\n        ? \"Descriptions\"\n        : (showTemplate ? \"Template Preview\" : \"Output\");\n    }\n\n    if (els.rightTabOutputBtn) {\n      els.rightTabOutputBtn.classList.toggle(\"active\", showOutput);\n      els.rightTabOutputBtn.setAttribute(\"aria-selected\", String(showOutput));\n    }\n    if (els.rightTabTemplateBtn) {\n      els.rightTabTemplateBtn.classList.toggle(\"active\", showTemplate);\n      els.rightTabTemplateBtn.setAttribute(\"aria-selected\", String(showTemplate));\n    }\n    if (els.rightTabDescBtn) {\n      els.rightTabDescBtn.classList.toggle(\"active\", showDescriptions);\n      els.rightTabDescBtn.setAttribute(\"aria-selected\", String(showDescriptions));\n    }\n    if (els.declDescJsonBtn) {\n      els.declDescJsonBtn.hidden = !showDescriptions;\n    }\n\n    if (showDescriptions) {\n      renderDeclDescPanelUi();\n      setTimeout(() => {\n        if (els.declDescSearch) {\n          els.declDescSearch.focus();\n        }\n      }, 0);\n    } else if (showOutput) {\n      renderOutput();\n    } else if (showTemplate) {\n      renderTemplatePreview();\n    }\n\n    refreshInputGutterTargets();\n  }\n\n  function applySettingsFromModal() {\n    if (!els.settingsModal) {\n      return;\n    }\n\n    const next = {\n      normalizeDeclDesc: Boolean(els.settingsNormalizeDesc && els.settingsNormalizeDesc.checked),\n      declFilterTypes: [],\n      structDescTemplate: (els.settingsStructTemplate && els.settingsStructTemplate.value)\n        ? String(els.settingsStructTemplate.value || \"\")\n        : DEFAULT_SETTINGS.structDescTemplate,\n      nameTemplatesByCode: {}\n    };\n\n    if (els.settingsDeclTypes) {\n      const inputs = els.settingsDeclTypes.querySelectorAll(\"input[type=checkbox]\");\n      for (const input of Array.from(inputs)) {\n        if (input.checked) {\n          next.declFilterTypes.push(String(input.value || \"\").trim().toUpperCase());\n        }\n      }\n    }\n\n\n    const nameInputs = els.settingsNameTemplates\n      ? els.settingsNameTemplates.querySelectorAll(\"input[data-code]\")\n      : [];\n\n    for (const input of Array.from(nameInputs)) {\n      const code = String(input.getAttribute(\"data-code\") || \"\").trim().toUpperCase();\n      if (!code) {\n        continue;\n      }\n      next.nameTemplatesByCode[code] = String(input.value || \"\");\n    }\n\n    state.settings = normalizeSettings(next);\n    saveSettings(state.settings);\n    state.haystackById = buildSearchIndex(state.renderObjects);\n    renderOutput();\n  }\n\n  function resetSettingsToDefault() {\n    state.settings = normalizeSettings(DEFAULT_SETTINGS);\n    saveSettings(state.settings);\n    renderSettingsModalUi();\n    state.haystackById = buildSearchIndex(state.renderObjects);\n    renderOutput();\n  }\n\n  function normalizeKeyToken(value) {\n    return String(value || \"\").trim().toUpperCase();\n  }\n\n  function getDeclFallbackKey(decl) {\n    if (!decl || typeof decl !== \"object\") {\n      return \"\";\n    }\n\n    const name = normalizeKeyToken(decl.name);\n    if (!name) {\n      return \"\";\n    }\n\n    const objectType = normalizeKeyToken(decl.objectType);\n    const file = String(decl.file || \"\").trim();\n    const line = decl.lineStart ? String(decl.lineStart) : \"\";\n    return `FALLBACK:${objectType}|${name}|${file}|${line}`;\n  }\n\n  function getDeclKey(decl) {\n    if (!decl || typeof decl !== \"object\") {\n      return \"\";\n    }\n\n    const scope = normalizeKeyToken(decl.scopeLabel);\n    const name = normalizeKeyToken(decl.name);\n\n    if (!scope || !name) {\n      return \"\";\n    }\n\n    return `${scope}:${name}`;\n  }\n\n  function getLegacyDeclKey(decl) {\n    if (!decl || typeof decl !== \"object\") {\n      return \"\";\n    }\n\n    const type = normalizeKeyToken(decl.objectType);\n    const name = normalizeKeyToken(decl.name);\n\n    if (!type || !name) {\n      return \"\";\n    }\n\n    return `${type}:NAME:${name}`;\n  }\n\n  function getDeclOverrideLookupKeys(decl) {\n    const keys = [];\n    const pushKey = (value) => {\n      const key = String(value || \"\").trim();\n      if (!key || keys.includes(key)) {\n        return;\n      }\n      keys.push(key);\n    };\n\n    pushKey(getDeclKey(decl));\n    pushKey(getLegacyDeclKey(decl));\n    pushKey(getDeclFallbackKey(decl));\n    return keys;\n  }\n\n  function getDeclOverrideStorageKey(decl) {\n    const keys = getDeclOverrideLookupKeys(decl);\n    return keys.length ? keys[0] : \"\";\n  }\n\n  function normalizeDescOverrideEntry(value) {\n    if (typeof value === \"string\") {\n      return { text: String(value || \"\"), noNormalize: false };\n    }\n    if (!value || typeof value !== \"object\" || Array.isArray(value)) {\n      return { text: \"\", noNormalize: false };\n    }\n\n    const text = typeof value.text === \"string\"\n      ? value.text\n      : typeof value.desc === \"string\"\n        ? value.desc\n        : typeof value.value === \"string\"\n          ? value.value\n          : \"\";\n\n    const noNormalize = Boolean(value.noNormalize || value.skipNormalize || value.disableNormalize || value.no_normalize);\n    return { text: String(text || \"\"), noNormalize };\n  }\n\n  function getDeclOverrideEntry(decl) {\n    const keys = getDeclOverrideLookupKeys(decl);\n    for (const key of keys) {\n      if (key && Object.prototype.hasOwnProperty.call(state.descOverrides || {}, key)) {\n        return normalizeDescOverrideEntry(state.descOverrides[key]);\n      }\n    }\n\n    const legacyKey = getLegacyDeclKey(decl);\n    if (legacyKey && Object.prototype.hasOwnProperty.call(state.descOverridesLegacy || {}, legacyKey)) {\n      return { text: String(state.descOverridesLegacy[legacyKey] || \"\"), noNormalize: false };\n    }\n\n    return { text: \"\", noNormalize: false };\n  }\n\n  function getDeclOverrideDesc(decl) {\n    return getDeclOverrideEntry(decl).text;\n  }\n\n  function getDeclOverrideNoNormalize(decl) {\n    return Boolean(getDeclOverrideEntry(decl).noNormalize);\n  }\n\n  function getBaseDeclDesc(decl) {\n    if (!decl || typeof decl !== \"object\") {\n      return \"\";\n    }\n\n    const objectType = normalizeKeyToken(decl.objectType);\n    const scopeType = normalizeKeyToken(decl.scopeType);\n    if (objectType === \"PATH_DECL\" || scopeType === \"PATH\") {\n      return \"\";\n    }\n\n    const registry = window.AbapVarDescriptions && typeof window.AbapVarDescriptions === \"object\"\n      ? window.AbapVarDescriptions\n      : null;\n    if (!registry) {\n      return \"\";\n    }\n\n    const nameUpper = normalizeKeyToken(decl.name);\n    if (!nameUpper) {\n      return \"\";\n    }\n\n    const scopeLabel = normalizeKeyToken(decl.scopeLabel);\n\n    if (objectType === \"SYSTEM\" || scopeLabel === \"SYSTEM\") {\n      const systemMap = registry.system && typeof registry.system === \"object\" ? registry.system : null;\n      if (systemMap && Object.prototype.hasOwnProperty.call(systemMap, nameUpper)) {\n        return String(systemMap[nameUpper] || \"\");\n      }\n    }\n\n    const byScope = registry.customByScope && typeof registry.customByScope === \"object\" ? registry.customByScope : null;\n    if (byScope && scopeLabel && Object.prototype.hasOwnProperty.call(byScope, scopeLabel)) {\n      const scopeMap = byScope[scopeLabel];\n      if (scopeMap && typeof scopeMap === \"object\" && Object.prototype.hasOwnProperty.call(scopeMap, nameUpper)) {\n        return String(scopeMap[nameUpper] || \"\");\n      }\n    }\n\n    const globalMap = registry.customGlobal && typeof registry.customGlobal === \"object\" ? registry.customGlobal : null;\n    if (globalMap && Object.prototype.hasOwnProperty.call(globalMap, nameUpper)) {\n      return String(globalMap[nameUpper] || \"\");\n    }\n\n    return \"\";\n  }\n\n  function getSourceDeclDesc(decl) {\n    if (!decl || typeof decl !== \"object\") {\n      return \"\";\n    }\n    return decl.comment ? String(decl.comment) : \"\";\n  }\n\n  function normalizeDeclDescText(decl, text) {\n    const settings = state.settings || DEFAULT_SETTINGS;\n    if (!settings.normalizeDeclDesc) {\n      return String(text || \"\").trim();\n    }\n    return normalizeDeclDescByTemplate(decl, text);\n  }\n\n  function stripDeclTemplateAffixes(text, template) {\n    const raw = String(text || \"\").trim();\n    if (!raw) {\n      return \"\";\n    }\n\n    const tpl = String(template || \"\");\n    const marker = \"{{desc}}\";\n    const markerIndex = tpl.indexOf(marker);\n    if (markerIndex === -1) {\n      return raw;\n    }\n\n    const prefix = tpl.slice(0, markerIndex).trim();\n    const suffix = tpl.slice(markerIndex + marker.length).trim();\n\n    let next = raw;\n    if (prefix && next.toLowerCase().startsWith(prefix.toLowerCase())) {\n      next = next.slice(prefix.length).trim();\n    }\n    if (\n      suffix &&\n      next.length >= suffix.length &&\n      next.toLowerCase().endsWith(suffix.toLowerCase())\n    ) {\n      next = next.slice(0, next.length - suffix.length).trim();\n    }\n\n    return next || raw;\n  }\n\n  function normalizeDeclDescByTemplate(decl, text) {\n    const descTrimmed = String(text || \"\").trim();\n    if (!descTrimmed) {\n      return \"\";\n    }\n\n    const techName = getDeclTechName(decl);\n    const bare = stripAngleBrackets(techName);\n    if (bare.length < 3) {\n      return descTrimmed;\n    }\n\n    const code = bare.slice(1, 3).toUpperCase();\n    const settings = state.settings || DEFAULT_SETTINGS;\n    const templates = settings.nameTemplatesByCode || DEFAULT_SETTINGS.nameTemplatesByCode;\n    const template = templates && Object.prototype.hasOwnProperty.call(templates, code) ? String(templates[code] || \"\") : \"\";\n    if (!template.trim()) {\n      return descTrimmed;\n    }\n\n    const strippedKnownPrefix = stripDeclCategoryPrefix(descTrimmed);\n    const normalizedDesc = stripDeclTemplateAffixes(strippedKnownPrefix, template);\n    const normalized = template.replace(/\\{\\{desc\\}\\}/g, normalizedDesc).trim();\n    return normalized || descTrimmed;\n  }\n\n  function getEffectiveDeclAtomicDesc(decl) {\n    const override = getDeclOverrideDesc(decl);\n    if (override) {\n      return override;\n    }\n\n    const source = getSourceDeclDesc(decl);\n    if (source) {\n      return source;\n    }\n\n    return getBaseDeclDesc(decl);\n  }\n\n  function getEffectiveDeclAtomicDescNormalized(decl) {\n    if (!decl || typeof decl !== \"object\") {\n      return \"\";\n    }\n\n    const settings = state.settings || DEFAULT_SETTINGS;\n    const normalizeEnabled = Boolean(settings.normalizeDeclDesc);\n\n    const overrideEntry = getDeclOverrideEntry(decl);\n    const overrideText = overrideEntry.text ? String(overrideEntry.text) : \"\";\n    if (overrideText) {\n      if (!normalizeEnabled || overrideEntry.noNormalize) {\n        return overrideText;\n      }\n      return normalizeDeclDescText(decl, overrideText);\n    }\n\n    const source = getSourceDeclDesc(decl);\n    if (source) {\n      return normalizeEnabled ? normalizeDeclDescText(decl, source) : source;\n    }\n\n    const base = getBaseDeclDesc(decl);\n    if (base) {\n      return normalizeEnabled ? normalizeDeclDescText(decl, base) : base;\n    }\n\n    return String(getDeclTechName(decl) || \"\").trim();\n  }\n\n  function getFinalDeclAtomicDescNormalized(decl) {\n    if (!decl || typeof decl !== \"object\") {\n      return \"\";\n    }\n\n    const overrideEntry = getDeclOverrideEntry(decl);\n    const overrideText = overrideEntry.text ? String(overrideEntry.text) : \"\";\n    if (overrideText) {\n      return normalizeDeclDescByTemplate(decl, overrideText);\n    }\n\n    const codeDesc = getDeclCodeDesc(decl);\n    if (codeDesc) {\n      return normalizeDeclDescByTemplate(decl, codeDesc);\n    }\n\n    const techId = String(getDeclTechName(decl) || \"\").trim();\n    if (!techId) {\n      return \"\";\n    }\n\n    return normalizeDeclDescByTemplate(decl, techId);\n  }\n\n  function buildStructDeclFromFieldDecl(decl) {\n    if (!decl || typeof decl !== \"object\") {\n      return null;\n    }\n\n    if (!decl.scopeLabel || !decl.structName) {\n      return null;\n    }\n\n    return {\n      id: decl.structId || null,\n      objectType: decl.structObjectType || decl.objectType || \"STRUCT\",\n      name: String(decl.structName || \"\"),\n      file: decl.file || \"\",\n      lineStart: decl.structLineStart || null,\n      raw: decl.structRaw || \"\",\n      comment: decl.structComment || decl.structTypeComment || \"\",\n      scopeId: decl.scopeId || 0,\n      scopeLabel: decl.scopeLabel || \"\",\n      scopeType: decl.scopeType || \"\",\n      scopeName: decl.scopeName || \"\"\n    };\n  }\n\n  function stripStructNamePrefixFromItemText(itemText, structName) {\n    const raw = String(itemText || \"\").trim();\n    if (!raw) {\n      return \"\";\n    }\n\n    const struct = String(structName || \"\").trim();\n    if (!struct) {\n      return raw;\n    }\n\n    const prefix = `${struct.toUpperCase()}-`;\n    if (raw.toUpperCase().startsWith(prefix)) {\n      return raw.slice(struct.length + 1).trim();\n    }\n\n    return raw;\n  }\n\n  function hasStructCompositeMeta(decl) {\n    if (!decl || typeof decl !== \"object\") {\n      return false;\n    }\n    const structName = String(decl.structName || \"\").trim();\n    const fieldPath = String(decl.fieldPath || \"\").trim();\n    return Boolean(structName && fieldPath);\n  }\n\n  function stripDeclCategoryPrefixDeep(text) {\n    let current = String(text || \"\").trim();\n    while (current) {\n      const next = stripDeclCategoryPrefix(current);\n      if (!next || next === current) {\n        break;\n      }\n      current = next;\n    }\n    return current;\n  }\n\n  function sanitizeStructCompositeText(text, decl) {\n    const raw = String(text || \"\").replace(/\\u00A0/g, \" \").trim();\n    if (!raw) {\n      return \"\";\n    }\n\n    const parts = raw.split(\"-\");\n    if (parts.length < 2) {\n      return stripDeclCategoryPrefixDeep(raw);\n    }\n\n    const structPart = stripDeclCategoryPrefixDeep(parts.shift());\n    let itemPart = stripDeclCategoryPrefixDeep(parts.join(\"-\"));\n    itemPart = stripStructNamePrefixFromItemText(itemPart, String(decl && decl.structName ? decl.structName : \"\").trim());\n\n    if (!structPart) {\n      return itemPart;\n    }\n    if (!itemPart) {\n      return structPart;\n    }\n    return `${structPart}-${itemPart}`;\n  }\n\n  function getDeclTechNameSafe(decl) {\n    if (!decl || typeof decl !== \"object\") {\n      return \"\";\n    }\n    return String(getDeclTechName(decl) || decl.name || \"\").trim();\n  }\n\n  function isTechnicalFallbackDesc(decl, text) {\n    const candidate = String(text || \"\").trim();\n    if (!candidate) {\n      return false;\n    }\n    const tech = getDeclTechNameSafe(decl);\n    if (!tech) {\n      return false;\n    }\n    return candidate.toUpperCase() === tech.toUpperCase();\n  }\n\n  function formatStructFieldDesc(decl) {\n    if (!isStructFieldDecl(decl)) {\n      return getEffectiveDeclAtomicDesc(decl);\n    }\n\n    const settings = state.settings || DEFAULT_SETTINGS;\n    const template = settings.structDescTemplate || DEFAULT_SETTINGS.structDescTemplate;\n\n    const structTech = String(decl.structName || \"\").trim() || getDeclTechName(decl);\n    const itemTech = String(decl.fieldPath || \"\").trim() || (() => {\n      const tech = getDeclTechName(decl);\n      const structPrefix = String(decl.structName || \"\").trim();\n      if (structPrefix && tech.toUpperCase().startsWith(`${structPrefix.toUpperCase()}-`)) {\n        return tech.slice(structPrefix.length + 1);\n      }\n      return tech;\n    })();\n\n    const structDecl = buildStructDeclFromFieldDecl(decl);\n    const structDescRaw = structDecl ? getEffectiveDeclAtomicDescNormalized(structDecl) : \"\";\n    const itemDescRaw = getEffectiveDeclAtomicDescNormalized(decl);\n\n    const structText = stripDeclCategoryPrefix(String(structDescRaw || \"\").trim()) || structTech;\n    const itemTextRaw = stripDeclCategoryPrefix(String(itemDescRaw || \"\").trim()) || itemTech;\n    const itemText = stripStructNamePrefixFromItemText(itemTextRaw, String(decl.structName || \"\").trim() || structTech);\n\n    return String(template || DEFAULT_SETTINGS.structDescTemplate)\n      .replace(/\\{\\{struct\\}\\}/g, structText)\n      .replace(/\\{\\{item\\}\\}/g, itemText);\n  }\n\n  function getEffectiveDeclDesc(decl) {\n    if (!isStructFieldDecl(decl)) {\n      return getEffectiveDeclAtomicDescNormalized(decl);\n    }\n\n    const composed = sanitizeStructCompositeText(formatStructFieldDesc(decl), decl);\n    if (!hasStructCompositeMeta(decl)) {\n      const normalized = normalizeDeclDescByTemplate(decl, composed);\n      return normalized || composed;\n    }\n    return composed;\n  }\n\n  function formatStructFieldFinalDesc(decl) {\n    if (!isStructFieldDecl(decl)) {\n      return getFinalDeclAtomicDescNormalized(decl);\n    }\n\n    const structDecl = buildStructDeclFromFieldDecl(decl);\n    const structTextRaw = structDecl ? String(getFinalDeclAtomicDescNormalized(structDecl) || \"\").trim() : \"\";\n    const itemTextRaw = String(getFinalDeclAtomicDescNormalized(decl) || \"\").trim();\n    const structText = stripDeclCategoryPrefix(structTextRaw);\n    const itemTextNormalized = stripDeclCategoryPrefix(itemTextRaw);\n    const itemText = stripStructNamePrefixFromItemText(itemTextNormalized, String(decl.structName || \"\").trim());\n\n    if (!structText && !itemText) {\n      return \"\";\n    }\n    if (!structText) {\n      return itemText;\n    }\n    if (!itemText) {\n      return structText;\n    }\n\n    const settings = state.settings || DEFAULT_SETTINGS;\n    const template = settings.structDescTemplate || DEFAULT_SETTINGS.structDescTemplate;\n    return String(template || DEFAULT_SETTINGS.structDescTemplate)\n      .replace(/\\{\\{struct\\}\\}/g, structText)\n      .replace(/\\{\\{item\\}\\}/g, itemText);\n  }\n\n  function getFinalDeclDesc(decl) {\n    if (!isStructFieldDecl(decl)) {\n      return getFinalDeclAtomicDescNormalized(decl);\n    }\n\n    const composed = sanitizeStructCompositeText(formatStructFieldFinalDesc(decl), decl);\n    if (!composed) {\n      return \"\";\n    }\n\n    if (isTechnicalFallbackDesc(decl, composed)) {\n      return composed;\n    }\n\n    const normalized = normalizeDeclDescByTemplate(decl, composed);\n    return normalized || composed;\n  }\n\n  function openEditModal({ mode, key, structKey, itemKey, label, hint, initialValue, structValue, itemValue, skipNormalize }) {\n    const editMode = mode === \"structField\" ? \"structField\" : \"single\";\n\n    if (editMode === \"single\" && !key) {\n      return;\n    }\n\n    if (editMode === \"structField\" && (!structKey || !itemKey)) {\n      return;\n    }\n\n    if (!els.jsonModal.hidden) {\n      closeJsonModal();\n    }\n\n    state.activeEdit = editMode === \"structField\"\n      ? { mode: \"structField\", structKey, itemKey }\n      : { mode: \"single\", key };\n    els.editLabel.textContent = label ? String(label) : \"\";\n\n    const hintText = hint ? String(hint) : \"\";\n    els.editHint.textContent = hintText;\n    els.editHint.style.display = hintText ? \"block\" : \"none\";\n\n    if (els.editSingleWrap) {\n      els.editSingleWrap.hidden = editMode !== \"single\";\n    }\n    if (els.editStructWrap) {\n      els.editStructWrap.hidden = editMode !== \"structField\";\n    }\n\n    els.editDesc.value = \"\";\n    if (els.editStructDesc) {\n      els.editStructDesc.value = \"\";\n    }\n    if (els.editItemDesc) {\n      els.editItemDesc.value = \"\";\n    }\n    if (els.editSkipNormalize) {\n      els.editSkipNormalize.checked = Boolean(skipNormalize);\n    }\n\n    if (editMode === \"single\") {\n      els.editDesc.value = initialValue ? String(initialValue) : \"\";\n    } else {\n      if (els.editStructDesc) {\n        els.editStructDesc.value = structValue ? String(structValue) : \"\";\n      }\n      if (els.editItemDesc) {\n        els.editItemDesc.value = itemValue ? String(itemValue) : \"\";\n      }\n    }\n\n    els.editModal.hidden = false;\n    setTimeout(() => {\n      const target = editMode === \"structField\" && els.editStructDesc ? els.editStructDesc : els.editDesc;\n      target.focus();\n    }, 0);\n  }\n\n  function closeEditModal() {\n    els.editModal.hidden = true;\n    els.editDesc.value = \"\";\n    if (els.editStructDesc) {\n      els.editStructDesc.value = \"\";\n    }\n    if (els.editItemDesc) {\n      els.editItemDesc.value = \"\";\n    }\n    if (els.editSkipNormalize) {\n      els.editSkipNormalize.checked = false;\n    }\n    state.activeEdit = null;\n  }\n\n  function applyEditModal(action) {\n    if (!state.activeEdit) {\n      return;\n    }\n\n    const mode = state.activeEdit.mode === \"structField\" ? \"structField\" : \"single\";\n    const skipNormalize = Boolean(els.editSkipNormalize && els.editSkipNormalize.checked);\n\n    if (mode === \"single\") {\n      const key = state.activeEdit.key;\n      if (!key) {\n        return;\n      }\n\n      const value = action === \"clear\" ? \"\" : String(els.editDesc.value || \"\");\n      const trimmed = value.trim();\n      const stored = skipNormalize ? trimmed : stripDeclCategoryPrefix(trimmed);\n\n      if (!stored) {\n        delete state.descOverrides[key];\n\n      } else {\n        state.descOverrides[key] = skipNormalize ? { text: stored, noNormalize: true } : stored;\n      }\n    } else {\n      const structKey = state.activeEdit.structKey;\n      const itemKey = state.activeEdit.itemKey;\n      if (!structKey || !itemKey) {\n        return;\n      }\n\n      const structValue = action === \"clear\" ? \"\" : String((els.editStructDesc && els.editStructDesc.value) || \"\");\n      const itemValue = action === \"clear\" ? \"\" : String((els.editItemDesc && els.editItemDesc.value) || \"\");\n      const structTrimmed = structValue.trim();\n      const itemTrimmed = itemValue.trim();\n      const structStored = stripDeclCategoryPrefix(structTrimmed);\n      const itemStored = skipNormalize ? itemTrimmed : stripDeclCategoryPrefix(itemTrimmed);\n\n      if (!structStored) {\n        delete state.descOverrides[structKey];\n      } else {\n        state.descOverrides[structKey] = structStored;\n      }\n\n      if (!itemStored) {\n        delete state.descOverrides[itemKey];\n      } else {\n        state.descOverrides[itemKey] = skipNormalize ? { text: itemStored, noNormalize: true } : itemStored;\n      }\n    }\n\n    saveDescOverrides();\n    state.haystackById = buildSearchIndex(state.renderObjects);\n    renderOutput();\n    if (state.rightTab === \"template\") {\n      if (typeof renderTemplatePreview === \"function\") {\n        renderTemplatePreview();\n      }\n    } else if (state.rightTab === \"descriptions\") {\n      renderDeclDescPanelUi();\n    }\n  }\n\n  function editDeclDesc(decl) {\n    if (!decl || !decl.name) {\n      return;\n    }\n\n    const isStructField = isStructFieldDecl(decl);\n\n    const key = getDeclOverrideStorageKey(decl);\n    if (!key) {\n      return;\n    }\n\n    const settings = state.settings || DEFAULT_SETTINGS;\n    const normalizeEnabled = Boolean(settings.normalizeDeclDesc);\n\n    const currentEntry = getDeclOverrideEntry(decl);\n    const current = currentEntry.text ? String(currentEntry.text) : \"\";\n    const effective = getEffectiveDeclDesc(decl);\n    const currentDisplay = current\n      ? (normalizeEnabled && !currentEntry.noNormalize ? normalizeDeclDescText(decl, current) : current)\n      : \"\";\n    const hintParts = [];\n    hintParts.push(`Key: ${key}`);\n    if (decl.scopeLabel) {\n      hintParts.push(`Scope: ${decl.scopeLabel}`);\n    }\n    if (decl.objectType) {\n      hintParts.push(`Type: ${decl.objectType}`);\n    }\n    if (decl.lineStart) {\n      hintParts.push(`Line: ${decl.lineStart}`);\n    }\n    const base = getBaseDeclDesc(decl);\n    const source = getSourceDeclDesc(decl);\n    if (base) {\n      hintParts.push(`Registry: ${base}`);\n    }\n    if (source) {\n      hintParts.push(`Comment: ${source}`);\n    }\n    if (decl.raw) {\n      hintParts.push(decl.raw);\n    }\n\n    if (!isStructField) {\n      openEditModal({\n        mode: \"single\",\n        key,\n        label: `${decl.objectType || \"DECL\"} ${getDeclTechName(decl)}`,\n        hint: hintParts.join(\" • \"),\n        initialValue: currentDisplay || effective,\n        skipNormalize: Boolean(currentEntry.noNormalize)\n      });\n      return;\n    }\n\n    const structDecl = buildStructDeclFromFieldDecl(decl);\n    const structKey = structDecl ? getDeclOverrideStorageKey(structDecl) : \"\";\n    if (!structKey) {\n      return;\n    }\n\n    const structCurrentEntry = structDecl ? getDeclOverrideEntry(structDecl) : { text: \"\", noNormalize: false };\n    const structCurrent = structCurrentEntry.text ? String(structCurrentEntry.text) : \"\";\n    const structEffective = structDecl ? getEffectiveDeclDesc(structDecl) : \"\";\n    const structCurrentDisplay = structDecl && structCurrent && normalizeEnabled\n      ? normalizeDeclDescText(structDecl, structCurrent)\n      : structCurrent;\n\n    hintParts.push(`StructKey: ${structKey}`);\n    hintParts.push(`ItemKey: ${key}`);\n\n    openEditModal({\n      mode: \"structField\",\n      structKey,\n      itemKey: key,\n      label: `${decl.objectType || \"DECL\"} ${getDeclTechName(decl)}`,\n      hint: hintParts.join(\" • \"),\n      structValue: structCurrentDisplay || structEffective,\n      itemValue: stripStructNamePrefixFromItemText(currentDisplay || getEffectiveDeclAtomicDescNormalized(decl), String(decl.structName || '').trim()),\n      skipNormalize: Boolean(currentEntry.noNormalize)\n    });\n  }\n\n  function escapeSelectorValue(value) {\n    const text = String(value || \"\");\n    if (window.CSS && typeof window.CSS.escape === \"function\") {\n      return window.CSS.escape(text);\n    }\n    return text.replace(/\"/g, '\\\\\"');\n  }\n\n  function safeJson(value, pretty) {\n    try {\n      return JSON.stringify(value, null, pretty ? 2 : 0);\n    } catch {\n      return \"\";\n    }\n  }\n\n  function sanitizeXmlText(value) {\n    const text = String(value ?? \"\");\n    // Keep: TAB (0x9), LF (0xA), CR (0xD)\n    return text.replace(/[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F]/g, \"\");\n  }\n\n  function escapeXmlText(value) {\n    return sanitizeXmlText(value)\n      .replace(/&/g, \"&amp;\")\n      .replace(/</g, \"&lt;\")\n      .replace(/>/g, \"&gt;\")\n      .replace(/\"/g, \"&quot;\")\n      .replace(/'/g, \"&apos;\");\n  }\n\n  function toXmlTagName(key) {\n    const raw = String(key || \"\").trim();\n    if (!raw) {\n      return \"value\";\n    }\n\n    const normalized = raw.replace(/[^A-Za-z0-9_:-]/g, \"_\");\n    if (!/^[A-Za-z_]/.test(normalized)) {\n      return `_${normalized}`;\n    }\n    return normalized;\n  }\n\n  function getArrayItemTagName(keyHint) {\n    const key = String(keyHint || \"\").trim().toLowerCase();\n    if (key === \"objects\" || key === \"children\") {\n      return \"object\";\n    }\n    return \"item\";\n  }\n\n  function isPlainObjectRecord(value) {\n    return Boolean(value) && typeof value === \"object\" && !Array.isArray(value);\n  }\n\n  function isAbapStatementObject(value) {\n    if (!isPlainObjectRecord(value)) {\n      return false;\n    }\n    const hasNodeShape = Object.prototype.hasOwnProperty.call(value, \"values\")\n      || Object.prototype.hasOwnProperty.call(value, \"extras\")\n      || Object.prototype.hasOwnProperty.call(value, \"children\");\n    if (!hasNodeShape) {\n      return false;\n    }\n    return (\n      Object.prototype.hasOwnProperty.call(value, \"objectType\")\n      && Object.prototype.hasOwnProperty.call(value, \"raw\")\n      && Object.prototype.hasOwnProperty.call(value, \"lineStart\")\n    );\n  }\n\n  function extractIdentifierCandidate(text) {\n    const raw = String(text || \"\").trim();\n    if (!raw) {\n      return \"\";\n    }\n    if (raw.startsWith(\"'\") || raw.startsWith(\"|\")) {\n      return \"\";\n    }\n    if (/^[+-]?\\d/.test(raw)) {\n      return \"\";\n    }\n\n    const sysMatch = raw.match(/^SY-[A-Za-z_][A-Za-z0-9_]*/i);\n    if (sysMatch) {\n      return sysMatch[0].toUpperCase();\n    }\n\n    const fieldPathMatch = raw.match(\n      /^(<[^>]+>|[A-Za-z_][A-Za-z0-9_]*)(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)+/\n    );\n    if (fieldPathMatch) {\n      return String(fieldPathMatch[0] || \"\").trim();\n    }\n\n    const inlinePatterns = [\n      /@?DATA\\s*\\(\\s*([^)]+)\\s*\\)/i,\n      /@?FINAL\\s*\\(\\s*([^)]+)\\s*\\)/i,\n      /FIELD-SYMBOL\\s*\\(\\s*(<[^>]+>)\\s*\\)/i\n    ];\n    for (const regex of inlinePatterns) {\n      const match = regex.exec(raw);\n      if (!match || !match[1]) {\n        continue;\n      }\n      const candidate = String(match[1] || \"\").trim();\n      if (candidate) {\n        return candidate;\n      }\n    }\n\n    const genericMatch = raw.match(\n      /<[^>]+>|[A-Za-z_][A-Za-z0-9_]*(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)*/\n    );\n    return genericMatch ? String(genericMatch[0] || \"\").trim() : \"\";\n  }\n\n  function resolveFallbackFieldId(entry) {\n    if (!isPlainObjectRecord(entry)) {\n      return \"\";\n    }\n\n    const fromDeclRef = String(entry.declRef || \"\").trim();\n    if (fromDeclRef) {\n      return fromDeclRef;\n    }\n\n    const valueText = String(entry.value || \"\").trim();\n    const identifier = extractIdentifierCandidate(valueText);\n    if (identifier) {\n      return identifier;\n    }\n\n    if (valueText) {\n      return valueText;\n    }\n\n    const fromName = String(entry.name || \"\").trim();\n    if (fromName) {\n      return fromName;\n    }\n\n    return \"\";\n  }\n\n  function buildPathKeyFromParts(parts) {\n    const tokens = Array.isArray(parts) ? parts : [];\n    const cleaned = [];\n    for (const part of tokens) {\n      const token = String(part || \"\").trim();\n      if (token) {\n        cleaned.push(token);\n      }\n    }\n    return cleaned.join(\"/\");\n  }\n\n  function normalizeSyntheticPathKey(pathKey) {\n    const text = String(pathKey || \"\").trim();\n    if (!text) {\n      return \"ROOT\";\n    }\n    const normalized = text\n      .replace(/\\s+/g, \"_\")\n      .replace(/[^A-Za-z0-9_:\\-./[\\]#]/g, \"_\")\n      .toUpperCase();\n    return normalized || \"ROOT\";\n  }\n\n  function buildSyntheticDeclForPath({ pathKey, fieldId, file, lineStart, raw, role }) {\n    const name = String(fieldId || \"\").trim();\n    if (!name) {\n      return null;\n    }\n\n    const numericLine = lineStart === null || lineStart === undefined || lineStart === \"\"\n      ? null\n      : (Number(lineStart) || null);\n\n    const normalizedPath = normalizeSyntheticPathKey(pathKey);\n    return {\n      id: null,\n      objectType: \"PATH_DECL\",\n      name,\n      file: String(file || \"\"),\n      lineStart: numericLine,\n      raw: String(raw || \"\"),\n      comment: \"\",\n      scopeId: 0,\n      scopeLabel: `PATH:${normalizedPath}`,\n      scopeType: \"PATH\",\n      scopeName: String(role || \"\")\n    };\n  }\n\n  function getDeclSourceContextFromObject(obj) {\n    if (!isPlainObjectRecord(obj)) {\n      return { file: \"\", lineStart: null, raw: \"\" };\n    }\n    return {\n      file: String(obj.file || \"\"),\n      lineStart: obj.lineStart === null || obj.lineStart === undefined\n        ? null\n        : (Number(obj.lineStart) || null),\n      raw: String(obj.raw || \"\")\n    };\n  }\n\n  function buildObjectPathBase(obj) {\n    const id = normalizeId(obj && obj.id);\n    if (id) {\n      return `OBJECT:${id}`;\n    }\n    const type = String(obj && obj.objectType ? obj.objectType : \"OBJECT\").trim() || \"OBJECT\";\n    const file = String(obj && obj.file ? obj.file : \"\").trim() || \"NO_FILE\";\n    const line = obj && obj.lineStart ? String(obj.lineStart) : \"0\";\n    return `OBJECT:${type}:${file}:${line}`;\n  }\n\n  function hasAnyDecls(list) {\n    if (!Array.isArray(list)) {\n      return false;\n    }\n    return list.some((item) => item && typeof item === \"object\");\n  }\n\n  function ensureEntryDeclWithSynthetic(entry, options) {\n    if (!isPlainObjectRecord(entry)) {\n      return entry;\n    }\n    if (isDeclLikeObject(entry.decl)) {\n      return entry;\n    }\n\n    const fieldId = resolveFallbackFieldId(entry);\n    const pathKey = buildPathKeyFromParts([options && options.pathKey ? options.pathKey : \"\", \"decl\"]);\n    const syntheticDecl = buildSyntheticDeclForPath({\n      pathKey,\n      fieldId,\n      file: options && options.file ? options.file : \"\",\n      lineStart: options ? options.lineStart : null,\n      raw: options && options.raw ? options.raw : \"\",\n      role: options && options.role ? options.role : \"value\"\n    });\n    if (!syntheticDecl) {\n      return entry;\n    }\n\n    const next = { ...entry, decl: syntheticDecl };\n    if (!String(next.declRef || \"\").trim()) {\n      next.declRef = fieldId;\n    }\n    return next;\n  }\n\n  function ensureValueDeclWithSynthetic(entry, options) {\n    if (!isPlainObjectRecord(entry)) {\n      return entry;\n    }\n    if (isDeclLikeObject(entry.valueDecl) || hasAnyDecls(entry.originDecls)) {\n      return entry;\n    }\n\n    const sourceForId = {\n      declRef: String(entry.valueRef || entry.declRef || \"\").trim(),\n      value: entry.value,\n      name: entry.name || (options && options.nameHint ? options.nameHint : \"\")\n    };\n    const fieldId = resolveFallbackFieldId(sourceForId);\n    const pathKey = buildPathKeyFromParts([options && options.pathKey ? options.pathKey : \"\", \"valueDecl\"]);\n    const syntheticDecl = buildSyntheticDeclForPath({\n      pathKey,\n      fieldId,\n      file: options && options.file ? options.file : \"\",\n      lineStart: options ? options.lineStart : null,\n      raw: options && options.raw ? options.raw : \"\",\n      role: options && options.role ? options.role : \"value\"\n    });\n    if (!syntheticDecl) {\n      return entry;\n    }\n\n    return {\n      ...entry,\n      valueDecl: syntheticDecl\n    };\n  }\n\n  function ensureConditionClauseDeclsWithSynthetic(clause, options) {\n    if (!isPlainObjectRecord(clause)) {\n      return clause;\n    }\n\n    let next = clause;\n    const file = options && options.file ? options.file : \"\";\n    const lineStart = options ? options.lineStart : null;\n    const raw = options && options.raw ? options.raw : \"\";\n    const basePath = options && options.pathKey ? options.pathKey : \"\";\n\n    if (!isDeclLikeObject(clause.leftOperandDecl)) {\n      const leftFieldId = resolveFallbackFieldId({\n        declRef: clause.leftOperandRef,\n        value: clause.leftOperand,\n        name: \"leftOperand\"\n      });\n      const leftDecl = buildSyntheticDeclForPath({\n        pathKey: buildPathKeyFromParts([basePath, \"leftOperandDecl\"]),\n        fieldId: leftFieldId,\n        file,\n        lineStart,\n        raw,\n        role: \"leftOperand\"\n      });\n      if (leftDecl) {\n        if (next === clause) {\n          next = { ...clause };\n        }\n        next.leftOperandDecl = leftDecl;\n        if (!String(next.leftOperandRef || \"\").trim()) {\n          next.leftOperandRef = leftFieldId;\n        }\n      }\n    }\n\n    if (!isDeclLikeObject(clause.rightOperandDecl)) {\n      const rightFieldId = resolveFallbackFieldId({\n        declRef: clause.rightOperandRef,\n        value: clause.rightOperand,\n        name: \"rightOperand\"\n      });\n      const rightDecl = buildSyntheticDeclForPath({\n        pathKey: buildPathKeyFromParts([basePath, \"rightOperandDecl\"]),\n        fieldId: rightFieldId,\n        file,\n        lineStart,\n        raw,\n        role: \"rightOperand\"\n      });\n      if (rightDecl) {\n        if (next === clause) {\n          next = { ...clause };\n        }\n        next.rightOperandDecl = rightDecl;\n        if (!String(next.rightOperandRef || \"\").trim()) {\n          next.rightOperandRef = rightFieldId;\n        }\n      }\n    }\n\n    return next;\n  }\n\n  function normalizeXmlObjectId(value) {\n    if (value === null || value === undefined) {\n      return \"\";\n    }\n    return String(value);\n  }\n\n  function getFormNameFromNode(node) {\n    if (!node || typeof node !== \"object\") {\n      return \"\";\n    }\n    const valueName = getFirstValueFromValues(node.values, \"name\");\n    const extrasName = node.extras && node.extras.form && node.extras.form.name\n      ? String(node.extras.form.name)\n      : \"\";\n    return String(valueName || extrasName || \"\").trim();\n  }\n\n  function getPerformFormNameFromNode(node) {\n    if (!node || typeof node !== \"object\") {\n      return \"\";\n    }\n    const extrasName = node.extras && node.extras.performCall && node.extras.performCall.form\n      ? String(node.extras.performCall.form)\n      : \"\";\n    const valueName = getFirstValueFromValues(node.values, \"form\");\n    return String(extrasName || valueName || \"\").trim();\n  }\n\n  function getPerformProgramFromNode(node) {\n    if (!node || typeof node !== \"object\") {\n      return \"\";\n    }\n    const extrasProgram = node.extras && node.extras.performCall && node.extras.performCall.program\n      ? String(node.extras.performCall.program)\n      : \"\";\n    const valueProgram = getFirstValueFromValues(node.values, \"program\");\n    return String(extrasProgram || valueProgram || \"\").trim();\n  }\n\n  function buildFormsByNameUpperFromRoots(rawRoots) {\n    const map = new Map();\n    walkObjects(rawRoots, (obj) => {\n      if (!obj || obj.objectType !== \"FORM\") {\n        return;\n      }\n      const name = getFormNameFromNode(obj);\n      if (!name) {\n        return;\n      }\n      const upper = name.toUpperCase();\n      if (!map.has(upper)) {\n        map.set(upper, obj);\n      }\n    });\n    return map;\n  }\n\n  function buildRenderableObjects(rawRoots, options) {\n    const roots = Array.isArray(rawRoots) ? rawRoots : [];\n    if (!roots.length) {\n      return [];\n    }\n\n\n    const opts = {\n      expandPerformForms: true,\n      hideFormRoots: true,\n      maxExpandDepth: Number.POSITIVE_INFINITY,\n      ...(options && typeof options === \"object\" ? options : {})\n    };\n    const maxExpandDepth = Math.max(0, Number(opts.maxExpandDepth) || 0);\n    const formsByNameUpper = opts.expandPerformForms ? buildFormsByNameUpperFromRoots(roots) : new Map();\n    var PERFORM_TRACE_META_KEY_DESC = \"__abapPerformTraceBinding\";\n\n    const getDeclIdentityKey = (decl) => {\n      if (!decl || typeof decl !== \"object\") {\n        return \"\";\n      }\n      return [\n        decl.objectType || \"\",\n        decl.scopeLabel || \"\",\n        decl.name || \"\",\n        decl.file || \"\",\n        decl.lineStart || \"\"\n      ].join(\"|\");\n    };\n\n    const dedupeDeclList = (list) => {\n      const out = [];\n      const seen = new Set();\n      for (const decl of Array.isArray(list) ? list : []) {\n        if (!decl || typeof decl !== \"object\") {\n          continue;\n        }\n        const key = getDeclIdentityKey(decl);\n        if (!key || seen.has(key)) {\n          continue;\n        }\n        seen.add(key);\n        out.push(decl);\n      }\n      return out;\n    };\n\n    const resolveActualTraceDecls = (actualEntry, currentBindingContext) => {\n      if (!actualEntry || typeof actualEntry !== \"object\") {\n        return [];\n      }\n\n      const out = [];\n      const pushDecl = (decl) => {\n        if (decl && typeof decl === \"object\") {\n          out.push(decl);\n        }\n      };\n      const pushList = (decls) => {\n        for (const decl of Array.isArray(decls) ? decls : []) {\n          pushDecl(decl);\n        }\n      };\n\n      const valueDecl = actualEntry.valueDecl && typeof actualEntry.valueDecl === \"object\"\n        ? actualEntry.valueDecl\n        : null;\n      if (!valueDecl) {\n        pushList(actualEntry.originDecls);\n        return dedupeDeclList(out);\n      }\n\n      pushDecl(valueDecl);\n\n      const valueDeclType = String(valueDecl.objectType || \"\").toUpperCase();\n      if (valueDeclType === \"FORM_PARAM\") {\n        const paramUpper = String(valueDecl.name || \"\").trim().toUpperCase();\n        const byParamUpper = currentBindingContext && currentBindingContext.byParamUpper instanceof Map\n          ? currentBindingContext.byParamUpper\n          : null;\n        const externalDecls = byParamUpper && paramUpper ? byParamUpper.get(paramUpper) : null;\n        if (Array.isArray(externalDecls) && externalDecls.length) {\n          pushList(externalDecls);\n        } else {\n          pushList(actualEntry.originDecls);\n        }\n      } else {\n        pushList(actualEntry.originDecls);\n      }\n\n      return dedupeDeclList(out);\n    };\n\n    const buildPerformBindingContext = (performNode, resolvedForm, currentBindingContext) => {\n      if (!performNode || !resolvedForm) {\n        return null;\n      }\n\n      const call = performNode.extras && performNode.extras.performCall && typeof performNode.extras.performCall === \"object\"\n        ? performNode.extras.performCall\n        : null;\n      const formExtras = resolvedForm.extras && resolvedForm.extras.form && typeof resolvedForm.extras.form === \"object\"\n        ? resolvedForm.extras.form\n        : null;\n      const params = formExtras && Array.isArray(formExtras.params) ? formExtras.params : [];\n      if (!call || !params.length) {\n        return null;\n      }\n\n      const bySection = {\n        USING: [],\n        CHANGING: [],\n        TABLES: []\n      };\n      for (const param of params) {\n        if (!param || !param.name) {\n          continue;\n        }\n        const section = String(param.section || \"\").trim().toUpperCase();\n        if (!Object.prototype.hasOwnProperty.call(bySection, section)) {\n          continue;\n        }\n        bySection[section].push(param);\n      }\n\n      const byParamUpper = new Map();\n      for (const section of [\"USING\", \"CHANGING\", \"TABLES\"]) {\n        const formalParams = bySection[section] || [];\n        const actualArgs = Array.isArray(call[section.toLowerCase()]) ? call[section.toLowerCase()] : [];\n        const max = Math.min(formalParams.length, actualArgs.length);\n        for (let index = 0; index < max; index += 1) {\n          const formalParam = formalParams[index];\n          const actualArg = actualArgs[index];\n          if (!formalParam || !formalParam.name || !actualArg) {\n            continue;\n          }\n          const paramUpper = String(formalParam.name || \"\").trim().toUpperCase();\n          if (!paramUpper) {\n            continue;\n          }\n          const traceDecls = resolveActualTraceDecls(actualArg, currentBindingContext);\n          if (!traceDecls.length) {\n            continue;\n          }\n          byParamUpper.set(paramUpper, traceDecls);\n        }\n      }\n\n      if (!byParamUpper.size) {\n        return null;\n      }\n\n      return {\n        byParamUpper\n      };\n    };\n\n    const attachPerformBindingMetadata = (node, bindingContext) => {\n      if (!node || typeof node !== \"object\" || !bindingContext || !bindingContext.byParamUpper) {\n        return;\n      }\n      try {\n        Object.defineProperty(node, PERFORM_TRACE_META_KEY_DESC, {\n          value: bindingContext,\n          enumerable: false,\n          configurable: true\n        });\n      } catch {\n        // ignore metadata errors; rendering should keep working without trace metadata.\n      }\n    };\n\n    const cloneNode = (sourceNode, parentId, expandDepth, pathToken, forceSyntheticId, formCallStack, bindingContext) => {\n      if (!sourceNode || typeof sourceNode !== \"object\") {\n        return null;\n      }\n\n      if (opts.hideFormRoots && sourceNode.objectType === \"FORM\" && !forceSyntheticId) {\n        return null;\n      }\n\n      const out = {};\n      for (const key of Object.keys(sourceNode)) {\n        if (key === \"children\") {\n          continue;\n        }\n        out[key] = sourceNode[key];\n      }\n\n      if (forceSyntheticId) {\n        out.id = `PERFORM_EXPANDED:${pathToken}`;\n      }\n\n      if (parentId !== undefined) {\n        out.parent = parentId;\n      }\n      attachPerformBindingMetadata(out, bindingContext);\n\n      const ownId = out.id !== null && out.id !== undefined && String(out.id).trim() ? out.id : undefined;\n      const outChildren = [];\n\n      const sourceChildren = Array.isArray(sourceNode.children) ? sourceNode.children : [];\n      for (let index = 0; index < sourceChildren.length; index += 1) {\n        const child = sourceChildren[index];\n        const childPath = `${pathToken}.C${index}`;\n        const clonedChild = cloneNode(child, ownId, expandDepth, childPath, forceSyntheticId, formCallStack, bindingContext);\n        if (clonedChild) {\n          outChildren.push(clonedChild);\n        }\n      }\n\n      if (\n        opts.expandPerformForms &&\n        sourceNode.objectType === \"PERFORM\" &&\n        expandDepth < maxExpandDepth\n      ) {\n        const formName = getPerformFormNameFromNode(sourceNode);\n        const programName = getPerformProgramFromNode(sourceNode);\n        const formNameUpper = formName ? formName.toUpperCase() : \"\";\n        const resolvedForm = !programName && formNameUpper ? formsByNameUpper.get(formNameUpper) : null;\n        const isRecursiveCall = Boolean(formNameUpper) && Array.isArray(formCallStack) && formCallStack.includes(formNameUpper);\n\n        if (resolvedForm && !isRecursiveCall) {\n          const nextBindingContext = buildPerformBindingContext(sourceNode, resolvedForm, bindingContext);\n          const nextFormCallStack = formNameUpper\n            ? [...(Array.isArray(formCallStack) ? formCallStack : []), formNameUpper]\n            : (Array.isArray(formCallStack) ? formCallStack.slice() : []);\n          const formChildren = Array.isArray(resolvedForm.children) ? resolvedForm.children : [];\n          for (let index = 0; index < formChildren.length; index += 1) {\n            const formChild = formChildren[index];\n            const expandedPath = `${pathToken}.FORM:${formNameUpper}.C${index}`;\n            const clonedExpandedChild = cloneNode(\n              formChild,\n              ownId,\n              expandDepth + 1,\n              expandedPath,\n              true,\n              nextFormCallStack,\n              nextBindingContext\n            );\n            if (clonedExpandedChild) {\n              outChildren.push(clonedExpandedChild);\n            }\n          }\n        }\n      }\n\n      if (outChildren.length) {\n        out.children = outChildren;\n      } else if (Array.isArray(sourceNode.children)) {\n        out.children = [];\n      }\n\n      return out;\n    };\n\n    const output = [];\n    for (let index = 0; index < roots.length; index += 1) {\n      const root = roots[index];\n      const clonedRoot = cloneNode(root, null, 0, `ROOT${index}`, false, [], null);\n      if (clonedRoot) {\n        output.push(clonedRoot);\n      }\n    }\n\n    return output;\n  }\n\n  function buildXmlExportRoots(objects) {\n    const input = Array.isArray(objects) ? objects : [];\n    if (!input.length) {\n      return [];\n    }\n\n    const nodeById = new Map();\n    const idOrder = [];\n    const childIdsByParentId = new Map();\n    const topLevelNoIdNodes = [];\n\n    const pushChildId = (parentId, childId) => {\n      if (!parentId || !childId) {\n        return;\n      }\n      if (!childIdsByParentId.has(parentId)) {\n        childIdsByParentId.set(parentId, []);\n      }\n      const list = childIdsByParentId.get(parentId);\n      if (!list.includes(childId)) {\n        list.push(childId);\n      }\n    };\n\n    const stack = input\n      .filter((node) => node && typeof node === \"object\")\n      .map((node) => ({ node, isTopLevel: true }));\n\n    while (stack.length) {\n      const item = stack.pop();\n      const node = item && item.node;\n      if (!node || typeof node !== \"object\") {\n        continue;\n      }\n\n      const nodeId = normalizeXmlObjectId(node.id);\n      if (!nodeId) {\n        if (item.isTopLevel) {\n          topLevelNoIdNodes.push(node);\n        }\n      } else if (!nodeById.has(nodeId)) {\n        nodeById.set(nodeId, node);\n        idOrder.push(nodeId);\n      }\n\n      const parentId = normalizeXmlObjectId(node.parent);\n      if (nodeId && parentId) {\n        pushChildId(parentId, nodeId);\n      }\n\n      const children = Array.isArray(node.children) ? node.children : [];\n      for (let index = children.length - 1; index >= 0; index -= 1) {\n        const child = children[index];\n        if (!child || typeof child !== \"object\") {\n          continue;\n        }\n        const childId = normalizeXmlObjectId(child.id);\n        if (nodeId && childId) {\n          pushChildId(nodeId, childId);\n        }\n        stack.push({ node: child, isTopLevel: false });\n      }\n    }\n\n    if (!nodeById.size) {\n      return input.slice();\n    }\n\n    const cloneNodeNoId = (node, seenNoId) => {\n      if (!node || typeof node !== \"object\") {\n        return node;\n      }\n      if (seenNoId.has(node)) {\n        return null;\n      }\n\n      const nextSeenNoId = new Set(seenNoId);\n      nextSeenNoId.add(node);\n\n      const out = {};\n      for (const key of Object.keys(node)) {\n        if (key === \"children\") {\n          continue;\n        }\n        out[key] = node[key];\n      }\n\n      const children = Array.isArray(node.children) ? node.children : [];\n      const outChildren = [];\n      for (const child of children) {\n        if (!child || typeof child !== \"object\") {\n          continue;\n        }\n        const childId = normalizeXmlObjectId(child.id);\n        if (childId) {\n          // ID-based children are wired later from parent map.\n          continue;\n        }\n        const cloned = cloneNodeNoId(child, nextSeenNoId);\n        if (cloned) {\n          outChildren.push(cloned);\n        }\n      }\n\n      if (outChildren.length) {\n        out.children = outChildren;\n      } else if (Array.isArray(node.children) && node.children.length === 0) {\n        out.children = [];\n      }\n\n      return out;\n    };\n\n    const cloneNodeById = (nodeId, ancestorIds, emittedIds) => {\n      if (!nodeId || !nodeById.has(nodeId)) {\n        return null;\n      }\n      if (ancestorIds.has(nodeId)) {\n        return null;\n      }\n      if (emittedIds && emittedIds.has(nodeId)) {\n        return null;\n      }\n\n      const node = nodeById.get(nodeId);\n      const nextAncestors = new Set(ancestorIds);\n      nextAncestors.add(nodeId);\n      if (emittedIds) {\n        emittedIds.add(nodeId);\n      }\n\n      const out = {};\n      for (const key of Object.keys(node)) {\n        if (key === \"children\") {\n          continue;\n        }\n        out[key] = node[key];\n      }\n\n      const outChildren = [];\n\n      const explicitChildren = Array.isArray(node.children) ? node.children : [];\n      for (const child of explicitChildren) {\n        if (!child || typeof child !== \"object\") {\n          continue;\n        }\n        const childId = normalizeXmlObjectId(child.id);\n        if (childId) {\n          continue;\n        }\n        const clonedNoId = cloneNodeNoId(child, new Set());\n        if (clonedNoId) {\n          outChildren.push(clonedNoId);\n        }\n      }\n\n      const childIds = childIdsByParentId.get(nodeId) || [];\n      for (const childId of childIds) {\n        const cloned = cloneNodeById(childId, nextAncestors, emittedIds);\n        if (cloned) {\n          outChildren.push(cloned);\n        }\n      }\n\n      if (outChildren.length) {\n        out.children = outChildren;\n      } else if (Array.isArray(node.children) && node.children.length === 0) {\n        out.children = [];\n      }\n\n      return out;\n    };\n\n    const isRootId = (nodeId) => {\n      const node = nodeById.get(nodeId);\n      if (!node) {\n        return false;\n      }\n      const parentId = normalizeXmlObjectId(node.parent);\n      return !parentId || !nodeById.has(parentId);\n    };\n\n    const rootIds = [];\n    const addedRootIds = new Set();\n    const addRootId = (nodeId) => {\n      if (!nodeId || addedRootIds.has(nodeId) || !nodeById.has(nodeId)) {\n        return;\n      }\n      addedRootIds.add(nodeId);\n      rootIds.push(nodeId);\n    };\n\n    for (const topNode of input) {\n      const topId = normalizeXmlObjectId(topNode && topNode.id);\n      if (topId && isRootId(topId)) {\n        addRootId(topId);\n      }\n    }\n\n    for (const nodeId of idOrder) {\n      if (isRootId(nodeId)) {\n        addRootId(nodeId);\n      }\n    }\n\n    const reachableIds = new Set();\n    const markReachable = (nodeId) => {\n      if (!nodeId || reachableIds.has(nodeId) || !nodeById.has(nodeId)) {\n        return;\n      }\n      reachableIds.add(nodeId);\n      const childIds = childIdsByParentId.get(nodeId) || [];\n      for (const childId of childIds) {\n        markReachable(childId);\n      }\n    };\n\n    for (const rootId of rootIds) {\n      markReachable(rootId);\n    }\n\n    for (const nodeId of idOrder) {\n      if (!reachableIds.has(nodeId)) {\n        addRootId(nodeId);\n        markReachable(nodeId);\n      }\n    }\n\n    const roots = [];\n    const emittedIds = new Set();\n    for (const node of topLevelNoIdNodes) {\n      const cloned = cloneNodeNoId(node, new Set());\n      if (cloned) {\n        roots.push(cloned);\n      }\n    }\n    for (const rootId of rootIds) {\n      const cloned = cloneNodeById(rootId, new Set(), emittedIds);\n      if (cloned) {\n        roots.push(cloned);\n      }\n    }\n\n    return roots;\n  }\n\n  function isDeclLikeObject(value) {\n    if (!value || typeof value !== \"object\") {\n      return false;\n    }\n    return (\n      typeof value.objectType === \"string\" &&\n      typeof value.name === \"string\" &&\n      typeof value.scopeLabel === \"string\"\n    );\n  }\n\n  function isDeclHintKey(keyHint) {\n    const key = String(keyHint || \"\").trim();\n    if (!key) {\n      return false;\n    }\n    return /decl$/i.test(key);\n  }\n\n  function isDeclObjectForXml(keyHint, value) {\n    if (isDeclLikeObject(value)) {\n      return true;\n    }\n    if (!isDeclHintKey(keyHint) || !value || typeof value !== \"object\" || Array.isArray(value)) {\n      return false;\n    }\n    return (\n      typeof value.name === \"string\" ||\n      typeof value.objectType === \"string\" ||\n      typeof value.scopeLabel === \"string\" ||\n      typeof value.comment === \"string\"\n    );\n  }\n\n  function hasValueLevelDescFields(value) {\n    if (!value || typeof value !== \"object\" || Array.isArray(value)) {\n      return false;\n    }\n    return (\n      Object.prototype.hasOwnProperty.call(value, \"userDesc\") ||\n      Object.prototype.hasOwnProperty.call(value, \"codeDesc\")\n    );\n  }\n\n  function resolveValueLevelTechId(value) {\n    if (!value || typeof value !== \"object\") {\n      return \"\";\n    }\n\n    if (isDeclLikeObject(value.decl)) {\n      const declTech = String(getDeclTechName(value.decl) || \"\").trim();\n      if (declTech) {\n        return declTech;\n      }\n    }\n\n    const declRef = String(value.declRef || \"\").trim();\n    if (declRef) {\n      return declRef;\n    }\n\n    const identifier = extractIdentifierCandidate(value.value);\n    if (identifier) {\n      return identifier;\n    }\n\n    const rawValue = String(value.value || \"\").trim();\n    if (rawValue) {\n      return rawValue;\n    }\n\n    const fallbackName = String(value.name || \"\").trim();\n    return fallbackName;\n  }\n\n  const VALUE_LEVEL_IDENTIFIER_REGEX =\n    /<[^>]+>(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)*|SY-[A-Za-z_][A-Za-z0-9_]*|[A-Za-z_][A-Za-z0-9_]*(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)*/g;\n\n  function normalizeValueIdentifierKey(text) {\n    return String(text || \"\").trim().toUpperCase();\n  }\n\n  function buildValueLevelDeclReplacementMap(value, rawValueText) {\n    if (!value || typeof value !== \"object\" || !isDeclLikeObject(value.decl)) {\n      return null;\n    }\n\n    const replacement = String(getFinalDeclDesc(value.decl) || getDeclTechName(value.decl) || \"\").trim();\n    if (!replacement) {\n      return null;\n    }\n\n    const map = Object.create(null);\n    const register = (token) => {\n      const key = normalizeValueIdentifierKey(token);\n      if (!key) {\n        return;\n      }\n      map[key] = replacement;\n    };\n\n    register(value.declRef);\n    register(value.decl && value.decl.name);\n    register(extractIdentifierCandidate(rawValueText));\n\n    return Object.keys(map).length ? map : null;\n  }\n\n  function replaceIdentifiersOutsideLiterals(rawText, replacementMap) {\n    const text = String(rawText || \"\");\n    if (!text || !replacementMap || typeof replacementMap !== \"object\") {\n      return \"\";\n    }\n\n    let out = \"\";\n    let i = 0;\n    const length = text.length;\n\n    const replaceSegment = (segment) => segment.replace(VALUE_LEVEL_IDENTIFIER_REGEX, (token) => {\n      const key = normalizeValueIdentifierKey(token);\n      if (key && Object.prototype.hasOwnProperty.call(replacementMap, key)) {\n        return replacementMap[key];\n      }\n      return token;\n    });\n\n    while (i < length) {\n      const ch = text[i];\n\n      if (ch === \"'\" || ch === \"|\") {\n        const quote = ch;\n        const start = i;\n        i += 1;\n        while (i < length) {\n          if (text[i] !== quote) {\n            i += 1;\n            continue;\n          }\n          if (quote === \"'\" && i + 1 < length && text[i + 1] === \"'\") {\n            i += 2;\n            continue;\n          }\n          i += 1;\n          break;\n        }\n        out += text.slice(start, i);\n        continue;\n      }\n\n      const start = i;\n      while (i < length && text[i] !== \"'\" && text[i] !== \"|\") {\n        i += 1;\n      }\n      out += replaceSegment(text.slice(start, i));\n    }\n\n    return out;\n  }\n\n  function resolveValueLevelFinalDesc(value) {\n    if (!value || typeof value !== \"object\") {\n      return \"\";\n    }\n\n    const userDesc = String(value.userDesc || \"\").trim();\n    if (userDesc) {\n      const decl = value.decl;\n      if (decl && typeof decl === \"object\" && typeof normalizeDeclDescByTemplate === \"function\") {\n        const normalizedUserDesc = String(normalizeDeclDescByTemplate(decl, userDesc) || \"\").trim();\n        return normalizedUserDesc || userDesc;\n      }\n      return userDesc;\n    }\n\n    const rawValueText = String(value.value || \"\");\n    if (rawValueText.trim()) {\n      const replacementMap = buildValueLevelDeclReplacementMap(value, rawValueText);\n      if (replacementMap) {\n        const replaced = replaceIdentifiersOutsideLiterals(rawValueText, replacementMap).trim();\n        if (replaced) {\n          return replaced;\n        }\n      }\n    }\n\n    const codeDesc = String(value.codeDesc || \"\").trim();\n    if (codeDesc) {\n      return codeDesc;\n    }\n\n    return resolveValueLevelTechId(value);\n  }\n\nwindow.AbapViewerModules.factories = window.AbapViewerModules.factories || {};\nwindow.AbapViewerModules.factories[\"02-descriptions\"] = function registerDescriptions(runtime) {\n  const targetRuntime = runtime || (window.AbapViewerRuntime = window.AbapViewerRuntime || {});\n  targetRuntime.api = targetRuntime.api || {};\n  targetRuntime.api.renderDeclDescPanelUi = renderDeclDescPanelUi;\n  targetRuntime.api.getFinalDeclDesc = getFinalDeclDesc;\n  targetRuntime.api.getEffectiveDeclDesc = getEffectiveDeclDesc;\n  targetRuntime.api.resolveValueLevelFinalDesc = resolveValueLevelFinalDesc;\n  window.AbapViewerModules.parts[\"02-descriptions\"] = true;\n};\nwindow.AbapViewerModules.factories[\"02-descriptions\"](window.AbapViewerRuntime);\n";
-})(typeof globalThis !== "undefined" ? globalThis : (typeof self !== "undefined" ? self : this));
+window.AbapViewerModules = window.AbapViewerModules || {};
+window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
+
+  function collectConditionDeclsFromClauses(clauses, addDecl) {
+    const list = Array.isArray(clauses) ? clauses : [];
+    for (const clause of list) {
+      if (!clause || typeof clause !== "object") {
+        continue;
+      }
+      addDecl(clause.leftOperandDecl);
+      addDecl(clause.rightOperandDecl);
+    }
+  }
+
+  function collectConditionDeclsFromExtras(extras, addDecl) {
+    if (!extras || typeof extras !== "object" || typeof addDecl !== "function") {
+      return;
+    }
+
+    if (extras.ifCondition) {
+      collectConditionDeclsFromClauses(extras.ifCondition.conditions, addDecl);
+    }
+
+    if (extras.performCall) {
+      collectConditionDeclsFromClauses(extras.performCall.ifConditions, addDecl);
+    }
+
+    if (extras.select) {
+      collectConditionDeclsFromClauses(extras.select.whereConditions, addDecl);
+      collectConditionDeclsFromClauses(extras.select.havingConditions, addDecl);
+    }
+
+    for (const key of ["readTable", "loopAtItab", "modifyItab", "deleteItab"]) {
+      if (extras[key]) {
+        collectConditionDeclsFromClauses(extras[key].conditions, addDecl);
+      }
+    }
+  }
+
+  function getDeclsForDescriptionsModal() {
+    const decls = [];
+    const seen = new Set();
+
+    const addDecl = (decl) => {
+      if (!decl || typeof decl !== "object") {
+        return;
+      }
+      const key = getDeclOverrideStorageKey(decl) || stringifyDecl(decl);
+      if (!key || seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      decls.push(decl);
+    };
+
+    for (const decl of (state.data && typeof state.data === "object" && Array.isArray(state.data.decls))
+      ? state.data.decls
+      : []) {
+      addDecl(decl);
+    }
+
+    const objectSources = [];
+    if (Array.isArray(state.renderObjects) && state.renderObjects.length) {
+      objectSources.push(state.renderObjects);
+    }
+    if (state.data && Array.isArray(state.data.objects)) {
+      objectSources.push(state.data.objects);
+    }
+
+    for (const objectList of objectSources) {
+      walkObjects(objectList, (obj) => {
+      for (const value of getValueEntries(obj)) {
+        addDecl(value && value.decl);
+      }
+
+      const extras = obj && obj.extras && typeof obj.extras === "object" ? obj.extras : null;
+      if (!extras) {
+        return;
+      }
+
+      const collectFromAssignmentSections = (container, sections) => {
+        for (const sectionName of sections) {
+          const list = container && Array.isArray(container[sectionName]) ? container[sectionName] : [];
+          for (const entry of list) {
+            const origin = entry && Array.isArray(entry.originDecls) ? entry.originDecls : [];
+            for (const originDecl of origin) {
+              addDecl(originDecl);
+            }
+            addDecl(entry && entry.valueDecl);
+          }
+        }
+      };
+
+      if (extras.callFunction) {
+        collectFromAssignmentSections(extras.callFunction, ["exporting", "importing", "changing", "tables", "exceptions"]);
+      }
+
+      if (extras.callMethod) {
+        collectFromAssignmentSections(extras.callMethod, ["exporting", "importing", "changing", "receiving", "exceptions"]);
+      }
+
+      if (extras.performCall) {
+        for (const sectionName of ["using", "changing", "tables"]) {
+          const list = Array.isArray(extras.performCall[sectionName]) ? extras.performCall[sectionName] : [];
+          for (const entry of list) {
+            const origin = entry && Array.isArray(entry.originDecls) ? entry.originDecls : [];
+            for (const originDecl of origin) {
+              addDecl(originDecl);
+            }
+            addDecl(entry && entry.valueDecl);
+          }
+        }
+      }
+
+      if (extras.form && Array.isArray(extras.form.params)) {
+        for (const param of extras.form.params) {
+          const origin = param && Array.isArray(param.originDecls) ? param.originDecls : [];
+          for (const originDecl of origin) {
+            addDecl(originDecl);
+          }
+        }
+      }
+
+        collectConditionDeclsFromExtras(extras, addDecl);
+      });
+    }
+
+    return decls;
+  }
+
+  function getDeclCodeDesc(decl) {
+    const source = getSourceDeclDesc(decl);
+    if (source) {
+      return source;
+    }
+    return getBaseDeclDesc(decl);
+  }
+
+  function renderDeclDescCellLines({ structText, itemText }) {
+    const wrap = document.createElement("div");
+    const structLine = document.createElement("div");
+    const structLabel = document.createElement("span");
+    structLabel.className = "muted";
+    structLabel.textContent = "Struct: ";
+    structLine.appendChild(structLabel);
+    structLine.appendChild(document.createTextNode(structText || ""));
+    wrap.appendChild(structLine);
+
+    const itemLine = document.createElement("div");
+    const itemLabel = document.createElement("span");
+    itemLabel.className = "muted";
+    itemLabel.textContent = "Item: ";
+    itemLine.appendChild(itemLabel);
+    itemLine.appendChild(document.createTextNode(itemText || ""));
+    wrap.appendChild(itemLine);
+
+    return wrap;
+  }
+
+  function renderDeclDescPanelUi() {
+    if (!els.declDescPanel) {
+      return;
+    }
+
+    const settings = state.settings || loadSettings();
+    state.settings = settings;
+
+    if (els.declDescTypes) {
+      els.declDescTypes.replaceChildren();
+      for (const type of DECL_TYPE_OPTIONS) {
+        const label = document.createElement("label");
+        label.className = "toggle";
+
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.value = type;
+        input.checked = Array.isArray(settings.declFilterTypes) && settings.declFilterTypes.includes(type);
+        input.addEventListener("change", () => {
+          const selected = [];
+          const inputs = els.declDescTypes ? els.declDescTypes.querySelectorAll("input[type=checkbox]") : [];
+          for (const checkbox of Array.from(inputs)) {
+            if (checkbox.checked) {
+              selected.push(String(checkbox.value || "").trim().toUpperCase());
+            }
+          }
+          state.settings = normalizeSettings({ ...settings, declFilterTypes: selected });
+          saveSettings(state.settings);
+          renderDeclDescPanelUi();
+        });
+
+        label.appendChild(input);
+        label.appendChild(document.createTextNode(type));
+        els.declDescTypes.appendChild(label);
+      }
+    }
+
+    const decls = getDeclsForDescriptionsModal();
+    const types = new Set((state.settings && Array.isArray(state.settings.declFilterTypes))
+      ? state.settings.declFilterTypes
+      : DEFAULT_SETTINGS.declFilterTypes);
+
+    const query = els.declDescSearch ? String(els.declDescSearch.value || "").trim().toLowerCase() : "";
+    const missingOnly = Boolean(els.declDescMissingOnly && els.declDescMissingOnly.checked);
+
+    const rows = [];
+    let totalRows = 0;
+    let missingRows = 0;
+
+    for (const decl of decls) {
+      if (!decl || typeof decl !== "object" || !decl.objectType || !decl.name) {
+        continue;
+      }
+
+      const objectType = String(decl.objectType || "").trim().toUpperCase();
+      if (objectType === "STRUCT_FIELD") {
+        const structType = String(decl.structObjectType || "").trim().toUpperCase();
+        if (structType && !types.has(structType)) {
+          continue;
+        }
+      } else if (!types.has(objectType)) {
+        continue;
+      }
+
+      totalRows += 1;
+
+      const techName = getDeclTechName(decl);
+      const scopeLabel = String(decl.scopeLabel || "");
+
+      const isStructField = isStructFieldDecl(decl);
+      if (!isStructField) {
+        const codeDescRaw = String(getDeclCodeDesc(decl) || "");
+        const userEntry = getDeclOverrideEntry(decl);
+        const userDescRaw = userEntry.text ? String(userEntry.text) : "";
+
+        const codeDesc = settings.normalizeDeclDesc ? normalizeDeclDescText(decl, codeDescRaw) : codeDescRaw;
+        const userDesc = (!settings.normalizeDeclDesc || userEntry.noNormalize)
+          ? userDescRaw
+          : normalizeDeclDescText(decl, userDescRaw);
+
+        const missing = !codeDescRaw.trim() && !userDescRaw.trim();
+        if (missing) {
+          missingRows += 1;
+        }
+        if (missingOnly && !missing) {
+          continue;
+        }
+
+        const haystack = [
+          objectType,
+          scopeLabel,
+          techName,
+          codeDescRaw,
+          userDescRaw,
+          codeDesc,
+          userDesc
+        ]
+          .filter(Boolean)
+          .join("\n")
+          .toLowerCase();
+
+        if (query && !haystack.includes(query)) {
+          continue;
+        }
+
+        rows.push({
+          decl,
+          objectType,
+          scopeLabel,
+          techName,
+          missing,
+          codeDesc,
+          userDesc
+        });
+        continue;
+      }
+
+      const structDecl = buildStructDeclFromFieldDecl(decl);
+      const structCodeRaw = structDecl ? String(getDeclCodeDesc(structDecl) || "") : "";
+      const structUserRaw = structDecl ? String(getDeclOverrideDesc(structDecl) || "") : "";
+      const itemCodeRaw = String(getDeclCodeDesc(decl) || "");
+      const itemEntry = getDeclOverrideEntry(decl);
+      const itemUserRaw = itemEntry.text ? String(itemEntry.text) : "";
+
+      const structCode = structDecl && settings.normalizeDeclDesc ? normalizeDeclDescText(structDecl, structCodeRaw) : structCodeRaw;
+      const structUser = structDecl && settings.normalizeDeclDesc ? normalizeDeclDescText(structDecl, structUserRaw) : structUserRaw;
+      const itemCode = settings.normalizeDeclDesc ? normalizeDeclDescText(decl, itemCodeRaw) : itemCodeRaw;
+      const itemUser = (!settings.normalizeDeclDesc || itemEntry.noNormalize)
+        ? itemUserRaw
+        : normalizeDeclDescText(decl, itemUserRaw);
+
+      const structMissing = !structCodeRaw.trim() && !structUserRaw.trim();
+      const itemMissing = !itemCodeRaw.trim() && !itemUserRaw.trim();
+      const missing = structMissing || itemMissing;
+      if (missing) {
+        missingRows += 1;
+      }
+      if (missingOnly && !missing) {
+        continue;
+      }
+
+      const haystack = [
+        objectType,
+        scopeLabel,
+        techName,
+        structCodeRaw,
+        structUserRaw,
+        itemCodeRaw,
+        itemUserRaw,
+        structCode,
+        structUser,
+        itemCode,
+        itemUser
+      ]
+        .filter(Boolean)
+        .join("\n")
+        .toLowerCase();
+
+      if (query && !haystack.includes(query)) {
+        continue;
+      }
+
+      rows.push({
+        decl,
+        objectType,
+        scopeLabel,
+        techName,
+        missing,
+        structMissing,
+        itemMissing,
+        structCode,
+        structUser,
+        itemCode,
+        itemUser
+      });
+    }
+
+    rows.sort((a, b) => {
+      const scopeCmp = String(a.scopeLabel || "").localeCompare(String(b.scopeLabel || ""));
+      if (scopeCmp) {
+        return scopeCmp;
+      }
+      const typeCmp = String(a.objectType || "").localeCompare(String(b.objectType || ""));
+      if (typeCmp) {
+        return typeCmp;
+      }
+      return String(a.techName || "").localeCompare(String(b.techName || ""));
+    });
+
+    if (els.declDescSummary) {
+      const shown = rows.length;
+      els.declDescSummary.textContent = `Showing ${shown} of ${totalRows} decls • Missing: ${missingRows}`;
+    }
+
+    if (!els.declDescTable) {
+      refreshInputGutterTargets();
+      return;
+    }
+
+    if (!state.data || !Array.isArray(state.data.objects)) {
+      els.declDescTable.replaceChildren(el("div", { className: "muted", text: "No data loaded. Click Render first." }));
+      refreshInputGutterTargets();
+      return;
+    }
+
+    const table = document.createElement("table");
+    const thead = document.createElement("thead");
+    const headRow = document.createElement("tr");
+    for (const title of ["type", "scope", "technical id", "code desc", "user desc", ""]) {
+      const th = document.createElement("th");
+      th.textContent = title;
+      headRow.appendChild(th);
+    }
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    for (const row of rows) {
+      const tr = document.createElement("tr");
+      const declKey = getDeclOverrideStorageKey(row.decl);
+      if (declKey) {
+        tr.setAttribute("data-decl-key", declKey);
+        if (declKey === state.selectedDeclKey) {
+          tr.classList.add("desc-selected");
+        }
+      }
+      if (row.decl && row.decl.lineStart) {
+        tr.setAttribute("data-line-start", String(row.decl.lineStart));
+      }
+
+      const typeCell = document.createElement("td");
+      typeCell.textContent = row.objectType || "";
+      tr.appendChild(typeCell);
+
+      const scopeCell = document.createElement("td");
+      scopeCell.textContent = row.scopeLabel || "";
+      tr.appendChild(scopeCell);
+
+      const idCell = document.createElement("td");
+      const idWrap = document.createElement("div");
+      const idLine = document.createElement("div");
+      idLine.textContent = row.techName || "";
+      const title = buildDeclTitle(row.decl);
+      if (title) {
+        idLine.title = title;
+      }
+      if (row.decl && row.decl.lineStart) {
+        idLine.style.cursor = "pointer";
+        idLine.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          const api = window.AbapViewerRuntime && window.AbapViewerRuntime.api ? window.AbapViewerRuntime.api : null;
+          const segmentIndex = Number.isFinite(Number(row.decl && row.decl.segmentIndex))
+            ? Math.max(0, Math.floor(Number(row.decl.segmentIndex)))
+            : (api && typeof api.findDeclSegmentIndex === "function"
+              ? api.findDeclSegmentIndex(row.decl)
+              : null);
+          if (api && typeof api.jumpInputToCodeRange === "function") {
+            api.jumpInputToCodeRange(
+              row.decl.lineStart,
+              row.decl.block && row.decl.block.lineEnd ? row.decl.block.lineEnd : row.decl.lineStart,
+              segmentIndex
+            );
+          } else {
+            selectCodeLines(row.decl.lineStart, row.decl.lineStart);
+          }
+          if (row.decl.id) {
+            setSelectedCard(row.decl.id);
+          }
+        });
+      }
+      idWrap.appendChild(idLine);
+
+      if (row.objectType === "STRUCT_FIELD") {
+        const pills = document.createElement("div");
+        if (row.structMissing) {
+          pills.appendChild(el("span", { className: "pill", text: "struct missing" }));
+        }
+        if (row.itemMissing) {
+          pills.appendChild(el("span", { className: "pill", text: "item missing" }));
+        }
+        if (pills.childNodes.length) {
+          idWrap.appendChild(pills);
+        }
+      } else if (row.missing) {
+        idWrap.appendChild(el("span", { className: "pill", text: "missing" }));
+      }
+
+      idCell.appendChild(idWrap);
+      tr.appendChild(idCell);
+
+      const codeCell = document.createElement("td");
+      if (row.objectType === "STRUCT_FIELD") {
+        codeCell.appendChild(renderDeclDescCellLines({ structText: row.structCode || "", itemText: row.itemCode || "" }));
+      } else {
+        codeCell.textContent = row.codeDesc || "";
+      }
+      tr.appendChild(codeCell);
+
+      const userCell = document.createElement("td");
+      if (row.objectType === "STRUCT_FIELD") {
+        userCell.appendChild(renderDeclDescCellLines({ structText: row.structUser || "", itemText: row.itemUser || "" }));
+      } else {
+        userCell.textContent = row.userDesc || "";
+      }
+      tr.appendChild(userCell);
+
+      const actionCell = document.createElement("td");
+      const btn = el("button", {
+        className: "icon-btn",
+        text: "✎",
+        attrs: { type: "button", title: "Edit description", "aria-label": "Edit description" }
+      });
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        editDeclDesc(row.decl);
+      });
+      actionCell.appendChild(btn);
+      tr.appendChild(actionCell);
+
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+
+    els.declDescTable.replaceChildren(table);
+    refreshInputGutterTargets();
+  }
+
+  function setRightTab(nextTab) {
+    const tab = nextTab === "descriptions"
+      ? "descriptions"
+      : (nextTab === "template" ? "template" : "output");
+    state.rightTab = tab;
+
+    const showDescriptions = tab === "descriptions";
+    const showTemplate = tab === "template";
+    const showOutput = tab === "output";
+    if (els.output) {
+      els.output.hidden = !showOutput;
+    }
+    if (els.templatePreviewPanel) {
+      els.templatePreviewPanel.hidden = !showTemplate;
+    }
+    if (els.declDescPanel) {
+      els.declDescPanel.hidden = !showDescriptions;
+    }
+
+    if (els.rightPanelTitle) {
+      els.rightPanelTitle.textContent = showDescriptions
+        ? "Descriptions"
+        : (showTemplate ? "Template Preview" : "Output");
+    }
+
+    if (els.rightTabOutputBtn) {
+      els.rightTabOutputBtn.classList.toggle("active", showOutput);
+      els.rightTabOutputBtn.setAttribute("aria-selected", String(showOutput));
+    }
+    if (els.rightTabTemplateBtn) {
+      els.rightTabTemplateBtn.classList.toggle("active", showTemplate);
+      els.rightTabTemplateBtn.setAttribute("aria-selected", String(showTemplate));
+    }
+    if (els.rightTabDescBtn) {
+      els.rightTabDescBtn.classList.toggle("active", showDescriptions);
+      els.rightTabDescBtn.setAttribute("aria-selected", String(showDescriptions));
+    }
+    if (els.declDescJsonBtn) {
+      els.declDescJsonBtn.hidden = !showDescriptions;
+    }
+
+    if (showDescriptions) {
+      renderDeclDescPanelUi();
+      setTimeout(() => {
+        if (els.declDescSearch) {
+          els.declDescSearch.focus();
+        }
+      }, 0);
+    } else if (showOutput) {
+      renderOutput();
+    } else if (showTemplate) {
+      renderTemplatePreview();
+    }
+
+    refreshInputGutterTargets();
+  }
+
+  function applySettingsFromModal() {
+    if (!els.settingsModal) {
+      return;
+    }
+
+    const next = {
+      normalizeDeclDesc: Boolean(els.settingsNormalizeDesc && els.settingsNormalizeDesc.checked),
+      declFilterTypes: [],
+      structDescTemplate: (els.settingsStructTemplate && els.settingsStructTemplate.value)
+        ? String(els.settingsStructTemplate.value || "")
+        : DEFAULT_SETTINGS.structDescTemplate,
+      nameTemplatesByCode: {}
+    };
+
+    if (els.settingsDeclTypes) {
+      const inputs = els.settingsDeclTypes.querySelectorAll("input[type=checkbox]");
+      for (const input of Array.from(inputs)) {
+        if (input.checked) {
+          next.declFilterTypes.push(String(input.value || "").trim().toUpperCase());
+        }
+      }
+    }
+
+
+    const nameInputs = els.settingsNameTemplates
+      ? els.settingsNameTemplates.querySelectorAll("input[data-code]")
+      : [];
+
+    for (const input of Array.from(nameInputs)) {
+      const code = String(input.getAttribute("data-code") || "").trim().toUpperCase();
+      if (!code) {
+        continue;
+      }
+      next.nameTemplatesByCode[code] = String(input.value || "");
+    }
+
+    state.settings = normalizeSettings(next);
+    saveSettings(state.settings);
+    state.haystackById = buildSearchIndex(state.renderObjects);
+    renderOutput();
+  }
+
+  function resetSettingsToDefault() {
+    state.settings = normalizeSettings(DEFAULT_SETTINGS);
+    saveSettings(state.settings);
+    renderSettingsModalUi();
+    state.haystackById = buildSearchIndex(state.renderObjects);
+    renderOutput();
+  }
+
+  function normalizeKeyToken(value) {
+    return String(value || "").trim().toUpperCase();
+  }
+
+  function getDeclFallbackKey(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+
+    const name = normalizeKeyToken(decl.name);
+    if (!name) {
+      return "";
+    }
+
+    const objectType = normalizeKeyToken(decl.objectType);
+    const file = String(decl.file || "").trim();
+    const line = decl.lineStart ? String(decl.lineStart) : "";
+    return `FALLBACK:${objectType}|${name}|${file}|${line}`;
+  }
+
+  function getDeclKey(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+
+    const scope = normalizeKeyToken(decl.scopeLabel);
+    const name = normalizeKeyToken(decl.name);
+
+    if (!scope || !name) {
+      return "";
+    }
+
+    return `${scope}:${name}`;
+  }
+
+  function getLegacyDeclKey(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+
+    const type = normalizeKeyToken(decl.objectType);
+    const name = normalizeKeyToken(decl.name);
+
+    if (!type || !name) {
+      return "";
+    }
+
+    return `${type}:NAME:${name}`;
+  }
+
+  function getDeclOverrideLookupKeys(decl) {
+    const keys = [];
+    const pushKey = (value) => {
+      const key = String(value || "").trim();
+      if (!key || keys.includes(key)) {
+        return;
+      }
+      keys.push(key);
+    };
+
+    pushKey(getDeclKey(decl));
+    pushKey(getLegacyDeclKey(decl));
+    pushKey(getDeclFallbackKey(decl));
+    return keys;
+  }
+
+  function getDeclOverrideStorageKey(decl) {
+    const keys = getDeclOverrideLookupKeys(decl);
+    return keys.length ? keys[0] : "";
+  }
+
+  function normalizeDescOverrideEntry(value) {
+    if (typeof value === "string") {
+      return { text: String(value || ""), noNormalize: false };
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return { text: "", noNormalize: false };
+    }
+
+    const text = typeof value.text === "string"
+      ? value.text
+      : typeof value.desc === "string"
+        ? value.desc
+        : typeof value.value === "string"
+          ? value.value
+          : "";
+
+    const noNormalize = Boolean(value.noNormalize || value.skipNormalize || value.disableNormalize || value.no_normalize);
+    return { text: String(text || ""), noNormalize };
+  }
+
+  function getDeclOverrideEntry(decl) {
+    const keys = getDeclOverrideLookupKeys(decl);
+    for (const key of keys) {
+      if (key && Object.prototype.hasOwnProperty.call(state.descOverrides || {}, key)) {
+        return normalizeDescOverrideEntry(state.descOverrides[key]);
+      }
+    }
+
+    const legacyKey = getLegacyDeclKey(decl);
+    if (legacyKey && Object.prototype.hasOwnProperty.call(state.descOverridesLegacy || {}, legacyKey)) {
+      return { text: String(state.descOverridesLegacy[legacyKey] || ""), noNormalize: false };
+    }
+
+    return { text: "", noNormalize: false };
+  }
+
+  function getDeclOverrideDesc(decl) {
+    return getDeclOverrideEntry(decl).text;
+  }
+
+  function getDeclOverrideNoNormalize(decl) {
+    return Boolean(getDeclOverrideEntry(decl).noNormalize);
+  }
+
+  function getBaseDeclDesc(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+
+    const objectType = normalizeKeyToken(decl.objectType);
+    const scopeType = normalizeKeyToken(decl.scopeType);
+    if (objectType === "PATH_DECL" || scopeType === "PATH") {
+      return "";
+    }
+
+    const registry = window.AbapVarDescriptions && typeof window.AbapVarDescriptions === "object"
+      ? window.AbapVarDescriptions
+      : null;
+    if (!registry) {
+      return "";
+    }
+
+    const nameUpper = normalizeKeyToken(decl.name);
+    if (!nameUpper) {
+      return "";
+    }
+
+    const scopeLabel = normalizeKeyToken(decl.scopeLabel);
+
+    if (objectType === "SYSTEM" || scopeLabel === "SYSTEM") {
+      const systemMap = registry.system && typeof registry.system === "object" ? registry.system : null;
+      if (systemMap && Object.prototype.hasOwnProperty.call(systemMap, nameUpper)) {
+        return String(systemMap[nameUpper] || "");
+      }
+    }
+
+    const byScope = registry.customByScope && typeof registry.customByScope === "object" ? registry.customByScope : null;
+    if (byScope && scopeLabel && Object.prototype.hasOwnProperty.call(byScope, scopeLabel)) {
+      const scopeMap = byScope[scopeLabel];
+      if (scopeMap && typeof scopeMap === "object" && Object.prototype.hasOwnProperty.call(scopeMap, nameUpper)) {
+        return String(scopeMap[nameUpper] || "");
+      }
+    }
+
+    const globalMap = registry.customGlobal && typeof registry.customGlobal === "object" ? registry.customGlobal : null;
+    if (globalMap && Object.prototype.hasOwnProperty.call(globalMap, nameUpper)) {
+      return String(globalMap[nameUpper] || "");
+    }
+
+    return "";
+  }
+
+  function getSourceDeclDesc(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+    return decl.comment ? String(decl.comment) : "";
+  }
+
+  function normalizeDeclDescText(decl, text) {
+    const settings = state.settings || DEFAULT_SETTINGS;
+    if (!settings.normalizeDeclDesc) {
+      return String(text || "").trim();
+    }
+    return normalizeDeclDescByTemplate(decl, text);
+  }
+
+  function stripDeclTemplateAffixes(text, template) {
+    const raw = String(text || "").trim();
+    if (!raw) {
+      return "";
+    }
+
+    const tpl = String(template || "");
+    const marker = "{{desc}}";
+    const markerIndex = tpl.indexOf(marker);
+    if (markerIndex === -1) {
+      return raw;
+    }
+
+    const prefix = tpl.slice(0, markerIndex).trim();
+    const suffix = tpl.slice(markerIndex + marker.length).trim();
+
+    let next = raw;
+    if (prefix && next.toLowerCase().startsWith(prefix.toLowerCase())) {
+      next = next.slice(prefix.length).trim();
+    }
+    if (
+      suffix &&
+      next.length >= suffix.length &&
+      next.toLowerCase().endsWith(suffix.toLowerCase())
+    ) {
+      next = next.slice(0, next.length - suffix.length).trim();
+    }
+
+    return next || raw;
+  }
+
+  function normalizeDeclDescByTemplate(decl, text) {
+    const descTrimmed = String(text || "").trim();
+    if (!descTrimmed) {
+      return "";
+    }
+
+    const techName = getDeclTechName(decl);
+    const bare = stripAngleBrackets(techName);
+    if (bare.length < 3) {
+      return descTrimmed;
+    }
+
+    const code = bare.slice(1, 3).toUpperCase();
+    const settings = state.settings || DEFAULT_SETTINGS;
+    const templates = settings.nameTemplatesByCode || DEFAULT_SETTINGS.nameTemplatesByCode;
+    const template = templates && Object.prototype.hasOwnProperty.call(templates, code) ? String(templates[code] || "") : "";
+    if (!template.trim()) {
+      return descTrimmed;
+    }
+
+    const strippedKnownPrefix = stripDeclCategoryPrefix(descTrimmed);
+    const normalizedDesc = stripDeclTemplateAffixes(strippedKnownPrefix, template);
+    const normalized = template.replace(/\{\{desc\}\}/g, normalizedDesc).trim();
+    return normalized || descTrimmed;
+  }
+
+  function getEffectiveDeclAtomicDesc(decl) {
+    const override = getDeclOverrideDesc(decl);
+    if (override) {
+      return override;
+    }
+
+    const source = getSourceDeclDesc(decl);
+    if (source) {
+      return source;
+    }
+
+    return getBaseDeclDesc(decl);
+  }
+
+  function getEffectiveDeclAtomicDescNormalized(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+
+    const settings = state.settings || DEFAULT_SETTINGS;
+    const normalizeEnabled = Boolean(settings.normalizeDeclDesc);
+
+    const overrideEntry = getDeclOverrideEntry(decl);
+    const overrideText = overrideEntry.text ? String(overrideEntry.text) : "";
+    if (overrideText) {
+      if (!normalizeEnabled || overrideEntry.noNormalize) {
+        return overrideText;
+      }
+      return normalizeDeclDescText(decl, overrideText);
+    }
+
+    const source = getSourceDeclDesc(decl);
+    if (source) {
+      return normalizeEnabled ? normalizeDeclDescText(decl, source) : source;
+    }
+
+    const base = getBaseDeclDesc(decl);
+    if (base) {
+      return normalizeEnabled ? normalizeDeclDescText(decl, base) : base;
+    }
+
+    return String(getDeclTechName(decl) || "").trim();
+  }
+
+  function getFinalDeclAtomicDescNormalized(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+
+    const overrideEntry = getDeclOverrideEntry(decl);
+    const overrideText = overrideEntry.text ? String(overrideEntry.text) : "";
+    if (overrideText) {
+      return normalizeDeclDescByTemplate(decl, overrideText);
+    }
+
+    const codeDesc = getDeclCodeDesc(decl);
+    if (codeDesc) {
+      return normalizeDeclDescByTemplate(decl, codeDesc);
+    }
+
+    const techId = String(getDeclTechName(decl) || "").trim();
+    if (!techId) {
+      return "";
+    }
+
+    return normalizeDeclDescByTemplate(decl, techId);
+  }
+
+  function buildStructDeclFromFieldDecl(decl) {
+    if (!decl || typeof decl !== "object") {
+      return null;
+    }
+
+    if (!decl.scopeLabel || !decl.structName) {
+      return null;
+    }
+
+    return {
+      id: decl.structId || null,
+      objectType: decl.structObjectType || decl.objectType || "STRUCT",
+      name: String(decl.structName || ""),
+      file: decl.file || "",
+      lineStart: decl.structLineStart || null,
+      raw: decl.structRaw || "",
+      comment: decl.structComment || decl.structTypeComment || "",
+      scopeId: decl.scopeId || 0,
+      scopeLabel: decl.scopeLabel || "",
+      scopeType: decl.scopeType || "",
+      scopeName: decl.scopeName || ""
+    };
+  }
+
+  function stripStructNamePrefixFromItemText(itemText, structName) {
+    const raw = String(itemText || "").trim();
+    if (!raw) {
+      return "";
+    }
+
+    const struct = String(structName || "").trim();
+    if (!struct) {
+      return raw;
+    }
+
+    const prefix = `${struct.toUpperCase()}-`;
+    if (raw.toUpperCase().startsWith(prefix)) {
+      return raw.slice(struct.length + 1).trim();
+    }
+
+    return raw;
+  }
+
+  function hasStructCompositeMeta(decl) {
+    if (!decl || typeof decl !== "object") {
+      return false;
+    }
+    const structName = String(decl.structName || "").trim();
+    const fieldPath = String(decl.fieldPath || "").trim();
+    return Boolean(structName && fieldPath);
+  }
+
+  function stripDeclCategoryPrefixDeep(text) {
+    let current = String(text || "").trim();
+    while (current) {
+      const next = stripDeclCategoryPrefix(current);
+      if (!next || next === current) {
+        break;
+      }
+      current = next;
+    }
+    return current;
+  }
+
+  function sanitizeStructCompositeText(text, decl) {
+    const raw = String(text || "").replace(/\u00A0/g, " ").trim();
+    if (!raw) {
+      return "";
+    }
+
+    const parts = raw.split("-");
+    if (parts.length < 2) {
+      return stripDeclCategoryPrefixDeep(raw);
+    }
+
+    const structPart = stripDeclCategoryPrefixDeep(parts.shift());
+    let itemPart = stripDeclCategoryPrefixDeep(parts.join("-"));
+    itemPart = stripStructNamePrefixFromItemText(itemPart, String(decl && decl.structName ? decl.structName : "").trim());
+
+    if (!structPart) {
+      return itemPart;
+    }
+    if (!itemPart) {
+      return structPart;
+    }
+    return `${structPart}-${itemPart}`;
+  }
+
+  function getDeclTechNameSafe(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+    return String(getDeclTechName(decl) || decl.name || "").trim();
+  }
+
+  function isTechnicalFallbackDesc(decl, text) {
+    const candidate = String(text || "").trim();
+    if (!candidate) {
+      return false;
+    }
+    const tech = getDeclTechNameSafe(decl);
+    if (!tech) {
+      return false;
+    }
+    return candidate.toUpperCase() === tech.toUpperCase();
+  }
+
+  function formatStructFieldDesc(decl) {
+    if (!isStructFieldDecl(decl)) {
+      return getEffectiveDeclAtomicDesc(decl);
+    }
+
+    const settings = state.settings || DEFAULT_SETTINGS;
+    const template = settings.structDescTemplate || DEFAULT_SETTINGS.structDescTemplate;
+
+    const structTech = String(decl.structName || "").trim() || getDeclTechName(decl);
+    const itemTech = String(decl.fieldPath || "").trim() || (() => {
+      const tech = getDeclTechName(decl);
+      const structPrefix = String(decl.structName || "").trim();
+      if (structPrefix && tech.toUpperCase().startsWith(`${structPrefix.toUpperCase()}-`)) {
+        return tech.slice(structPrefix.length + 1);
+      }
+      return tech;
+    })();
+
+    const structDecl = buildStructDeclFromFieldDecl(decl);
+    const structDescRaw = structDecl ? getEffectiveDeclAtomicDescNormalized(structDecl) : "";
+    const itemDescRaw = getEffectiveDeclAtomicDescNormalized(decl);
+
+    const structText = stripDeclCategoryPrefix(String(structDescRaw || "").trim()) || structTech;
+    const itemTextRaw = stripDeclCategoryPrefix(String(itemDescRaw || "").trim()) || itemTech;
+    const itemText = stripStructNamePrefixFromItemText(itemTextRaw, String(decl.structName || "").trim() || structTech);
+
+    return String(template || DEFAULT_SETTINGS.structDescTemplate)
+      .replace(/\{\{struct\}\}/g, structText)
+      .replace(/\{\{item\}\}/g, itemText);
+  }
+
+  function getEffectiveDeclDesc(decl) {
+    if (!isStructFieldDecl(decl)) {
+      return getEffectiveDeclAtomicDescNormalized(decl);
+    }
+
+    const composed = sanitizeStructCompositeText(formatStructFieldDesc(decl), decl);
+    if (!hasStructCompositeMeta(decl)) {
+      const normalized = normalizeDeclDescByTemplate(decl, composed);
+      return normalized || composed;
+    }
+    return composed;
+  }
+
+  function formatStructFieldFinalDesc(decl) {
+    if (!isStructFieldDecl(decl)) {
+      return getFinalDeclAtomicDescNormalized(decl);
+    }
+
+    const structDecl = buildStructDeclFromFieldDecl(decl);
+    const structTextRaw = structDecl ? String(getFinalDeclAtomicDescNormalized(structDecl) || "").trim() : "";
+    const itemTextRaw = String(getFinalDeclAtomicDescNormalized(decl) || "").trim();
+    const structText = stripDeclCategoryPrefix(structTextRaw);
+    const itemTextNormalized = stripDeclCategoryPrefix(itemTextRaw);
+    const itemText = stripStructNamePrefixFromItemText(itemTextNormalized, String(decl.structName || "").trim());
+
+    if (!structText && !itemText) {
+      return "";
+    }
+    if (!structText) {
+      return itemText;
+    }
+    if (!itemText) {
+      return structText;
+    }
+
+    const settings = state.settings || DEFAULT_SETTINGS;
+    const template = settings.structDescTemplate || DEFAULT_SETTINGS.structDescTemplate;
+    return String(template || DEFAULT_SETTINGS.structDescTemplate)
+      .replace(/\{\{struct\}\}/g, structText)
+      .replace(/\{\{item\}\}/g, itemText);
+  }
+
+  function getFinalDeclDesc(decl) {
+    if (!isStructFieldDecl(decl)) {
+      return getFinalDeclAtomicDescNormalized(decl);
+    }
+
+    const composed = sanitizeStructCompositeText(formatStructFieldFinalDesc(decl), decl);
+    if (!composed) {
+      return "";
+    }
+
+    if (isTechnicalFallbackDesc(decl, composed)) {
+      return composed;
+    }
+
+    const normalized = normalizeDeclDescByTemplate(decl, composed);
+    return normalized || composed;
+  }
+
+  function openEditModal({ mode, key, structKey, itemKey, label, hint, initialValue, structValue, itemValue, skipNormalize }) {
+    const editMode = mode === "structField" ? "structField" : "single";
+
+    if (editMode === "single" && !key) {
+      return;
+    }
+
+    if (editMode === "structField" && (!structKey || !itemKey)) {
+      return;
+    }
+
+    if (!els.jsonModal.hidden) {
+      closeJsonModal();
+    }
+
+    state.activeEdit = editMode === "structField"
+      ? { mode: "structField", structKey, itemKey }
+      : { mode: "single", key };
+    els.editLabel.textContent = label ? String(label) : "";
+
+    const hintText = hint ? String(hint) : "";
+    els.editHint.textContent = hintText;
+    els.editHint.style.display = hintText ? "block" : "none";
+
+    if (els.editSingleWrap) {
+      els.editSingleWrap.hidden = editMode !== "single";
+    }
+    if (els.editStructWrap) {
+      els.editStructWrap.hidden = editMode !== "structField";
+    }
+
+    els.editDesc.value = "";
+    if (els.editStructDesc) {
+      els.editStructDesc.value = "";
+    }
+    if (els.editItemDesc) {
+      els.editItemDesc.value = "";
+    }
+    if (els.editSkipNormalize) {
+      els.editSkipNormalize.checked = Boolean(skipNormalize);
+    }
+
+    if (editMode === "single") {
+      els.editDesc.value = initialValue ? String(initialValue) : "";
+    } else {
+      if (els.editStructDesc) {
+        els.editStructDesc.value = structValue ? String(structValue) : "";
+      }
+      if (els.editItemDesc) {
+        els.editItemDesc.value = itemValue ? String(itemValue) : "";
+      }
+    }
+
+    els.editModal.hidden = false;
+    setTimeout(() => {
+      const target = editMode === "structField" && els.editStructDesc ? els.editStructDesc : els.editDesc;
+      target.focus();
+    }, 0);
+  }
+
+  function closeEditModal() {
+    els.editModal.hidden = true;
+    els.editDesc.value = "";
+    if (els.editStructDesc) {
+      els.editStructDesc.value = "";
+    }
+    if (els.editItemDesc) {
+      els.editItemDesc.value = "";
+    }
+    if (els.editSkipNormalize) {
+      els.editSkipNormalize.checked = false;
+    }
+    state.activeEdit = null;
+  }
+
+  function applyEditModal(action) {
+    if (!state.activeEdit) {
+      return;
+    }
+
+    const mode = state.activeEdit.mode === "structField" ? "structField" : "single";
+    const skipNormalize = Boolean(els.editSkipNormalize && els.editSkipNormalize.checked);
+
+    if (mode === "single") {
+      const key = state.activeEdit.key;
+      if (!key) {
+        return;
+      }
+
+      const value = action === "clear" ? "" : String(els.editDesc.value || "");
+      const trimmed = value.trim();
+      const stored = skipNormalize ? trimmed : stripDeclCategoryPrefix(trimmed);
+
+      if (!stored) {
+        delete state.descOverrides[key];
+
+      } else {
+        state.descOverrides[key] = skipNormalize ? { text: stored, noNormalize: true } : stored;
+      }
+    } else {
+      const structKey = state.activeEdit.structKey;
+      const itemKey = state.activeEdit.itemKey;
+      if (!structKey || !itemKey) {
+        return;
+      }
+
+      const structValue = action === "clear" ? "" : String((els.editStructDesc && els.editStructDesc.value) || "");
+      const itemValue = action === "clear" ? "" : String((els.editItemDesc && els.editItemDesc.value) || "");
+      const structTrimmed = structValue.trim();
+      const itemTrimmed = itemValue.trim();
+      const structStored = stripDeclCategoryPrefix(structTrimmed);
+      const itemStored = skipNormalize ? itemTrimmed : stripDeclCategoryPrefix(itemTrimmed);
+
+      if (!structStored) {
+        delete state.descOverrides[structKey];
+      } else {
+        state.descOverrides[structKey] = structStored;
+      }
+
+      if (!itemStored) {
+        delete state.descOverrides[itemKey];
+      } else {
+        state.descOverrides[itemKey] = skipNormalize ? { text: itemStored, noNormalize: true } : itemStored;
+      }
+    }
+
+    saveDescOverrides();
+    state.haystackById = buildSearchIndex(state.renderObjects);
+    renderOutput();
+    if (state.rightTab === "template") {
+      if (typeof renderTemplatePreview === "function") {
+        renderTemplatePreview();
+      }
+    } else if (state.rightTab === "descriptions") {
+      renderDeclDescPanelUi();
+    }
+  }
+
+  function editDeclDesc(decl) {
+    if (!decl || !decl.name) {
+      return;
+    }
+
+    const isStructField = isStructFieldDecl(decl);
+
+    const key = getDeclOverrideStorageKey(decl);
+    if (!key) {
+      return;
+    }
+
+    const settings = state.settings || DEFAULT_SETTINGS;
+    const normalizeEnabled = Boolean(settings.normalizeDeclDesc);
+
+    const currentEntry = getDeclOverrideEntry(decl);
+    const current = currentEntry.text ? String(currentEntry.text) : "";
+    const effective = getEffectiveDeclDesc(decl);
+    const currentDisplay = current
+      ? (normalizeEnabled && !currentEntry.noNormalize ? normalizeDeclDescText(decl, current) : current)
+      : "";
+    const hintParts = [];
+    hintParts.push(`Key: ${key}`);
+    if (decl.scopeLabel) {
+      hintParts.push(`Scope: ${decl.scopeLabel}`);
+    }
+    if (decl.objectType) {
+      hintParts.push(`Type: ${decl.objectType}`);
+    }
+    if (decl.lineStart) {
+      hintParts.push(`Line: ${decl.lineStart}`);
+    }
+    const base = getBaseDeclDesc(decl);
+    const source = getSourceDeclDesc(decl);
+    if (base) {
+      hintParts.push(`Registry: ${base}`);
+    }
+    if (source) {
+      hintParts.push(`Comment: ${source}`);
+    }
+    if (decl.raw) {
+      hintParts.push(decl.raw);
+    }
+
+    if (!isStructField) {
+      openEditModal({
+        mode: "single",
+        key,
+        label: `${decl.objectType || "DECL"} ${getDeclTechName(decl)}`,
+        hint: hintParts.join(" • "),
+        initialValue: currentDisplay || effective,
+        skipNormalize: Boolean(currentEntry.noNormalize)
+      });
+      return;
+    }
+
+    const structDecl = buildStructDeclFromFieldDecl(decl);
+    const structKey = structDecl ? getDeclOverrideStorageKey(structDecl) : "";
+    if (!structKey) {
+      return;
+    }
+
+    const structCurrentEntry = structDecl ? getDeclOverrideEntry(structDecl) : { text: "", noNormalize: false };
+    const structCurrent = structCurrentEntry.text ? String(structCurrentEntry.text) : "";
+    const structEffective = structDecl ? getEffectiveDeclDesc(structDecl) : "";
+    const structCurrentDisplay = structDecl && structCurrent && normalizeEnabled
+      ? normalizeDeclDescText(structDecl, structCurrent)
+      : structCurrent;
+
+    hintParts.push(`StructKey: ${structKey}`);
+    hintParts.push(`ItemKey: ${key}`);
+
+    openEditModal({
+      mode: "structField",
+      structKey,
+      itemKey: key,
+      label: `${decl.objectType || "DECL"} ${getDeclTechName(decl)}`,
+      hint: hintParts.join(" • "),
+      structValue: structCurrentDisplay || structEffective,
+      itemValue: stripStructNamePrefixFromItemText(currentDisplay || getEffectiveDeclAtomicDescNormalized(decl), String(decl.structName || '').trim()),
+      skipNormalize: Boolean(currentEntry.noNormalize)
+    });
+  }
+
+  function escapeSelectorValue(value) {
+    const text = String(value || "");
+    if (window.CSS && typeof window.CSS.escape === "function") {
+      return window.CSS.escape(text);
+    }
+    return text.replace(/"/g, '\\"');
+  }
+
+  function safeJson(value, pretty) {
+    try {
+      return JSON.stringify(value, null, pretty ? 2 : 0);
+    } catch {
+      return "";
+    }
+  }
+
+  function sanitizeXmlText(value) {
+    const text = String(value ?? "");
+    // Keep: TAB (0x9), LF (0xA), CR (0xD)
+    return text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
+  }
+
+  function escapeXmlText(value) {
+    return sanitizeXmlText(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
+  }
+
+  function toXmlTagName(key) {
+    const raw = String(key || "").trim();
+    if (!raw) {
+      return "value";
+    }
+
+    const normalized = raw.replace(/[^A-Za-z0-9_:-]/g, "_");
+    if (!/^[A-Za-z_]/.test(normalized)) {
+      return `_${normalized}`;
+    }
+    return normalized;
+  }
+
+  function getArrayItemTagName(keyHint) {
+    const key = String(keyHint || "").trim().toLowerCase();
+    if (key === "objects" || key === "children") {
+      return "object";
+    }
+    return "item";
+  }
+
+  function isPlainObjectRecord(value) {
+    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function isAbapStatementObject(value) {
+    if (!isPlainObjectRecord(value)) {
+      return false;
+    }
+    const hasNodeShape = Object.prototype.hasOwnProperty.call(value, "values")
+      || Object.prototype.hasOwnProperty.call(value, "extras")
+      || Object.prototype.hasOwnProperty.call(value, "children");
+    if (!hasNodeShape) {
+      return false;
+    }
+    return (
+      Object.prototype.hasOwnProperty.call(value, "objectType")
+      && Object.prototype.hasOwnProperty.call(value, "raw")
+      && Object.prototype.hasOwnProperty.call(value, "lineStart")
+    );
+  }
+
+  function extractIdentifierCandidate(text) {
+    const raw = String(text || "").trim();
+    if (!raw) {
+      return "";
+    }
+    if (raw.startsWith("'") || raw.startsWith("|")) {
+      return "";
+    }
+    if (/^[+-]?\d/.test(raw)) {
+      return "";
+    }
+
+    const sysMatch = raw.match(/^SY-[A-Za-z_][A-Za-z0-9_]*/i);
+    if (sysMatch) {
+      return sysMatch[0].toUpperCase();
+    }
+
+    const fieldPathMatch = raw.match(
+      /^(<[^>]+>|[A-Za-z_][A-Za-z0-9_]*)(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)+/
+    );
+    if (fieldPathMatch) {
+      return String(fieldPathMatch[0] || "").trim();
+    }
+
+    const inlinePatterns = [
+      /@?DATA\s*\(\s*([^)]+)\s*\)/i,
+      /@?FINAL\s*\(\s*([^)]+)\s*\)/i,
+      /FIELD-SYMBOL\s*\(\s*(<[^>]+>)\s*\)/i
+    ];
+    for (const regex of inlinePatterns) {
+      const match = regex.exec(raw);
+      if (!match || !match[1]) {
+        continue;
+      }
+      const candidate = String(match[1] || "").trim();
+      if (candidate) {
+        return candidate;
+      }
+    }
+
+    const genericMatch = raw.match(
+      /<[^>]+>|[A-Za-z_][A-Za-z0-9_]*(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)*/
+    );
+    return genericMatch ? String(genericMatch[0] || "").trim() : "";
+  }
+
+  function resolveFallbackFieldId(entry) {
+    if (!isPlainObjectRecord(entry)) {
+      return "";
+    }
+
+    const fromDeclRef = String(entry.declRef || "").trim();
+    if (fromDeclRef) {
+      return fromDeclRef;
+    }
+
+    const valueText = String(entry.value || "").trim();
+    const identifier = extractIdentifierCandidate(valueText);
+    if (identifier) {
+      return identifier;
+    }
+
+    if (valueText) {
+      return valueText;
+    }
+
+    const fromName = String(entry.name || "").trim();
+    if (fromName) {
+      return fromName;
+    }
+
+    return "";
+  }
+
+  function buildPathKeyFromParts(parts) {
+    const tokens = Array.isArray(parts) ? parts : [];
+    const cleaned = [];
+    for (const part of tokens) {
+      const token = String(part || "").trim();
+      if (token) {
+        cleaned.push(token);
+      }
+    }
+    return cleaned.join("/");
+  }
+
+  function normalizeSyntheticPathKey(pathKey) {
+    const text = String(pathKey || "").trim();
+    if (!text) {
+      return "ROOT";
+    }
+    const normalized = text
+      .replace(/\s+/g, "_")
+      .replace(/[^A-Za-z0-9_:\-./[\]#]/g, "_")
+      .toUpperCase();
+    return normalized || "ROOT";
+  }
+
+  function buildSyntheticDeclForPath({ pathKey, fieldId, file, lineStart, raw, role }) {
+    const name = String(fieldId || "").trim();
+    if (!name) {
+      return null;
+    }
+
+    const numericLine = lineStart === null || lineStart === undefined || lineStart === ""
+      ? null
+      : (Number(lineStart) || null);
+
+    const normalizedPath = normalizeSyntheticPathKey(pathKey);
+    return {
+      id: null,
+      objectType: "PATH_DECL",
+      name,
+      file: String(file || ""),
+      lineStart: numericLine,
+      raw: String(raw || ""),
+      comment: "",
+      scopeId: 0,
+      scopeLabel: `PATH:${normalizedPath}`,
+      scopeType: "PATH",
+      scopeName: String(role || "")
+    };
+  }
+
+  function getDeclSourceContextFromObject(obj) {
+    if (!isPlainObjectRecord(obj)) {
+      return { file: "", lineStart: null, raw: "" };
+    }
+    return {
+      file: String(obj.file || ""),
+      lineStart: obj.lineStart === null || obj.lineStart === undefined
+        ? null
+        : (Number(obj.lineStart) || null),
+      raw: String(obj.raw || "")
+    };
+  }
+
+  function buildObjectPathBase(obj) {
+    const id = normalizeId(obj && obj.id);
+    if (id) {
+      return `OBJECT:${id}`;
+    }
+    const type = String(obj && obj.objectType ? obj.objectType : "OBJECT").trim() || "OBJECT";
+    const file = String(obj && obj.file ? obj.file : "").trim() || "NO_FILE";
+    const line = obj && obj.lineStart ? String(obj.lineStart) : "0";
+    return `OBJECT:${type}:${file}:${line}`;
+  }
+
+  function hasAnyDecls(list) {
+    if (!Array.isArray(list)) {
+      return false;
+    }
+    return list.some((item) => item && typeof item === "object");
+  }
+
+  function ensureEntryDeclWithSynthetic(entry, options) {
+    if (!isPlainObjectRecord(entry)) {
+      return entry;
+    }
+    if (isDeclLikeObject(entry.decl)) {
+      return entry;
+    }
+
+    const fieldId = resolveFallbackFieldId(entry);
+    const pathKey = buildPathKeyFromParts([options && options.pathKey ? options.pathKey : "", "decl"]);
+    const syntheticDecl = buildSyntheticDeclForPath({
+      pathKey,
+      fieldId,
+      file: options && options.file ? options.file : "",
+      lineStart: options ? options.lineStart : null,
+      raw: options && options.raw ? options.raw : "",
+      role: options && options.role ? options.role : "value"
+    });
+    if (!syntheticDecl) {
+      return entry;
+    }
+
+    const next = { ...entry, decl: syntheticDecl };
+    if (!String(next.declRef || "").trim()) {
+      next.declRef = fieldId;
+    }
+    return next;
+  }
+
+  function ensureValueDeclWithSynthetic(entry, options) {
+    if (!isPlainObjectRecord(entry)) {
+      return entry;
+    }
+    if (isDeclLikeObject(entry.valueDecl) || hasAnyDecls(entry.originDecls)) {
+      return entry;
+    }
+
+    const sourceForId = {
+      declRef: String(entry.valueRef || entry.declRef || "").trim(),
+      value: entry.value,
+      name: entry.name || (options && options.nameHint ? options.nameHint : "")
+    };
+    const fieldId = resolveFallbackFieldId(sourceForId);
+    const pathKey = buildPathKeyFromParts([options && options.pathKey ? options.pathKey : "", "valueDecl"]);
+    const syntheticDecl = buildSyntheticDeclForPath({
+      pathKey,
+      fieldId,
+      file: options && options.file ? options.file : "",
+      lineStart: options ? options.lineStart : null,
+      raw: options && options.raw ? options.raw : "",
+      role: options && options.role ? options.role : "value"
+    });
+    if (!syntheticDecl) {
+      return entry;
+    }
+
+    return {
+      ...entry,
+      valueDecl: syntheticDecl
+    };
+  }
+
+  function ensureConditionClauseDeclsWithSynthetic(clause, options) {
+    if (!isPlainObjectRecord(clause)) {
+      return clause;
+    }
+
+    let next = clause;
+    const file = options && options.file ? options.file : "";
+    const lineStart = options ? options.lineStart : null;
+    const raw = options && options.raw ? options.raw : "";
+    const basePath = options && options.pathKey ? options.pathKey : "";
+
+    if (!isDeclLikeObject(clause.leftOperandDecl)) {
+      const leftFieldId = resolveFallbackFieldId({
+        declRef: clause.leftOperandRef,
+        value: clause.leftOperand,
+        name: "leftOperand"
+      });
+      const leftDecl = buildSyntheticDeclForPath({
+        pathKey: buildPathKeyFromParts([basePath, "leftOperandDecl"]),
+        fieldId: leftFieldId,
+        file,
+        lineStart,
+        raw,
+        role: "leftOperand"
+      });
+      if (leftDecl) {
+        if (next === clause) {
+          next = { ...clause };
+        }
+        next.leftOperandDecl = leftDecl;
+        if (!String(next.leftOperandRef || "").trim()) {
+          next.leftOperandRef = leftFieldId;
+        }
+      }
+    }
+
+    if (!isDeclLikeObject(clause.rightOperandDecl)) {
+      const rightFieldId = resolveFallbackFieldId({
+        declRef: clause.rightOperandRef,
+        value: clause.rightOperand,
+        name: "rightOperand"
+      });
+      const rightDecl = buildSyntheticDeclForPath({
+        pathKey: buildPathKeyFromParts([basePath, "rightOperandDecl"]),
+        fieldId: rightFieldId,
+        file,
+        lineStart,
+        raw,
+        role: "rightOperand"
+      });
+      if (rightDecl) {
+        if (next === clause) {
+          next = { ...clause };
+        }
+        next.rightOperandDecl = rightDecl;
+        if (!String(next.rightOperandRef || "").trim()) {
+          next.rightOperandRef = rightFieldId;
+        }
+      }
+    }
+
+    return next;
+  }
+
+  function normalizeXmlObjectId(value) {
+    if (value === null || value === undefined) {
+      return "";
+    }
+    return String(value);
+  }
+
+  function getFormNameFromNode(node) {
+    if (!node || typeof node !== "object") {
+      return "";
+    }
+    const valueName = getFirstValueFromValues(node.values, "name");
+    const extrasName = node.extras && node.extras.form && node.extras.form.name
+      ? String(node.extras.form.name)
+      : "";
+    return String(valueName || extrasName || "").trim();
+  }
+
+  function getPerformFormNameFromNode(node) {
+    if (!node || typeof node !== "object") {
+      return "";
+    }
+    const extrasName = node.extras && node.extras.performCall && node.extras.performCall.form
+      ? String(node.extras.performCall.form)
+      : "";
+    const valueName = getFirstValueFromValues(node.values, "form");
+    return String(extrasName || valueName || "").trim();
+  }
+
+  function getPerformProgramFromNode(node) {
+    if (!node || typeof node !== "object") {
+      return "";
+    }
+    const extrasProgram = node.extras && node.extras.performCall && node.extras.performCall.program
+      ? String(node.extras.performCall.program)
+      : "";
+    const valueProgram = getFirstValueFromValues(node.values, "program");
+    return String(extrasProgram || valueProgram || "").trim();
+  }
+
+  function buildFormsByNameUpperFromRoots(rawRoots) {
+    const map = new Map();
+    walkObjects(rawRoots, (obj) => {
+      if (!obj || obj.objectType !== "FORM") {
+        return;
+      }
+      const name = getFormNameFromNode(obj);
+      if (!name) {
+        return;
+      }
+      const upper = name.toUpperCase();
+      if (!map.has(upper)) {
+        map.set(upper, obj);
+      }
+    });
+    return map;
+  }
+
+  function buildRenderableObjects(rawRoots, options) {
+    const roots = Array.isArray(rawRoots) ? rawRoots : [];
+    if (!roots.length) {
+      return [];
+    }
+
+
+    const opts = {
+      expandPerformForms: true,
+      hideFormRoots: true,
+      maxExpandDepth: Number.POSITIVE_INFINITY,
+      ...(options && typeof options === "object" ? options : {})
+    };
+    const maxExpandDepth = Math.max(0, Number(opts.maxExpandDepth) || 0);
+    const formsByNameUpper = opts.expandPerformForms ? buildFormsByNameUpperFromRoots(roots) : new Map();
+    var PERFORM_TRACE_META_KEY_DESC = "__abapPerformTraceBinding";
+
+    const getDeclIdentityKey = (decl) => {
+      if (!decl || typeof decl !== "object") {
+        return "";
+      }
+      return [
+        decl.objectType || "",
+        decl.scopeLabel || "",
+        decl.name || "",
+        decl.file || "",
+        decl.lineStart || ""
+      ].join("|");
+    };
+
+    const dedupeDeclList = (list) => {
+      const out = [];
+      const seen = new Set();
+      for (const decl of Array.isArray(list) ? list : []) {
+        if (!decl || typeof decl !== "object") {
+          continue;
+        }
+        const key = getDeclIdentityKey(decl);
+        if (!key || seen.has(key)) {
+          continue;
+        }
+        seen.add(key);
+        out.push(decl);
+      }
+      return out;
+    };
+
+    const isPerformTraceSyntheticStructFieldDecl = (decl) => {
+      if (!decl || typeof decl !== "object") {
+        return false;
+      }
+      return String(decl.objectType || "").toUpperCase() === "STRUCT_FIELD"
+        && String(decl.structObjectType || "").toUpperCase() === "FORM_PARAM"
+        && String(decl.structName || "").trim() !== ""
+        && String(decl.fieldPath || "").trim() !== "";
+    };
+
+    const getPerformTraceParamUpper = (decl) => {
+      if (!decl || typeof decl !== "object") {
+        return "";
+      }
+      const objectType = String(decl.objectType || "").toUpperCase();
+      if (objectType === "FORM_PARAM") {
+        return String(decl.name || "").trim().toUpperCase();
+      }
+      if (isPerformTraceSyntheticStructFieldDecl(decl)) {
+        return String(decl.structName || "").trim().toUpperCase();
+      }
+      return "";
+    };
+
+    const buildPerformTraceSyntheticStructFieldDecl = (baseDecl, valueDecl, actualEntry) => {
+      if (!baseDecl || typeof baseDecl !== "object") {
+        return null;
+      }
+      if (!valueDecl || typeof valueDecl !== "object" || String(valueDecl.objectType || "").toUpperCase() !== "STRUCT_FIELD") {
+        return baseDecl;
+      }
+
+      const localFieldPath = String(valueDecl.fieldPath || "").trim();
+      if (!localFieldPath) {
+        return baseDecl;
+      }
+
+      let rootBaseDecl = baseDecl;
+      let rootStructName = String(baseDecl.name || "").trim();
+      let prefixFieldPath = "";
+      if (String(baseDecl.objectType || "").toUpperCase() === "STRUCT_FIELD") {
+        rootStructName = String(baseDecl.structName || rootStructName).trim();
+        prefixFieldPath = String(baseDecl.fieldPath || "").trim();
+        rootBaseDecl = {
+          ...baseDecl,
+          id: baseDecl.structId || baseDecl.id || null,
+          objectType: String(baseDecl.structObjectType || "STRUCT"),
+          name: rootStructName,
+          lineStart: Number(baseDecl.structLineStart || baseDecl.lineStart) || null,
+          raw: String(baseDecl.structRaw || baseDecl.raw || ""),
+          comment: String(baseDecl.structComment || baseDecl.comment || "")
+        };
+      }
+
+      if (!rootStructName || !String(rootBaseDecl.scopeLabel || "").trim()) {
+        return baseDecl;
+      }
+
+      const combinedFieldPath = prefixFieldPath ? (prefixFieldPath + "-" + localFieldPath) : localFieldPath;
+      const candidate = {
+        fullRef: rootStructName + "-" + combinedFieldPath,
+        structName: rootStructName,
+        fieldPath: combinedFieldPath
+      };
+      const traceContext = actualEntry && typeof actualEntry === "object"
+        ? { file: actualEntry.file, lineStart: actualEntry.lineStart }
+        : { file: rootBaseDecl.file, lineStart: rootBaseDecl.lineStart };
+      if (typeof createSyntheticStructFieldDecl === "function") {
+        const syntheticDecl = createSyntheticStructFieldDecl(rootBaseDecl, candidate, traceContext);
+        if (syntheticDecl && typeof syntheticDecl === "object") {
+          return syntheticDecl;
+        }
+      }
+
+      return {
+        id: rootBaseDecl.id || null,
+        objectType: "STRUCT_FIELD",
+        name: candidate.fullRef,
+        file: String(traceContext.file || rootBaseDecl.file || ""),
+        lineStart: Number(traceContext.lineStart || rootBaseDecl.lineStart) || null,
+        raw: String(rootBaseDecl.raw || ""),
+        comment: "",
+        scopeId: Number(rootBaseDecl.scopeId || 0) || 0,
+        scopeLabel: String(rootBaseDecl.scopeLabel || ""),
+        scopeType: String(rootBaseDecl.scopeType || ""),
+        scopeName: String(rootBaseDecl.scopeName || ""),
+        structId: rootBaseDecl.id || null,
+        structName: rootStructName,
+        structObjectType: String(rootBaseDecl.objectType || "STRUCT"),
+        structLineStart: Number(rootBaseDecl.lineStart || 0) || null,
+        structRaw: String(rootBaseDecl.raw || ""),
+        structComment: String(rootBaseDecl.comment || ""),
+        traceFile: String(traceContext.file || ""),
+        traceLineStart: Number(traceContext.lineStart || 0) || null,
+        fieldPath: combinedFieldPath,
+        synthetic: true
+      };
+    };
+
+    const resolveActualTraceDecls = (actualEntry, currentBindingContext) => {
+      if (!actualEntry || typeof actualEntry !== "object") {
+        return [];
+      }
+
+      const out = [];
+      const pushDecl = (decl) => {
+        if (decl && typeof decl === "object") {
+          out.push(decl);
+        }
+      };
+      const pushList = (decls) => {
+        for (const decl of Array.isArray(decls) ? decls : []) {
+          pushDecl(decl);
+        }
+      };
+
+      const valueDecl = actualEntry.valueDecl && typeof actualEntry.valueDecl === "object"
+        ? actualEntry.valueDecl
+        : null;
+      if (!valueDecl) {
+        pushList(actualEntry.originDecls);
+        return dedupeDeclList(out);
+      }
+
+      pushDecl(valueDecl);
+
+      const paramUpper = getPerformTraceParamUpper(valueDecl);
+      if (!paramUpper) {
+        pushList(actualEntry.originDecls);
+        return dedupeDeclList(out);
+      }
+
+      const byParamUpper = currentBindingContext && currentBindingContext.byParamUpper instanceof Map
+        ? currentBindingContext.byParamUpper
+        : null;
+      const externalDecls = byParamUpper ? byParamUpper.get(paramUpper) : null;
+      const tracedDecls = Array.isArray(externalDecls) && externalDecls.length
+        ? externalDecls
+        : actualEntry.originDecls;
+
+      if (String(valueDecl.objectType || "").toUpperCase() === "STRUCT_FIELD") {
+        pushList(tracedDecls.map((decl) => buildPerformTraceSyntheticStructFieldDecl(decl, valueDecl, actualEntry)).filter(Boolean));
+      } else {
+        pushList(tracedDecls);
+      }
+
+      return dedupeDeclList(out);
+    };
+
+    const buildPerformBindingContext = (performNode, resolvedForm, currentBindingContext) => {
+      if (!performNode || !resolvedForm) {
+        return null;
+      }
+
+      const call = performNode.extras && performNode.extras.performCall && typeof performNode.extras.performCall === "object"
+        ? performNode.extras.performCall
+        : null;
+      const formExtras = resolvedForm.extras && resolvedForm.extras.form && typeof resolvedForm.extras.form === "object"
+        ? resolvedForm.extras.form
+        : null;
+      const params = formExtras && Array.isArray(formExtras.params) ? formExtras.params : [];
+      if (!call || !params.length) {
+        return null;
+      }
+
+      const bySection = {
+        USING: [],
+        CHANGING: [],
+        TABLES: []
+      };
+      for (const param of params) {
+        if (!param || !param.name) {
+          continue;
+        }
+        const section = String(param.section || "").trim().toUpperCase();
+        if (!Object.prototype.hasOwnProperty.call(bySection, section)) {
+          continue;
+        }
+        bySection[section].push(param);
+      }
+
+      const byParamUpper = new Map();
+      for (const section of ["USING", "CHANGING", "TABLES"]) {
+        const formalParams = bySection[section] || [];
+        const actualArgs = Array.isArray(call[section.toLowerCase()]) ? call[section.toLowerCase()] : [];
+        const max = Math.min(formalParams.length, actualArgs.length);
+        for (let index = 0; index < max; index += 1) {
+          const formalParam = formalParams[index];
+          const actualArg = actualArgs[index];
+          if (!formalParam || !formalParam.name || !actualArg) {
+            continue;
+          }
+          const paramUpper = String(formalParam.name || "").trim().toUpperCase();
+          if (!paramUpper) {
+            continue;
+          }
+          const traceDecls = resolveActualTraceDecls(actualArg, currentBindingContext);
+          if (!traceDecls.length) {
+            continue;
+          }
+          byParamUpper.set(paramUpper, traceDecls);
+        }
+      }
+
+      if (!byParamUpper.size) {
+        return null;
+      }
+
+      return {
+        byParamUpper
+      };
+    };
+
+    const attachPerformBindingMetadata = (node, bindingContext) => {
+      if (!node || typeof node !== "object" || !bindingContext || !bindingContext.byParamUpper) {
+        return;
+      }
+      try {
+        Object.defineProperty(node, PERFORM_TRACE_META_KEY_DESC, {
+          value: bindingContext,
+          enumerable: false,
+          configurable: true
+        });
+      } catch {
+        // ignore metadata errors; rendering should keep working without trace metadata.
+      }
+    };
+
+    const cloneNode = (sourceNode, parentId, expandDepth, pathToken, forceSyntheticId, formCallStack, bindingContext) => {
+      if (!sourceNode || typeof sourceNode !== "object") {
+        return null;
+      }
+
+      if (opts.hideFormRoots && sourceNode.objectType === "FORM" && !forceSyntheticId) {
+        return null;
+      }
+
+      const out = {};
+      for (const key of Object.keys(sourceNode)) {
+        if (key === "children") {
+          continue;
+        }
+        out[key] = sourceNode[key];
+      }
+
+      if (forceSyntheticId) {
+        out.id = `PERFORM_EXPANDED:${pathToken}`;
+      }
+
+      if (parentId !== undefined) {
+        out.parent = parentId;
+      }
+      attachPerformBindingMetadata(out, bindingContext);
+
+      const ownId = out.id !== null && out.id !== undefined && String(out.id).trim() ? out.id : undefined;
+      const outChildren = [];
+
+      const sourceChildren = Array.isArray(sourceNode.children) ? sourceNode.children : [];
+      for (let index = 0; index < sourceChildren.length; index += 1) {
+        const child = sourceChildren[index];
+        const childPath = `${pathToken}.C${index}`;
+        const clonedChild = cloneNode(child, ownId, expandDepth, childPath, forceSyntheticId, formCallStack, bindingContext);
+        if (clonedChild) {
+          outChildren.push(clonedChild);
+        }
+      }
+
+      if (
+        opts.expandPerformForms &&
+        sourceNode.objectType === "PERFORM" &&
+        expandDepth < maxExpandDepth
+      ) {
+        const formName = getPerformFormNameFromNode(sourceNode);
+        const programName = getPerformProgramFromNode(sourceNode);
+        const formNameUpper = formName ? formName.toUpperCase() : "";
+        const resolvedForm = !programName && formNameUpper ? formsByNameUpper.get(formNameUpper) : null;
+        const isRecursiveCall = Boolean(formNameUpper) && Array.isArray(formCallStack) && formCallStack.includes(formNameUpper);
+
+        if (resolvedForm && !isRecursiveCall) {
+          const nextBindingContext = buildPerformBindingContext(sourceNode, resolvedForm, bindingContext);
+          const nextFormCallStack = formNameUpper
+            ? [...(Array.isArray(formCallStack) ? formCallStack : []), formNameUpper]
+            : (Array.isArray(formCallStack) ? formCallStack.slice() : []);
+          const formChildren = Array.isArray(resolvedForm.children) ? resolvedForm.children : [];
+          for (let index = 0; index < formChildren.length; index += 1) {
+            const formChild = formChildren[index];
+            const expandedPath = `${pathToken}.FORM:${formNameUpper}.C${index}`;
+            const clonedExpandedChild = cloneNode(
+              formChild,
+              ownId,
+              expandDepth + 1,
+              expandedPath,
+              true,
+              nextFormCallStack,
+              nextBindingContext
+            );
+            if (clonedExpandedChild) {
+              outChildren.push(clonedExpandedChild);
+            }
+          }
+        }
+      }
+
+      if (outChildren.length) {
+        out.children = outChildren;
+      } else if (Array.isArray(sourceNode.children)) {
+        out.children = [];
+      }
+
+      return out;
+    };
+
+    const output = [];
+    for (let index = 0; index < roots.length; index += 1) {
+      const root = roots[index];
+      const clonedRoot = cloneNode(root, null, 0, `ROOT${index}`, false, [], null);
+      if (clonedRoot) {
+        output.push(clonedRoot);
+      }
+    }
+
+    return output;
+  }
+
+  function buildXmlExportRoots(objects) {
+    const input = Array.isArray(objects) ? objects : [];
+    if (!input.length) {
+      return [];
+    }
+
+    const nodeById = new Map();
+    const idOrder = [];
+    const childIdsByParentId = new Map();
+    const topLevelNoIdNodes = [];
+
+    const pushChildId = (parentId, childId) => {
+      if (!parentId || !childId) {
+        return;
+      }
+      if (!childIdsByParentId.has(parentId)) {
+        childIdsByParentId.set(parentId, []);
+      }
+      const list = childIdsByParentId.get(parentId);
+      if (!list.includes(childId)) {
+        list.push(childId);
+      }
+    };
+
+    const stack = input
+      .filter((node) => node && typeof node === "object")
+      .map((node) => ({ node, isTopLevel: true }));
+
+    while (stack.length) {
+      const item = stack.pop();
+      const node = item && item.node;
+      if (!node || typeof node !== "object") {
+        continue;
+      }
+
+      const nodeId = normalizeXmlObjectId(node.id);
+      if (!nodeId) {
+        if (item.isTopLevel) {
+          topLevelNoIdNodes.push(node);
+        }
+      } else if (!nodeById.has(nodeId)) {
+        nodeById.set(nodeId, node);
+        idOrder.push(nodeId);
+      }
+
+      const parentId = normalizeXmlObjectId(node.parent);
+      if (nodeId && parentId) {
+        pushChildId(parentId, nodeId);
+      }
+
+      const children = Array.isArray(node.children) ? node.children : [];
+      for (let index = children.length - 1; index >= 0; index -= 1) {
+        const child = children[index];
+        if (!child || typeof child !== "object") {
+          continue;
+        }
+        const childId = normalizeXmlObjectId(child.id);
+        if (nodeId && childId) {
+          pushChildId(nodeId, childId);
+        }
+        stack.push({ node: child, isTopLevel: false });
+      }
+    }
+
+    if (!nodeById.size) {
+      return input.slice();
+    }
+
+    const cloneNodeNoId = (node, seenNoId) => {
+      if (!node || typeof node !== "object") {
+        return node;
+      }
+      if (seenNoId.has(node)) {
+        return null;
+      }
+
+      const nextSeenNoId = new Set(seenNoId);
+      nextSeenNoId.add(node);
+
+      const out = {};
+      for (const key of Object.keys(node)) {
+        if (key === "children") {
+          continue;
+        }
+        out[key] = node[key];
+      }
+
+      const children = Array.isArray(node.children) ? node.children : [];
+      const outChildren = [];
+      for (const child of children) {
+        if (!child || typeof child !== "object") {
+          continue;
+        }
+        const childId = normalizeXmlObjectId(child.id);
+        if (childId) {
+          // ID-based children are wired later from parent map.
+          continue;
+        }
+        const cloned = cloneNodeNoId(child, nextSeenNoId);
+        if (cloned) {
+          outChildren.push(cloned);
+        }
+      }
+
+      if (outChildren.length) {
+        out.children = outChildren;
+      } else if (Array.isArray(node.children) && node.children.length === 0) {
+        out.children = [];
+      }
+
+      return out;
+    };
+
+    const cloneNodeById = (nodeId, ancestorIds, emittedIds) => {
+      if (!nodeId || !nodeById.has(nodeId)) {
+        return null;
+      }
+      if (ancestorIds.has(nodeId)) {
+        return null;
+      }
+      if (emittedIds && emittedIds.has(nodeId)) {
+        return null;
+      }
+
+      const node = nodeById.get(nodeId);
+      const nextAncestors = new Set(ancestorIds);
+      nextAncestors.add(nodeId);
+      if (emittedIds) {
+        emittedIds.add(nodeId);
+      }
+
+      const out = {};
+      for (const key of Object.keys(node)) {
+        if (key === "children") {
+          continue;
+        }
+        out[key] = node[key];
+      }
+
+      const outChildren = [];
+
+      const explicitChildren = Array.isArray(node.children) ? node.children : [];
+      for (const child of explicitChildren) {
+        if (!child || typeof child !== "object") {
+          continue;
+        }
+        const childId = normalizeXmlObjectId(child.id);
+        if (childId) {
+          continue;
+        }
+        const clonedNoId = cloneNodeNoId(child, new Set());
+        if (clonedNoId) {
+          outChildren.push(clonedNoId);
+        }
+      }
+
+      const childIds = childIdsByParentId.get(nodeId) || [];
+      for (const childId of childIds) {
+        const cloned = cloneNodeById(childId, nextAncestors, emittedIds);
+        if (cloned) {
+          outChildren.push(cloned);
+        }
+      }
+
+      if (outChildren.length) {
+        out.children = outChildren;
+      } else if (Array.isArray(node.children) && node.children.length === 0) {
+        out.children = [];
+      }
+
+      return out;
+    };
+
+    const isRootId = (nodeId) => {
+      const node = nodeById.get(nodeId);
+      if (!node) {
+        return false;
+      }
+      const parentId = normalizeXmlObjectId(node.parent);
+      return !parentId || !nodeById.has(parentId);
+    };
+
+    const rootIds = [];
+    const addedRootIds = new Set();
+    const addRootId = (nodeId) => {
+      if (!nodeId || addedRootIds.has(nodeId) || !nodeById.has(nodeId)) {
+        return;
+      }
+      addedRootIds.add(nodeId);
+      rootIds.push(nodeId);
+    };
+
+    for (const topNode of input) {
+      const topId = normalizeXmlObjectId(topNode && topNode.id);
+      if (topId && isRootId(topId)) {
+        addRootId(topId);
+      }
+    }
+
+    for (const nodeId of idOrder) {
+      if (isRootId(nodeId)) {
+        addRootId(nodeId);
+      }
+    }
+
+    const reachableIds = new Set();
+    const markReachable = (nodeId) => {
+      if (!nodeId || reachableIds.has(nodeId) || !nodeById.has(nodeId)) {
+        return;
+      }
+      reachableIds.add(nodeId);
+      const childIds = childIdsByParentId.get(nodeId) || [];
+      for (const childId of childIds) {
+        markReachable(childId);
+      }
+    };
+
+    for (const rootId of rootIds) {
+      markReachable(rootId);
+    }
+
+    for (const nodeId of idOrder) {
+      if (!reachableIds.has(nodeId)) {
+        addRootId(nodeId);
+        markReachable(nodeId);
+      }
+    }
+
+    const roots = [];
+    const emittedIds = new Set();
+    for (const node of topLevelNoIdNodes) {
+      const cloned = cloneNodeNoId(node, new Set());
+      if (cloned) {
+        roots.push(cloned);
+      }
+    }
+    for (const rootId of rootIds) {
+      const cloned = cloneNodeById(rootId, new Set(), emittedIds);
+      if (cloned) {
+        roots.push(cloned);
+      }
+    }
+
+    return roots;
+  }
+
+  function isDeclLikeObject(value) {
+    if (!value || typeof value !== "object") {
+      return false;
+    }
+    return (
+      typeof value.objectType === "string" &&
+      typeof value.name === "string" &&
+      typeof value.scopeLabel === "string"
+    );
+  }
+
+  function isDeclHintKey(keyHint) {
+    const key = String(keyHint || "").trim();
+    if (!key) {
+      return false;
+    }
+    return /decl$/i.test(key);
+  }
+
+  function isDeclObjectForXml(keyHint, value) {
+    if (isDeclLikeObject(value)) {
+      return true;
+    }
+    if (!isDeclHintKey(keyHint) || !value || typeof value !== "object" || Array.isArray(value)) {
+      return false;
+    }
+    return (
+      typeof value.name === "string" ||
+      typeof value.objectType === "string" ||
+      typeof value.scopeLabel === "string" ||
+      typeof value.comment === "string"
+    );
+  }
+
+  function hasValueLevelDescFields(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return false;
+    }
+    return (
+      Object.prototype.hasOwnProperty.call(value, "userDesc") ||
+      Object.prototype.hasOwnProperty.call(value, "codeDesc")
+    );
+  }
+
+  function resolveValueLevelTechId(value) {
+    if (!value || typeof value !== "object") {
+      return "";
+    }
+
+    if (isDeclLikeObject(value.decl)) {
+      const declTech = String(getDeclTechName(value.decl) || "").trim();
+      if (declTech) {
+        return declTech;
+      }
+    }
+
+    const declRef = String(value.declRef || "").trim();
+    if (declRef) {
+      return declRef;
+    }
+
+    const identifier = extractIdentifierCandidate(value.value);
+    if (identifier) {
+      return identifier;
+    }
+
+    const rawValue = String(value.value || "").trim();
+    if (rawValue) {
+      return rawValue;
+    }
+
+    const fallbackName = String(value.name || "").trim();
+    return fallbackName;
+  }
+
+  const VALUE_LEVEL_IDENTIFIER_REGEX =
+    /<[^>]+>(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)*|SY-[A-Za-z_][A-Za-z0-9_]*|[A-Za-z_][A-Za-z0-9_]*(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)*/g;
+
+  function normalizeValueIdentifierKey(text) {
+    return String(text || "").trim().toUpperCase();
+  }
+
+  function buildValueLevelDeclReplacementMap(value, rawValueText) {
+    if (!value || typeof value !== "object" || !isDeclLikeObject(value.decl)) {
+      return null;
+    }
+
+    const replacement = String(getFinalDeclDesc(value.decl) || getDeclTechName(value.decl) || "").trim();
+    if (!replacement) {
+      return null;
+    }
+
+    const map = Object.create(null);
+    const register = (token) => {
+      const key = normalizeValueIdentifierKey(token);
+      if (!key) {
+        return;
+      }
+      map[key] = replacement;
+    };
+
+    register(value.declRef);
+    register(value.decl && value.decl.name);
+    register(extractIdentifierCandidate(rawValueText));
+
+    return Object.keys(map).length ? map : null;
+  }
+
+  function replaceIdentifiersOutsideLiterals(rawText, replacementMap) {
+    const text = String(rawText || "");
+    if (!text || !replacementMap || typeof replacementMap !== "object") {
+      return "";
+    }
+
+    let out = "";
+    let i = 0;
+    const length = text.length;
+
+    const replaceSegment = (segment) => segment.replace(VALUE_LEVEL_IDENTIFIER_REGEX, (token) => {
+      const key = normalizeValueIdentifierKey(token);
+      if (key && Object.prototype.hasOwnProperty.call(replacementMap, key)) {
+        return replacementMap[key];
+      }
+      return token;
+    });
+
+    while (i < length) {
+      const ch = text[i];
+
+      if (ch === "'" || ch === "|") {
+        const quote = ch;
+        const start = i;
+        i += 1;
+        while (i < length) {
+          if (text[i] !== quote) {
+            i += 1;
+            continue;
+          }
+          if (quote === "'" && i + 1 < length && text[i + 1] === "'") {
+            i += 2;
+            continue;
+          }
+          i += 1;
+          break;
+        }
+        out += text.slice(start, i);
+        continue;
+      }
+
+      const start = i;
+      while (i < length && text[i] !== "'" && text[i] !== "|") {
+        i += 1;
+      }
+      out += replaceSegment(text.slice(start, i));
+    }
+
+    return out;
+  }
+
+  function resolveValueLevelFinalDesc(value) {
+    if (!value || typeof value !== "object") {
+      return "";
+    }
+
+    const userDesc = String(value.userDesc || "").trim();
+    if (userDesc) {
+      const decl = value.decl;
+      if (decl && typeof decl === "object" && typeof normalizeDeclDescByTemplate === "function") {
+        const normalizedUserDesc = String(normalizeDeclDescByTemplate(decl, userDesc) || "").trim();
+        return normalizedUserDesc || userDesc;
+      }
+      return userDesc;
+    }
+
+    const rawValueText = String(value.value || "");
+    if (rawValueText.trim()) {
+      const replacementMap = buildValueLevelDeclReplacementMap(value, rawValueText);
+      if (replacementMap) {
+        const replaced = replaceIdentifiersOutsideLiterals(rawValueText, replacementMap).trim();
+        if (replaced) {
+          return replaced;
+        }
+      }
+    }
+
+    const codeDesc = String(value.codeDesc || "").trim();
+    if (codeDesc) {
+      return codeDesc;
+    }
+
+    return resolveValueLevelTechId(value);
+  }
+
+window.AbapViewerModules.factories = window.AbapViewerModules.factories || {};
+window.AbapViewerModules.factories["02-descriptions"] = function registerDescriptions(runtime) {
+  const targetRuntime = runtime || (window.AbapViewerRuntime = window.AbapViewerRuntime || {});
+  targetRuntime.api = targetRuntime.api || {};
+  targetRuntime.api.renderDeclDescPanelUi = renderDeclDescPanelUi;
+  targetRuntime.api.getFinalDeclDesc = getFinalDeclDesc;
+  targetRuntime.api.getEffectiveDeclDesc = getEffectiveDeclDesc;
+  targetRuntime.api.resolveValueLevelFinalDesc = resolveValueLevelFinalDesc;
+  window.AbapViewerModules.parts["02-descriptions"] = true;
+};
+window.AbapViewerModules.factories["02-descriptions"](window.AbapViewerRuntime);

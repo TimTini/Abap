@@ -438,9 +438,18 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return null;
   }
 
-  function jumpInputToCodeRange(lineStart, lineEnd) {
+  function jumpInputToCodeRange(lineStart, lineEnd, segmentIndex) {
     const start = Math.max(1, Number(lineStart) || 1);
     const end = Math.max(start, Number(lineEnd) || start);
+    const targetSegmentIndex = Number.isFinite(Number(segmentIndex))
+      ? Math.max(0, Math.floor(Number(segmentIndex)))
+      : null;
+
+    if (targetSegmentIndex !== null && typeof goToInputLine === "function") {
+      goToInputLine({ line: start, segmentIndex: targetSegmentIndex });
+      return;
+    }
+
     if (typeof selectCodeLines === "function") {
       selectCodeLines(start, end);
     } else if (els.inputText) {
@@ -494,6 +503,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const obj = findRenderObjectById(objId);
     const lineStart = Number(obj && obj.lineStart) || Number(card.getAttribute("data-line-start")) || 0;
     const lineEnd = Number(obj && obj.block && obj.block.lineEnd) || lineStart;
+    const segmentIndex = Number.isFinite(Number(obj && obj.segmentIndex))
+      ? Math.max(0, Math.floor(Number(obj.segmentIndex)))
+      : null;
     if (lineStart <= 0) {
       return;
     }
@@ -502,7 +514,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (typeof ev.stopImmediatePropagation === "function") {
       ev.stopImmediatePropagation();
     }
-    jumpInputToCodeRange(lineStart, lineEnd);
+    jumpInputToCodeRange(lineStart, lineEnd, segmentIndex);
   }
 
   function interceptTemplateCodeButtonClick(ev) {
@@ -521,6 +533,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const obj = findTemplateObjectByIndex(absIndex);
     const lineStart = Number(obj && obj.lineStart) || Number(block.getAttribute("data-line-start")) || 0;
     const lineEnd = Number(obj && obj.block && obj.block.lineEnd) || lineStart;
+    const segmentIndex = Number.isFinite(Number(obj && obj.segmentIndex))
+      ? Math.max(0, Math.floor(Number(obj.segmentIndex)))
+      : null;
     if (lineStart <= 0) {
       return;
     }
@@ -529,19 +544,180 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (typeof ev.stopImmediatePropagation === "function") {
       ev.stopImmediatePropagation();
     }
-    jumpInputToCodeRange(lineStart, lineEnd);
+    jumpInputToCodeRange(lineStart, lineEnd, segmentIndex);
+  }
+
+  function normalizeTemplateConfigLegacyFieldsInPlace(config) {
+    if (!config || typeof config !== "object" || Array.isArray(config)) {
+      return false;
+    }
+
+    const normalizeColor = (value) => {
+      const raw = String(value === undefined || value === null ? "" : value).trim();
+      if (!raw) {
+        return "";
+      }
+      if (typeof normalizeTemplateColorValue === "function") {
+        return normalizeTemplateColorValue(raw);
+      }
+      if (/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(raw)) {
+        return raw;
+      }
+      const lower = raw.toLowerCase();
+      if (lower === "mau xanh nhat") {
+        return "#dbeef4";
+      }
+      if (lower === "den") {
+        return "#000000";
+      }
+      return raw;
+    };
+
+    const normalizeBorder = (value) => {
+      const raw = String(value === undefined || value === null ? "" : value).trim();
+      if (!raw) {
+        return "";
+      }
+      if (typeof normalizeTemplateBorderValue === "function") {
+        return normalizeTemplateBorderValue(raw);
+      }
+      if (raw.toLowerCase() === "outside line mong") {
+        return "outside-thin";
+      }
+      return raw;
+    };
+
+    const normalizeAlign = (value) => {
+      const raw = String(value === undefined || value === null ? "" : value).trim();
+      if (!raw) {
+        return "";
+      }
+      if (typeof normalizeTemplateAlignValue === "function") {
+        return normalizeTemplateAlignValue(raw);
+      }
+      const lower = raw.toLowerCase();
+      if (lower === "left" || lower === "center" || lower === "right") {
+        return lower;
+      }
+      return "";
+    };
+
+    const normalizeVAlign = (value) => {
+      const raw = String(value === undefined || value === null ? "" : value).trim();
+      if (!raw) {
+        return "";
+      }
+      if (typeof normalizeTemplateVAlignValue === "function") {
+        return normalizeTemplateVAlignValue(raw);
+      }
+      const lower = raw.toLowerCase();
+      if (lower === "top") {
+        return "top";
+      }
+      if (lower === "middle" || lower === "center") {
+        return "middle";
+      }
+      if (lower === "bottom") {
+        return "bottom";
+      }
+      return "";
+    };
+
+    let changed = false;
+    const walk = (node) => {
+      if (!node || typeof node !== "object") {
+        return;
+      }
+      if (Array.isArray(node)) {
+        for (const item of node) {
+          walk(item);
+        }
+        return;
+      }
+
+      for (const key of Object.keys(node)) {
+        const value = node[key];
+        const keyLower = String(key || "").trim().toLowerCase();
+        if (keyLower === "background" || keyLower === "font color") {
+          const normalized = normalizeColor(value);
+          if (normalized !== value) {
+            changed = true;
+          }
+          if (normalized) {
+            node[key] = normalized;
+          } else if (Object.prototype.hasOwnProperty.call(node, key)) {
+            delete node[key];
+            changed = true;
+          }
+          continue;
+        }
+        if (keyLower === "border") {
+          const normalized = normalizeBorder(value);
+          if (normalized !== value) {
+            changed = true;
+          }
+          if (normalized) {
+            node[key] = normalized;
+          } else if (Object.prototype.hasOwnProperty.call(node, key)) {
+            delete node[key];
+            changed = true;
+          }
+          continue;
+        }
+        if (keyLower === "align") {
+          const normalized = normalizeAlign(value);
+          if (normalized !== value) {
+            changed = true;
+          }
+          if (normalized) {
+            node[key] = normalized;
+          } else if (Object.prototype.hasOwnProperty.call(node, key)) {
+            delete node[key];
+            changed = true;
+          }
+          continue;
+        }
+        if (keyLower === "valign") {
+          const normalized = normalizeVAlign(value);
+          if (normalized !== value) {
+            changed = true;
+          }
+          if (normalized) {
+            node[key] = normalized;
+          } else if (Object.prototype.hasOwnProperty.call(node, key)) {
+            delete node[key];
+            changed = true;
+          }
+          continue;
+        }
+        walk(value);
+      }
+    };
+
+    walk(config);
+    return changed;
   }
 
   function openTemplateConfigModal() {
     const modal = openTemplateDynamicModal("Template Form", { contentClass: "template-runtime-modal-content template-runtime-modal-wide" });
     modal.closeBtn.textContent = "Cancel";
+    modal.body.classList.add("template-config-modal-body");
     const prevJsonEl = els.templateConfigJson;
     const prevErrEl = els.templateConfigError;
+    const PREVIEW_LIMIT = 4;
+    let previewTimer = 0;
     const applyBtn = document.createElement("button");
     applyBtn.type = "button";
     applyBtn.className = "secondary";
     applyBtn.textContent = "Apply";
     modal.actions.prepend(applyBtn);
+
+    const workspace = document.createElement("div");
+    workspace.className = "template-config-workspace";
+    modal.body.appendChild(workspace);
+    const editorPane = document.createElement("div");
+    editorPane.className = "template-config-editor-pane";
+    workspace.appendChild(editorPane);
 
     const tabs = document.createElement("div");
     tabs.className = "template-config-editor-tabs";
@@ -555,22 +731,44 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     jsonBtn.textContent = "JSON (Advanced)";
     tabs.appendChild(formBtn);
     tabs.appendChild(jsonBtn);
-    modal.body.appendChild(tabs);
+    editorPane.appendChild(tabs);
     const host = document.createElement("div");
     host.className = "template-config-editor-host";
-    modal.body.appendChild(host);
+    editorPane.appendChild(host);
     const errEl = document.createElement("div");
     errEl.className = "template-error";
-    modal.body.appendChild(errEl);
+    editorPane.appendChild(errEl);
+
+    const previewPane = document.createElement("section");
+    previewPane.className = "template-config-live-preview";
+    const previewHead = document.createElement("div");
+    previewHead.className = "template-config-live-preview-head";
+    const previewTitle = document.createElement("div");
+    previewTitle.className = "template-config-live-preview-title";
+    previewTitle.textContent = "Live preview";
+    const previewMeta = document.createElement("div");
+    previewMeta.className = "template-config-live-preview-meta";
+    const previewNote = document.createElement("div");
+    previewNote.className = "template-config-live-preview-note";
+    previewNote.textContent = `Auto-update while editing • showing up to ${PREVIEW_LIMIT} matching objects`;
+    previewHead.appendChild(previewTitle);
+    previewHead.appendChild(previewMeta);
+    previewHead.appendChild(previewNote);
+    previewPane.appendChild(previewHead);
+    const previewBody = document.createElement("div");
+    previewBody.className = "template-config-live-preview-body muted";
+    previewBody.textContent = "Preview unavailable.";
+    previewPane.appendChild(previewBody);
+    workspace.appendChild(previewPane);
 
     const OPTION_KEYS = new Set(["_options", "options", "ranges", "compact", "hideemptyrows", "hiderowswithoutvalues", "expandmultilinerows", "removeemptyrows", "removeemptyrowsadvanced", "removeemptyrowsadv", "expandarrayrows", "arraytorows"]);
     const FIELD_DEFS = [
       { key: "text", label: "Text", kind: "text" },
-      { key: "background", label: "Background", kind: "text" },
-      { key: "border", label: "Border", kind: "text" },
+      { key: "background", label: "Background", kind: "color", fallback: "#ffffff" },
+      { key: "border", label: "Border", kind: "suggest", opts: ["outside-thin"] },
       { key: "font", label: "Font", kind: "text" },
       { key: "font size", label: "Font Size", kind: "number" },
-      { key: "font color", label: "Font Color", kind: "text" },
+      { key: "font color", label: "Font Color", kind: "color", fallback: "#111111" },
       { key: "align", label: "Align", kind: "select", opts: ["", "left", "center", "right"] },
       { key: "valign", label: "VAlign", kind: "select", opts: ["", "top", "middle", "bottom"] },
       { key: "wrap", label: "Wrap", kind: "bool" },
@@ -579,6 +777,28 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       { key: "italic", label: "Italic", kind: "bool" },
       { key: "underline", label: "Underline", kind: "bool" }
     ];
+    const isHexColorValue = (value) => /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(value || "").trim());
+    const expandHexColorValue = (value) => {
+      const raw = String(value || "").trim().toLowerCase();
+      if (!/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(raw)) {
+        return "";
+      }
+      if (raw.length === 4) {
+        return "#" + raw.slice(1).split("").map((ch) => ch + ch).join("");
+      }
+      return raw;
+    };
+    const getColorPickerValue = (value, fallback) => {
+      const expanded = expandHexColorValue(value);
+      if (expanded) {
+        return expanded;
+      }
+      return expandHexColorValue(fallback) || "#000000";
+    };
+    const buildTemplateConfigDomId = (...parts) => parts
+      .map((part) => String(part || "").trim().replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase())
+      .filter(Boolean)
+      .join("-");
     const showErr = (m) => {
       const t = String(m || "").trim();
       errEl.textContent = t;
@@ -609,6 +829,499 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     els.templateConfigJson = null;
     showErr("");
 
+    const clearPreviewTimer = () => {
+      if (!previewTimer) {
+        return;
+      }
+      clearTimeout(previewTimer);
+      previewTimer = 0;
+    };
+    const setPreviewState = (metaText, noteText, message, warning) => {
+      previewTitle.textContent = "Live preview";
+      previewMeta.textContent = String(metaText || "").trim();
+      previewNote.textContent = String(noteText || "").trim();
+      previewNote.classList.toggle("is-warning", warning === true);
+      previewBody.classList.add("muted");
+      previewBody.replaceChildren();
+      previewBody.textContent = String(message || "").trim() || "Preview unavailable.";
+    };
+    const buildPreviewConfig = () => {
+      if (activeTab === "json" && jsonArea) {
+        const raw = String(jsonArea.value || "").trim();
+        if (!raw) {
+          return { config: null, message: "JSON draft is empty." };
+        }
+        let parsed = null;
+        try {
+          parsed = JSON.parse(raw);
+        } catch (err) {
+          return { config: null, message: `Preview paused: JSON parse error (${err && err.message ? err.message : err}).` };
+        }
+        const normalized = cloneJsonValue(parsed);
+        if (!normalized || typeof normalized !== "object" || Array.isArray(normalized)) {
+          return { config: null, message: "Preview paused: JSON root must be an object." };
+        }
+        normalizeTemplateConfigLegacyFieldsInPlace(normalized);
+        normalized.version = 1;
+        if (!normalized.templates || typeof normalized.templates !== "object" || Array.isArray(normalized.templates)) {
+          normalized.templates = {};
+        }
+        if (!Object.keys(normalized.templates).length) {
+          normalized.templates.DEFAULT = {};
+        }
+        const chk = validateTemplateConfig(normalized);
+        if (!chk.valid) {
+          return { config: null, message: `Preview paused: ${chk.errors[0] || "Template config is invalid."}` };
+        }
+        return { config: normalized, message: "" };
+      }
+      const preCheck = validateDraft();
+      if (!preCheck.ok) {
+        return { config: null, message: preCheck.messages[0] || "Template draft is invalid." };
+      }
+      const nextConfig = serializeDraft();
+      const chk = validateTemplateConfig(nextConfig);
+      if (!chk.valid) {
+        return { config: null, message: chk.errors[0] || "Template config is invalid." };
+      }
+      return { config: nextConfig, message: "" };
+    };
+    const renderLivePreview = () => {
+      const activeKey = String(selKey || "").trim();
+      if (!state.data || !Array.isArray(state.renderObjects) || !state.renderObjects.length) {
+        setPreviewState(
+          activeKey ? `Key: ${activeKey}` : "",
+          "Render ABAP first to unlock live preview.",
+          "No parsed data loaded.",
+          false
+        );
+        return;
+      }
+      if (typeof getRenderableObjectListForTemplate !== "function" || typeof resolveTemplateMapForObject !== "function" || typeof buildTemplateBlockElement !== "function") {
+        setPreviewState(
+          activeKey ? `Key: ${activeKey}` : "",
+          "Preview helpers are unavailable in this runtime.",
+          "Live preview is unavailable.",
+          true
+        );
+        return;
+      }
+      const previewConfig = buildPreviewConfig();
+      if (!previewConfig.config) {
+        setPreviewState(
+          activeKey ? `Key: ${activeKey}` : "",
+          activeTab === "json"
+            ? "JSON mode updates preview only when the draft is valid."
+            : "Fix validation issues to resume preview.",
+          previewConfig.message || "Template config is invalid.",
+          true
+        );
+        return;
+      }
+      const items = getRenderableObjectListForTemplate({ includeHidden: true });
+      if (!Array.isArray(items) || !items.length) {
+        setPreviewState(
+          activeKey ? `Key: ${activeKey}` : "",
+          "There are no renderable objects right now.",
+          "Nothing to preview.",
+          false
+        );
+        return;
+      }
+      const matches = [];
+      for (let index = 0; index < items.length; index += 1) {
+        const item = items[index];
+        const obj = item && typeof item === "object" ? item.obj : null;
+        if (!obj) {
+          continue;
+        }
+        const resolved = resolveTemplateMapForObject(obj, previewConfig.config);
+        if (String((resolved && resolved.key) || "") === activeKey) {
+          matches.push({ item, index });
+        }
+      }
+      if (!matches.length) {
+        setPreviewState(
+          activeKey ? `Key: ${activeKey}` : "No template key selected",
+          "Preview shows the objects that currently resolve to the selected key.",
+          activeKey
+            ? `No objects currently resolve to template key "${activeKey}".`
+            : "Select a template key to preview.",
+          false
+        );
+        return;
+      }
+      const fragment = document.createDocumentFragment();
+      let renderedCount = 0;
+      for (const match of matches.slice(0, PREVIEW_LIMIT)) {
+        const block = buildTemplateBlockElement(match.item, match.index, previewConfig.config, false);
+        if (!block) {
+          continue;
+        }
+        fragment.appendChild(block);
+        renderedCount += 1;
+      }
+      if (!renderedCount) {
+        setPreviewState(
+          activeKey ? `Key: ${activeKey}` : "",
+          "The selected template key has matches, but preview blocks failed to render.",
+          "Preview rendering failed.",
+          true
+        );
+        return;
+      }
+      previewTitle.textContent = "Live preview";
+      previewMeta.textContent = activeKey
+        ? `Key: ${activeKey} • showing ${renderedCount}/${matches.length} matching objects`
+        : `Showing ${renderedCount}/${matches.length} objects`;
+      previewNote.textContent = activeTab === "json"
+        ? "JSON mode: preview refreshes whenever the draft becomes valid."
+        : "Form mode: preview refreshes while you type.";
+      previewNote.classList.remove("is-warning");
+      previewBody.classList.remove("muted");
+      previewBody.replaceChildren(fragment);
+    };
+    const scheduleLivePreview = (delayMs) => {
+      clearPreviewTimer();
+      previewTimer = setTimeout(() => {
+        previewTimer = 0;
+        renderLivePreview();
+      }, Math.max(0, Number(delayMs) || 0));
+    };
+    const TEMPLATE_TOKEN_SUGGESTION_LIMIT = 12;
+    const TEMPLATE_TOKEN_SUGGESTION_OBJECT_SAMPLE = 16;
+    const TEMPLATE_TOKEN_CHAR_RE = /[A-Za-z0-9_.\[\]]/;
+    const templateTokenSuggestionCache = new Map();
+    let activeTokenSuggest = null;
+
+    const clearTemplateTokenSuggestionCache = () => {
+      templateTokenSuggestionCache.clear();
+    };
+    const hideTemplateTokenSuggest = (stateObj) => {
+      const nextState = stateObj || activeTokenSuggest;
+      if (!nextState || !nextState.popup) {
+        if (!stateObj) {
+          activeTokenSuggest = null;
+        }
+        return;
+      }
+      nextState.popup.hidden = true;
+      nextState.popup.replaceChildren();
+      nextState.items = [];
+      nextState.activeIndex = -1;
+      nextState.meta = null;
+      if (!stateObj || activeTokenSuggest === nextState) {
+        activeTokenSuggest = null;
+      }
+    };
+    const getTemplateAutocompleteConfig = () => {
+      const out = cloneJsonValue(draft);
+      if (!out || typeof out !== "object" || Array.isArray(out)) {
+        return { version: 1, templates: {} };
+      }
+      out.version = 1;
+      if (!out.templates || typeof out.templates !== "object" || Array.isArray(out.templates)) {
+        out.templates = {};
+      }
+      return out;
+    };
+    const getTemplatePathSuggestionsForSelectedKey = () => {
+      const activeKey = String(selKey || "").trim();
+      if (!activeKey) {
+        return [];
+      }
+      if (templateTokenSuggestionCache.has(activeKey)) {
+        return templateTokenSuggestionCache.get(activeKey) || [];
+      }
+      if (
+        !state.data
+        || !Array.isArray(state.renderObjects)
+        || !state.renderObjects.length
+        || typeof collectTemplateDumpPaths !== "function"
+        || typeof buildTemplateContextObject !== "function"
+        || typeof resolveTemplateMapForObject !== "function"
+      ) {
+        templateTokenSuggestionCache.set(activeKey, []);
+        return [];
+      }
+
+      const items = getRenderableObjectListForTemplate({ includeHidden: true });
+      const config = getTemplateAutocompleteConfig();
+      const out = new Set();
+      let sampledCount = 0;
+
+      for (let index = 0; index < items.length; index += 1) {
+        const item = items[index];
+        const obj = item && typeof item === "object" ? item.obj : null;
+        if (!obj) {
+          continue;
+        }
+        const resolved = resolveTemplateMapForObject(obj, config);
+        if (String((resolved && resolved.key) || "") !== activeKey) {
+          continue;
+        }
+
+        const contextObj = buildTemplateContextObject(obj, index + 1);
+        const paths = collectTemplateDumpPaths(contextObj);
+        for (const path of Array.isArray(paths) ? paths : []) {
+          const normalized = String(path || "").trim();
+          if (normalized) {
+            out.add(normalized);
+            if (normalized.startsWith("keywords.")) {
+              out.add(`keyword.${normalized.slice("keywords.".length)}`);
+            }
+          }
+        }
+
+        sampledCount += 1;
+        if (sampledCount >= TEMPLATE_TOKEN_SUGGESTION_OBJECT_SAMPLE) {
+          break;
+        }
+      }
+
+      const suggestions = Array.from(out).sort((left, right) => {
+        const leftLower = String(left || "").toLowerCase();
+        const rightLower = String(right || "").toLowerCase();
+        const leftRank = leftLower.startsWith("values.") ? 0 : (leftLower.startsWith("extras.") ? 1 : 2);
+        const rightRank = rightLower.startsWith("values.") ? 0 : (rightLower.startsWith("extras.") ? 1 : 2);
+        if (leftRank !== rightRank) {
+          return leftRank - rightRank;
+        }
+        const leftDepth = String(left || "").split(".").length;
+        const rightDepth = String(right || "").split(".").length;
+        if (leftDepth !== rightDepth) {
+          return leftDepth - rightDepth;
+        }
+        if (String(left || "").length !== String(right || "").length) {
+          return String(left || "").length - String(right || "").length;
+        }
+        return String(left || "").localeCompare(String(right || ""));
+      });
+      templateTokenSuggestionCache.set(activeKey, suggestions);
+      return suggestions;
+    };
+    const getTemplateTokenQueryMeta = (input) => {
+      if (!input || typeof input.value !== "string") {
+        return null;
+      }
+      const value = String(input.value || "");
+      const selectionStart = Number.isFinite(Number(input.selectionStart))
+        ? Number(input.selectionStart)
+        : value.length;
+      const caret = Math.max(0, Math.min(value.length, selectionStart));
+      const beforeCaret = value.slice(0, caret);
+      const openIndex = beforeCaret.lastIndexOf("{");
+      const closeIndex = beforeCaret.lastIndexOf("}");
+      if (openIndex < 0 || closeIndex > openIndex) {
+        return null;
+      }
+      const query = beforeCaret.slice(openIndex + 1);
+      if (/[{}\r\n]/.test(query) || /\s/.test(query)) {
+        return null;
+      }
+
+      let tokenTailEnd = caret;
+      while (tokenTailEnd < value.length && TEMPLATE_TOKEN_CHAR_RE.test(value[tokenTailEnd])) {
+        tokenTailEnd += 1;
+      }
+      const hasClosingBrace = value[tokenTailEnd] === "}";
+      const replaceEnd = hasClosingBrace ? tokenTailEnd + 1 : tokenTailEnd;
+
+      return {
+        query,
+        openIndex,
+        replaceEnd,
+        hasClosingBrace
+      };
+    };
+    const filterTemplateTokenSuggestions = (query, allSuggestions) => {
+      const rawQuery = String(query || "").trim().toLowerCase();
+      const ranked = [];
+      for (const suggestion of Array.isArray(allSuggestions) ? allSuggestions : []) {
+        const value = String(suggestion || "").trim();
+        if (!value) {
+          continue;
+        }
+        const lowered = value.toLowerCase();
+        let rank = 99;
+        if (!rawQuery) {
+          rank = lowered.startsWith("values.") ? 0 : (lowered.startsWith("extras.") ? 1 : 2);
+        } else if (lowered.startsWith(rawQuery)) {
+          rank = 0;
+        } else if (lowered.includes(`.${rawQuery}`)) {
+          rank = 1;
+        } else if (lowered.includes(rawQuery)) {
+          rank = 2;
+        }
+        if (rank === 99) {
+          continue;
+        }
+        ranked.push({ value, rank });
+      }
+      ranked.sort((left, right) => {
+        if (left.rank !== right.rank) {
+          return left.rank - right.rank;
+        }
+        const leftDepth = left.value.split(".").length;
+        const rightDepth = right.value.split(".").length;
+        if (leftDepth !== rightDepth) {
+          return leftDepth - rightDepth;
+        }
+        if (left.value.length !== right.value.length) {
+          return left.value.length - right.value.length;
+        }
+        return left.value.localeCompare(right.value);
+      });
+      return ranked.slice(0, TEMPLATE_TOKEN_SUGGESTION_LIMIT).map((item) => item.value);
+    };
+    const renderTemplateTokenSuggestions = (stateObj) => {
+      if (!stateObj || !stateObj.popup) {
+        return;
+      }
+      const items = Array.isArray(stateObj.items) ? stateObj.items : [];
+      if (!items.length) {
+        hideTemplateTokenSuggest(stateObj);
+        return;
+      }
+      const activeIndex = Math.max(0, Math.min(items.length - 1, Number(stateObj.activeIndex) || 0));
+      stateObj.activeIndex = activeIndex;
+      const fragment = document.createDocumentFragment();
+      items.forEach((item, index) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `template-config-token-option${index === activeIndex ? " is-active" : ""}`;
+        btn.textContent = item;
+        btn.addEventListener("mousedown", (ev) => {
+          ev.preventDefault();
+        });
+        btn.addEventListener("click", () => {
+          if (!stateObj.input || !stateObj.meta) {
+            return;
+          }
+          const input = stateObj.input;
+          const currentValue = String(input.value || "");
+          const before = currentValue.slice(0, stateObj.meta.openIndex + 1);
+          const after = currentValue.slice(stateObj.meta.replaceEnd);
+          const nextValue = `${before}${item}${stateObj.meta.hasClosingBrace ? "" : "}"}${after}`;
+          const nextCaret = before.length + item.length + (stateObj.meta.hasClosingBrace ? 0 : 1);
+          input.value = nextValue;
+          try {
+            input.setSelectionRange(nextCaret, nextCaret);
+          } catch {
+            // ignore
+          }
+          hideTemplateTokenSuggest(stateObj);
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.focus();
+          setTimeout(() => {
+            refreshTemplateTokenSuggest(input, stateObj.popup);
+          }, 0);
+        });
+        fragment.appendChild(btn);
+      });
+      stateObj.popup.hidden = false;
+      stateObj.popup.replaceChildren(fragment);
+    };
+    const refreshTemplateTokenSuggest = (input, popup) => {
+      if (!input || !popup) {
+        hideTemplateTokenSuggest();
+        return;
+      }
+      const meta = getTemplateTokenQueryMeta(input);
+      if (!meta) {
+        popup.hidden = true;
+        popup.replaceChildren();
+        if (activeTokenSuggest && activeTokenSuggest.input === input) {
+          hideTemplateTokenSuggest(activeTokenSuggest);
+        }
+        return;
+      }
+      const suggestions = filterTemplateTokenSuggestions(meta.query, getTemplatePathSuggestionsForSelectedKey());
+      if (!suggestions.length) {
+        popup.hidden = true;
+        popup.replaceChildren();
+        if (activeTokenSuggest && activeTokenSuggest.input === input) {
+          hideTemplateTokenSuggest(activeTokenSuggest);
+        }
+        return;
+      }
+      if (activeTokenSuggest && activeTokenSuggest.input !== input) {
+        hideTemplateTokenSuggest(activeTokenSuggest);
+      }
+      activeTokenSuggest = {
+        input,
+        popup,
+        meta,
+        items: suggestions,
+        activeIndex: 0
+      };
+      renderTemplateTokenSuggestions(activeTokenSuggest);
+    };
+    const bindTemplateTokenSuggestInput = (input, popup) => {
+      if (!input || !popup) {
+        return;
+      }
+      input.addEventListener("focus", () => {
+        refreshTemplateTokenSuggest(input, popup);
+      });
+      input.addEventListener("input", () => {
+        refreshTemplateTokenSuggest(input, popup);
+      });
+      input.addEventListener("click", () => {
+        refreshTemplateTokenSuggest(input, popup);
+      });
+      input.addEventListener("keyup", (ev) => {
+        if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+          return;
+        }
+        refreshTemplateTokenSuggest(input, popup);
+      });
+      input.addEventListener("keydown", (ev) => {
+        if (!activeTokenSuggest || activeTokenSuggest.input !== input || activeTokenSuggest.popup !== popup || popup.hidden) {
+          return;
+        }
+        const itemCount = Array.isArray(activeTokenSuggest.items) ? activeTokenSuggest.items.length : 0;
+        if (!itemCount) {
+          return;
+        }
+        if (ev.key === "ArrowDown") {
+          ev.preventDefault();
+          activeTokenSuggest.activeIndex = (activeTokenSuggest.activeIndex + 1) % itemCount;
+          renderTemplateTokenSuggestions(activeTokenSuggest);
+          return;
+        }
+        if (ev.key === "ArrowUp") {
+          ev.preventDefault();
+          activeTokenSuggest.activeIndex = (activeTokenSuggest.activeIndex - 1 + itemCount) % itemCount;
+          renderTemplateTokenSuggestions(activeTokenSuggest);
+          return;
+        }
+        if (ev.key === "Enter" || ev.key === "Tab") {
+          const current = activeTokenSuggest.items[activeTokenSuggest.activeIndex];
+          if (!current) {
+            return;
+          }
+          ev.preventDefault();
+          const button = popup.querySelector(".template-config-token-option.is-active");
+          if (button instanceof HTMLElement) {
+            button.click();
+          }
+          return;
+        }
+        if (ev.key === "Escape") {
+          ev.preventDefault();
+          hideTemplateTokenSuggest(activeTokenSuggest);
+        }
+      });
+      input.addEventListener("blur", () => {
+        setTimeout(() => {
+          if (activeTokenSuggest && activeTokenSuggest.input === input) {
+            hideTemplateTokenSuggest(activeTokenSuggest);
+          }
+        }, 0);
+      });
+    };
+
     const tdef = (k, create) => {
       const key = String(k || "").trim();
       if (!key) return null;
@@ -634,20 +1347,32 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     };
     const readOpts = (k) => {
       const info = tdef(k, true);
-      const out = { hideEmptyRows: true, hideRowsWithoutValues: true, expandMultilineRows: false };
+      const out = { hideEmptyRows: true, hideRowsWithoutValues: true, expandMultilineRows: false, squareCells: true, squareCellSize: 18 };
       if (!info) return out;
       const setB = (x, v) => { if (!(v === undefined || v === null || v === "")) out[x] = Boolean(v); };
+      const setN = (x, v, min, max) => {
+        if (v === undefined || v === null || v === "") return;
+        const num = Number(v);
+        if (!Number.isFinite(num)) return;
+        out[x] = Math.min(max, Math.max(min, Math.round(num)));
+      };
       for (const src of [info.def.options, info.def._options]) {
         if (!src || typeof src !== "object" || Array.isArray(src)) continue;
         setB("hideEmptyRows", src.hideEmptyRows);
         setB("hideRowsWithoutValues", src.hideRowsWithoutValues);
         setB("expandMultilineRows", src.expandMultilineRows);
+        setB("squareCells", src.squareCells ?? src.squareCellsEnabled ?? src.fixedSquareCells);
+        setN("squareCellSize", src.squareCellSize ?? src.squareCellSizePx ?? src.cellSize ?? src.cellSizePx, 16, 240);
       }
       setB("hideEmptyRows", info.def.compact);
       setB("hideEmptyRows", info.def.hideEmptyRows);
       setB("hideRowsWithoutValues", info.def.hideRowsWithoutValues);
       setB("hideRowsWithoutValues", info.def.removeEmptyRows || info.def.removeEmptyRowsAdvanced || info.def.removeEmptyRowsAdv);
       setB("expandMultilineRows", info.def.expandMultilineRows || info.def.expandArrayRows || info.def.arrayToRows);
+      setB("squareCells", info.def.squareCells ?? info.def.squareCellsEnabled ?? info.def.fixedSquareCells);
+      setN("squareCellSize", info.def.squareCellSize ?? info.def.squareCellSizePx ?? info.def.cellSize ?? info.def.cellSizePx, 16, 240);
+      setB("squareCells", info.ranges.squareCells ?? info.ranges.squareCellsEnabled ?? info.ranges.fixedSquareCells);
+      setN("squareCellSize", info.ranges.squareCellSize ?? info.ranges.squareCellSizePx ?? info.ranges.cellSize ?? info.ranges.cellSizePx, 16, 240);
       return out;
     };
     const setOpt = (k, name, v) => {
@@ -656,6 +1381,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       const next = info.def._options && typeof info.def._options === "object" && !Array.isArray(info.def._options) ? info.def._options : {};
       next[name] = Boolean(v);
       info.def._options = next;
+      scheduleLivePreview(80);
     };
     const nextRangeKey = (k) => {
       const info = tdef(k, true);
@@ -677,6 +1403,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         const raw = String(v === undefined || v === null ? "" : v).trim();
         if (!raw) delete cell["font size"];
         else cell["font size"] = raw;
+      } else if (f === "background" || f === "font color") {
+        const raw = String(v === undefined || v === null ? "" : v).trim();
+        if (!raw) delete cell[f];
+        else cell[f] = isHexColorValue(raw) ? expandHexColorValue(raw) : raw;
       } else if (f === "wrap" || f === "merge" || f === "bold" || f === "italic" || f === "underline") cell[f] = Boolean(v);
       else {
         const txt = String(v === undefined || v === null ? "" : v).trim();
@@ -684,6 +1414,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         else cell[f] = txt;
       }
       info.ranges[r] = cell;
+      scheduleLivePreview(80);
     };
     const validateDraft = () => {
       const msg = [];
@@ -693,6 +1424,16 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
           if (Object.prototype.hasOwnProperty.call(e.cell, "font size")) {
             const raw = String(e.cell["font size"] === undefined || e.cell["font size"] === null ? "" : e.cell["font size"]).trim();
             if (raw && !Number.isFinite(Number(raw))) msg.push(`[${key}] ${e.rangeKey}: Font size must be numeric.`);
+          }
+          for (const colorKey of ["background", "font color"]) {
+            if (!Object.prototype.hasOwnProperty.call(e.cell, colorKey)) {
+              continue;
+            }
+            const raw = String(e.cell[colorKey] === undefined || e.cell[colorKey] === null ? "" : e.cell[colorKey]).trim();
+            if (raw && !isHexColorValue(raw)) {
+              const label = colorKey === "font color" ? "Font color" : "Background";
+              msg.push(`[${key}] ${e.rangeKey}: ${label} must be a hex color like #aabbcc.`);
+            }
           }
         }
       }
@@ -708,7 +1449,13 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         const hasRanges = Object.prototype.hasOwnProperty.call(def, "ranges") && def.ranges && typeof def.ranges === "object" && !Array.isArray(def.ranges);
         const ranges = hasRanges ? def.ranges : def;
         const opts = readOpts(key);
-        def._options = { hideEmptyRows: Boolean(opts.hideEmptyRows), hideRowsWithoutValues: Boolean(opts.hideRowsWithoutValues), expandMultilineRows: Boolean(opts.expandMultilineRows) };
+        def._options = {
+          hideEmptyRows: Boolean(opts.hideEmptyRows),
+          hideRowsWithoutValues: Boolean(opts.hideRowsWithoutValues),
+          expandMultilineRows: Boolean(opts.expandMultilineRows),
+          squareCells: opts.squareCells !== false,
+          squareCellSize: Math.min(240, Math.max(16, Math.round(Number(opts.squareCellSize) || 18)))
+        };
         delete def.options; delete def.compact; delete def.hideEmptyRows; delete def.hideRowsWithoutValues; delete def.expandMultilineRows;
         delete def.removeEmptyRows; delete def.removeEmptyRowsAdvanced; delete def.removeEmptyRowsAdv; delete def.expandArrayRows; delete def.arrayToRows;
         for (const rk of Object.keys(ranges)) {
@@ -730,131 +1477,768 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       if (!raw) { showErr("Template config JSON is empty."); return false; }
       let parsed = null;
       try { parsed = JSON.parse(raw); } catch (er) { showErr(`JSON parse error: ${er && er.message ? er.message : er}`); return false; }
-      const chk = validateTemplateConfig(parsed);
+      const normalized = cloneJsonValue(parsed);
+      if (!normalized || typeof normalized !== "object" || Array.isArray(normalized)) { showErr("Cannot load JSON draft."); return false; }
+      normalizeTemplateConfigLegacyFieldsInPlace(normalized);
+      const chk = validateTemplateConfig(normalized);
       if (!chk.valid) { showErr(chk.errors.join("\n")); return false; }
-      draft = cloneJsonValue(parsed);
+      draft = normalized;
       if (!draft || typeof draft !== "object" || Array.isArray(draft)) { showErr("Cannot load JSON draft."); return false; }
       if (!draft.templates || typeof draft.templates !== "object" || Array.isArray(draft.templates)) draft.templates = {};
       if (!Object.keys(draft.templates).length) draft.templates.DEFAULT = {};
       if (!Object.prototype.hasOwnProperty.call(draft.templates, selKey)) selKey = Object.keys(draft.templates)[0] || "DEFAULT";
       selRange = "";
+      try { jsonArea.value = JSON.stringify(draft, null, 2); } catch { /* ignore */ }
       showErr("");
       return true;
     };
 
+    const columnNumberToLabel = (col) => {
+      let n = Math.max(1, Math.floor(Number(col) || 1));
+      let label = "";
+      while (n > 0) {
+        const rem = (n - 1) % 26;
+        label = String.fromCharCode(65 + rem) + label;
+        n = Math.floor((n - 1) / 26);
+      }
+      return label;
+    };
+    const makeCellKey = (row, col) => `${columnNumberToLabel(col)}${Math.max(1, Math.floor(Number(row) || 1))}`;
+    const normalizeRangeKeyForBuilder = (rangeKey) => {
+      try {
+        const parsed = parseRangeKey(rangeKey);
+        if (!parsed) {
+          return "A1";
+        }
+        const startKey = makeCellKey(parsed.r1, parsed.c1);
+        const endKey = makeCellKey(parsed.r2, parsed.c2);
+        return startKey === endKey ? startKey : `${startKey}:${endKey}`;
+      } catch {
+        return "A1";
+      }
+    };
+    const makeRangeKeyFromBounds = (r1, c1, r2, c2) => {
+      const top = Math.min(Number(r1) || 1, Number(r2) || 1);
+      const left = Math.min(Number(c1) || 1, Number(c2) || 1);
+      const bottom = Math.max(Number(r1) || 1, Number(r2) || 1);
+      const right = Math.max(Number(c1) || 1, Number(c2) || 1);
+      const startKey = makeCellKey(top, left);
+      const endKey = makeCellKey(bottom, right);
+      return startKey === endKey ? startKey : `${startKey}:${endKey}`;
+    };
+    const getBuilderSelection = () => {
+      const rangeKey = normalizeRangeKeyForBuilder(selRange || "A1");
+      try {
+        const parsed = parseRangeKey(rangeKey);
+        if (parsed) {
+          return parsed;
+        }
+      } catch {
+        // fallback below
+      }
+      return { r1: 1, c1: 1, r2: 1, c2: 1, key: "A1" };
+    };
+    const isSingleBuilderSelection = () => {
+      const selection = getBuilderSelection();
+      return selection.r1 === selection.r2 && selection.c1 === selection.c2;
+    };
+    const rangesOverlapForBuilder = (left, right) => Boolean(left && right)
+      && !(left.r2 < right.r1 || left.r1 > right.r2 || left.c2 < right.c1 || left.c1 > right.c2);
+    const rangeContainsCellForBuilder = (range, row, col) => Boolean(range)
+      && row >= range.r1 && row <= range.r2 && col >= range.c1 && col <= range.c2;
+    const rangeAreaForBuilder = (range) => {
+      if (!range) return Number.POSITIVE_INFINITY;
+      return Math.max(1, range.r2 - range.r1 + 1) * Math.max(1, range.c2 - range.c1 + 1);
+    };
+    const getCurrentCell = () => {
+      const info = tdef(selKey, true);
+      if (!info) return {};
+      const normalized = normalizeRangeKeyForBuilder(selRange || "A1");
+      const current = info.ranges[normalized];
+      if (current && typeof current === "object" && !Array.isArray(current)) {
+        return current;
+      }
+      return {};
+    };
+    const ensureSelectedCell = () => {
+      const info = tdef(selKey, true);
+      if (!info) return null;
+      const normalized = normalizeRangeKeyForBuilder(selRange || "A1");
+      selRange = normalized;
+      const current = info.ranges[normalized];
+      if (current && typeof current === "object" && !Array.isArray(current)) {
+        return current;
+      }
+      info.ranges[normalized] = {};
+      return info.ranges[normalized];
+    };
+    const setSelectedCellField = (field, value) => {
+      const normalized = normalizeRangeKeyForBuilder(selRange || "A1");
+      selRange = normalized;
+      setCell(selKey, normalized, field, value);
+    };
+    const setSelectedRangeKey = (nextRangeKey) => {
+      const normalized = normalizeRangeKeyForBuilder(nextRangeKey || "A1");
+      const info = tdef(selKey, true);
+      if (!info) {
+        selRange = normalized;
+        return true;
+      }
+      const oldKey = normalizeRangeKeyForBuilder(selRange || normalized);
+      if (oldKey === normalized) {
+        selRange = normalized;
+        return true;
+      }
+      if (Object.prototype.hasOwnProperty.call(info.ranges, normalized)) {
+        showErr(`Range ${normalized} already exists.`);
+        return false;
+      }
+      const current = info.ranges[oldKey];
+      if (current && typeof current === "object" && !Array.isArray(current)) {
+        delete info.ranges[oldKey];
+        info.ranges[normalized] = current;
+      } else {
+        info.ranges[normalized] = {};
+      }
+      selRange = normalized;
+      showErr("");
+      scheduleLivePreview(80);
+      return true;
+    };
+    const getTemplateGridEntries = () => listRanges(selKey)
+      .map((entry) => {
+        try {
+          const parsed = parseRangeKey(entry.rangeKey);
+          return parsed ? { ...entry, parsed, area: rangeAreaForBuilder(parsed) } : null;
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean)
+      .sort((left, right) => {
+        if (left.area !== right.area) return right.area - left.area;
+        return String(left.rangeKey || "").localeCompare(String(right.rangeKey || ""));
+      });
+    const getBuilderGridSize = () => {
+      let rows = 8;
+      let cols = 8;
+      for (const entry of getTemplateGridEntries()) {
+        rows = Math.max(rows, Number(entry.parsed.r2) || 1);
+        cols = Math.max(cols, Number(entry.parsed.c2) || 1);
+      }
+      const selection = getBuilderSelection();
+      rows = Math.max(rows, selection.r2);
+      cols = Math.max(cols, selection.c2);
+      return { rows: Math.min(Math.max(rows + 1, 8), 40), cols: Math.min(Math.max(cols + 1, 8), 26) };
+    };
+    const getEntryForGridCell = (row, col) => {
+      const matches = getTemplateGridEntries()
+        .filter((entry) => rangeContainsCellForBuilder(entry.parsed, row, col))
+        .sort((left, right) => left.area - right.area);
+      return matches[0] || null;
+    };
+    const applyStyleToGridCell = (td, cell) => {
+      const cfg = cell && typeof cell === "object" ? cell : {};
+      if (cfg.background) td.style.backgroundColor = String(cfg.background);
+      if (cfg["font color"]) td.style.color = String(cfg["font color"]);
+      if (cfg["font size"]) td.style.fontSize = `${Number(cfg["font size"]) || 10}pt`;
+      if (cfg.font) td.style.fontFamily = String(cfg.font);
+      if (cfg.align) td.style.textAlign = String(cfg.align);
+      if (cfg.valign) td.style.verticalAlign = String(cfg.valign);
+      if (cfg.bold) td.style.fontWeight = "700";
+      if (cfg.italic) td.style.fontStyle = "italic";
+      if (cfg.underline) td.style.textDecoration = "underline";
+      if (cfg.border) td.classList.add("has-border-token");
+    };
+    const insertPlaceholderIntoText = (text, placeholder) => {
+      const raw = String(placeholder || "").trim();
+      if (!raw) return String(text || "");
+      const token = raw.startsWith("{") && raw.endsWith("}") ? raw : `{${raw}}`;
+      const current = String(text || "");
+      return current ? `${current}${token}` : token;
+    };
+    const applyPaletteToolToSelection = (tool, options) => {
+      const type = String(tool || "").trim().toLowerCase();
+      const opts = options && typeof options === "object" ? options : {};
+      const targetRange = normalizeRangeKeyForBuilder(opts.rangeKey || selRange || "A1");
+      selRange = targetRange;
+      const cell = ensureSelectedCell() || {};
+      if (type === "text") {
+        if (!Object.prototype.hasOwnProperty.call(cell, "text") || String(cell.text || "") === "") {
+          setSelectedCellField("text", "Text");
+        }
+      } else if (type === "placeholder") {
+        const selectedPath = String(opts.placeholder || "").trim() || String(getTemplatePathSuggestionsForSelectedKey()[0] || "values.name.finalDesc");
+        setSelectedCellField("text", insertPlaceholderIntoText(cell.text, selectedPath));
+      } else if (type === "format") {
+        if (!cell.background) setSelectedCellField("background", "#dbeef4");
+        if (!cell.border) setSelectedCellField("border", "outside-thin");
+        if (!cell["font color"]) setSelectedCellField("font color", "#111111");
+      }
+      showErr("");
+      renderActive();
+    };
+    const makeBuilderButton = (label, onClick, extraClass) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `secondary${extraClass ? ` ${extraClass}` : ""}`;
+      btn.textContent = label;
+      btn.addEventListener("click", onClick);
+      return btn;
+    };
+    const renderOptionToggle = (parent, name) => {
+      const opts = readOpts(selKey);
+      const label = document.createElement("label");
+      label.className = "toggle";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.checked = Boolean(opts[name]);
+      input.addEventListener("change", () => {
+        setOpt(selKey, name, input.checked);
+        showErr("");
+        renderActive();
+      });
+      label.appendChild(input);
+      label.appendChild(document.createTextNode(name));
+      parent.appendChild(label);
+    };
+    const renderBuilderCellContent = (td, text) => {
+      td.replaceChildren();
+      const raw = String(text || "");
+      if (!raw) {
+        const empty = document.createElement("span");
+        empty.className = "template-builder-empty-cell";
+        empty.textContent = "＋";
+        td.appendChild(empty);
+        return;
+      }
+      const parts = raw.split(/(\{[^{}]+\})/g);
+      for (const part of parts) {
+        if (!part) {
+          continue;
+        }
+        const span = document.createElement("span");
+        if (/^\{[^{}]+\}$/.test(part)) {
+          span.className = "template-builder-placeholder-token";
+        }
+        span.textContent = part;
+        td.appendChild(span);
+      }
+    };
+    let builderDragging = false;
+    let builderDragAnchor = null;
+    const stopBuilderDrag = () => {
+      if (!builderDragging) {
+        return;
+      }
+      builderDragging = false;
+      builderDragAnchor = null;
+      renderActive();
+    };
+    document.addEventListener("pointerup", stopBuilderDrag);
+    document.addEventListener("pointercancel", stopBuilderDrag);
+
     function renderForm() {
       els.templateConfigJson = null;
       const root = document.createElement("div");
-      root.className = "template-config-form";
+      root.className = "template-config-builder";
       const keys = Object.keys(draft.templates);
       if (!keys.includes(selKey)) selKey = keys[0] || "DEFAULT";
-      const keyRow = document.createElement("div");
-      keyRow.className = "template-config-key-row";
-      root.appendChild(keyRow);
-      const lbl = document.createElement("label");
-      lbl.className = "muted";
-      lbl.textContent = "Template Key";
-      keyRow.appendChild(lbl);
-      const sel = document.createElement("select");
-      sel.className = "template-config-select";
-      for (const k of keys) { const o = document.createElement("option"); o.value = k; o.textContent = k; sel.appendChild(o); }
-      sel.value = selKey;
-      sel.addEventListener("change", () => { selKey = sel.value; selRange = ""; renderActive(); });
-      keyRow.appendChild(sel);
-      const mkBtn = (txt, fn) => { const b = document.createElement("button"); b.type = "button"; b.className = "secondary"; b.textContent = txt; b.addEventListener("click", fn); keyRow.appendChild(b); };
-      mkBtn("Add Key", () => { let i = 1; let k = "NEW_TEMPLATE"; while (Object.prototype.hasOwnProperty.call(draft.templates, k)) { i += 1; k = `NEW_TEMPLATE_${i}`; } draft.templates[k] = {}; selKey = k; selRange = ""; showErr(""); renderActive(); });
-      mkBtn("Clone Key", () => { const src = draft.templates[selKey]; if (!src || typeof src !== "object") { showErr("Current template key is invalid."); return; } let i = 1; let k = `${selKey}_COPY`; while (Object.prototype.hasOwnProperty.call(draft.templates, k)) { i += 1; k = `${selKey}_COPY_${i}`; } draft.templates[k] = cloneJsonValue(src); selKey = k; selRange = ""; showErr(""); renderActive(); });
-      mkBtn("Delete Key", () => { if (Object.keys(draft.templates).length <= 1) { showErr("At least one template key is required."); return; } if (!confirm(`Delete template key \"${selKey}\"?`)) return; delete draft.templates[selKey]; selKey = Object.keys(draft.templates)[0] || "DEFAULT"; selRange = ""; showErr(""); renderActive(); });
-      const opts = readOpts(selKey);
-      const optRow = document.createElement("div");
-      optRow.className = "template-config-options-row";
-      root.appendChild(optRow);
-      const optToggle = (name) => { const l = document.createElement("label"); l.className = "toggle"; const c = document.createElement("input"); c.type = "checkbox"; c.checked = Boolean(opts[name]); c.addEventListener("change", () => { setOpt(selKey, name, c.checked); showErr(""); }); l.appendChild(c); l.appendChild(document.createTextNode(name)); optRow.appendChild(l); };
-      optToggle("hideEmptyRows"); optToggle("hideRowsWithoutValues"); optToggle("expandMultilineRows");
-      const tool = document.createElement("div");
-      tool.className = "template-config-ranges-toolbar";
-      root.appendChild(tool);
-      const mkToolBtn = (txt, fn) => { const b = document.createElement("button"); b.type = "button"; b.className = "secondary"; b.textContent = txt; b.addEventListener("click", fn); tool.appendChild(b); };
-      mkToolBtn("Add Range", () => { const info = tdef(selKey, true); if (!info) return; const k = nextRangeKey(selKey); info.ranges[k] = { text: "" }; selRange = k; showErr(""); renderActive(); });
-      mkToolBtn("Duplicate", () => { if (!selRange) { showErr("Select a range to duplicate."); return; } const info = tdef(selKey, true); if (!info || !Object.prototype.hasOwnProperty.call(info.ranges, selRange)) { showErr("Selected range not found."); return; } const k = nextRangeKey(selKey); info.ranges[k] = cloneJsonValue(info.ranges[selRange]) || {}; selRange = k; showErr(""); renderActive(); });
-      mkToolBtn("Delete", () => { if (!selRange) { showErr("Select a range to delete."); return; } const info = tdef(selKey, true); if (!info || !Object.prototype.hasOwnProperty.call(info.ranges, selRange)) { showErr("Selected range not found."); return; } delete info.ranges[selRange]; selRange = ""; showErr(""); renderActive(); });
-      mkToolBtn("Sort by position", () => { const info = tdef(selKey, true); if (!info) return; const entries = listRanges(selKey); const ok = []; const bad = []; for (const e of entries) { try { const p = parseRangeKey(e.rangeKey); ok.push({ ...e, p }); } catch { bad.push(e); } } ok.sort((a, b) => (a.p.r1 - b.p.r1) || (a.p.c1 - b.p.c1) || (a.p.r2 - b.p.r2) || (a.p.c2 - b.p.c2)); const next = {}; for (const e of ok) next[e.rangeKey] = info.ranges[e.rangeKey]; for (const e of bad) next[e.rangeKey] = info.ranges[e.rangeKey]; if (info.hasRanges) info.def.ranges = next; else { const keep = {}; for (const k of Object.keys(info.def)) if (isOptionKey(k)) keep[k] = info.def[k]; for (const [k, v] of Object.entries(next)) keep[k] = v; for (const k of Object.keys(info.def)) delete info.def[k]; for (const [k, v] of Object.entries(keep)) info.def[k] = v; } renderActive(); });
-      const sLbl = document.createElement("span");
-      sLbl.className = "muted";
-      sLbl.textContent = selRange ? `Selected: ${selRange}` : "Selected: (none)";
-      tool.appendChild(sLbl);
-      const wrap = document.createElement("div");
-      wrap.className = "template-config-ranges-wrap";
-      root.appendChild(wrap);
-      const table = document.createElement("table");
-      table.className = "template-config-ranges-table";
-      const th = document.createElement("thead");
-      const trh = document.createElement("tr");
-      for (const t of ["Sel", "Range", ...FIELD_DEFS.map((f) => f.label)]) { const c = document.createElement("th"); c.textContent = t; trh.appendChild(c); }
-      th.appendChild(trh);
-      table.appendChild(th);
-      const tb = document.createElement("tbody");
-      const entries = listRanges(selKey);
-      if (!selRange && entries.length) selRange = entries[0].rangeKey;
-      for (const e of entries) {
-        const tr = document.createElement("tr");
-        if (e.rangeKey === selRange) tr.classList.add("is-selected");
-        const tdSel = document.createElement("td");
-        const rd = document.createElement("input");
-        rd.type = "radio";
-        rd.name = "templateRangeSelect";
-        rd.checked = e.rangeKey === selRange;
-        rd.addEventListener("change", () => { selRange = e.rangeKey; renderActive(); });
-        tdSel.appendChild(rd);
-        tr.appendChild(tdSel);
-        const tdKey = document.createElement("td");
-        const inpKey = document.createElement("input");
-        inpKey.type = "text";
-        inpKey.className = "template-config-cell-input";
-        inpKey.value = e.rangeKey;
-        inpKey.addEventListener("focus", () => { selRange = e.rangeKey; });
-        inpKey.addEventListener("blur", () => {
-          const oldK = String(e.rangeKey || "").trim();
-          const newK = String(inpKey.value || "").trim().toUpperCase();
-          if (!newK || oldK === newK) return;
-          const info = tdef(selKey, true);
-          if (!info || !Object.prototype.hasOwnProperty.call(info.ranges, oldK)) return;
-          if (Object.prototype.hasOwnProperty.call(info.ranges, newK)) { showErr(`Range ${newK} already exists.`); renderActive(); return; }
-          const v = info.ranges[oldK]; delete info.ranges[oldK]; info.ranges[newK] = v; if (selRange === oldK) selRange = newK; showErr(""); renderActive();
+      if (!selRange) selRange = listRanges(selKey)[0]?.rangeKey || "A1";
+      selRange = normalizeRangeKeyForBuilder(selRange);
+
+      const topbar = document.createElement("div");
+      topbar.className = "template-builder-topbar";
+      root.appendChild(topbar);
+
+      const keyField = document.createElement("label");
+      keyField.className = "template-builder-field template-builder-key-field";
+      const keyLabel = document.createElement("span");
+      keyLabel.textContent = "Template Key";
+      const keySelect = document.createElement("select");
+      keySelect.className = "template-config-select";
+      for (const key of keys) {
+        const option = document.createElement("option");
+        option.value = key;
+        option.textContent = key;
+        keySelect.appendChild(option);
+      }
+      keySelect.value = selKey;
+      keySelect.addEventListener("change", () => {
+        selKey = keySelect.value;
+        selRange = listRanges(selKey)[0]?.rangeKey || "A1";
+        showErr("");
+        renderActive();
+      });
+      keyField.appendChild(keyLabel);
+      keyField.appendChild(keySelect);
+      topbar.appendChild(keyField);
+
+      const keyActions = document.createElement("div");
+      keyActions.className = "template-builder-key-actions";
+      keyActions.appendChild(makeBuilderButton("Add Key", () => {
+        let i = 1;
+        let key = "NEW_TEMPLATE";
+        while (Object.prototype.hasOwnProperty.call(draft.templates, key)) {
+          i += 1;
+          key = `NEW_TEMPLATE_${i}`;
+        }
+        draft.templates[key] = {};
+        selKey = key;
+        selRange = "A1";
+        showErr("");
+        renderActive();
+      }));
+      keyActions.appendChild(makeBuilderButton("Clone Key", () => {
+        const src = draft.templates[selKey];
+        if (!src || typeof src !== "object") {
+          showErr("Current template key is invalid.");
+          return;
+        }
+        let i = 1;
+        let key = `${selKey}_COPY`;
+        while (Object.prototype.hasOwnProperty.call(draft.templates, key)) {
+          i += 1;
+          key = `${selKey}_COPY_${i}`;
+        }
+        draft.templates[key] = cloneJsonValue(src) || {};
+        selKey = key;
+        selRange = listRanges(selKey)[0]?.rangeKey || "A1";
+        showErr("");
+        renderActive();
+      }));
+      keyActions.appendChild(makeBuilderButton("Delete Key", () => {
+        if (Object.keys(draft.templates).length <= 1) {
+          showErr("At least one template key is required.");
+          return;
+        }
+        if (!confirm(`Delete template key "${selKey}"?`)) return;
+        delete draft.templates[selKey];
+        selKey = Object.keys(draft.templates)[0] || "DEFAULT";
+        selRange = listRanges(selKey)[0]?.rangeKey || "A1";
+        showErr("");
+        renderActive();
+      }, "danger-lite"));
+      topbar.appendChild(keyActions);
+
+      const optionRow = document.createElement("div");
+      optionRow.className = "template-builder-options-row";
+      renderOptionToggle(optionRow, "hideEmptyRows");
+      renderOptionToggle(optionRow, "hideRowsWithoutValues");
+      renderOptionToggle(optionRow, "expandMultilineRows");
+      root.appendChild(optionRow);
+
+      const builderShell = document.createElement("div");
+      builderShell.className = "template-builder-shell";
+      root.appendChild(builderShell);
+
+      const palette = document.createElement("aside");
+      palette.className = "template-builder-palette";
+      const paletteTitle = document.createElement("div");
+      paletteTitle.className = "template-builder-section-title";
+      paletteTitle.textContent = "Palette";
+      palette.appendChild(paletteTitle);
+      const paletteHint = document.createElement("div");
+      paletteHint.className = "template-config-editor-hint";
+      paletteHint.textContent = "Drag object vào grid, hoặc click để áp dụng vào vùng đang chọn.";
+      palette.appendChild(paletteHint);
+      const paletteItems = [
+        { type: "text", title: "Text", desc: "Tạo text cell hoặc giữ text hiện có." },
+        { type: "placeholder", title: "Placeholder", desc: "Chèn {path} vào text." },
+        { type: "format", title: "Format", desc: "Áp dụng background/border/font." }
+      ];
+      for (const item of paletteItems) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `template-builder-palette-item is-${item.type}`;
+        btn.draggable = true;
+        btn.setAttribute("data-template-builder-tool", item.type);
+        btn.innerHTML = `<strong>${item.title}</strong><span>${item.desc}</span>`;
+        btn.addEventListener("dragstart", (ev) => {
+          ev.dataTransfer.setData("text/plain", item.type);
+          ev.dataTransfer.effectAllowed = "copy";
         });
-        tdKey.appendChild(inpKey);
-        tr.appendChild(tdKey);
-        for (const f of FIELD_DEFS) {
-          const td = document.createElement("td");
-          if (f.kind === "bool") {
-            const c = document.createElement("input");
-            c.type = "checkbox";
-            c.checked = Boolean(e.cell[f.key]);
-            c.addEventListener("change", () => { selRange = e.rangeKey; setCell(selKey, e.rangeKey, f.key, c.checked); showErr(""); });
-            td.appendChild(c);
-          } else if (f.kind === "select") {
-            const s = document.createElement("select");
-            s.className = "template-config-select";
-            for (const ov of f.opts || []) { const o = document.createElement("option"); o.value = ov; o.textContent = ov || "(default)"; s.appendChild(o); }
-            s.value = String(e.cell[f.key] === undefined || e.cell[f.key] === null ? "" : e.cell[f.key]);
-            s.addEventListener("change", () => { selRange = e.rangeKey; setCell(selKey, e.rangeKey, f.key, s.value); showErr(""); });
-            td.appendChild(s);
-          } else {
-            const i = document.createElement("input");
-            i.type = "text";
-            i.className = "template-config-cell-input";
-            i.value = String(e.cell[f.key] === undefined || e.cell[f.key] === null ? "" : e.cell[f.key]);
-            i.addEventListener("input", () => { selRange = e.rangeKey; setCell(selKey, e.rangeKey, f.key, i.value); if (f.key === "font size" && i.value.trim() && !Number.isFinite(Number(i.value))) showErr(`[${selKey}] ${e.rangeKey}: Font size must be numeric.`); else showErr(""); });
-            td.appendChild(i);
+        btn.addEventListener("click", () => applyPaletteToolToSelection(item.type));
+        palette.appendChild(btn);
+      }
+      builderShell.appendChild(palette);
+
+      const gridPanel = document.createElement("section");
+      gridPanel.className = "template-builder-grid-panel";
+      const gridHead = document.createElement("div");
+      gridHead.className = "template-builder-panel-head";
+      const gridTitle = document.createElement("div");
+      gridTitle.className = "template-builder-section-title";
+      gridTitle.textContent = "Editable Grid";
+      const selectionPill = document.createElement("span");
+      selectionPill.className = "selection-pill template-builder-selection-pill";
+      selectionPill.textContent = selRange ? `Selected ${selRange}` : "Selected (none)";
+      gridHead.appendChild(gridTitle);
+      gridHead.appendChild(selectionPill);
+      gridPanel.appendChild(gridHead);
+
+      const gridWrap = document.createElement("div");
+      gridWrap.className = "template-builder-grid-wrap";
+      const grid = document.createElement("table");
+      grid.className = "template-builder-grid";
+      const builderOpts = readOpts(selKey);
+      const builderCellSize = Math.min(240, Math.max(16, Math.round(Number(builderOpts.squareCellSize) || 18)));
+      grid.style.setProperty("--template-builder-cell-size", `${builderCellSize}px`);
+      const refreshGridSelectionClasses = () => {
+        const nextSelection = getBuilderSelection();
+        for (const cell of grid.querySelectorAll("td[data-r1]")) {
+          const cellRange = {
+            r1: Number(cell.getAttribute("data-r1")) || 1,
+            c1: Number(cell.getAttribute("data-c1")) || 1,
+            r2: Number(cell.getAttribute("data-r2")) || 1,
+            c2: Number(cell.getAttribute("data-c2")) || 1
+          };
+          cell.classList.toggle("in-selection", rangesOverlapForBuilder(nextSelection, cellRange));
+          cell.classList.toggle("anchor", nextSelection.r1 === cellRange.r1 && nextSelection.c1 === cellRange.c1);
+        }
+        selectionPill.textContent = selRange ? `Selected ${selRange}` : "Selected (none)";
+      };
+      const size = getBuilderGridSize();
+      const selection = getBuilderSelection();
+      const headRow = document.createElement("tr");
+      headRow.appendChild(document.createElement("th"));
+      for (let col = 1; col <= size.cols; col += 1) {
+        const th = document.createElement("th");
+        th.textContent = columnNumberToLabel(col);
+        headRow.appendChild(th);
+      }
+      grid.appendChild(headRow);
+      const skipCells = new Set();
+      for (let row = 1; row <= size.rows; row += 1) {
+        const tr = document.createElement("tr");
+        const rowHeader = document.createElement("th");
+        rowHeader.textContent = String(row);
+        tr.appendChild(rowHeader);
+        for (let col = 1; col <= size.cols; col += 1) {
+          const cellKey = makeCellKey(row, col);
+          if (skipCells.has(cellKey)) {
+            continue;
           }
+          const matched = getEntryForGridCell(row, col);
+          const td = document.createElement("td");
+          td.tabIndex = 0;
+          td.setAttribute("data-row", String(row));
+          td.setAttribute("data-col", String(col));
+          let displayRange = { r1: row, c1: col, r2: row, c2: col };
+          let cellConfig = null;
+          if (matched) {
+            displayRange = matched.parsed;
+            cellConfig = matched.cell;
+            td.setAttribute("data-range-key", normalizeRangeKeyForBuilder(matched.rangeKey));
+            if (cellConfig && cellConfig.merge === true) {
+              td.rowSpan = Math.max(1, displayRange.r2 - displayRange.r1 + 1);
+              td.colSpan = Math.max(1, displayRange.c2 - displayRange.c1 + 1);
+              for (let rr = displayRange.r1; rr <= displayRange.r2; rr += 1) {
+                for (let cc = displayRange.c1; cc <= displayRange.c2; cc += 1) {
+                  if (rr !== row || cc !== col) skipCells.add(makeCellKey(rr, cc));
+                }
+              }
+            }
+          }
+          td.setAttribute("data-r1", String(displayRange.r1));
+          td.setAttribute("data-c1", String(displayRange.c1));
+          td.setAttribute("data-r2", String(displayRange.r2));
+          td.setAttribute("data-c2", String(displayRange.c2));
+          if (rangesOverlapForBuilder(selection, displayRange)) {
+            td.classList.add("in-selection");
+          }
+          if (selection.r1 === row && selection.c1 === col) {
+            td.classList.add("anchor");
+          }
+          applyStyleToGridCell(td, cellConfig);
+          const text = cellConfig && Object.prototype.hasOwnProperty.call(cellConfig, "text") ? String(cellConfig.text || "") : "";
+          renderBuilderCellContent(td, text);
+          td.addEventListener("pointerdown", (ev) => {
+            if (ev.button !== 0) return;
+            builderDragging = true;
+            builderDragAnchor = { row, col };
+            selRange = makeRangeKeyFromBounds(row, col, row, col);
+            showErr("");
+            refreshGridSelectionClasses();
+          });
+          td.addEventListener("pointerenter", () => {
+            if (!builderDragging || !builderDragAnchor) return;
+            selRange = makeRangeKeyFromBounds(builderDragAnchor.row, builderDragAnchor.col, row, col);
+            showErr("");
+            refreshGridSelectionClasses();
+          });
+          td.addEventListener("keydown", (ev) => {
+            if (ev.key !== "Enter" && ev.key !== " ") return;
+            ev.preventDefault();
+            selRange = makeRangeKeyFromBounds(row, col, row, col);
+            renderActive();
+          });
+          td.addEventListener("dragover", (ev) => {
+            ev.preventDefault();
+            td.classList.add("is-drop-target");
+            ev.dataTransfer.dropEffect = "copy";
+          });
+          td.addEventListener("dragleave", () => {
+            td.classList.remove("is-drop-target");
+          });
+          td.addEventListener("drop", (ev) => {
+            ev.preventDefault();
+            td.classList.remove("is-drop-target");
+            const tool = ev.dataTransfer.getData("text/plain") || ev.dataTransfer.getData("application/x-template-tool");
+            const targetRange = rangesOverlapForBuilder(getBuilderSelection(), displayRange)
+              ? selRange
+              : makeRangeKeyFromBounds(row, col, row, col);
+            applyPaletteToolToSelection(tool, { rangeKey: targetRange });
+          });
           tr.appendChild(td);
         }
-        tb.appendChild(tr);
+        grid.appendChild(tr);
       }
-      table.appendChild(tb);
-      wrap.appendChild(table);
+      gridWrap.appendChild(grid);
+      gridPanel.appendChild(gridWrap);
+      builderShell.appendChild(gridPanel);
+
+      const inspector = document.createElement("aside");
+      inspector.className = "template-builder-inspector";
+      const inspectorTitle = document.createElement("div");
+      inspectorTitle.className = "template-builder-section-title";
+      inspectorTitle.textContent = "Inspector";
+      inspector.appendChild(inspectorTitle);
+      const selectedCell = getCurrentCell();
+      const rangeField = document.createElement("label");
+      rangeField.className = "template-builder-field";
+      rangeField.innerHTML = "<span>Range</span>";
+      const rangeInput = document.createElement("input");
+      rangeInput.type = "text";
+      rangeInput.className = "template-config-cell-input";
+      rangeInput.value = selRange;
+      rangeInput.addEventListener("blur", () => {
+        if (setSelectedRangeKey(rangeInput.value)) {
+          renderActive();
+        } else {
+          rangeInput.value = selRange;
+        }
+      });
+      rangeInput.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") {
+          ev.preventDefault();
+          rangeInput.blur();
+        }
+      });
+      rangeField.appendChild(rangeInput);
+      inspector.appendChild(rangeField);
+
+      const textField = document.createElement("label");
+      textField.className = "template-builder-field";
+      const textLabel = document.createElement("span");
+      textLabel.textContent = "Text / Placeholder";
+      const textWrap = document.createElement("div");
+      textWrap.className = "template-config-text-field template-builder-text-field";
+      const textArea = document.createElement("textarea");
+      textArea.className = "template-config-json template-builder-textarea";
+      textArea.placeholder = "Text or {values.name.finalDesc}";
+      textArea.value = String(selectedCell.text === undefined || selectedCell.text === null ? "" : selectedCell.text);
+      const popup = document.createElement("div");
+      popup.className = "template-config-token-suggest";
+      popup.hidden = true;
+      textArea.addEventListener("input", () => {
+        setSelectedCellField("text", textArea.value);
+        showErr("");
+      });
+      bindTemplateTokenSuggestInput(textArea, popup);
+      textWrap.appendChild(textArea);
+      textWrap.appendChild(popup);
+      textField.appendChild(textLabel);
+      textField.appendChild(textWrap);
+      inspector.appendChild(textField);
+
+      const pathRow = document.createElement("div");
+      pathRow.className = "template-builder-path-row";
+      const pathSelect = document.createElement("select");
+      pathSelect.className = "template-config-select";
+      const pathSuggestions = getTemplatePathSuggestionsForSelectedKey();
+      const fallbackPaths = pathSuggestions.length ? pathSuggestions : ["values.name.finalDesc", "values.target.decl.finalDesc", "keywords.stmt.text"];
+      for (const path of fallbackPaths.slice(0, 80)) {
+        const option = document.createElement("option");
+        option.value = path;
+        option.textContent = path;
+        pathSelect.appendChild(option);
+      }
+      pathRow.appendChild(pathSelect);
+      pathRow.appendChild(makeBuilderButton("Insert", () => {
+        const token = pathSelect.value ? `{${pathSelect.value}}` : "";
+        if (!token) return;
+        textArea.value = insertPlaceholderIntoText(textArea.value, token);
+        textArea.dispatchEvent(new Event("input", { bubbles: true }));
+        textArea.focus();
+      }));
+      inspector.appendChild(pathRow);
+
+      const styleGrid = document.createElement("div");
+      styleGrid.className = "template-builder-style-grid";
+      const addInputField = (labelText, input) => {
+        const label = document.createElement("label");
+        label.className = "template-builder-field";
+        const span = document.createElement("span");
+        span.textContent = labelText;
+        label.appendChild(span);
+        label.appendChild(input);
+        styleGrid.appendChild(label);
+      };
+      const bgInput = document.createElement("input");
+      bgInput.type = "text";
+      bgInput.className = "template-config-cell-input";
+      bgInput.placeholder = "#ffffff";
+      bgInput.value = String(selectedCell.background || "");
+      bgInput.addEventListener("input", () => {
+        setSelectedCellField("background", bgInput.value);
+        const raw = String(bgInput.value || "").trim();
+        showErr(raw && !isHexColorValue(raw) ? `[${selKey}] ${selRange}: Background must be a hex color like #aabbcc.` : "");
+      });
+      addInputField("Background", bgInput);
+
+      const fontColorInput = document.createElement("input");
+      fontColorInput.type = "text";
+      fontColorInput.className = "template-config-cell-input";
+      fontColorInput.placeholder = "#111111";
+      fontColorInput.value = String(selectedCell["font color"] || "");
+      fontColorInput.addEventListener("input", () => {
+        setSelectedCellField("font color", fontColorInput.value);
+        const raw = String(fontColorInput.value || "").trim();
+        showErr(raw && !isHexColorValue(raw) ? `[${selKey}] ${selRange}: Font color must be a hex color like #aabbcc.` : "");
+      });
+      addInputField("Font Color", fontColorInput);
+
+      const borderInput = document.createElement("input");
+      borderInput.type = "text";
+      borderInput.className = "template-config-cell-input";
+      borderInput.placeholder = "outside-thin";
+      borderInput.value = String(selectedCell.border || "");
+      borderInput.addEventListener("input", () => { setSelectedCellField("border", borderInput.value); showErr(""); });
+      addInputField("Border", borderInput);
+
+      const fontSizeInput = document.createElement("input");
+      fontSizeInput.type = "text";
+      fontSizeInput.inputMode = "decimal";
+      fontSizeInput.className = "template-config-cell-input";
+      fontSizeInput.value = String(selectedCell["font size"] || "");
+      fontSizeInput.addEventListener("input", () => {
+        setSelectedCellField("font size", fontSizeInput.value);
+        showErr(fontSizeInput.value.trim() && !Number.isFinite(Number(fontSizeInput.value)) ? `[${selKey}] ${selRange}: Font size must be numeric.` : "");
+      });
+      addInputField("Font Size", fontSizeInput);
+
+      const alignSelect = document.createElement("select");
+      alignSelect.className = "template-config-select";
+      for (const value of ["", "left", "center", "right"]) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value || "(default)";
+        alignSelect.appendChild(option);
+      }
+      alignSelect.value = String(selectedCell.align || "");
+      alignSelect.addEventListener("change", () => { setSelectedCellField("align", alignSelect.value); showErr(""); renderActive(); });
+      addInputField("Align", alignSelect);
+
+      const valignSelect = document.createElement("select");
+      valignSelect.className = "template-config-select";
+      for (const value of ["", "top", "middle", "bottom"]) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value || "(default)";
+        valignSelect.appendChild(option);
+      }
+      valignSelect.value = String(selectedCell.valign || "");
+      valignSelect.addEventListener("change", () => { setSelectedCellField("valign", valignSelect.value); showErr(""); renderActive(); });
+      addInputField("VAlign", valignSelect);
+      inspector.appendChild(styleGrid);
+
+      const toggleGrid = document.createElement("div");
+      toggleGrid.className = "template-builder-toggle-grid";
+      const addToggle = (field, labelText, disabled) => {
+        const label = document.createElement("label");
+        label.className = "toggle";
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.checked = Boolean(selectedCell[field]);
+        input.disabled = Boolean(disabled);
+        input.addEventListener("change", () => {
+          setSelectedCellField(field, input.checked);
+          showErr("");
+          renderActive();
+        });
+        label.appendChild(input);
+        label.appendChild(document.createTextNode(labelText));
+        toggleGrid.appendChild(label);
+      };
+      addToggle("wrap", "Wrap");
+      addToggle("merge", "Merge", isSingleBuilderSelection());
+      addToggle("bold", "Bold");
+      addToggle("italic", "Italic");
+      addToggle("underline", "Underline");
+      inspector.appendChild(toggleGrid);
+
+      const actions = document.createElement("div");
+      actions.className = "template-builder-inspector-actions";
+      actions.appendChild(makeBuilderButton("Duplicate", () => {
+        const info = tdef(selKey, true);
+        if (!info || !selRange) return;
+        const sourceCell = info.ranges[selRange];
+        const nextKey = nextRangeKey(selKey);
+        info.ranges[nextKey] = cloneJsonValue(sourceCell && typeof sourceCell === "object" ? sourceCell : {}) || {};
+        selRange = nextKey;
+        showErr("");
+        renderActive();
+      }));
+      actions.appendChild(makeBuilderButton("Delete", () => {
+        const info = tdef(selKey, true);
+        if (!info || !selRange || !Object.prototype.hasOwnProperty.call(info.ranges, selRange)) {
+          showErr("Selected range not found.");
+          return;
+        }
+        delete info.ranges[selRange];
+        selRange = listRanges(selKey)[0]?.rangeKey || "A1";
+        showErr("");
+        renderActive();
+      }, "danger-lite"));
+      actions.appendChild(makeBuilderButton("Sort", () => {
+        const info = tdef(selKey, true);
+        if (!info) return;
+        const entries = listRanges(selKey);
+        const ok = [];
+        const bad = [];
+        for (const entry of entries) {
+          try {
+            const p = parseRangeKey(entry.rangeKey);
+            ok.push({ ...entry, p });
+          } catch {
+            bad.push(entry);
+          }
+        }
+        ok.sort((a, b) => (a.p.r1 - b.p.r1) || (a.p.c1 - b.p.c1) || (a.p.r2 - b.p.r2) || (a.p.c2 - b.p.c2));
+        const next = {};
+        for (const entry of ok) next[entry.rangeKey] = info.ranges[entry.rangeKey];
+        for (const entry of bad) next[entry.rangeKey] = info.ranges[entry.rangeKey];
+        if (info.hasRanges) info.def.ranges = next;
+        else {
+          const keep = {};
+          for (const key of Object.keys(info.def)) if (isOptionKey(key)) keep[key] = info.def[key];
+          for (const [key, value] of Object.entries(next)) keep[key] = value;
+          for (const key of Object.keys(info.def)) delete info.def[key];
+          for (const [key, value] of Object.entries(keep)) info.def[key] = value;
+        }
+        renderActive();
+      }));
+      inspector.appendChild(actions);
+
       const check = validateDraft();
-      if (!check.ok) { const sum = document.createElement("div"); sum.className = "template-error"; sum.textContent = check.messages.join("\n"); root.appendChild(sum); }
+      if (!check.ok) {
+        const sum = document.createElement("div");
+        sum.className = "template-error";
+        sum.textContent = check.messages.join("\n");
+        inspector.appendChild(sum);
+      }
+      builderShell.appendChild(inspector);
       host.replaceChildren(root);
     }
 
@@ -870,6 +2254,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       ta.spellcheck = false;
       ta.placeholder = "Template config JSON...";
       ta.value = safeJson(draft, true);
+      ta.addEventListener("input", () => {
+        scheduleLivePreview(180);
+      });
       ta.addEventListener("keydown", (ev) => { if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") { ev.preventDefault(); applyFromModal(); } });
       root.appendChild(ta);
       host.replaceChildren(root);
@@ -879,10 +2266,13 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     function renderActive() {
+      hideTemplateTokenSuggest();
+      clearTemplateTokenSuggestionCache();
       formBtn.classList.toggle("active", activeTab === "form");
       jsonBtn.classList.toggle("active", activeTab === "json");
       if (activeTab === "json") renderJson();
       else { jsonArea = null; renderForm(); }
+      renderLivePreview();
     }
 
     function switchTab(next) {
@@ -914,6 +2304,11 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     modal.root.addEventListener("keydown", (ev) => { if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") { ev.preventDefault(); applyFromModal(); } });
     renderActive();
     modal.setCleanup(() => {
+      clearPreviewTimer();
+      hideTemplateTokenSuggest();
+      clearTemplateTokenSuggestionCache();
+      document.removeEventListener("pointerup", stopBuilderDrag);
+      document.removeEventListener("pointercancel", stopBuilderDrag);
       els.templateConfigJson = prevJsonEl || null;
       els.templateConfigError = prevErrEl || null;
       jsonArea = null;
@@ -1201,7 +2596,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         return {
           mode: "single",
           text: String(candidate && candidate.currentDesc ? candidate.currentDesc : ""),
-          skipNormalize: Boolean(candidate && candidate.skipNormalize)
+          skipNormalize: Boolean(candidate && candidate.skipNormalize),
+          initialText: String(candidate && candidate.currentDesc ? candidate.currentDesc : ""),
+          initialSkipNormalize: Boolean(candidate && candidate.skipNormalize)
         };
       }
 
@@ -1215,7 +2612,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         return {
           mode: "single",
           text: itemDisplay,
-          skipNormalize: Boolean(itemEntry.noNormalize || (candidate && candidate.skipNormalize))
+          skipNormalize: Boolean(itemEntry.noNormalize || (candidate && candidate.skipNormalize)),
+          initialText: String(itemDisplay || ""),
+          initialSkipNormalize: Boolean(itemEntry.noNormalize || (candidate && candidate.skipNormalize))
         };
       }
 
@@ -1230,7 +2629,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         return {
           mode: "single",
           text: itemDisplay,
-          skipNormalize: Boolean(itemEntry.noNormalize || (candidate && candidate.skipNormalize))
+          skipNormalize: Boolean(itemEntry.noNormalize || (candidate && candidate.skipNormalize)),
+          initialText: String(itemDisplay || ""),
+          initialSkipNormalize: Boolean(itemEntry.noNormalize || (candidate && candidate.skipNormalize))
         };
       }
 
@@ -1247,7 +2648,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         itemKey,
         structText: String(structDisplay || ""),
         itemText: String(itemDisplay || ""),
-        skipNormalize: Boolean(itemEntry.noNormalize || (candidate && candidate.skipNormalize))
+        skipNormalize: Boolean(itemEntry.noNormalize || (candidate && candidate.skipNormalize)),
+        initialStructText: String(structDisplay || ""),
+        initialItemText: String(itemDisplay || ""),
+        initialSkipNormalize: Boolean(itemEntry.noNormalize || (candidate && candidate.skipNormalize))
       };
     };
 
@@ -1345,7 +2749,13 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const getDescDraft = () => {
       const selected = getSelectedDeclCandidate();
       if (!selected) {
-        return { mode: "single", text: "", skipNormalize: false };
+        return {
+          mode: "single",
+          text: "",
+          skipNormalize: false,
+          initialText: "",
+          initialSkipNormalize: false
+        };
       }
       const existing = descDraftByKey.get(selected.declKey);
       if (existing && typeof existing === "object") {
@@ -1358,13 +2768,18 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
             itemKey: String(existing.itemKey || selected.declKey || ""),
             structText: String(existing.structText || ""),
             itemText: String(existing.itemText || ""),
-            skipNormalize: Boolean(existing.skipNormalize)
+            skipNormalize: Boolean(existing.skipNormalize),
+            initialStructText: String(existing.initialStructText || ""),
+            initialItemText: String(existing.initialItemText || ""),
+            initialSkipNormalize: Boolean(existing.initialSkipNormalize)
           };
         }
         return {
           mode: "single",
           text: String(existing.text || ""),
-          skipNormalize: Boolean(existing.skipNormalize)
+          skipNormalize: Boolean(existing.skipNormalize),
+          initialText: String(existing.initialText || ""),
+          initialSkipNormalize: Boolean(existing.initialSkipNormalize)
         };
       }
       const draft = buildDescDraftForCandidate(selected);
@@ -1396,7 +2811,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       descDraftByKey.set(selected.declKey, {
         mode: "single",
         text: patch && Object.prototype.hasOwnProperty.call(patch, "text") ? String(patch.text || "") : String(current.text || ""),
-        skipNormalize: patch && Object.prototype.hasOwnProperty.call(patch, "skipNormalize") ? Boolean(patch.skipNormalize) : Boolean(current.skipNormalize)
+        skipNormalize: patch && Object.prototype.hasOwnProperty.call(patch, "skipNormalize") ? Boolean(patch.skipNormalize) : Boolean(current.skipNormalize),
+        initialText: String(current.initialText || ""),
+        initialSkipNormalize: Boolean(current.initialSkipNormalize)
       });
     };
 
@@ -1667,6 +3084,99 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       return { ok: true, error: "" };
     };
 
+    const cloneModalStateValue = (value) => {
+      if (typeof cloneJsonValue === "function") {
+        try {
+          return cloneJsonValue(value);
+        } catch {
+          // fallback below
+        }
+      }
+      try {
+        return JSON.parse(JSON.stringify(value));
+      } catch {
+        return value;
+      }
+    };
+
+    const rerenderAfterDescOverrideChange = () => {
+      state.haystackById = buildSearchIndex(state.renderObjects);
+      if (typeof renderOutput === "function") {
+        renderOutput();
+      }
+      if (typeof renderTemplatePreview === "function") {
+        renderTemplatePreview();
+      }
+      if (typeof renderDeclDescPanelUi === "function" && state.rightTab === "descriptions") {
+        renderDeclDescPanelUi();
+      }
+    };
+
+    const restoreModalSnapshots = (snapshots) => {
+      const original = snapshots && typeof snapshots === "object" ? snapshots : null;
+      if (!original) {
+        return true;
+      }
+
+      let restored = true;
+
+      if (Object.prototype.hasOwnProperty.call(original, "templateConfig")) {
+        const nextConfig = cloneModalStateValue(original.templateConfig);
+        if (normalizeTemplateConfigLegacyFieldsInPlace(nextConfig) && typeof localStorage !== "undefined") {
+          try {
+            localStorage.setItem(
+              TEMPLATE_CONFIG_STORAGE_KEY_V1,
+              JSON.stringify(nextConfig && typeof nextConfig === "object" ? nextConfig : getDefaultTemplateConfig())
+            );
+          } catch {
+            restored = false;
+          }
+        }
+        if (typeof applyTemplateConfigObject === "function") {
+          const applied = applyTemplateConfigObject(nextConfig, { save: true });
+          if (!applied) {
+            restored = false;
+          }
+        } else {
+          state.templateConfig = nextConfig;
+          try {
+            localStorage.setItem(
+              TEMPLATE_CONFIG_STORAGE_KEY_V1,
+              JSON.stringify(nextConfig && typeof nextConfig === "object" ? nextConfig : getDefaultTemplateConfig())
+            );
+          } catch {
+            restored = false;
+          }
+          if (typeof syncTemplateEditorFromState === "function") {
+            syncTemplateEditorFromState();
+          }
+          if (typeof renderTemplatePreview === "function") {
+            renderTemplatePreview();
+          }
+        }
+      }
+
+      if (Object.prototype.hasOwnProperty.call(original, "descOverrides")) {
+        state.descOverrides = cloneModalStateValue(original.descOverrides) || {};
+        if (typeof saveDescOverrides === "function") {
+          try {
+            saveDescOverrides();
+          } catch {
+            restored = false;
+          }
+        } else {
+          try {
+            localStorage.setItem(DESC_STORAGE_KEY_V2, JSON.stringify(state.descOverrides || {}));
+          } catch {
+            restored = false;
+          }
+        }
+        rerenderAfterDescOverrideChange();
+      }
+
+      return restored;
+    };
+
     const submit = () => {
       showInlineError("");
       if (!templateKey || !rangeKey || !onSaveText) {
@@ -1675,76 +3185,108 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       }
       syncActiveInputState();
 
-      let textResult = null;
-      try {
-        textResult = normalizeSaveResult(
-          onSaveText({ text: String(textValue || "") }),
-          "Save template text failed."
-        );
-      } catch (err) {
-        showInlineError(err && err.message ? err.message : String(err));
-        return;
-      }
-      if (!textResult.ok) {
-        const fallback = String((els.templateConfigError && els.templateConfigError.textContent) || "").trim();
-        showInlineError(textResult.error || fallback || "Save template text failed.");
-        return;
+      const operations = [];
+      const nextTemplateText = String(textValue || "");
+      if (nextTemplateText !== currentText) {
+        operations.push({
+          label: "template text",
+          run: () => onSaveText({ text: nextTemplateText }),
+          fallbackError: "Save template text failed.",
+          getError: (result) => {
+            const fallback = String((els.templateConfigError && els.templateConfigError.textContent) || "").trim();
+            return result.error || fallback || "Save template text failed.";
+          }
+        });
       }
 
       if (hasDecl) {
         const selected = getSelectedDeclCandidate();
         const draft = getDescDraft();
         if (draft.mode === "structField") {
-          let structResult = null;
-          try {
-            structResult = normalizeSaveResult(onSaveDesc({
-              decl: draft.structDecl || null,
-              declKey: String(draft.structKey || ""),
-              text: String(draft.structText || ""),
-              skipNormalize: false
-            }), "Save struct description failed.");
-          } catch (err) {
-            showInlineError(err && err.message ? err.message : String(err));
-            return;
-          }
-          if (!structResult.ok) {
-            showInlineError(structResult.error || "Save struct description failed.");
-            return;
+          const structChanged = String(draft.structText || "") !== String(draft.initialStructText || "");
+          if (structChanged) {
+            operations.push({
+              label: "struct description",
+              run: () => onSaveDesc({
+                decl: draft.structDecl || null,
+                declKey: String(draft.structKey || ""),
+                text: String(draft.structText || ""),
+                skipNormalize: false
+              }),
+              fallbackError: "Save struct description failed.",
+              getError: (result) => result.error || "Save struct description failed."
+            });
           }
 
-          let itemResult = null;
-          try {
-            itemResult = normalizeSaveResult(onSaveDesc({
-              decl: selected ? selected.decl : (draft.itemDecl || null),
-              declKey: selected ? selected.declKey : String(draft.itemKey || ""),
-              text: String(draft.itemText || ""),
-              skipNormalize: Boolean(draft.skipNormalize)
-            }), "Save item description failed.");
-          } catch (err) {
-            showInlineError(err && err.message ? err.message : String(err));
-            return;
-          }
-          if (!itemResult.ok) {
-            showInlineError(itemResult.error || "Save item description failed.");
-            return;
+          const itemChanged = (
+            String(draft.itemText || "") !== String(draft.initialItemText || "")
+            || Boolean(draft.skipNormalize) !== Boolean(draft.initialSkipNormalize)
+          );
+          if (itemChanged) {
+            operations.push({
+              label: "item description",
+              run: () => onSaveDesc({
+                decl: selected ? selected.decl : (draft.itemDecl || null),
+                declKey: selected ? selected.declKey : String(draft.itemKey || ""),
+                text: String(draft.itemText || ""),
+                skipNormalize: Boolean(draft.skipNormalize)
+              }),
+              fallbackError: "Save item description failed.",
+              getError: (result) => result.error || "Save item description failed."
+            });
           }
         } else {
-          let descResult = null;
-          try {
-            descResult = normalizeSaveResult(onSaveDesc({
-              decl: selected ? selected.decl : null,
-              declKey: selected ? selected.declKey : "",
-              text: String(draft.text || ""),
-              skipNormalize: Boolean(draft.skipNormalize)
-            }), "Save description failed.");
-          } catch (err) {
-            showInlineError(err && err.message ? err.message : String(err));
-            return;
+          const descChanged = (
+            String(draft.text || "") !== String(draft.initialText || "")
+            || Boolean(draft.skipNormalize) !== Boolean(draft.initialSkipNormalize)
+          );
+          if (descChanged) {
+            operations.push({
+              label: "description",
+              run: () => onSaveDesc({
+                decl: selected ? selected.decl : null,
+                declKey: selected ? selected.declKey : "",
+                text: String(draft.text || ""),
+                skipNormalize: Boolean(draft.skipNormalize)
+              }),
+              fallbackError: "Save description failed.",
+              getError: (result) => result.error || "Save description failed."
+            });
           }
-          if (!descResult.ok) {
-            showInlineError(descResult.error || "Save description failed.");
-            return;
-          }
+        }
+      }
+
+      if (!operations.length) {
+        closeTemplateDynamicModal();
+        return;
+      }
+
+      const snapshots = {
+        templateConfig: cloneModalStateValue(state.templateConfig && typeof state.templateConfig === "object"
+          ? state.templateConfig
+          : getDefaultTemplateConfig()),
+        descOverrides: cloneModalStateValue(state.descOverrides && typeof state.descOverrides === "object"
+          ? state.descOverrides
+          : {})
+      };
+
+      for (const operation of operations) {
+        let opResult = null;
+        try {
+          opResult = normalizeSaveResult(operation.run(), operation.fallbackError);
+        } catch (err) {
+          const restored = restoreModalSnapshots(snapshots);
+          const message = err && err.message ? err.message : String(err);
+          showInlineError(restored ? message : `${message}\nRollback failed. Reload the viewer before saving again.`);
+          return;
+        }
+        if (!opResult.ok) {
+          const restored = restoreModalSnapshots(snapshots);
+          const message = typeof operation.getError === "function"
+            ? operation.getError(opResult)
+            : (opResult.error || operation.fallbackError || `Save ${operation.label || "change"} failed.`);
+          showInlineError(restored ? message : `${message}\nRollback failed. Reload the viewer before saving again.`);
+          return;
         }
       }
 
@@ -1773,16 +3315,136 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return Math.max(1, text.split(/\r\n|\r|\n/).length);
   }
 
+  function getInputLineText(lineNumber) {
+    if (!els.inputText) {
+      return "";
+    }
+
+    const lines = String(els.inputText.value || "").split(/\r\n|\r|\n/);
+    const lineIndex = Math.max(0, Math.min(lines.length - 1, Math.floor(Math.max(1, Number(lineNumber) || 1)) - 1));
+    return String(lines[lineIndex] || "");
+  }
+
+  function getSegmentRangesForLineText(lineText) {
+    const source = String(lineText || "");
+    const segments = [];
+    let inSingleQuote = false;
+    let inPipe = false;
+    let segmentStart = 0;
+
+    for (let index = 0; index < source.length; index += 1) {
+      const char = source[index];
+      const nextChar = index + 1 < source.length ? source[index + 1] : "";
+      const prevChar = index > 0 ? source[index - 1] : "";
+
+      if (char === "'" && !inPipe) {
+        if (inSingleQuote && nextChar === "'") {
+          index += 1;
+          continue;
+        }
+        inSingleQuote = !inSingleQuote;
+        continue;
+      }
+
+      if (char === "|" && !inSingleQuote) {
+        if (inPipe && nextChar === "|") {
+          index += 1;
+          continue;
+        }
+        inPipe = !inPipe;
+        continue;
+      }
+
+      if (char !== "." || inSingleQuote || inPipe) {
+        continue;
+      }
+
+      if (/\d/.test(prevChar) && /\d/.test(nextChar)) {
+        continue;
+      }
+
+      const piece = source.slice(segmentStart, index + 1).trim();
+      if (piece) {
+        segments.push({ start: segmentStart, end: index + 1, text: piece });
+      }
+      segmentStart = index + 1;
+    }
+
+    const trailing = source.slice(segmentStart).trim();
+    if (trailing) {
+      segments.push({ start: segmentStart, end: source.length, text: trailing });
+    }
+
+    return segments;
+  }
+
+  function getSegmentRangeForLine(lineText, segmentIndex) {
+    const targetIndex = Math.max(0, Number(segmentIndex) || 0);
+    return getSegmentRangesForLineText(lineText)[targetIndex] || null;
+  }
+
+  function findDeclSegmentIndex(decl) {
+    if (!decl || typeof decl !== "object") {
+      return null;
+    }
+
+    const declaredSegmentIndex = Number.isFinite(Number(decl.segmentIndex))
+      ? Math.max(0, Math.floor(Number(decl.segmentIndex)))
+      : null;
+    if (declaredSegmentIndex !== null) {
+      return declaredSegmentIndex;
+    }
+
+    const lineStart = Number(decl.lineStart || 0) || 0;
+    if (lineStart <= 0) {
+      return null;
+    }
+
+    const lineText = getInputLineText(lineStart);
+    if (!lineText) {
+      return null;
+    }
+
+    const segments = getSegmentRangesForLineText(lineText);
+    if (!segments.length) {
+      return null;
+    }
+
+    const rawText = String(decl.raw || "").trim().toLowerCase();
+    if (rawText) {
+      const exactIndex = segments.findIndex((segment) => String(segment.text || "").trim().toLowerCase() === rawText);
+      if (exactIndex >= 0) {
+        return exactIndex;
+      }
+    }
+
+    const nameText = String(decl.name || "").trim().toLowerCase();
+    if (nameText) {
+      const nameIndex = segments.findIndex((segment) => String(segment.text || "").toLowerCase().includes(nameText));
+      if (nameIndex >= 0) {
+        return nameIndex;
+      }
+    }
+
+    return null;
+  }
+
   function goToInputLine(lineNumber) {
     if (!els.inputText) {
       return { line: 1, total: 1 };
     }
 
+    const inputLine = lineNumber && typeof lineNumber === "object"
+      ? lineNumber
+      : { line: lineNumber, segmentIndex: null };
     const totalLines = getCurrentInputLineCount();
-    const next = Number.isFinite(Number(lineNumber)) ? Number(lineNumber) : 1;
+    const next = Number.isFinite(Number(inputLine.line)) ? Number(inputLine.line) : 1;
     const targetLine = Math.max(1, Math.min(totalLines, Math.floor(next)));
+    const targetSegmentIndex = Number.isFinite(Number(inputLine.segmentIndex))
+      ? Math.max(0, Math.floor(Number(inputLine.segmentIndex)))
+      : null;
 
-    if (typeof selectCodeLines === "function") {
+    if (typeof selectCodeLines === "function" && targetSegmentIndex === null) {
       selectCodeLines(targetLine, targetLine);
       return { line: targetLine, total: totalLines };
     }
@@ -1799,8 +3461,22 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       : startOffset;
 
     els.inputText.focus();
-    els.inputText.selectionStart = startOffset;
-    els.inputText.selectionEnd = endOffset;
+    if (targetSegmentIndex !== null) {
+      const lineStartOffset = Number(offsets[Math.max(0, targetLine - 1)]) || 0;
+      const lineEndOffset = Number(offsets[Math.min(offsets.length - 1, targetLine)]) || text.length;
+      const lineText = text.slice(lineStartOffset, lineEndOffset);
+      const segmentRange = getSegmentRangeForLine(lineText, targetSegmentIndex);
+      if (segmentRange) {
+        els.inputText.selectionStart = lineStartOffset + segmentRange.start;
+        els.inputText.selectionEnd = lineStartOffset + segmentRange.end;
+      } else {
+        els.inputText.selectionStart = startOffset;
+        els.inputText.selectionEnd = endOffset;
+      }
+    } else {
+      els.inputText.selectionStart = startOffset;
+      els.inputText.selectionEnd = endOffset;
+    }
 
     let lineHeight = 18;
     try {
@@ -2106,8 +3782,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       id: `SYNTH:STRUCT_FIELD:${idScope}:${idStruct}:${idField}`,
       objectType: "STRUCT_FIELD",
       name: fullRef,
-      file: String(baseDecl.file || usageFile || ""),
-      lineStart: Number(baseDecl.lineStart || usageLine) || null,
+      file: String(usageFile || baseDecl.file || ""),
+      lineStart: Number(usageLine || baseDecl.lineStart) || null,
       raw: String(baseDecl.raw || ""),
       comment: "",
       scopeId: Number(baseDecl.scopeId || 0) || 0,
@@ -2120,6 +3796,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       structLineStart: Number(baseDecl.lineStart || 0) || null,
       structRaw: String(baseDecl.raw || ""),
       structComment: String(baseDecl.comment || ""),
+      traceFile: usageFile || "",
+      traceLineStart: usageLine || null,
       fieldPath,
       synthetic: true
     };
@@ -2469,6 +4147,19 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     state.customRules = loadCustomRules();
     state.settings = loadSettings();
     state.templateConfig = loadTemplateConfig();
+    if (!state.templateConfig || typeof state.templateConfig !== "object" || Array.isArray(state.templateConfig)) {
+      state.templateConfig = getDefaultTemplateConfig();
+    }
+    if (normalizeTemplateConfigLegacyFieldsInPlace(state.templateConfig)) {
+      try {
+        localStorage.setItem(
+          TEMPLATE_CONFIG_STORAGE_KEY_V1,
+          JSON.stringify(state.templateConfig)
+        );
+      } catch {
+        // ignore
+      }
+    }
     state.templatePreviewCache = null;
     applyTheme(loadTheme(), { save: false });
     initLayoutSplitter();
@@ -2805,6 +4496,10 @@ window.AbapViewerModules.factories["05-main"] = function registerMain(runtime) {
   targetRuntime.api = targetRuntime.api || {};
   targetRuntime.api.parseFromTextarea = parseFromTextarea;
   targetRuntime.api.init = init;
+  targetRuntime.api.goToInputLine = goToInputLine;
+  targetRuntime.api.jumpInputToCodeRange = jumpInputToCodeRange;
+  targetRuntime.api.findDeclSegmentIndex = findDeclSegmentIndex;
+  targetRuntime.api.getSegmentRangesForLineText = getSegmentRangesForLineText;
 
   window.AbapViewerModules.start = function startAbapViewer() {
     if (document.readyState === "loading") {

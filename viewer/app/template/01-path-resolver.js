@@ -1,10 +1,2935 @@
 "use strict";
 
-(function (root) {
-  const globalRoot = root || (typeof globalThis !== "undefined" ? globalThis : this);
-  const registry = globalRoot.__AbapSourceParts = globalRoot.__AbapSourceParts || {};
-  const targetKey = "viewer/app/03-template-preview.js";
-  const partKey = "viewer/app/template/01-path-resolver.js";
-  const bucket = registry[targetKey] = registry[targetKey] || {};
-  bucket[partKey] = "\"use strict\";\n\nwindow.AbapViewerModules = window.AbapViewerModules || {};\nwindow.AbapViewerModules.parts = window.AbapViewerModules.parts || {};\n\n  var PERFORM_TRACE_META_KEY_TEMPLATE = \"__abapPerformTraceBinding\";\n\n  function toInlineCssText(styleMap) {\n    if (!styleMap || typeof styleMap !== \"object\") {\n      return \"\";\n    }\n    const entries = [];\n    for (const [key, value] of Object.entries(styleMap)) {\n      const cssKey = String(key || \"\").trim();\n      const cssValue = String(value || \"\").trim();\n      if (!cssKey || !cssValue) {\n        continue;\n      }\n      entries.push(`${cssKey}:${cssValue}`);\n    }\n    return entries.join(\";\");\n  }\n\n  function normalizeTemplateColorValue(value) {\n    const raw = String(value || \"\").trim();\n    if (!raw) {\n      return \"\";\n    }\n\n    const alias = normalizeTemplateAliasToken(raw);\n    if (!alias || alias === \"default\") {\n      return \"\";\n    }\n    if (alias === \"mau xanh nhat\") {\n      return \"#dbeef4\";\n    }\n    if (alias === \"den\") {\n      return \"#000000\";\n    }\n    return raw;\n  }\n\n  function normalizeTemplateBorderValue(value) {\n    const raw = String(value || \"\").trim();\n    if (!raw) {\n      return \"\";\n    }\n\n    const alias = normalizeTemplateAliasToken(raw);\n    if (!alias || alias === \"default\") {\n      return \"\";\n    }\n    if (alias === \"outside line mong\") {\n      return \"outside-thin\";\n    }\n    return raw;\n  }\n\n  function normalizeTemplateAlignValue(value) {\n    const alias = normalizeTemplateAliasToken(value);\n    if (!alias || alias === \"default\") {\n      return \"\";\n    }\n    if (alias === \"left\" || alias === \"center\" || alias === \"right\") {\n      return alias;\n    }\n    return \"\";\n  }\n\n  function normalizeTemplateVAlignValue(value) {\n    const alias = normalizeTemplateAliasToken(value);\n    if (!alias || alias === \"default\") {\n      return \"\";\n    }\n    if (alias === \"top\") {\n      return \"top\";\n    }\n    if (alias === \"middle\" || alias === \"center\") {\n      return \"middle\";\n    }\n    if (alias === \"bottom\") {\n      return \"bottom\";\n    }\n    return \"\";\n  }\n\n  function parseTemplatePathSegments(pathExpression) {\n    const raw = String(pathExpression || \"\").trim();\n    if (!raw) {\n      return [];\n    }\n\n    const segments = [];\n    let token = \"\";\n    let index = 0;\n\n    const pushToken = () => {\n      const trimmed = token.trim();\n      if (trimmed) {\n        segments.push(trimmed);\n      }\n      token = \"\";\n    };\n\n    while (index < raw.length) {\n      const ch = raw[index];\n      if (ch === \".\") {\n        pushToken();\n        index += 1;\n        continue;\n      }\n\n      if (ch === \"[\") {\n        pushToken();\n        const close = raw.indexOf(\"]\", index + 1);\n        if (close === -1) {\n          return null;\n        }\n        const inside = raw.slice(index + 1, close).trim();\n        if (!/^\\d+$/.test(inside)) {\n          return null;\n        }\n        segments.push(Number(inside));\n        index = close + 1;\n        continue;\n      }\n\n      token += ch;\n      index += 1;\n    }\n\n    pushToken();\n    return segments;\n  }\n\n  function isDeclLikePathSegment(segment) {\n    const key = String(segment || \"\").replace(/\\[\\d+\\]$/, \"\").trim();\n    if (!key) {\n      return false;\n    }\n    if (key.toLowerCase() === \"decl\") {\n      return true;\n    }\n    return /decl$/i.test(key);\n  }\n\n  function isTemplateDeclLikeValue(value) {\n    if (isDeclLikeObject(value)) {\n      return true;\n    }\n    return Boolean(\n      value\n      && typeof value === \"object\"\n      && typeof value.objectType === \"string\"\n      && typeof value.name === \"string\"\n    );\n  }\n\n  function resolveTemplatePathValue(root, pathExpression) {\n    const segments = parseTemplatePathSegments(pathExpression);\n    if (!segments) {\n      return undefined;\n    }\n\n    let current = root;\n    let parent = null;\n    let parentAccessKey = \"\";\n    for (const segment of segments) {\n      if (typeof segment === \"number\") {\n        if (!Array.isArray(current)) {\n          return undefined;\n        }\n        parent = current;\n        parentAccessKey = `[${segment}]`;\n        current = current[segment];\n        continue;\n      }\n\n      const key = String(segment || \"\").trim();\n      if (!key) {\n        continue;\n      }\n\n      if (Array.isArray(current)) {\n        const projected = [];\n        for (const item of current) {\n          if (!item || typeof item !== \"object\") {\n            continue;\n          }\n\n          const keyLower = key.toLowerCase();\n          if (keyLower === \"desc\" && isDeclLikeObject(item)) {\n            projected.push(getEffectiveDeclDesc(item));\n            continue;\n          }\n\n          if (keyLower === \"finaldesc\") {\n            if (isTemplateDeclLikeValue(item)) {\n              projected.push(getFinalDeclDesc(item));\n              continue;\n            }\n            if (hasValueLevelDescFields(item) || isDeclLikeObject(item.decl)) {\n              projected.push(resolveValueLevelFinalDesc(item));\n              continue;\n            }\n          }\n\n          if (Object.prototype.hasOwnProperty.call(item, key)) {\n            projected.push(item[key]);\n          }\n        }\n        if (!projected.length) {\n          return undefined;\n        }\n        parent = null;\n        parentAccessKey = \"\";\n        current = projected;\n        continue;\n      }\n\n      if (!current || typeof current !== \"object\") {\n        return undefined;\n      }\n\n      const keyLower = key.toLowerCase();\n      if (keyLower === \"desc\" && isDeclLikeObject(current)) {\n        return getEffectiveDeclDesc(current);\n      }\n\n      if (keyLower === \"finaldesc\") {\n        const parentIsDecl = isDeclLikePathSegment(parentAccessKey);\n\n        // If the path is explicitly '...decl.finalDesc', prefer value-level finalDesc\n        // when the parent is a value-entry object (expression-aware output).\n        if (parentIsDecl) {\n          if (parent && typeof parent === \"object\" && (hasValueLevelDescFields(parent) || isDeclLikeObject(parent.decl))) {\n            return resolveValueLevelFinalDesc(parent);\n          }\n          return getFinalDeclDesc(current);\n        }\n\n        // Otherwise, apply the value-level or decl-level logic based on the object shape.\n        if (isTemplateDeclLikeValue(current)) {\n           return getFinalDeclDesc(current);\n        }\n        if (hasValueLevelDescFields(current) || isDeclLikeObject(current.decl)) {\n          return resolveValueLevelFinalDesc(current);\n        }\n      }\n\n      if (!Object.prototype.hasOwnProperty.call(current, key)) {\n        return undefined;\n      }\n      parent = current;\n      parentAccessKey = key;\n      current = current[key];\n    }\n\n    return current;\n  }\n\n  function buildTemplatePathCandidates(tokenExpression) {\n    const raw = String(tokenExpression || \"\").trim();\n    if (!raw) {\n      return [];\n    }\n\n    const candidates = new Set();\n    candidates.add(raw);\n\n    if (/^keyword\\./i.test(raw)) {\n      candidates.add(`keywords.${raw.slice(\"keyword.\".length)}`);\n    }\n\n    return Array.from(candidates);\n  }\n\n  function getTemplateArrayItemTagName(keyHint) {\n    if (typeof getArrayItemTagName === \"function\") {\n      return getArrayItemTagName(keyHint);\n    }\n    const key = String(keyHint || \"\").trim().toLowerCase();\n    if (key === \"objects\" || key === \"children\") {\n      return \"object\";\n    }\n    return \"item\";\n  }\n\n  function normalizeTemplateEntryForPath(value, keyHint, pathParts, ownerContext) {\n    if (typeof normalizeEntryObjectForXml !== \"function\") {\n      return value;\n    }\n    try {\n      return normalizeEntryObjectForXml(value, keyHint, pathParts, ownerContext);\n    } catch {\n      return value;\n    }\n  }\n\n  function getTemplateDeclRenderKey(decl) {\n    if (!decl || typeof decl !== \"object\") {\n      return \"\";\n    }\n    return (\n      (typeof getDeclKey === \"function\" ? getDeclKey(decl) : \"\")\n      || [\n        decl.objectType || \"\",\n        decl.scopeLabel || \"\",\n        decl.name || \"\",\n        decl.file || \"\",\n        decl.lineStart || \"\"\n      ].join(\"|\")\n    );\n  }\n\n  function dedupeTemplateDecls(list) {\n    const out = [];\n    const seen = new Set();\n    for (const decl of Array.isArray(list) ? list : []) {\n      if (!decl || typeof decl !== \"object\") {\n        continue;\n      }\n      const key = getTemplateDeclRenderKey(decl);\n      if (!key || seen.has(key)) {\n        continue;\n      }\n      seen.add(key);\n      out.push(decl);\n    }\n    return out;\n  }\n\n  function getExpandedPerformBindingContextForTemplate(obj) {\n    if (!obj || typeof obj !== \"object\") {\n      return null;\n    }\n    const bindingContext = obj[PERFORM_TRACE_META_KEY_TEMPLATE];\n    if (!bindingContext || typeof bindingContext !== \"object\") {\n      return null;\n    }\n    if (!(bindingContext.byParamUpper instanceof Map)) {\n      return null;\n    }\n    return bindingContext;\n  }\n\n  function resolveExpandedPerformTemplateTraceDecls(ownerContext, decl) {\n    if (!decl || typeof decl !== \"object\") {\n      return [];\n    }\n    if (String(decl.objectType || \"\").toUpperCase() !== \"FORM_PARAM\") {\n      return [];\n    }\n    const bindingContext = getExpandedPerformBindingContextForTemplate(ownerContext);\n    if (!bindingContext) {\n      return [];\n    }\n    const paramUpper = String(decl.name || \"\").trim().toUpperCase();\n    if (!paramUpper) {\n      return [];\n    }\n    const traceDecls = bindingContext.byParamUpper.get(paramUpper);\n    if (!Array.isArray(traceDecls) || !traceDecls.length) {\n      return [];\n    }\n    return dedupeTemplateDecls(traceDecls);\n  }\n\n  function isTemplateValueEntryLikeObject(value) {\n    if (!value || typeof value !== \"object\" || Array.isArray(value)) {\n      return false;\n    }\n    if (!Object.prototype.hasOwnProperty.call(value, \"decl\")) {\n      return false;\n    }\n    return (\n      Object.prototype.hasOwnProperty.call(value, \"value\")\n      || Object.prototype.hasOwnProperty.call(value, \"declRef\")\n      || Object.prototype.hasOwnProperty.call(value, \"name\")\n      || Object.prototype.hasOwnProperty.call(value, \"label\")\n      || hasValueLevelDescFields(value)\n    );\n  }\n\n  function remapTemplateDeclForExpandedPerform(value, ownerContext) {\n    if (!isTemplateValueEntryLikeObject(value)) {\n      return value;\n    }\n\n    const localDecl = value.decl;\n    if (!isDeclLikeObject(localDecl) || String(localDecl.objectType || \"\").toUpperCase() !== \"FORM_PARAM\") {\n      return value;\n    }\n\n    const externalTraceDecls = resolveExpandedPerformTemplateTraceDecls(ownerContext, localDecl);\n    if (!externalTraceDecls.length) {\n      return value;\n    }\n\n    const existingOrigins = Array.isArray(value.originDecls) ? value.originDecls : [];\n    const originDecls = dedupeTemplateDecls([localDecl, ...externalTraceDecls, ...existingOrigins]);\n    return {\n      ...value,\n      decl: externalTraceDecls[0],\n      originDecls\n    };\n  }\n\n  function buildTemplateContextObject(obj, objectIndexOneBased) {\n    const objectIndex = Number(objectIndexOneBased) || 1;\n    const basePathParts = [\"objects\", `object[${objectIndex}]`];\n\n    const cloneRecursive = (value, keyHint, pathParts, ownerContext) => {\n      if (value === null || value === undefined) {\n        return value;\n      }\n      if (typeof value === \"string\" || typeof value === \"number\" || typeof value === \"boolean\") {\n        return value;\n      }\n\n      if (Array.isArray(value)) {\n        const itemTag = getTemplateArrayItemTagName(keyHint);\n        return value.map((item, index) => cloneRecursive(\n          item,\n          itemTag,\n          pathParts.concat(`${itemTag}[${index + 1}]`),\n          ownerContext\n        ));\n      }\n\n      if (typeof value !== \"object\") {\n        return value;\n      }\n\n      const nextOwnerContext = (typeof isAbapStatementObject === \"function\" && isAbapStatementObject(value))\n        ? value\n        : ownerContext;\n      const normalized = normalizeTemplateEntryForPath(value, keyHint, pathParts, nextOwnerContext);\n      if (!normalized || typeof normalized !== \"object\") {\n        return normalized;\n      }\n      const remappedForTrace = remapTemplateDeclForExpandedPerform(normalized, nextOwnerContext);\n\n      const out = {};\n      for (const key of Object.keys(remappedForTrace)) {\n        out[key] = cloneRecursive(\n          remappedForTrace[key],\n          key,\n          pathParts.concat(key),\n          nextOwnerContext\n        );\n      }\n      return out;\n    };\n\n    return cloneRecursive(obj, \"object\", basePathParts, obj);\n  }\n\n  function stringifyTemplateResolvedValue(value) {\n    if (value === undefined || value === null) {\n      return \"\";\n    }\n    if (typeof value === \"string\" || typeof value === \"number\" || typeof value === \"boolean\") {\n      return String(value);\n    }\n    if (Array.isArray(value)) {\n      return value\n        .map((item) => stringifyTemplateResolvedValue(item))\n        .filter((text) => text !== \"\")\n        .join(\"\\n\");\n    }\n    if (isDeclLikeObject(value)) {\n      return getDeclDisplayName(value) || getDeclTechName(value);\n    }\n    if (typeof value === \"object\") {\n      if (hasValueLevelDescFields(value) || isDeclLikeObject(value.decl)) {\n        const finalDesc = resolveValueLevelFinalDesc(value);\n        if (finalDesc) {\n          return finalDesc;\n        }\n      }\n      return safeJson(value, false);\n    }\n    return String(value);\n  }\n\n  function collectTemplateDumpPaths(root) {\n    const out = new Set();\n\n    const walk = (value, path) => {\n      if (path) {\n        out.add(path);\n      }\n      if (value === null || value === undefined) {\n        return;\n      }\n\n      if (Array.isArray(value)) {\n        for (let i = 0; i < value.length; i += 1) {\n          const nextPath = path ? `${path}[${i}]` : `[${i}]`;\n          walk(value[i], nextPath);\n        }\n        return;\n      }\n\n      if (typeof value !== \"object\") {\n        return;\n      }\n\n      if (path && isDeclLikeObject(value)) {\n        out.add(`${path}.desc`);\n        out.add(`${path}.finalDesc`);\n      }\n      if (path && (hasValueLevelDescFields(value) || isDeclLikeObject(value.decl))) {\n        out.add(`${path}.finalDesc`);\n      }\n\n      for (const key of Object.keys(value)) {\n        if (key === \"children\") {\n          continue;\n        }\n        const nextPath = path ? `${path}.${key}` : key;\n        walk(value[key], nextPath);\n      }\n    };\n\n    walk(root, \"\");\n    return Array.from(out).sort((a, b) => a.localeCompare(b));\n  }\n\n  function formatTemplateDumpValue(value) {\n    if (value === undefined || value === null) {\n      return \"\";\n    }\n    const text = String(value);\n    return text\n      .replace(/\\r\\n/g, \"\\\\n\")\n      .replace(/\\r/g, \"\\\\n\")\n\n      .replace(/\\n/g, \"\\\\n\");\n  }\n\n  function collectTemplateDumpPathValues(root) {\n    const out = new Map();\n\n    const addEntry = (path, value) => {\n      const key = String(path || \"\").trim();\n      if (!key || out.has(key)) {\n        return;\n      }\n      out.set(key, formatTemplateDumpValue(value));\n    };\n\n    const walk = (value, path) => {\n      const currentPath = String(path || \"\");\n      if (value === undefined) {\n        return;\n      }\n\n      if (value === null) {\n        if (currentPath) {\n          addEntry(currentPath, \"\");\n        }\n        return;\n      }\n\n      if (typeof value === \"string\" || typeof value === \"number\" || typeof value === \"boolean\") {\n        if (currentPath) {\n          addEntry(currentPath, value);\n        }\n        return;\n      }\n\n      if (Array.isArray(value)) {\n        for (let i = 0; i < value.length; i += 1) {\n          const nextPath = currentPath ? `${currentPath}[${i}]` : `[${i}]`;\n          walk(value[i], nextPath);\n        }\n        return;\n      }\n\n      if (typeof value !== \"object\") {\n        if (currentPath) {\n          addEntry(currentPath, String(value));\n        }\n        return;\n      }\n\n      if (currentPath && isDeclLikeObject(value)) {\n        addEntry(`${currentPath}.desc`, getEffectiveDeclDesc(value));\n        addEntry(`${currentPath}.finalDesc`, getFinalDeclDesc(value));\n      }\n      if (currentPath && (hasValueLevelDescFields(value) || isDeclLikeObject(value.decl))) {\n        addEntry(`${currentPath}.finalDesc`, resolveValueLevelFinalDesc(value));\n      }\n\n      const keys = Object.keys(value);\n      keys.sort((a, b) => a.localeCompare(b));\n      for (const key of keys) {\n        if (key === \"children\") {\n          continue;\n        }\n        const nextPath = currentPath ? `${currentPath}.${key}` : key;\n        walk(value[key], nextPath);\n      }\n    };\n\n    walk(root, \"\");\n    return Array.from(out.entries()).map(([path, value]) => `${path} = ${value}`);\n  }\n\n  function openTemplatePathDump(contextObj, index, obj) {\n    const lines = collectTemplateDumpPathValues(contextObj);\n    const fallback = collectTemplateDumpPaths(contextObj).map((path) => `${path} =`);\n    const dumpText = (lines.length ? lines : fallback).join(\"\\n\");\n    const objectType = obj && obj.objectType ? String(obj.objectType) : \"OBJECT\";\n    const title = `Template Paths #${Number(index) + 1} ${objectType}`;\n\n    if (typeof openTextModal === \"function\") {\n      openTextModal(title, dumpText || \"[No paths]\");\n      return;\n    }\n\n    if (typeof setError === \"function\") {\n      setError(\"Path viewer is unavailable.\");\n    }\n  }\n\n  function resolveTemplatePlaceholderValue(obj, tokenExpression) {\n    const token = String(tokenExpression || \"\").trim();\n    if (!token) {\n      return \"\";\n    }\n\n    if (token === \"__DUMP__\") {\n      return collectTemplateDumpPaths(obj).join(\"\\n\");\n    }\n    if (token === \"__DUMP_VALUES__\" || token === \"__DUMP_WITH_VALUES__\") {\n      return collectTemplateDumpPathValues(obj).join(\"\\n\");\n    }\n\n    const candidates = buildTemplatePathCandidates(token);\n\n    for (const candidate of candidates) {\n      const value = resolveTemplatePathValue(obj, candidate);\n      if (value !== undefined) {\n        return value;\n      }\n    }\n\n    return \"\";\n  }\n\n  function resolveTemplateText(rawText, obj) {\n    const templateText = String(rawText === undefined || rawText === null ? \"\" : rawText);\n    if (!templateText.includes(\"{\")) {\n      return {\n        text: templateText,\n        hasPlaceholder: false,\n        hasTokenValue: false\n      };\n    }\n\n    let hasPlaceholder = false;\n    let hasTokenValue = false;\n    const text = templateText.replace(/\\{([^{}]+)\\}/g, (full, token) => {\n      hasPlaceholder = true;\n      const resolved = resolveTemplatePlaceholderValue(obj, token);\n      const resolvedText = stringifyTemplateResolvedValue(resolved);\n      if (resolvedText !== \"\") {\n        hasTokenValue = true;\n      }\n      return resolvedText;\n    });\n\n    return {\n      text,\n      hasPlaceholder,\n      hasTokenValue\n    };\n  }\n\n  function parseSingleTemplatePlaceholderToken(rawText) {\n    const text = String(rawText === undefined || rawText === null ? \"\" : rawText).trim();\n    if (!text) {\n      return \"\";\n    }\n    const match = text.match(/^\\{([^{}]+)\\}$/);\n    if (!match || !match[1]) {\n      return \"\";\n    }\n    return String(match[1] || \"\").trim();\n  }\n\n  function buildTemplateDeclTokenCandidates(tokenExpression) {\n    const token = String(tokenExpression || \"\").trim();\n    if (!token) {\n      return [];\n    }\n\n    const out = new Set();\n    const add = (value) => {\n      const next = String(value || \"\").trim();\n      if (next) {\n        out.add(next);\n      }\n    };\n\n    add(token);\n\n    if (/\\.decl\\.finaldesc$/i.test(token)) {\n      add(token.replace(/\\.finaldesc$/i, \"\"));\n    }\n\n    if (/\\.finaldesc$/i.test(token)) {\n      const base = token.replace(/\\.finaldesc$/i, \"\");\n      add(base);\n      if (!/\\.decl$/i.test(base)) {\n        add(base + \".decl\");\n      }\n      add(base + \".declRef\");\n    }\n\n    if (/\\.desc$/i.test(token)) {\n      const base = token.replace(/\\.desc$/i, \"\");\n      add(base);\n      if (!/\\.decl$/i.test(base)) {\n        add(base + \".decl\");\n      }\n    }\n\n    if (/^values\\./i.test(token) && !/\\.decl(\\.|$)/i.test(token)) {\n      add(token + \".decl\");\n    }\n\n    const lowered = token.toLowerCase();\n    if (lowered === \"values.condition.finaldesc\" || lowered === \"values.condition\") {\n      add(\"values.condition\");\n      add(\"values.condition.leftOperand\");\n      add(\"values.condition.leftOperand.decl\");\n      add(\"values.condition.rightOperand\");\n      add(\"values.condition.rightOperand.decl\");\n    }\n\n    if (lowered.includes(\".conditions\")) {\n      const withoutFinal = token.replace(/\\.finaldesc$/i, \"\");\n      add(withoutFinal);\n      add(withoutFinal + \".leftOperand\");\n      add(withoutFinal + \".leftOperand.decl\");\n      add(withoutFinal + \".rightOperand\");\n      add(withoutFinal + \".rightOperand.decl\");\n    }\n\n    return Array.from(out);\n  }\n\n  function collectTemplateEditableDeclsFromResolvedValue(value, outList, depth, seenValues) {\n    const out = Array.isArray(outList) ? outList : [];\n    const currentDepth = Number(depth) || 0;\n    const seen = seenValues instanceof Set ? seenValues : new Set();\n\n    if (value === null || value === undefined) {\n      return out;\n    }\n    if (currentDepth > 5) {\n      return out;\n    }\n\n    if (Array.isArray(value)) {\n      for (const item of value) {\n        collectTemplateEditableDeclsFromResolvedValue(item, out, currentDepth + 1, seen);\n      }\n      return out;\n    }\n\n    if (isDeclLikeObject(value)) {\n      out.push(value);\n      return out;\n    }\n\n    if (typeof value !== \"object\") {\n      return out;\n    }\n\n    if (seen.has(value)) {\n      return out;\n    }\n    seen.add(value);\n\n    if (isDeclLikeObject(value.decl)) {\n      out.push(value.decl);\n    }\n\n    for (const key of Object.keys(value)) {\n      if (key === \"decl\" || key === \"desc\" || key === \"finalDesc\" || key === \"codeDesc\" || key === \"userDesc\") {\n        continue;\n      }\n      collectTemplateEditableDeclsFromResolvedValue(value[key], out, currentDepth + 1, seen);\n    }\n    return out;\n  }\n\n  function getTemplateEditableDeclCandidatesFromResolvedValue(value) {\n    return dedupeTemplateDecls(collectTemplateEditableDeclsFromResolvedValue(value, []));\n  }\n\n  function getTemplateEditableDeclFromResolvedValue(value) {\n    const candidates = getTemplateEditableDeclCandidatesFromResolvedValue(value);\n    return candidates.length ? candidates[0] : null;\n  }\n\n  function resolveTemplateEditableDeclCandidatesFromToken(contextObj, token) {\n    const out = [];\n    const candidates = buildTemplateDeclTokenCandidates(token);\n    for (const candidate of candidates) {\n      const resolved = resolveTemplatePlaceholderValue(contextObj, candidate);\n      const decls = getTemplateEditableDeclCandidatesFromResolvedValue(resolved);\n      if (decls.length) {\n        out.push(...decls);\n      }\n    }\n    return dedupeTemplateDecls(out);\n  }\n\n  function resolveTemplateEditableDeclFromToken(contextObj, token) {\n    const candidates = resolveTemplateEditableDeclCandidatesFromToken(contextObj, token);\n    return candidates.length ? candidates[0] : null;\n  }\n\n  function createTemplateCellModel() {\n    return {\n      text: \"\",\n      style: {},\n      hidden: false,\n      rowspan: 1,\n      colspan: 1,\n      hasPlaceholder: false,\n      hasTokenValue: false,\n      meta: null\n    };\n  }\n\n  function buildTemplateCellStyle(rangeConfig, position) {\n    const cfg = rangeConfig && typeof rangeConfig === \"object\" ? rangeConfig : {};\n    const style = {};\n\n    const background = normalizeTemplateColorValue(cfg.background);\n    if (background) {\n      style[\"background-color\"] = background;\n    }\n\n    const fontColor = normalizeTemplateColorValue(cfg[\"font color\"]);\n    if (fontColor) {\n      style.color = fontColor;\n    }\n\n    const fontSize = Number(cfg[\"font size\"]);\n    if (Number.isFinite(fontSize) && fontSize > 0) {\n      style[\"font-size\"] = `${fontSize}pt`;\n    }\n\n    const fontFamilyRaw = String(cfg[\"font family\"] || \"\").trim();\n    if (fontFamilyRaw && normalizeTemplateAliasToken(fontFamilyRaw) !== \"default\") {\n      style[\"font-family\"] = fontFamilyRaw;\n    }\n\n    if (cfg.bold === true) {\n      style[\"font-weight\"] = \"700\";\n    }\n    if (cfg.italic === true) {\n      style[\"font-style\"] = \"italic\";\n    }\n    if (cfg.underline === true) {\n      style[\"text-decoration\"] = \"underline\";\n    }\n\n    const align = normalizeTemplateAlignValue(cfg.align);\n    if (align) {\n      style[\"text-align\"] = align;\n    }\n\n    const valign = normalizeTemplateVAlignValue(cfg.valign);\n    if (valign) {\n      style[\"vertical-align\"] = valign;\n    }\n\n    if (cfg.wrap === true) {\n      style[\"white-space\"] = \"pre-wrap\";\n    } else if (cfg.wrap === false) {\n      style[\"white-space\"] = \"nowrap\";\n    }\n\n    const border = normalizeTemplateBorderValue(cfg.border);\n    if (border === \"outside-thin\") {\n      const borderLine = \"0.5pt solid #000000\";\n      if (position && position.isMergeAnchor) {\n        style.border = borderLine;\n      } else {\n        style[\"border-top\"] = position && position.isTop ? borderLine : \"none\";\n        style[\"border-right\"] = position && position.isRight ? borderLine : \"none\";\n        style[\"border-bottom\"] = position && position.isBottom ? borderLine : \"none\";\n        style[\"border-left\"] = position && position.isLeft ? borderLine : \"none\";\n      }\n    } else if (border) {\n      style.border = border;\n    }\n\n    return style;\n  }\n\n  function parseTemplateOptionBoolean(value, fallback) {\n    if (typeof value === \"boolean\") {\n      return value;\n    }\n    if (typeof value === \"number\") {\n      if (value === 1) {\n        return true;\n      }\n      if (value === 0) {\n        return false;\n      }\n      return fallback;\n    }\n    const token = String(value || \"\").trim().toLowerCase();\n    if (!token) {\n      return fallback;\n    }\n    if (token === \"1\" || token === \"true\" || token === \"yes\" || token === \"y\" || token === \"on\") {\n      return true;\n    }\n    if (token === \"0\" || token === \"false\" || token === \"no\" || token === \"n\" || token === \"off\") {\n      return false;\n    }\n    return fallback;\n  }\n\n  function parseTemplateOptionNumber(value, fallback, min, max) {\n    const fallbackValue = Number.isFinite(Number(fallback)) ? Number(fallback) : 0;\n    const minValue = Number.isFinite(Number(min)) ? Number(min) : fallbackValue;\n    const maxValue = Number.isFinite(Number(max)) ? Number(max) : fallbackValue;\n\n    let numeric = NaN;\n    if (typeof value === \"number\") {\n      numeric = value;\n    } else if (typeof value === \"string\") {\n      const token = value.trim();\n      if (token) {\n        numeric = Number(token);\n      }\n    }\n\n    if (!Number.isFinite(numeric)) {\n      return fallbackValue;\n    }\n\n    const normalized = Math.round(numeric);\n    return Math.max(minValue, Math.min(maxValue, normalized));\n  }\n\n  function getTemplateOptionByPath(source, path) {\n    if (!source || typeof source !== \"object\" || Array.isArray(source)) {\n      return undefined;\n    }\n    const parts = String(path || \"\").split(\".\").map((item) => String(item || \"\").trim()).filter(Boolean);\n    if (!parts.length) {\n      return undefined;\n    }\n\n    let current = source;\n    for (const part of parts) {\n      if (!current || typeof current !== \"object\" || Array.isArray(current)) {\n        return undefined;\n      }\n      if (!Object.prototype.hasOwnProperty.call(current, part)) {\n        return undefined;\n      }\n      current = current[part];\n    }\n    return current;\n  }\n\n  function readTemplateOptionValue(sources, paths) {\n    const sourceList = Array.isArray(sources) ? sources : [];\n    const pathList = Array.isArray(paths) ? paths : [];\n    for (const source of sourceList) {\n      for (const path of pathList) {\n        const value = getTemplateOptionByPath(source, path);\n        if (value !== undefined) {\n          return value;\n        }\n      }\n    }\n    return undefined;\n  }\n\n  function normalizeTemplatePreviewOptions(optionSource, templateDef, rangeSource) {\n    const sources = [optionSource, templateDef, rangeSource];\n    const hideEmptyRows = parseTemplateOptionBoolean(readTemplateOptionValue(sources, [\n      \"hideEmptyRows\",\n      \"removeEmptyRows\",\n      \"compact.removeEmptyRows\"\n    ]), true);\n    const hideRowsWithoutValues = parseTemplateOptionBoolean(readTemplateOptionValue(sources, [\n      \"hideRowsWithoutValues\",\n      \"removeEmptyRowsAdvanced\",\n      \"removeEmptyRowsAdv\",\n      \"compact.removeEmptyRowsAdvanced\",\n      \"compact.removeEmptyRowsAdv\"\n    ]), true);\n    const expandMultilineRows = parseTemplateOptionBoolean(readTemplateOptionValue(sources, [\n      \"expandMultilineRows\",\n      \"expandArrayRows\",\n      \"arrayToRows\"\n    ]), false);\n    const squareCells = parseTemplateOptionBoolean(readTemplateOptionValue(sources, [\n      \"squareCells\",\n      \"squareCellsEnabled\",\n      \"fixedSquareCells\"\n    ]), true);\n    const squareCellSize = parseTemplateOptionNumber(readTemplateOptionValue(sources, [\n      \"squareCellSize\",\n      \"squareCellSizePx\",\n      \"cellSize\",\n      \"cellSizePx\"\n    ]), 18, 16, 240);\n\n    return {\n      hideEmptyRows,\n      hideRowsWithoutValues,\n      expandMultilineRows,\n      squareCells,\n      squareCellSize\n    };\n  }\n\n  function isTemplateRangeMetaKey(rawKey) {\n    const key = String(rawKey || \"\").trim().toLowerCase();\n    if (!key) {\n      return false;\n    }\n    return (\n      key === \"_options\"\n      || key === \"options\"\n      || key === \"ranges\"\n      || key === \"compact\"\n      || key === \"hideemptyrows\"\n      || key === \"hiderowswithoutvalues\"\n      || key === \"expandmultilinerows\"\n      || key === \"removeemptyrows\"\n      || key === \"removeemptyrowsadvanced\"\n      || key === \"removeemptyrowsadv\"\n      || key === \"expandarrayrows\"\n      || key === \"arraytorows\"\n      || key === \"squarecells\"\n      || key === \"squarecellsenabled\"\n      || key === \"fixedsquarecells\"\n      || key === \"squarecellsize\"\n      || key === \"squarecellsizepx\"\n      || key === \"cellsize\"\n      || key === \"cellsizepx\"\n    );\n  }\n\n  function resolveTemplateDefinitionForPreview(definition) {\n    if (!definition || typeof definition !== \"object\" || Array.isArray(definition)) {\n      return {\n        map: null,\n        options: normalizeTemplatePreviewOptions(null, null, null)\n      };\n    }\n\n    const hasRanges = definition.ranges && typeof definition.ranges === \"object\" && !Array.isArray(definition.ranges);\n    const rangeSource = hasRanges ? definition.ranges : definition;\n    const optionSource = (definition._options && typeof definition._options === \"object\" && !Array.isArray(definition._options))\n      ? definition._options\n      : ((definition.options && typeof definition.options === \"object\" && !Array.isArray(definition.options))\n        ? definition.options\n        : null);\n    const options = normalizeTemplatePreviewOptions(optionSource, definition, rangeSource);\n\n    const map = {};\n    for (const [key, value] of Object.entries(rangeSource)) {\n      if (isTemplateRangeMetaKey(key)) {\n        continue;\n      }\n      map[key] = value;\n    }\n\n    return { map, options };\n\n  }\n\n  function splitTemplateTextLines(text) {\n    const normalized = String(text === undefined || text === null ? \"\" : text)\n      .replace(/\\r\\n/g, \"\\n\")\n      .replace(/\\r/g, \"\\n\");\n    if (normalized === \"\") {\n      return [\"\"];\n    }\n    return normalized.split(\"\\n\");\n  }\n\n  function getTemplateTextLine(lines, index) {\n    const list = Array.isArray(lines) && lines.length ? lines : [\"\"];\n    const idx = Number(index) || 0;\n    if (idx < list.length) {\n      return String(list[idx] || \"\");\n    }\n    return String(list[list.length - 1] || \"\");\n  }\n\n  function cloneTemplateMatrixCell(cell) {\n    if (!cell || typeof cell !== \"object\") {\n      return createTemplateCellModel();\n    }\n    return {\n      text: String(cell.text || \"\"),\n      style: { ...(cell.style && typeof cell.style === \"object\" ? cell.style : {}) },\n      hidden: Boolean(cell.hidden),\n      rowspan: Number(cell.rowspan) || 1,\n      colspan: Number(cell.colspan) || 1,\n      hasPlaceholder: Boolean(cell.hasPlaceholder),\n      hasTokenValue: Boolean(cell.hasTokenValue),\n      meta: cell && cell.meta && typeof cell.meta === \"object\" ? { ...cell.meta } : null\n    };\n  }\n\n  function expandTemplateMatrixRows(matrix) {\n    const rows = Array.isArray(matrix)\n      ? matrix.map((row) => (Array.isArray(row) ? row.map((cell) => cloneTemplateMatrixCell(cell)) : []))\n      : [];\n    if (!rows.length) {\n      return rows;\n    }\n\n    for (let rowIndex = rows.length - 1; rowIndex >= 0; rowIndex -= 1) {\n      const row = rows[rowIndex];\n      if (!Array.isArray(row) || !row.length) {\n        continue;\n      }\n\n      const hasMergedCells = row.some((cell) => cell && (cell.hidden || cell.rowspan > 1 || cell.colspan > 1));\n      if (hasMergedCells) {\n        continue;\n      }\n\n      const lineByCol = new Map();\n      let maxLines = 1;\n      for (let colIndex = 0; colIndex < row.length; colIndex += 1) {\n        const cell = row[colIndex];\n        if (!cell || cell.hidden) {\n          continue;\n        }\n        const lines = splitTemplateTextLines(cell.text);\n        lineByCol.set(colIndex, lines);\n        maxLines = Math.max(maxLines, lines.length);\n      }\n\n      if (maxLines <= 1) {\n        continue;\n      }\n\n      for (let colIndex = 0; colIndex < row.length; colIndex += 1) {\n        const cell = row[colIndex];\n        if (!cell || cell.hidden) {\n          continue;\n        }\n        const lines = lineByCol.get(colIndex) || [String(cell.text || \"\")];\n        cell.text = getTemplateTextLine(lines, 0);\n      }\n\n      const extraRows = [];\n      for (let lineIndex = 1; lineIndex < maxLines; lineIndex += 1) {\n        const extraRow = row.map((cell) => cloneTemplateMatrixCell(cell));\n        for (let colIndex = 0; colIndex < extraRow.length; colIndex += 1) {\n          const cell = extraRow[colIndex];\n          if (!cell || cell.hidden) {\n            continue;\n          }\n          const lines = lineByCol.get(colIndex) || [String(cell.text || \"\")];\n          cell.text = getTemplateTextLine(lines, lineIndex);\n        }\n        extraRows.push(extraRow);\n      }\n\n      if (extraRows.length) {\n        rows.splice(rowIndex + 1, 0, ...extraRows);\n      }\n    }\n\n    return rows;\n  }\n\n  function isTemplateRowBlank(row) {\n    const list = Array.isArray(row) ? row : [];\n    for (const cell of list) {\n      if (!cell || cell.hidden) {\n        continue;\n      }\n      if (String(cell.text || \"\").trim() !== \"\") {\n        return false;\n      }\n    }\n    return true;\n  }\n\n  function getTemplateRowPlaceholderState(row) {\n    const list = Array.isArray(row) ? row : [];\n    let hasPlaceholder = false;\n    let hasTokenValue = false;\n    for (const cell of list) {\n      if (!cell || cell.hidden) {\n        continue;\n      }\n      if (cell.hasPlaceholder) {\n        hasPlaceholder = true;\n      }\n      if (cell.hasTokenValue) {\n        hasTokenValue = true;\n      }\n    }\n    return { hasPlaceholder, hasTokenValue };\n  }\n\n  function compactTemplateMatrixRows(matrix, options) {\n    const rows = Array.isArray(matrix) ? matrix : [];\n    if (!rows.length) {\n      return rows;\n    }\n\n    const removeAdvanced = options && options.hideRowsWithoutValues === true;\n    const removeEmpty = removeAdvanced || (options && options.hideEmptyRows === true);\n    if (!removeAdvanced && !removeEmpty) {\n      return rows;\n    }\n\n    const out = [];\n    for (const row of rows) {\n      const rowBlank = isTemplateRowBlank(row);\n      if (removeAdvanced) {\n        const stateRow = getTemplateRowPlaceholderState(row);\n        if (rowBlank || (stateRow.hasPlaceholder && !stateRow.hasTokenValue)) {\n          continue;\n        }\n        out.push(row);\n        continue;\n      }\n\n      if (removeEmpty && rowBlank) {\n        continue;\n      }\n      out.push(row);\n    }\n\n    return out;\n  }\n\n  function applyTemplatePreviewOptions(matrix, options) {\n    let next = Array.isArray(matrix) ? matrix : [];\n    if (!next.length) {\n      return next;\n    }\n    if (options && options.expandMultilineRows === true) {\n      next = expandTemplateMatrixRows(next);\n    }\n    return compactTemplateMatrixRows(next, options);\n  }\n\n  function buildTemplateGridModel(obj, templateMap, templateOptions, metaOptions) {\n    const map = templateMap && typeof templateMap === \"object\" ? templateMap : {};\n    const options = templateOptions && typeof templateOptions === \"object\"\n      ? templateOptions\n      : normalizeTemplatePreviewOptions(null, null, null);\n    const modelMeta = metaOptions && typeof metaOptions === \"object\" ? metaOptions : {};\n    const modelTemplateKey = String(modelMeta.templateKey || \"\").trim();\n    const modelObjectType = String(modelMeta.objectType || \"\").trim();\n    const entries = [];\n    const errors = [];\n    let maxRow = 0;\n    let maxCol = 0;\n\n    for (const rangeKey of Object.keys(map)) {\n      if (isTemplateRangeMetaKey(rangeKey)) {\n        continue;\n      }\n      try {\n        const parsedRange = parseRangeKey(rangeKey);\n        entries.push({\n          rangeKey,\n          parsedRange,\n          config: map[rangeKey] && typeof map[rangeKey] === \"object\" ? map[rangeKey] : {}\n        });\n        maxRow = Math.max(maxRow, parsedRange.r2);\n        maxCol = Math.max(maxCol, parsedRange.c2);\n      } catch (err) {\n        errors.push(`${rangeKey}: ${err && err.message ? err.message : err}`);\n      }\n    }\n\n    if (!entries.length) {\n      return {\n        matrix: [],\n        maxRow: 0,\n        maxCol: 0,\n        errors\n      };\n    }\n\n    const matrix = Array.from({ length: maxRow }, () =>\n      Array.from({ length: maxCol }, () => createTemplateCellModel())\n    );\n\n    for (const entry of entries) {\n      const cfg = entry.config;\n      const range = entry.parsedRange;\n      const hasText = Object.prototype.hasOwnProperty.call(cfg, \"text\");\n      const rawText = hasText ? String(cfg.text === undefined || cfg.text === null ? \"\" : cfg.text) : \"\";\n      const textMeta = hasText ? resolveTemplateText(rawText, obj) : null;\n      const placeholderToken = hasText ? parseSingleTemplatePlaceholderToken(rawText) : \"\";\n      const cellMeta = hasText\n        ? {\n            rangeKey: String(entry.rangeKey || \"\"),\n            templateKey: modelTemplateKey,\n            rawText,\n            isSinglePlaceholder: Boolean(placeholderToken),\n            placeholderToken,\n            objectType: modelObjectType\n          }\n        : null;\n      const merge = cfg && cfg.merge === true;\n\n      if (merge) {\n        for (let row = range.r1; row <= range.r2; row += 1) {\n          for (let col = range.c1; col <= range.c2; col += 1) {\n            const cell = matrix[row - 1][col - 1];\n            if (!cell) {\n              continue;\n            }\n            const isAnchor = row === range.r1 && col === range.c1;\n            if (isAnchor) {\n              cell.hidden = false;\n              cell.rowspan = range.r2 - range.r1 + 1;\n              cell.colspan = range.c2 - range.c1 + 1;\n              if (hasText) {\n                cell.text = String(textMeta && textMeta.text ? textMeta.text : \"\");\n                cell.hasPlaceholder = cell.hasPlaceholder || Boolean(textMeta && textMeta.hasPlaceholder);\n                cell.hasTokenValue = cell.hasTokenValue || Boolean(textMeta && textMeta.hasTokenValue);\n                cell.meta = cellMeta ? { ...cellMeta } : cell.meta;\n              }\n              const cellStyle = buildTemplateCellStyle(cfg, {\n                isTop: true,\n                isRight: true,\n                isBottom: true,\n                isLeft: true,\n                isMergeAnchor: true\n              });\n              cell.style = { ...cell.style, ...cellStyle };\n            } else {\n              cell.hidden = true;\n              cell.rowspan = 1;\n              cell.colspan = 1;\n            }\n          }\n        }\n        continue;\n      }\n\n      for (let row = range.r1; row <= range.r2; row += 1) {\n        for (let col = range.c1; col <= range.c2; col += 1) {\n          const cell = matrix[row - 1][col - 1];\n          if (!cell) {\n            continue;\n          }\n          cell.hidden = false;\n          cell.rowspan = 1;\n          cell.colspan = 1;\n          if (hasText) {\n            cell.text = String(textMeta && textMeta.text ? textMeta.text : \"\");\n            cell.hasPlaceholder = cell.hasPlaceholder || Boolean(textMeta && textMeta.hasPlaceholder);\n            cell.hasTokenValue = cell.hasTokenValue || Boolean(textMeta && textMeta.hasTokenValue);\n            cell.meta = cellMeta ? { ...cellMeta } : cell.meta;\n          }\n          const cellStyle = buildTemplateCellStyle(cfg, {\n            isTop: row === range.r1,\n            isRight: col === range.c2,\n            isBottom: row === range.r2,\n            isLeft: col === range.c1,\n            isMergeAnchor: false\n          });\n          cell.style = { ...cell.style, ...cellStyle };\n        }\n      }\n    }\n\n    const compactedMatrix = applyTemplatePreviewOptions(matrix, options);\n    return {\n      matrix: compactedMatrix,\n      maxRow: compactedMatrix.length,\n      maxCol,\n      errors,\n      options\n    };\n  }\n\n  function renderTemplateTable(model, handlers) {\n    const matrix = model && Array.isArray(model.matrix) ? model.matrix : [];\n    if (!matrix.length) {\n      return null;\n    }\n    const options = model && model.options && typeof model.options === \"object\"\n      ? model.options\n      : normalizeTemplatePreviewOptions(null, null, null);\n    const squareCells = options.squareCells === true;\n    const squareCellSize = parseTemplateOptionNumber(options.squareCellSize, 18, 16, 240);\n    const handleCellDblClick = handlers && typeof handlers.onCellDblClick === \"function\"\n      ? handlers.onCellDblClick\n      : null;\n\n    const table = el(\"table\", {\n      className: \"template-preview-table\",\n      attrs: {\n        style: \"border-collapse:collapse;table-layout:fixed;width:max-content;min-width:100%;\"\n      }\n    });\n    const tbody = el(\"tbody\");\n\n    for (let rowIndex = 0; rowIndex < matrix.length; rowIndex += 1) {\n      const row = matrix[rowIndex];\n      const tr = el(\"tr\");\n      for (let colIndex = 0; colIndex < row.length; colIndex += 1) {\n        const cell = row[colIndex];\n        if (!cell || cell.hidden) {\n          continue;\n        }\n\n        const td = document.createElement(\"td\");\n        if (cell.rowspan > 1) {\n          td.rowSpan = cell.rowspan;\n        }\n        if (cell.colspan > 1) {\n          td.colSpan = cell.colspan;\n        }\n\n        td.textContent = String(cell.text || \"\");\n        const colSpan = Math.max(1, Number(td.colSpan) || 1);\n        const rowSpan = Math.max(1, Number(td.rowSpan) || 1);\n        const baseMinWidth = squareCells ? `${squareCellSize}px` : \"56px\";\n        const baseMaxWidth = squareCells ? `${squareCellSize}px` : \"360px\";\n        const baseWidth = squareCells ? `${squareCellSize * colSpan}px` : \"\";\n        const baseMinHeight = squareCells ? `${squareCellSize}px` : \"\";\n        const baseHeight = squareCells ? `${squareCellSize * rowSpan}px` : \"\";\n        const baseTextOverflow = squareCells ? \"ellipsis\" : \"\";\n        const cssText = toInlineCssText({\n          \"min-width\": baseMinWidth,\n          \"max-width\": baseMaxWidth,\n          width: baseWidth,\n          \"min-height\": baseMinHeight,\n          height: baseHeight,\n          padding: \"4px 6px\",\n          border: \"none\",\n          \"vertical-align\": \"top\",\n          \"white-space\": \"pre-wrap\",\n          \"text-overflow\": baseTextOverflow,\n          \"box-sizing\": \"border-box\",\n          \"font-size\": \"10pt\",\n          \"font-family\": \"\\\"MS PGothic\\\", \\\"MS UI Gothic\\\", Meiryo, sans-serif\",\n          color: \"#111111\",\n          \"background-color\": \"#ffffff\",\n          ...cell.style\n        });\n        if (cssText) {\n          td.setAttribute(\"style\", cssText);\n        }\n\n        const cellMeta = cell && cell.meta && typeof cell.meta === \"object\" ? cell.meta : null;\n        if (cellMeta && cellMeta.rangeKey) {\n          td.setAttribute(\"data-template-range-key\", String(cellMeta.rangeKey));\n        }\n        if (handleCellDblClick) {\n          const fallbackMeta = cellMeta || {\n            rangeKey: String(td.getAttribute(\"data-template-range-key\") || \"\"),\n            templateKey: String(table.getAttribute(\"data-template-key\") || \"\"),\n            rawText: String(cell && cell.text ? cell.text : \"\"),\n            isSinglePlaceholder: false,\n            placeholderToken: \"\",\n            objectType: String(table.getAttribute(\"data-object-type\") || \"\")\n          };\n          td.__templateCellMeta = fallbackMeta;\n          td.addEventListener(\"dblclick\", (ev) => {\n            if (ev.__abapTemplateHandled) {\n              return;\n            }\n            try {\n              handleCellDblClick(fallbackMeta, td, ev);\n              ev.__abapTemplateHandled = true;\n              ev.preventDefault();\n              ev.stopPropagation();\n            } catch (err) {\n              if (typeof setError === \"function\") {\n                setError(\"Template cell edit failed: \" + (err && err.message ? err.message : String(err || \"\")));\n              }\n            }\n          });\n        }\n\n        tr.appendChild(td);\n      }\n      tbody.appendChild(tr);\n    }\n\n    if (handleCellDblClick) {\n      table.addEventListener(\"dblclick\", (ev) => {\n        if (ev.__abapTemplateHandled) {\n          return;\n        }\n        const target = ev.target && typeof ev.target.closest === \"function\"\n          ? ev.target.closest(\"td\")\n          : null;\n        if (!target || !table.contains(target)) {\n          return;\n        }\n        const fallbackMeta = target.__templateCellMeta && typeof target.__templateCellMeta === \"object\"\n          ? target.__templateCellMeta\n          : {\n              rangeKey: String(target.getAttribute(\"data-template-range-key\") || \"\"),\n              templateKey: String(table.getAttribute(\"data-template-key\") || \"\"),\n              rawText: String(target.textContent || \"\"),\n              isSinglePlaceholder: false,\n              placeholderToken: \"\",\n              objectType: String(table.getAttribute(\"data-object-type\") || \"\")\n            };\n        try {\n          handleCellDblClick(fallbackMeta, target, ev);\n          ev.__abapTemplateHandled = true;\n          ev.preventDefault();\n          ev.stopPropagation();\n        } catch (err) {\n          if (typeof setError === \"function\") {\n            setError(\"Template cell edit failed: \" + (err && err.message ? err.message : String(err || \"\")));\n          }\n        }\n      });\n    }\n\n    table.appendChild(tbody);\n    return table;\n  }\n\n  async function copyHtmlWithFallback(html, plainText) {\n    const safeHtml = String(html || \"\");\n    const safeText = String(plainText || \"\");\n\n    if (\n      safeHtml\n      && navigator.clipboard\n      && typeof navigator.clipboard.write === \"function\"\n      && typeof window.ClipboardItem === \"function\"\n    ) {\n      const item = new window.ClipboardItem({\n        \"text/html\": new Blob([safeHtml], { type: \"text/html\" }),\n        \"text/plain\": new Blob([safeText], { type: \"text/plain\" })\n      });\n      await navigator.clipboard.write([item]);\n      return;\n    }\n\n    if (navigator.clipboard && typeof navigator.clipboard.writeText === \"function\") {\n      await navigator.clipboard.writeText(safeText);\n      return;\n    }\n\n    const temp = document.createElement(\"div\");\n    temp.style.position = \"fixed\";\n    temp.style.left = \"-99999px\";\n\n    temp.style.top = \"0\";\n    temp.setAttribute(\"contenteditable\", \"true\");\n    temp.innerHTML = safeHtml || safeText.replace(/\\n/g, \"<br>\");\n    document.body.appendChild(temp);\n\n    const selection = window.getSelection();\n    if (!selection) {\n      document.body.removeChild(temp);\n      throw new Error(\"Clipboard selection is unavailable.\");\n    }\n\n    selection.removeAllRanges();\n    const range = document.createRange();\n    range.selectNodeContents(temp);\n    selection.addRange(range);\n    const copied = document.execCommand(\"copy\");\n    selection.removeAllRanges();\n    document.body.removeChild(temp);\n\n    if (!copied) {\n      throw new Error(\"Copy failed in this browser.\");\n    }\n  }\n\n  async function copyHtmlWithFallback(html, plainText) {\n    const safeHtml = String(html || \"\");\n    const safeText = String(plainText || \"\");\n    const clipboard = typeof navigator !== \"undefined\" && navigator ? navigator.clipboard : null;\n    let lastClipboardError = null;\n\n    if (\n      safeHtml\n      && clipboard\n      && typeof clipboard.write === \"function\"\n      && typeof window.ClipboardItem === \"function\"\n    ) {\n      try {\n        const item = new window.ClipboardItem({\n          \"text/html\": new Blob([safeHtml], { type: \"text/html\" }),\n          \"text/plain\": new Blob([safeText], { type: \"text/plain\" })\n        });\n        await clipboard.write([item]);\n        return;\n      } catch (err) {\n        lastClipboardError = err;\n      }\n    }\n\n    if (clipboard && typeof clipboard.writeText === \"function\") {\n      try {\n        await clipboard.writeText(safeText);\n        return;\n      } catch (err) {\n        lastClipboardError = err;\n      }\n    }\n\n    const temp = document.createElement(\"div\");\n    temp.style.position = \"fixed\";\n    temp.style.left = \"-99999px\";\n    temp.style.top = \"0\";\n    temp.setAttribute(\"contenteditable\", \"true\");\n    temp.innerHTML = safeHtml || safeText.replace(/\\n/g, \"<br>\");\n    document.body.appendChild(temp);\n\n    const selection = window.getSelection();\n    if (!selection) {\n      document.body.removeChild(temp);\n      if (lastClipboardError) {\n        throw lastClipboardError;\n      }\n      throw new Error(\"Clipboard selection is unavailable.\");\n    }\n\n    selection.removeAllRanges();\n    const range = document.createRange();\n    range.selectNodeContents(temp);\n    selection.addRange(range);\n    const copied = document.execCommand(\"copy\");\n    selection.removeAllRanges();\n    document.body.removeChild(temp);\n\n    if (!copied) {\n      if (lastClipboardError) {\n        throw lastClipboardError;\n      }\n      throw new Error(\"Copy failed in this browser.\");\n    }\n  }\n\n  function resolveTemplateMapForObject(obj, config) {\n    const templates = config && typeof config === \"object\" && config.templates && typeof config.templates === \"object\"\n      ? config.templates\n      : {};\n    const objectType = obj && obj.objectType ? String(obj.objectType) : \"\";\n    if (objectType && Object.prototype.hasOwnProperty.call(templates, objectType)) {\n      const resolved = resolveTemplateDefinitionForPreview(templates[objectType]);\n      return { key: objectType, map: resolved.map, options: resolved.options };\n    }\n    if (Object.prototype.hasOwnProperty.call(templates, \"DEFAULT\")) {\n      const resolved = resolveTemplateDefinitionForPreview(templates.DEFAULT);\n      return { key: \"DEFAULT\", map: resolved.map, options: resolved.options };\n    }\n    const resolved = resolveTemplateDefinitionForPreview(null);\n    return { key: \"\", map: null, options: resolved.options };\n  }\n\n  function buildTemplatePlainTextFromBlock(block) {\n    if (!block) {\n      return \"\";\n    }\n    return String(block.innerText || block.textContent || \"\").trim();\n  }\n\n  function isTemplateCopyTableOnlyEnabled() {\n    return Boolean(els.templateCopyTableOnly && els.templateCopyTableOnly.checked);\n  }\n\n  function buildTemplateCopyPayloadFromBlock(block) {\n    if (!block || typeof block.cloneNode !== \"function\") {\n      return { node: null, text: \"\" };\n    }\n\n    const clone = block.cloneNode(true);\n    const actionButtons = clone.querySelectorAll(\"[data-template-action]\");\n    for (const actionBtn of Array.from(actionButtons)) {\n      actionBtn.remove();\n    }\n\n    if (isTemplateCopyTableOnlyEnabled()) {\n      const table = clone.querySelector(\".template-preview-table\");\n      if (table) {\n        return {\n          node: table.cloneNode(true),\n          text: buildTemplatePlainTextFromBlock(table)\n        };\n      }\n    }\n\n    return {\n      node: clone,\n      text: buildTemplatePlainTextFromBlock(clone)\n    };\n  }\n\n  function getRenderableObjectListForTemplate() {\n    const out = [];\n    const roots = Array.isArray(state.renderObjects) ? state.renderObjects : [];\n\n    const appendNode = (obj, depth) => {\n      if (!obj || typeof obj !== \"object\") {\n        return;\n      }\n      out.push({ obj, depth: Math.max(0, Number(depth) || 0) });\n\n      const children = Array.isArray(obj.children) ? obj.children : [];\n      for (const child of children) {\n        appendNode(child, (Number(depth) || 0) + 1);\n      }\n    };\n\n    for (const root of roots) {\n      appendNode(root, 0);\n    }\n\n    return out;\n  }\n\n  function renderTemplatePreview() {\n    if (!els.templatePreviewOutput) {\n      return;\n    }\n\n    if (!state.data || !Array.isArray(state.renderObjects)) {\n      setTemplatePreviewMessage(\"No data loaded.\");\n      return;\n    }\n\n    const config = state.templateConfig && typeof state.templateConfig === \"object\"\n      ? state.templateConfig\n      : getDefaultTemplateConfig();\n\n    const check = validateTemplateConfig(config);\n    if (!check.valid) {\n      setTemplatePreviewMessage(\"Template config is invalid.\");\n      setTemplateConfigError(check.errors.join(\"\\n\"));\n      return;\n    }\n\n    const items = getRenderableObjectListForTemplate();\n    if (!items.length) {\n      setTemplatePreviewMessage(\"No renderable objects.\");\n      return;\n    }\n\n    const fragment = document.createDocumentFragment();\n    for (let index = 0; index < items.length; index += 1) {\n      const item = items[index];\n      const obj = item.obj;\n      const depth = Math.max(0, Number(item.depth) || 0);\n      const templateContextObj = buildTemplateContextObject(obj, index + 1);\n      const resolved = resolveTemplateMapForObject(obj, config);\n\n      const blockAttrs = { \"data-template-index\": String(index), \"data-depth\": String(depth) };\n      const lineStart = Number(obj && obj.lineStart) || 0;\n      if (lineStart > 0) {\n        blockAttrs[\"data-line-start\"] = String(lineStart);\n      }\n      const block = el(\"div\", { className: \"template-block\", attrs: blockAttrs });\n      const indentPx = Math.min(120, depth * 12);\n      if (indentPx > 0) {\n        block.style.marginLeft = `${indentPx}px`;\n      } else {\n        block.style.marginLeft = \"\";\n      }\n      const header = el(\"div\", { className: \"template-block-header\" });\n\n      const left = el(\"div\");\n      const label = getObjectLabel(obj);\n      const titleText = `${index + 1}. ${String(obj.objectType || \"OBJECT\")}${label ? ` ${label}` : \"\"}`;\n      left.appendChild(el(\"h4\", { className: \"template-block-title\", text: titleText }));\n      const meta = renderMeta(obj);\n      const keyText = resolved.key ? `template=${resolved.key}` : \"template=missing\";\n      left.appendChild(el(\"div\", { className: \"template-block-meta\", text: [meta, keyText].filter(Boolean).join(\" • \") }));\n      header.appendChild(left);\n\n      const actions = el(\"div\", { className: \"template-block-actions\" });\n      const codeBtn = el(\"button\", {\n        className: \"secondary\",\n        text: \"Code\",\n        attrs: { type: \"button\", \"data-template-action\": \"code\" }\n      });\n      codeBtn.addEventListener(\"click\", () => {\n        const selectedIndex = String(index);\n        if (typeof setSelectedTemplateBlock === \"function\") {\n          setSelectedTemplateBlock(selectedIndex);\n        } else {\n          state.selectedTemplateIndex = selectedIndex;\n        }\n        if (lineStart > 0 && typeof selectCodeLines === \"function\") {\n          const lineEnd = Number(obj && obj.block && obj.block.lineEnd) || lineStart;\n          selectCodeLines(lineStart, lineEnd);\n        }\n      });\n      actions.appendChild(codeBtn);\n\n      const pathsBtn = el(\"button\", {\n        className: \"secondary\",\n        text: \"Paths\",\n        attrs: { type: \"button\", \"data-template-action\": \"paths\" }\n      });\n      pathsBtn.addEventListener(\"click\", (ev) => {\n        if (ev && typeof ev.stopPropagation === \"function\") {\n          ev.stopPropagation();\n        }\n        openTemplatePathDump(templateContextObj, index, obj);\n      });\n      actions.appendChild(pathsBtn);\n\n      const copyBtn = el(\"button\", {\n        className: \"secondary\",\n        text: \"Copy\",\n        attrs: { type: \"button\", \"data-template-action\": \"copy\" }\n      });\n      copyBtn.addEventListener(\"click\", async () => {\n        try {\n          const payload = buildTemplateCopyPayloadFromBlock(block);\n          if (!payload.node) {\n            setError(\"Nothing to copy.\");\n            return;\n          }\n          await copyHtmlWithFallback(payload.node.outerHTML, payload.text);\n          setError(\"\");\n        } catch (err) {\n          setError(`Copy failed: ${err && err.message ? err.message : err}`);\n        }\n      });\n      actions.appendChild(copyBtn);\n      header.appendChild(actions);\n      block.appendChild(header);\n      block.addEventListener(\"click\", () => {\n        const selectedIndex = String(index);\n        if (typeof setSelectedTemplateBlock === \"function\") {\n          setSelectedTemplateBlock(selectedIndex, { scroll: false });\n        } else {\n          state.selectedTemplateIndex = selectedIndex;\n        }\n      });\n\n      if (!resolved.map || typeof resolved.map !== \"object\") {\n        block.appendChild(el(\"div\", { className: \"template-empty\", text: \"[Missing template]\" }));\n        fragment.appendChild(block);\n        continue;\n      }\n\n      const model = buildTemplateGridModel(templateContextObj, resolved.map, resolved.options, {\n      templateKey: resolved.key || \"\",\n      objectType: String(obj.objectType || \"\")\n    });\n      if (model.errors.length) {\n        block.appendChild(el(\"div\", { className: \"template-error\", text: model.errors.join(\"\\n\") }));\n      }\n\n      const table = renderTemplateTable(model, isInteractive ? {\n      onCellDblClick: (cellMeta, cellEl) => {\n        const safeMeta = cellMeta && typeof cellMeta === \"object\"\n          ? cellMeta\n          : {\n              rangeKey: String(cellEl && typeof cellEl.getAttribute === \"function\" ? (cellEl.getAttribute(\"data-template-range-key\") || \"\") : \"\"),\n              templateKey: String(resolved.key || \"\"),\n              rawText: String(cellEl && cellEl.textContent ? cellEl.textContent : \"\"),\n              isSinglePlaceholder: false,\n              placeholderToken: \"\",\n              objectType: String(obj.objectType || \"\")\n            };\n        try {\n          openCellUnifiedEditor(safeMeta);\n        } catch (err) {\n          if (typeof setError === \"function\") {\n            setError(\"Template cell edit failed: \" + (err && err.message ? err.message : String(err || \"\")));\n          }\n        }\n      }\n    } : null);\n      if (table) {\n      table.setAttribute(\"data-template-key\", String(resolved.key || \"\"));\n      table.setAttribute(\"data-object-type\", String(obj.objectType || \"\"));\n      table.setAttribute(\"data-template-index\", indexText);\n      block.appendChild(table);\n    } else {\n      block.appendChild(el(\"div\", { className: \"template-empty\", text: \"[Missing template]\" }));\n    }\n\n      fragment.appendChild(block);\n    }\n\n    els.templatePreviewOutput.classList.remove(\"muted\");\n    els.templatePreviewOutput.replaceChildren(fragment);\n    state.templatePreviewCache = { count: items.length };\n    if (state.selectedTemplateIndex !== \"\" && typeof setSelectedTemplateBlock === \"function\") {\n      setSelectedTemplateBlock(state.selectedTemplateIndex, { scroll: false });\n    }\n    if (typeof refreshInputGutterTargets === \"function\") {\n      refreshInputGutterTargets();\n    }\n  }\n\n  function syncTemplateEditorFromState() {\n    if (!els.templateConfigJson) {\n      return;\n    }\n    const pretty = safeJson(state.templateConfig || getDefaultTemplateConfig(), true);\n    state.templateConfigDraft = pretty;\n    els.templateConfigJson.value = pretty;\n  }\n\n  function applyTemplateConfigObject(config, options) {\n    const opts = options && typeof options === \"object\" ? options : {};\n    const check = validateTemplateConfig(config);\n    if (!check.valid) {\n      setTemplateConfigError(check.errors.join(\"\\n\"));\n      return false;\n    }\n\n    const next = cloneJsonValue(config);\n    if (!next || typeof next !== \"object\") {\n      setTemplateConfigError(\"Cannot clone template config.\");\n      return false;\n    }\n\n    state.templateConfig = next;\n    if (opts.save !== false) {\n      saveTemplateConfig(next);\n    }\n    setTemplateConfigError(\"\");\n    syncTemplateEditorFromState();\n    renderTemplatePreview();\n    return true;\n  }\n\n  function applyTemplateConfigFromEditor() {\n    const raw = els.templateConfigJson ? String(els.templateConfigJson.value || \"\").trim() : \"\";\n    if (!raw) {\n      setTemplateConfigError(\"Template config JSON is empty.\");\n      return;\n    }\n\n    let parsed = null;\n    try {\n      parsed = JSON.parse(raw);\n    } catch (err) {\n      setTemplateConfigError(`JSON parse error: ${err && err.message ? err.message : err}`);\n      return;\n    }\n\n    applyTemplateConfigObject(parsed, { save: true });\n  }\n\n  function resetTemplateConfig() {\n    applyTemplateConfigObject(getDefaultTemplateConfig(), { save: true });\n  }\n\n  function exportTemplateConfig() {\n    const config = state.templateConfig || getDefaultTemplateConfig();\n    const content = safeJson(config, true);\n    const fileName = \"abap-template-config.json\";\n\n    try {\n      const blob = new Blob([content], { type: \"application/json\" });\n      const url = URL.createObjectURL(blob);\n      const a = document.createElement(\"a\");\n      a.href = url;\n      a.download = fileName;\n      document.body.appendChild(a);\n      a.click();\n      document.body.removeChild(a);\n      URL.revokeObjectURL(url);\n      setError(\"\");\n    } catch (err) {\n      setError(`Export failed: ${err && err.message ? err.message : err}`);\n    }\n  }\n\n  async function importTemplateConfigFromFile(file) {\n    if (!file) {\n      return;\n    }\n\n    let text = \"\";\n    try {\n      text = await file.text();\n    } catch (err) {\n      setTemplateConfigError(`Import failed: ${err && err.message ? err.message : err}`);\n      return;\n    }\n\n    try {\n      const parsed = JSON.parse(text);\n      const applied = applyTemplateConfigObject(parsed, { save: true });\n      if (applied) {\n        setError(\"\");\n      }\n    } catch (err) {\n      setTemplateConfigError(`Import JSON parse error: ${err && err.message ? err.message : err}`);\n    }\n  }\n\n  async function copyAllTemplateBlocks() {\n    if (!els.templatePreviewOutput) {\n      return;\n    }\n    const blocks = Array.from(els.templatePreviewOutput.querySelectorAll(\".template-block\"));\n    if (!blocks.length) {\n      setError(\"Nothing to copy.\");\n      return;\n    }\n\n    const wrapper = document.createElement(\"div\");\n    const plainLines = [];\n    const tableOnly = isTemplateCopyTableOnlyEnabled();\n    for (const block of blocks) {\n      const payload = buildTemplateCopyPayloadFromBlock(block);\n      if (!payload.node) {\n        continue;\n      }\n      wrapper.appendChild(payload.node);\n      if (tableOnly) {\n        wrapper.appendChild(document.createElement(\"br\"));\n      }\n      plainLines.push(payload.text);\n    }\n\n    if (!wrapper.childNodes.length) {\n      setError(\"Nothing to copy.\");\n      return;\n    }\n\n    await copyHtmlWithFallback(wrapper.innerHTML, plainLines.filter(Boolean).join(\"\\n\\n\"));\n  }\n\n  function getTemplateVirtualState() {\n    if (!state.templateVirtual || typeof state.templateVirtual !== \"object\") {\n      state.templateVirtual = {\n        items: [],\n        itemCount: 0,\n        start: 0,\n        end: 0,\n        lastScrollTop: 0,\n        scrollDir: \"down\",\n        pendingRaf: 0,\n        isAdjustingScroll: false,\n        avgItemHeight: 140,\n        lineTargetMap: new Map(),\n        isInitialized: false\n      };\n    }\n    if (!(state.templateVirtual.lineTargetMap instanceof Map)) {\n      state.templateVirtual.lineTargetMap = new Map();\n    }\n    return state.templateVirtual;\n  }\n\n  function getTemplateVirtualConfig(container, avgItemHeight) {\n    const safeAvg = Math.max(1, Number(avgItemHeight) || 1);\n    const clientHeight = Math.max(0, Number(container && container.clientHeight) || 0);\n    const visibleEstimate = Math.max(1, Math.ceil(clientHeight / safeAvg));\n    const overscanCount = Math.max(2, Math.ceil(visibleEstimate * 0.5));\n    const batchCount = Math.max(4, Math.ceil(visibleEstimate * 0.5));\n    const targetCount = visibleEstimate + (overscanCount * 2);\n    const maxCount = targetCount + (batchCount * 2);\n    const edgeThresholdPx = Math.max(40, Math.round(clientHeight * 0.2));\n    return { visibleEstimate, overscanCount, batchCount, targetCount, maxCount, edgeThresholdPx };\n  }\n\n  function measureTemplateOuterHeight(node) {\n    if (!node || typeof node.getBoundingClientRect !== \"function\") {\n      return 0;\n    }\n    const rect = node.getBoundingClientRect();\n    let marginTop = 0;\n    let marginBottom = 0;\n    try {\n      const style = window.getComputedStyle(node);\n      marginTop = Number.parseFloat(style && style.marginTop ? style.marginTop : \"0\") || 0;\n      marginBottom = Number.parseFloat(style && style.marginBottom ? style.marginBottom : \"0\") || 0;\n    } catch {\n      // ignore\n    }\n    return Math.max(0, rect.height + marginTop + marginBottom);\n  }\n\n  function updateTemplateAverageHeight(virtual, heights) {\n    const list = Array.isArray(heights) ? heights.filter((v) => Number(v) > 0) : [];\n    if (!list.length) {\n      return;\n    }\n    const sampleAvg = list.reduce((sum, value) => sum + Number(value || 0), 0) / list.length;\n    const prev = Math.max(60, Number(virtual.avgItemHeight) || 140);\n    const next = Math.max(60, ((prev * 0.8) + (sampleAvg * 0.2)));\n    virtual.avgItemHeight = Math.round(next);\n  }\n\n  function buildTemplateLineTargetMap(items) {\n    const map = new Map();\n    const list = Array.isArray(items) ? items : [];\n    for (let index = 0; index < list.length; index += 1) {\n      const item = list[index];\n      const obj = item && item.obj ? item.obj : null;\n      if (!obj) {\n        continue;\n      }\n      const line = Number(obj.lineStart) || 0;\n      if (!line || map.has(line)) {\n        continue;\n      }\n      map.set(line, { kind: \"template\", index: String(index) });\n    }\n    return map;\n  }\n\n  function buildTemplateBlockElement(item, absIndex, config, interactive) {\n    const row = item && typeof item === \"object\" ? item : null;\n    const obj = row && row.obj ? row.obj : null;\n    if (!obj) {\n      return null;\n    }\n\n    const isInteractive = interactive !== false;\n    const depth = Math.max(0, Number(row.depth) || 0);\n    const lineStart = Number(obj.lineStart) || 0;\n    const indexText = String(absIndex);\n    const templateContextObj = buildTemplateContextObject(obj, absIndex + 1);\n    const resolved = resolveTemplateMapForObject(obj, config);\n    const selected = state.selectedTemplateIndex !== \"\" && state.selectedTemplateIndex === indexText;\n    const blockAttrs = { \"data-template-index\": indexText, \"data-depth\": String(depth) };\n    if (lineStart > 0) {\n      blockAttrs[\"data-line-start\"] = String(lineStart);\n    }\n    const block = el(\"div\", { className: `template-block${selected ? \" selected\" : \"\"}`, attrs: blockAttrs });\n    const indentPx = Math.min(120, depth * 12);\n    if (indentPx > 0) {\n      block.style.marginLeft = `${indentPx}px`;\n    } else {\n      block.style.marginLeft = \"\";\n    }\n\n    const header = el(\"div\", { className: \"template-block-header\" });\n    const left = el(\"div\");\n    const label = getObjectLabel(obj);\n    const titleText = `${absIndex + 1}. ${String(obj.objectType || \"OBJECT\")}${label ? ` ${label}` : \"\"}`;\n    left.appendChild(el(\"h4\", { className: \"template-block-title\", text: titleText }));\n    const meta = renderMeta(obj);\n    const keyText = resolved.key ? `template=${resolved.key}` : \"template=missing\";\n    left.appendChild(el(\"div\", { className: \"template-block-meta\", text: [meta, keyText].filter(Boolean).join(\" • \") }));\n    header.appendChild(left);\n\n    if (isInteractive) {\n      const actions = el(\"div\", { className: \"template-block-actions\" });\n      const codeBtn = el(\"button\", {\n        className: \"secondary\",\n        text: \"Code\",\n        attrs: { type: \"button\", \"data-template-action\": \"code\" }\n      });\n      codeBtn.addEventListener(\"click\", () => {\n        if (typeof setSelectedTemplateBlock === \"function\") {\n          setSelectedTemplateBlock(indexText);\n        } else {\n          state.selectedTemplateIndex = indexText;\n        }\n        if (lineStart > 0 && typeof selectCodeLines === \"function\") {\n          const lineEnd = Number(obj && obj.block && obj.block.lineEnd) || lineStart;\n          selectCodeLines(lineStart, lineEnd);\n        }\n      });\n      actions.appendChild(codeBtn);\n\n      const pathsBtn = el(\"button\", {\n        className: \"secondary\",\n        text: \"Paths\",\n        attrs: { type: \"button\", \"data-template-action\": \"paths\" }\n      });\n      pathsBtn.addEventListener(\"click\", (ev) => {\n        if (ev && typeof ev.stopPropagation === \"function\") {\n          ev.stopPropagation();\n        }\n        openTemplatePathDump(templateContextObj, absIndex, obj);\n      });\n      actions.appendChild(pathsBtn);\n\n      const copyBtn = el(\"button\", {\n        className: \"secondary\",\n        text: \"Copy\",\n        attrs: { type: \"button\", \"data-template-action\": \"copy\" }\n      });\n      copyBtn.addEventListener(\"click\", async () => {\n        try {\n          const payload = buildTemplateCopyPayloadFromBlock(block);\n          if (!payload.node) {\n            setError(\"Nothing to copy.\");\n            return;\n          }\n          await copyHtmlWithFallback(payload.node.outerHTML, payload.text);\n          setError(\"\");\n        } catch (err) {\n          setError(`Copy failed: ${err && err.message ? err.message : err}`);\n        }\n      });\n      actions.appendChild(copyBtn);\n      header.appendChild(actions);\n\n      block.addEventListener(\"click\", () => {\n        if (typeof setSelectedTemplateBlock === \"function\") {\n          setSelectedTemplateBlock(indexText, { scroll: false });\n        } else {\n          state.selectedTemplateIndex = indexText;\n        }\n      });\n    }\n\n    block.appendChild(header);\n\n    if (!resolved.map || typeof resolved.map !== \"object\") {\n      block.appendChild(el(\"div\", { className: \"template-empty\", text: \"[Missing template]\" }));\n      return block;\n    }\n\n    const model = buildTemplateGridModel(templateContextObj, resolved.map, resolved.options, {\n      templateKey: resolved.key || \"\",\n      objectType: String(obj.objectType || \"\")\n    });\n    if (model.errors.length) {\n      block.appendChild(el(\"div\", { className: \"template-error\", text: model.errors.join(\"\\n\") }));\n    }\n\n    const openCellUnifiedEditor = (cellMeta) => {\n      if (!cellMeta || typeof cellMeta !== \"object\") {\n        return;\n      }\n      const openUnifiedEditorModal = (typeof openTemplateCellUnifiedEditModal === \"function\")\n        ? openTemplateCellUnifiedEditModal\n        : ((typeof window !== \"undefined\" && typeof window.openTemplateCellUnifiedEditModal === \"function\")\n          ? window.openTemplateCellUnifiedEditModal\n          : null);\n      if (!openUnifiedEditorModal) {\n        return;\n      }\n\n      const templateKey = String(cellMeta.templateKey || resolved.key || \"\").trim();\n      const rangeKey = String(cellMeta.rangeKey || \"\").trim();\n      const currentText = cellMeta.rawText === undefined || cellMeta.rawText === null\n        ? \"\"\n        : String(cellMeta.rawText);\n      const token = String(cellMeta.placeholderToken || \"\").trim();\n\n      const getDescOverrideEntrySafe = (declKey) => {\n        if (!declKey) {\n          return null;\n        }\n        if (typeof getDescOverrideEntry === \"function\") {\n          return getDescOverrideEntry(declKey);\n        }\n        const rawOverride = state && state.descOverrides ? state.descOverrides[declKey] : null;\n        if (rawOverride === undefined || rawOverride === null) {\n          return null;\n        }\n        if (typeof rawOverride === \"string\") {\n          return { text: rawOverride, noNormalize: false };\n        }\n        if (typeof rawOverride === \"object\") {\n          return {\n            text: String(rawOverride.text || \"\"),\n            noNormalize: rawOverride.noNormalize === true\n          };\n        }\n        return null;\n      };\n\n      let targetDeclCandidates = [];\n      if (token) {\n        try {\n          const resolvedValue = resolveTemplatePlaceholderValue(templateContextObj, token);\n          targetDeclCandidates = getTemplateEditableDeclCandidatesFromResolvedValue(resolvedValue);\n          if (!targetDeclCandidates.length) {\n            targetDeclCandidates = resolveTemplateEditableDeclCandidatesFromToken(templateContextObj, token);\n          }\n        } catch {\n          targetDeclCandidates = [];\n        }\n      }\n      targetDeclCandidates = dedupeTemplateDecls(targetDeclCandidates);\n\n      const modalDeclCandidates = [];\n      for (let index = 0; index < targetDeclCandidates.length; index += 1) {\n        const decl = targetDeclCandidates[index];\n        if (!decl || typeof decl !== \"object\") {\n          continue;\n        }\n        let declKey = \"\";\n        try {\n          declKey = typeof getDeclOverrideStorageKey === \"function\" ? getDeclOverrideStorageKey(decl) : \"\";\n        } catch {\n          declKey = \"\";\n        }\n        const descEntry = getDescOverrideEntrySafe(declKey);\n        const techName = typeof getDeclTechName === \"function\" ? getDeclTechName(decl) : String(decl && decl.name ? decl.name : \"\");\n        const scopeName = String(decl && decl.scopeLabel ? decl.scopeLabel : \"\").trim();\n        const label = scopeName ? (techName || \"(unknown)\") + \" @ \" + scopeName : (techName || \"(unknown)\");\n        modalDeclCandidates.push({\n          decl,\n          declKey,\n          label,\n          currentDesc: String(descEntry && descEntry.text ? descEntry.text : \"\"),\n          skipNormalize: Boolean(descEntry && descEntry.noNormalize),\n          selected: index === 0\n        });\n      }\n\n      openUnifiedEditorModal({\n        metadata: {\n          objectType: String(cellMeta.objectType || obj.objectType || \"\"),\n          templateKey,\n          rangeKey,\n          token\n        },\n        textPart: {\n          templateKey,\n          rangeKey,\n          objectType: String(cellMeta.objectType || obj.objectType || \"\"),\n          currentText,\n          onSaveText: ({ text: nextText }) => {\n            if (!templateKey || !rangeKey) {\n              return { ok: false, error: \"Missing template key or range key.\" };\n            }\n            const baseConfig = state.templateConfig && typeof state.templateConfig === \"object\"\n              ? state.templateConfig\n              : getDefaultTemplateConfig();\n            const nextConfig = {\n              ...baseConfig,\n              templates: { ...(baseConfig.templates && typeof baseConfig.templates === \"object\" ? baseConfig.templates : {}) }\n            };\n            const currentTemplate = nextConfig.templates[templateKey];\n            const nextTemplate = currentTemplate && typeof currentTemplate === \"object\" && !Array.isArray(currentTemplate)\n              ? { ...currentTemplate }\n              : {};\n            const existingCell = nextTemplate[rangeKey];\n            const nextCell = existingCell && typeof existingCell === \"object\" && !Array.isArray(existingCell)\n              ? { ...existingCell }\n              : {};\n            nextCell.text = String(nextText === undefined || nextText === null ? \"\" : nextText);\n            nextTemplate[rangeKey] = nextCell;\n            nextConfig.templates[templateKey] = nextTemplate;\n            const applied = applyTemplateConfigObject(nextConfig, { save: true });\n            if (!applied) {\n              return { ok: false, error: \"Failed to apply template config.\" };\n            }\n            setError(\"\");\n            return { ok: true };\n          }\n        },\n        descPart: {\n          token,\n          declCandidates: modalDeclCandidates,\n          onSaveDesc: ({ decl, text: nextDesc, skipNormalize }) => {\n            if (!decl || typeof decl !== \"object\") {\n              return { ok: false, error: \"Decl target is unavailable.\" };\n            }\n            if (typeof getDeclOverrideStorageKey !== \"function\" || typeof saveDescOverrides !== \"function\") {\n              return { ok: false, error: \"Description override helpers are unavailable.\" };\n            }\n            const declKey = getDeclOverrideStorageKey(decl);\n            if (!declKey) {\n              return { ok: false, error: \"Decl key is unavailable.\" };\n            }\n            const raw = String(nextDesc === undefined || nextDesc === null ? \"\" : nextDesc);\n            const trimmed = raw.trim();\n            const stored = skipNormalize ? trimmed : stripDeclCategoryPrefix(trimmed);\n            if (!stored) {\n              delete state.descOverrides[declKey];\n            } else {\n              state.descOverrides[declKey] = skipNormalize ? { text: stored, noNormalize: true } : stored;\n            }\n            saveDescOverrides();\n            state.haystackById = buildSearchIndex(state.renderObjects);\n            if (typeof renderOutput === \"function\") {\n              renderOutput();\n            }\n            if (typeof renderTemplatePreview === \"function\") {\n              renderTemplatePreview();\n            }\n            if (typeof renderDeclDescPanelUi === \"function\" && state.rightTab === \"descriptions\") {\n              renderDeclDescPanelUi();\n            }\n            return { ok: true };\n          }\n        }\n      });\n    };\n\n    const table = renderTemplateTable(model, isInteractive ? {\n      onCellDblClick: (cellMeta) => {\n        if (!cellMeta || typeof cellMeta !== \"object\") {\n          return;\n        }\n        openCellUnifiedEditor(cellMeta);\n      }\n    } : null);\n    if (table) {\n      block.appendChild(table);\n    } else {\n      block.appendChild(el(\"div\", { className: \"template-empty\", text: \"[Missing template]\" }));\n    }\n\n    return block;\n  }\n\n  function buildTemplateBlockCopyPayload(item, absIndex, config, tableOnly) {\n    const block = buildTemplateBlockElement(item, absIndex, config, false);\n    if (!block || typeof block.cloneNode !== \"function\") {\n      return { node: null, text: \"\" };\n    }\n\n    const clone = block.cloneNode(true);\n    const actionButtons = clone.querySelectorAll(\"[data-template-action]\");\n    for (const actionBtn of Array.from(actionButtons)) {\n      actionBtn.remove();\n    }\n\n    if (tableOnly) {\n      const table = clone.querySelector(\".template-preview-table\");\n      if (table) {\n        return {\n          node: table.cloneNode(true),\n          text: buildTemplatePlainTextFromBlock(table)\n        };\n      }\n    }\n\n    return {\n      node: clone,\n      text: buildTemplatePlainTextFromBlock(clone)\n    };\n  }\n\n  function getTemplateEstimatedItemHeight(virtual) {\n    return Math.max(24, Number(virtual && virtual.avgItemHeight) || 140);\n  }\n\n  function computeTemplateVirtualRangeFromScroll(scrollTop) {\n    const virtual = getTemplateVirtualState();\n    const total = Number(virtual.itemCount) || 0;\n    if (!els.templatePreviewOutput || !total) {\n      return { start: 0, end: 0 };\n    }\n\n    const estimatedHeight = getTemplateEstimatedItemHeight(virtual);\n    const metrics = getTemplateVirtualConfig(els.templatePreviewOutput, estimatedHeight);\n    if (total <= metrics.targetCount) {\n      return { start: 0, end: total };\n    }\n\n    const top = Math.max(0, Number(scrollTop) || 0);\n    const firstVisible = Math.max(0, Math.floor(top / estimatedHeight));\n    let start = Math.max(0, firstVisible - metrics.overscanCount);\n    let end = Math.min(total, start + metrics.targetCount);\n    if ((end - start) < metrics.targetCount) {\n      start = Math.max(0, end - metrics.targetCount);\n    }\n\n    return { start, end };\n  }\n\n  function renderTemplateVirtualRangeReplace(options) {\n    if (!els.templatePreviewOutput) {\n      return;\n    }\n\n    const opts = options && typeof options === \"object\" ? options : {};\n    const virtual = getTemplateVirtualState();\n    const items = Array.isArray(virtual.items) ? virtual.items : [];\n    const total = items.length;\n    const start = Math.max(0, Math.min(total, Number(virtual.start) || 0));\n    const end = Math.max(start, Math.min(total, Number(virtual.end) || 0));\n    const estimatedHeight = getTemplateEstimatedItemHeight(virtual);\n    const config = virtual.config && typeof virtual.config === \"object\"\n      ? virtual.config\n      : getDefaultTemplateConfig();\n\n    const frag = document.createDocumentFragment();\n    const topSpacer = document.createElement(\"div\");\n    topSpacer.className = \"virtual-spacer template-virtual-spacer-top\";\n    topSpacer.style.height = String(Math.max(0, Math.round(start * estimatedHeight))) + \"px\";\n    topSpacer.setAttribute(\"aria-hidden\", \"true\");\n    frag.appendChild(topSpacer);\n\n    const heights = [];\n    for (let index = start; index < end; index += 1) {\n      const block = buildTemplateBlockElement(items[index], index, config, true);\n      if (!block) {\n        continue;\n      }\n      frag.appendChild(block);\n      heights.push(measureTemplateOuterHeight(block));\n    }\n\n    const bottomSpacer = document.createElement(\"div\");\n    bottomSpacer.className = \"virtual-spacer template-virtual-spacer-bottom\";\n    bottomSpacer.style.height = String(Math.max(0, Math.round((total - end) * estimatedHeight))) + \"px\";\n    bottomSpacer.setAttribute(\"aria-hidden\", \"true\");\n    frag.appendChild(bottomSpacer);\n\n    els.templatePreviewOutput.classList.remove(\"muted\");\n    els.templatePreviewOutput.replaceChildren(frag);\n    updateTemplateAverageHeight(virtual, heights);\n\n    if (opts.preserveScroll) {\n      const maxTop = Math.max(0, Number(els.templatePreviewOutput.scrollHeight || 0) - Number(els.templatePreviewOutput.clientHeight || 0));\n      els.templatePreviewOutput.scrollTop = Math.max(0, Math.min(maxTop, Number(opts.scrollTop) || 0));\n    } else {\n      els.templatePreviewOutput.scrollTop = Math.max(0, Number(opts.scrollTop) || 0);\n    }\n    virtual.lastScrollTop = Number(els.templatePreviewOutput.scrollTop || 0) || 0;\n  }\n\n  function initTemplateVirtualWindow(items, config, options) {\n    const opts = options && typeof options === \"object\" ? options : {};\n    const virtual = getTemplateVirtualState();\n    const list = Array.isArray(items) ? items : [];\n\n    if (virtual.pendingRaf) {\n      cancelAnimationFrame(virtual.pendingRaf);\n      virtual.pendingRaf = 0;\n    }\n\n    virtual.items = list;\n    virtual.itemCount = list.length;\n    virtual.lineTargetMap = buildTemplateLineTargetMap(list);\n    virtual.start = 0;\n    virtual.end = 0;\n    virtual.lastScrollTop = 0;\n    virtual.scrollDir = \"down\";\n    virtual.isAdjustingScroll = false;\n    virtual.isInitialized = list.length > 0;\n    virtual.config = config && typeof config === \"object\" ? config : getDefaultTemplateConfig();\n\n    if (!list.length) {\n      return;\n    }\n\n    const metrics = getTemplateVirtualConfig(els.templatePreviewOutput, virtual.avgItemHeight);\n    const total = list.length;\n    let start = 0;\n    let end = Math.min(total, metrics.targetCount);\n\n    const selectedIndex = state.selectedTemplateIndex !== \"\"\n      ? Number(state.selectedTemplateIndex)\n      : Number.NaN;\n    if (Number.isFinite(selectedIndex) && selectedIndex >= 0 && selectedIndex < total) {\n      start = Math.max(0, selectedIndex - Math.floor(metrics.targetCount / 2));\n      end = Math.min(total, start + metrics.targetCount);\n      if ((end - start) < metrics.targetCount) {\n        start = Math.max(0, end - metrics.targetCount);\n      }\n    } else if (opts.preserveScroll === true) {\n      const range = computeTemplateVirtualRangeFromScroll(Number(opts.scrollTop) || 0);\n      start = range.start;\n      end = range.end;\n    }\n\n    virtual.start = start;\n    virtual.end = end;\n    renderTemplateVirtualRangeReplace({\n      preserveScroll: true,\n      scrollTop: opts.preserveScroll === true ? (Number(opts.scrollTop) || 0) : 0\n    });\n  }\n\n  function ensureTemplateWindowContainsIndex(index) {\n    const absIndex = Number(index);\n    if (!Number.isFinite(absIndex) || absIndex < 0 || !els.templatePreviewOutput) {\n      return false;\n    }\n    const virtual = getTemplateVirtualState();\n    const total = Number(virtual.itemCount) || 0;\n    if (!virtual.isInitialized || !total || absIndex >= total) {\n      return false;\n    }\n    if (absIndex >= virtual.start && absIndex < virtual.end) {\n      return true;\n    }\n\n    const metrics = getTemplateVirtualConfig(els.templatePreviewOutput, virtual.avgItemHeight);\n    let start = Math.max(0, absIndex - Math.floor(metrics.targetCount / 2));\n    let end = Math.min(total, start + metrics.targetCount);\n    if ((end - start) < metrics.targetCount) {\n      start = Math.max(0, end - metrics.targetCount);\n    }\n\n    virtual.start = start;\n    virtual.end = end;\n    const targetTop = Math.max(0, Math.round(start * getTemplateEstimatedItemHeight(virtual)));\n    renderTemplateVirtualRangeReplace({ preserveScroll: false, scrollTop: targetTop });\n    return true;\n  }\n\n  function processTemplateVirtualScrollFrame() {\n    if (!els.templatePreviewOutput) {\n      return;\n    }\n    const virtual = getTemplateVirtualState();\n    const total = Number(virtual.itemCount) || 0;\n    if (!virtual.isInitialized || !total) {\n      return;\n    }\n\n    const currentTop = Number(els.templatePreviewOutput.scrollTop || 0) || 0;\n    const prevTop = Number(virtual.lastScrollTop || 0) || 0;\n    virtual.scrollDir = currentTop >= prevTop ? \"down\" : \"up\";\n    virtual.lastScrollTop = currentTop;\n\n    const range = computeTemplateVirtualRangeFromScroll(currentTop);\n    if (range.start === virtual.start && range.end === virtual.end) {\n      return;\n    }\n\n    virtual.start = range.start;\n    virtual.end = range.end;\n    renderTemplateVirtualRangeReplace({ preserveScroll: true, scrollTop: currentTop });\n  }\n\n  function scheduleTemplateVirtualScroll() {\n    const virtual = getTemplateVirtualState();\n    if (virtual.pendingRaf) {\n      return;\n    }\n    virtual.pendingRaf = requestAnimationFrame(() => {\n      virtual.pendingRaf = 0;\n      processTemplateVirtualScrollFrame();\n    });\n  }\n\n  function handleTemplateVirtualScroll() {\n    scheduleTemplateVirtualScroll();\n  }\n\nfunction resetTemplateVirtualState() {\n    const virtual = getTemplateVirtualState();\n    if (virtual.pendingRaf) {\n      cancelAnimationFrame(virtual.pendingRaf);\n      virtual.pendingRaf = 0;\n    }\n    virtual.items = [];\n    virtual.itemCount = 0;\n    virtual.start = 0;\n    virtual.end = 0;\n    virtual.lastScrollTop = 0;\n    virtual.scrollDir = \"down\";\n    virtual.isAdjustingScroll = false;\n    virtual.lineTargetMap = new Map();\n    virtual.isInitialized = false;\n  }\n\n  function renderTemplatePreview() {\n    if (!els.templatePreviewOutput) {\n      return;\n    }\n\n    if (!state.data || !Array.isArray(state.renderObjects)) {\n      resetTemplateVirtualState();\n      setTemplatePreviewMessage(\"No data loaded.\");\n      if (typeof refreshInputGutterTargets === \"function\") {\n        refreshInputGutterTargets();\n      }\n      return;\n    }\n\n    const config = state.templateConfig && typeof state.templateConfig === \"object\"\n      ? state.templateConfig\n      : getDefaultTemplateConfig();\n\n    const check = validateTemplateConfig(config);\n    if (!check.valid) {\n      resetTemplateVirtualState();\n      setTemplatePreviewMessage(\"Template config is invalid.\");\n      setTemplateConfigError(check.errors.join(\"\\n\"));\n      if (typeof refreshInputGutterTargets === \"function\") {\n        refreshInputGutterTargets();\n      }\n      return;\n    }\n\n    const items = getRenderableObjectListForTemplate();\n    if (!items.length) {\n      resetTemplateVirtualState();\n      setTemplatePreviewMessage(\"No renderable objects.\");\n      if (typeof refreshInputGutterTargets === \"function\") {\n        refreshInputGutterTargets();\n      }\n      return;\n    }\n\n    const scrollTop = Number(els.templatePreviewOutput.scrollTop || 0) || 0;\n    initTemplateVirtualWindow(items, config, { preserveScroll: true, scrollTop });\n    state.templatePreviewCache = { count: items.length };\n\n    if (state.selectedTemplateIndex !== \"\" && typeof setSelectedTemplateBlock === \"function\") {\n      setSelectedTemplateBlock(state.selectedTemplateIndex, { scroll: false, ensure: false });\n    }\n    if (typeof refreshInputGutterTargets === \"function\") {\n      refreshInputGutterTargets();\n    }\n  }\n\n  async function copyAllTemplateBlocks() {\n    const virtual = getTemplateVirtualState();\n    const items = Array.isArray(virtual.items) && virtual.items.length\n      ? virtual.items\n      : getRenderableObjectListForTemplate();\n    if (!items.length) {\n      setError(\"Nothing to copy.\");\n      return;\n    }\n\n    const config = virtual.config && typeof virtual.config === \"object\"\n      ? virtual.config\n      : (state.templateConfig && typeof state.templateConfig === \"object\"\n        ? state.templateConfig\n        : getDefaultTemplateConfig());\n\n    const wrapper = document.createElement(\"div\");\n    const plainLines = [];\n    const tableOnly = isTemplateCopyTableOnlyEnabled();\n    for (let index = 0; index < items.length; index += 1) {\n      const payload = buildTemplateBlockCopyPayload(items[index], index, config, tableOnly);\n      if (!payload.node) {\n        continue;\n      }\n      wrapper.appendChild(payload.node);\n      if (tableOnly) {\n        wrapper.appendChild(document.createElement(\"br\"));\n      }\n      plainLines.push(payload.text);\n    }\n\n    if (!wrapper.childNodes.length) {\n      setError(\"Nothing to copy.\");\n      return;\n    }\n\n    await copyHtmlWithFallback(wrapper.innerHTML, plainLines.filter(Boolean).join(\"\\n\\n\"));\n  }\n\nwindow.AbapViewerModules.factories = window.AbapViewerModules.factories || {};\nwindow.AbapViewerModules.factories[\"03-template-preview\"] = function registerTemplatePreview(runtime) {\n  const targetRuntime = runtime || (window.AbapViewerRuntime = window.AbapViewerRuntime || {});\n  targetRuntime.api = targetRuntime.api || {};\n  targetRuntime.api.renderTemplatePreview = renderTemplatePreview;\n  targetRuntime.api.applyTemplateConfigFromEditor = applyTemplateConfigFromEditor;\n  window.AbapViewerModules.parts[\"03-template-preview\"] = true;\n};\nwindow.AbapViewerModules.factories[\"03-template-preview\"](window.AbapViewerRuntime);\n\n";
-})(typeof globalThis !== "undefined" ? globalThis : (typeof self !== "undefined" ? self : this));
+window.AbapViewerModules = window.AbapViewerModules || {};
+window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
+
+  var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
+
+  function toInlineCssText(styleMap) {
+    if (!styleMap || typeof styleMap !== "object") {
+      return "";
+    }
+    const entries = [];
+    for (const [key, value] of Object.entries(styleMap)) {
+      const cssKey = String(key || "").trim();
+      const cssValue = String(value || "").trim();
+      if (!cssKey || !cssValue) {
+        continue;
+      }
+      entries.push(`${cssKey}:${cssValue}`);
+    }
+    return entries.join(";");
+  }
+
+  function normalizeTemplateColorValue(value) {
+    const raw = String(value || "").trim();
+    if (!raw) {
+      return "";
+    }
+
+    const alias = normalizeTemplateAliasToken(raw);
+    if (!alias || alias === "default") {
+      return "";
+    }
+    if (alias === "mau xanh nhat") {
+      return "#dbeef4";
+    }
+    if (alias === "den") {
+      return "#000000";
+    }
+    return raw;
+  }
+
+  function normalizeTemplateBorderValue(value) {
+    const raw = String(value || "").trim();
+    if (!raw) {
+      return "";
+    }
+
+    const alias = normalizeTemplateAliasToken(raw);
+    if (!alias || alias === "default") {
+      return "";
+    }
+    if (alias === "outside line mong") {
+      return "outside-thin";
+    }
+    return raw;
+  }
+
+  function normalizeTemplateAlignValue(value) {
+    const alias = normalizeTemplateAliasToken(value);
+    if (!alias || alias === "default") {
+      return "";
+    }
+    if (alias === "left" || alias === "center" || alias === "right") {
+      return alias;
+    }
+    return "";
+  }
+
+  function normalizeTemplateVAlignValue(value) {
+    const alias = normalizeTemplateAliasToken(value);
+    if (!alias || alias === "default") {
+      return "";
+    }
+    if (alias === "top") {
+      return "top";
+    }
+    if (alias === "middle" || alias === "center") {
+      return "middle";
+    }
+    if (alias === "bottom") {
+      return "bottom";
+    }
+    return "";
+  }
+
+  function parseTemplatePathSegments(pathExpression) {
+    const raw = String(pathExpression || "").trim();
+    if (!raw) {
+      return [];
+    }
+
+    const segments = [];
+    let token = "";
+    let index = 0;
+
+    const pushToken = () => {
+      const trimmed = token.trim();
+      if (trimmed) {
+        segments.push(trimmed);
+      }
+      token = "";
+    };
+
+    while (index < raw.length) {
+      const ch = raw[index];
+      if (ch === ".") {
+        pushToken();
+        index += 1;
+        continue;
+      }
+
+      if (ch === "[") {
+        pushToken();
+        const close = raw.indexOf("]", index + 1);
+        if (close === -1) {
+          return null;
+        }
+        const inside = raw.slice(index + 1, close).trim();
+        if (!/^\d+$/.test(inside)) {
+          return null;
+        }
+        segments.push(Number(inside));
+        index = close + 1;
+        continue;
+      }
+
+      token += ch;
+      index += 1;
+    }
+
+    pushToken();
+    return segments;
+  }
+
+  function isDeclLikePathSegment(segment) {
+    const key = String(segment || "").replace(/\[\d+\]$/, "").trim();
+    if (!key) {
+      return false;
+    }
+    if (key.toLowerCase() === "decl") {
+      return true;
+    }
+    return /decl$/i.test(key);
+  }
+
+  function isTemplateDeclLikeValue(value) {
+    if (isDeclLikeObject(value)) {
+      return true;
+    }
+    return Boolean(
+      value
+      && typeof value === "object"
+      && typeof value.objectType === "string"
+      && typeof value.name === "string"
+    );
+  }
+
+  function resolveTemplatePathValue(root, pathExpression) {
+    const segments = parseTemplatePathSegments(pathExpression);
+    if (!segments) {
+      return undefined;
+    }
+
+    let current = root;
+    let parent = null;
+    let parentAccessKey = "";
+    for (const segment of segments) {
+      if (typeof segment === "number") {
+        if (!Array.isArray(current)) {
+          return undefined;
+        }
+        parent = current;
+        parentAccessKey = `[${segment}]`;
+        current = current[segment];
+        continue;
+      }
+
+      const key = String(segment || "").trim();
+      if (!key) {
+        continue;
+      }
+
+      if (Array.isArray(current)) {
+        const projected = [];
+        for (const item of current) {
+          if (!item || typeof item !== "object") {
+            continue;
+          }
+
+          const keyLower = key.toLowerCase();
+          if (keyLower === "desc" && isDeclLikeObject(item)) {
+            projected.push(getEffectiveDeclDesc(item));
+            continue;
+          }
+
+          if (keyLower === "finaldesc") {
+            if (isTemplateDeclLikeValue(item)) {
+              projected.push(getFinalDeclDesc(item));
+              continue;
+            }
+            if (hasValueLevelDescFields(item) || isDeclLikeObject(item.decl)) {
+              projected.push(resolveValueLevelFinalDesc(item));
+              continue;
+            }
+          }
+
+          if (Object.prototype.hasOwnProperty.call(item, key)) {
+            projected.push(item[key]);
+          }
+        }
+        if (!projected.length) {
+          return undefined;
+        }
+        parent = null;
+        parentAccessKey = "";
+        current = projected;
+        continue;
+      }
+
+      if (!current || typeof current !== "object") {
+        return undefined;
+      }
+
+      const keyLower = key.toLowerCase();
+      if (keyLower === "desc" && isDeclLikeObject(current)) {
+        return getEffectiveDeclDesc(current);
+      }
+
+      if (keyLower === "finaldesc") {
+        const parentIsDecl = isDeclLikePathSegment(parentAccessKey);
+
+        // If the path is explicitly '...decl.finalDesc', prefer value-level finalDesc
+        // when the parent is a value-entry object (expression-aware output).
+        if (parentIsDecl) {
+          if (parent && typeof parent === "object" && (hasValueLevelDescFields(parent) || isDeclLikeObject(parent.decl))) {
+            return resolveValueLevelFinalDesc(parent);
+          }
+          return getFinalDeclDesc(current);
+        }
+
+        // Otherwise, apply the value-level or decl-level logic based on the object shape.
+        if (isTemplateDeclLikeValue(current)) {
+           return getFinalDeclDesc(current);
+        }
+        if (hasValueLevelDescFields(current) || isDeclLikeObject(current.decl)) {
+          return resolveValueLevelFinalDesc(current);
+        }
+      }
+
+      if (!Object.prototype.hasOwnProperty.call(current, key)) {
+        return undefined;
+      }
+      parent = current;
+      parentAccessKey = key;
+      current = current[key];
+    }
+
+    return current;
+  }
+
+  function buildTemplatePathCandidates(tokenExpression) {
+    const raw = String(tokenExpression || "").trim();
+    if (!raw) {
+      return [];
+    }
+
+    const candidates = new Set();
+    candidates.add(raw);
+
+    if (/^keyword\./i.test(raw)) {
+      candidates.add(`keywords.${raw.slice("keyword.".length)}`);
+    }
+
+    return Array.from(candidates);
+  }
+
+  function getTemplateArrayItemTagName(keyHint) {
+    if (typeof getArrayItemTagName === "function") {
+      return getArrayItemTagName(keyHint);
+    }
+    const key = String(keyHint || "").trim().toLowerCase();
+    if (key === "objects" || key === "children") {
+      return "object";
+    }
+    return "item";
+  }
+
+  function normalizeTemplateEntryForPath(value, keyHint, pathParts, ownerContext) {
+    if (typeof normalizeEntryObjectForXml !== "function") {
+      return value;
+    }
+    try {
+      return normalizeEntryObjectForXml(value, keyHint, pathParts, ownerContext);
+    } catch {
+      return value;
+    }
+  }
+
+  function getTemplateDeclRenderKey(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+    return (
+      (typeof getDeclKey === "function" ? getDeclKey(decl) : "")
+      || [
+        decl.objectType || "",
+        decl.scopeLabel || "",
+        decl.name || "",
+        decl.file || "",
+        decl.lineStart || ""
+      ].join("|")
+    );
+  }
+
+  function dedupeTemplateDecls(list) {
+    const out = [];
+    const seen = new Set();
+    for (const decl of Array.isArray(list) ? list : []) {
+      if (!decl || typeof decl !== "object") {
+        continue;
+      }
+      const key = getTemplateDeclRenderKey(decl);
+      if (!key || seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      out.push(decl);
+    }
+    return out;
+  }
+
+  function getExpandedPerformBindingContextForTemplate(obj) {
+    if (!obj || typeof obj !== "object") {
+      return null;
+    }
+    const bindingContext = obj[PERFORM_TRACE_META_KEY_TEMPLATE];
+    if (!bindingContext || typeof bindingContext !== "object") {
+      return null;
+    }
+    if (!(bindingContext.byParamUpper instanceof Map)) {
+      return null;
+    }
+    return bindingContext;
+  }
+
+  function isExpandedPerformTemplateTraceableDecl(decl) {
+    if (!decl || typeof decl !== "object") {
+      return false;
+    }
+    const objectType = String(decl.objectType || "").toUpperCase();
+    if (objectType === "FORM_PARAM") {
+      return true;
+    }
+    return objectType === "STRUCT_FIELD"
+      && String(decl.structObjectType || "").toUpperCase() === "FORM_PARAM"
+      && String(decl.structName || "").trim() !== ""
+      && String(decl.fieldPath || "").trim() !== "";
+  }
+
+  function getExpandedPerformTemplateParamUpper(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+    const objectType = String(decl.objectType || "").toUpperCase();
+    if (objectType === "FORM_PARAM") {
+      return String(decl.name || "").trim().toUpperCase();
+    }
+    if (objectType === "STRUCT_FIELD" && String(decl.structObjectType || "").toUpperCase() === "FORM_PARAM") {
+      return String(decl.structName || "").trim().toUpperCase();
+    }
+    return "";
+  }
+
+  function buildExpandedPerformTemplateTraceDecl(baseDecl, localDecl, ownerContext) {
+    if (!baseDecl || typeof baseDecl !== "object") {
+      return null;
+    }
+    if (!localDecl || typeof localDecl !== "object" || String(localDecl.objectType || "").toUpperCase() !== "STRUCT_FIELD") {
+      return baseDecl;
+    }
+
+    const localFieldPath = String(localDecl.fieldPath || "").trim();
+    if (!localFieldPath) {
+      return baseDecl;
+    }
+
+    let rootBaseDecl = baseDecl;
+    let rootStructName = String(baseDecl.name || "").trim();
+    let prefixFieldPath = "";
+    if (String(baseDecl.objectType || "").toUpperCase() === "STRUCT_FIELD") {
+      rootStructName = String(baseDecl.structName || rootStructName).trim();
+      prefixFieldPath = String(baseDecl.fieldPath || "").trim();
+      rootBaseDecl = {
+        ...baseDecl,
+        id: baseDecl.structId || baseDecl.id || null,
+        objectType: String(baseDecl.structObjectType || "STRUCT"),
+        name: rootStructName,
+        lineStart: Number(baseDecl.structLineStart || baseDecl.lineStart) || null,
+        raw: String(baseDecl.structRaw || baseDecl.raw || ""),
+        comment: String(baseDecl.structComment || baseDecl.comment || "")
+      };
+    }
+
+    if (!rootStructName || !String(rootBaseDecl.scopeLabel || "").trim()) {
+      return baseDecl;
+    }
+
+    const combinedFieldPath = prefixFieldPath ? (prefixFieldPath + "-" + localFieldPath) : localFieldPath;
+    const candidate = {
+      fullRef: rootStructName + "-" + combinedFieldPath,
+      structName: rootStructName,
+      fieldPath: combinedFieldPath
+    };
+    const traceContext = ownerContext && typeof ownerContext === "object"
+      ? { file: ownerContext.file, lineStart: ownerContext.lineStart }
+      : { file: rootBaseDecl.file, lineStart: rootBaseDecl.lineStart };
+    if (typeof createSyntheticStructFieldDecl === "function") {
+      const syntheticDecl = createSyntheticStructFieldDecl(rootBaseDecl, candidate, traceContext);
+      if (syntheticDecl && typeof syntheticDecl === "object") {
+        return syntheticDecl;
+      }
+    }
+
+    return {
+      id: rootBaseDecl.id || null,
+      objectType: "STRUCT_FIELD",
+      name: candidate.fullRef,
+      file: String(traceContext.file || rootBaseDecl.file || ""),
+      lineStart: Number(traceContext.lineStart || rootBaseDecl.lineStart) || null,
+      raw: String(rootBaseDecl.raw || ""),
+      comment: "",
+      scopeId: Number(rootBaseDecl.scopeId || 0) || 0,
+      scopeLabel: String(rootBaseDecl.scopeLabel || ""),
+      scopeType: String(rootBaseDecl.scopeType || ""),
+      scopeName: String(rootBaseDecl.scopeName || ""),
+      structId: rootBaseDecl.id || null,
+      structName: rootStructName,
+      structObjectType: String(rootBaseDecl.objectType || "STRUCT"),
+      structLineStart: Number(rootBaseDecl.lineStart || 0) || null,
+      structRaw: String(rootBaseDecl.raw || ""),
+      structComment: String(rootBaseDecl.comment || ""),
+      traceFile: String(traceContext.file || ""),
+      traceLineStart: Number(traceContext.lineStart || 0) || null,
+      fieldPath: combinedFieldPath,
+      synthetic: true
+    };
+  }
+
+  function resolveExpandedPerformTemplateTraceDecls(ownerContext, decl) {
+    if (!isExpandedPerformTemplateTraceableDecl(decl)) {
+      return [];
+    }
+    const bindingContext = getExpandedPerformBindingContextForTemplate(ownerContext);
+    if (!bindingContext) {
+      return [];
+    }
+    const paramUpper = getExpandedPerformTemplateParamUpper(decl);
+    if (!paramUpper) {
+      return [];
+    }
+    const traceDecls = bindingContext.byParamUpper.get(paramUpper);
+    if (!Array.isArray(traceDecls) || !traceDecls.length) {
+      return [];
+    }
+    const localDeclType = String(decl.objectType || "").toUpperCase();
+    const remappedTraceDecls = localDeclType === "STRUCT_FIELD"
+      ? traceDecls.map((traceDecl) => buildExpandedPerformTemplateTraceDecl(traceDecl, decl, ownerContext)).filter(Boolean)
+      : traceDecls;
+    return dedupeTemplateDecls(remappedTraceDecls);
+  }
+
+  function isTemplateValueEntryLikeObject(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return false;
+    }
+    if (!Object.prototype.hasOwnProperty.call(value, "decl")) {
+      return false;
+    }
+    return (
+      Object.prototype.hasOwnProperty.call(value, "value")
+      || Object.prototype.hasOwnProperty.call(value, "declRef")
+      || Object.prototype.hasOwnProperty.call(value, "name")
+      || Object.prototype.hasOwnProperty.call(value, "label")
+      || hasValueLevelDescFields(value)
+    );
+  }
+
+  function remapTemplateDeclForExpandedPerform(value, ownerContext) {
+    if (!isTemplateValueEntryLikeObject(value)) {
+      return value;
+    }
+
+    const localDecl = value.decl;
+    if (!isDeclLikeObject(localDecl) || !isExpandedPerformTemplateTraceableDecl(localDecl)) {
+      return value;
+    }
+
+    const externalTraceDecls = resolveExpandedPerformTemplateTraceDecls(ownerContext, localDecl);
+    if (!externalTraceDecls.length) {
+      return value;
+    }
+
+    const existingOrigins = Array.isArray(value.originDecls) ? value.originDecls : [];
+    const originDecls = dedupeTemplateDecls([localDecl, ...externalTraceDecls, ...existingOrigins]);
+    return {
+      ...value,
+      decl: externalTraceDecls[0],
+      originDecls
+    };
+  }
+
+  function buildTemplateContextObject(obj, objectIndexOneBased) {
+    const objectIndex = Number(objectIndexOneBased) || 1;
+    const basePathParts = ["objects", `object[${objectIndex}]`];
+
+    const cloneRecursive = (value, keyHint, pathParts, ownerContext) => {
+      if (value === null || value === undefined) {
+        return value;
+      }
+      if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+        return value;
+      }
+
+      if (Array.isArray(value)) {
+        const itemTag = getTemplateArrayItemTagName(keyHint);
+        return value.map((item, index) => cloneRecursive(
+          item,
+          itemTag,
+          pathParts.concat(`${itemTag}[${index + 1}]`),
+          ownerContext
+        ));
+      }
+
+      if (typeof value !== "object") {
+        return value;
+      }
+
+      const nextOwnerContext = (typeof isAbapStatementObject === "function" && isAbapStatementObject(value))
+        ? value
+        : ownerContext;
+      const normalized = normalizeTemplateEntryForPath(value, keyHint, pathParts, nextOwnerContext);
+      if (!normalized || typeof normalized !== "object") {
+        return normalized;
+      }
+      const remappedForTrace = remapTemplateDeclForExpandedPerform(normalized, nextOwnerContext);
+
+      const out = {};
+      for (const key of Object.keys(remappedForTrace)) {
+        out[key] = cloneRecursive(
+          remappedForTrace[key],
+          key,
+          pathParts.concat(key),
+          nextOwnerContext
+        );
+      }
+      return out;
+    };
+
+    return cloneRecursive(obj, "object", basePathParts, obj);
+  }
+
+  function stringifyTemplateResolvedValue(value) {
+    if (value === undefined || value === null) {
+      return "";
+    }
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      return String(value);
+    }
+    if (Array.isArray(value)) {
+      return value
+        .map((item) => stringifyTemplateResolvedValue(item))
+        .filter((text) => text !== "")
+        .join("\n");
+    }
+    if (isDeclLikeObject(value)) {
+      return getDeclDisplayName(value) || getDeclTechName(value);
+    }
+    if (typeof value === "object") {
+      if (hasValueLevelDescFields(value) || isDeclLikeObject(value.decl)) {
+        const finalDesc = resolveValueLevelFinalDesc(value);
+        if (finalDesc) {
+          return finalDesc;
+        }
+      }
+      return safeJson(value, false);
+    }
+    return String(value);
+  }
+
+  function collectTemplateDumpPaths(root) {
+    const out = new Set();
+
+    const walk = (value, path) => {
+      if (path) {
+        out.add(path);
+      }
+      if (value === null || value === undefined) {
+        return;
+      }
+
+      if (Array.isArray(value)) {
+        for (let i = 0; i < value.length; i += 1) {
+          const nextPath = path ? `${path}[${i}]` : `[${i}]`;
+          walk(value[i], nextPath);
+        }
+        return;
+      }
+
+      if (typeof value !== "object") {
+        return;
+      }
+
+      if (path && isDeclLikeObject(value)) {
+        out.add(`${path}.desc`);
+        out.add(`${path}.finalDesc`);
+      }
+      if (path && (hasValueLevelDescFields(value) || isDeclLikeObject(value.decl))) {
+        out.add(`${path}.finalDesc`);
+      }
+
+      for (const key of Object.keys(value)) {
+        if (key === "children") {
+          continue;
+        }
+        const nextPath = path ? `${path}.${key}` : key;
+        walk(value[key], nextPath);
+      }
+    };
+
+    walk(root, "");
+    return Array.from(out).sort((a, b) => a.localeCompare(b));
+  }
+
+  function formatTemplateDumpValue(value) {
+    if (value === undefined || value === null) {
+      return "";
+    }
+    const text = String(value);
+    return text
+      .replace(/\r\n/g, "\\n")
+      .replace(/\r/g, "\\n")
+
+      .replace(/\n/g, "\\n");
+  }
+
+  function collectTemplateDumpPathValues(root) {
+    const out = new Map();
+
+    const addEntry = (path, value) => {
+      const key = String(path || "").trim();
+      if (!key || out.has(key)) {
+        return;
+      }
+      out.set(key, formatTemplateDumpValue(value));
+    };
+
+    const walk = (value, path) => {
+      const currentPath = String(path || "");
+      if (value === undefined) {
+        return;
+      }
+
+      if (value === null) {
+        if (currentPath) {
+          addEntry(currentPath, "");
+        }
+        return;
+      }
+
+      if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+        if (currentPath) {
+          addEntry(currentPath, value);
+        }
+        return;
+      }
+
+      if (Array.isArray(value)) {
+        for (let i = 0; i < value.length; i += 1) {
+          const nextPath = currentPath ? `${currentPath}[${i}]` : `[${i}]`;
+          walk(value[i], nextPath);
+        }
+        return;
+      }
+
+      if (typeof value !== "object") {
+        if (currentPath) {
+          addEntry(currentPath, String(value));
+        }
+        return;
+      }
+
+      if (currentPath && isDeclLikeObject(value)) {
+        addEntry(`${currentPath}.desc`, getEffectiveDeclDesc(value));
+        addEntry(`${currentPath}.finalDesc`, getFinalDeclDesc(value));
+      }
+      if (currentPath && (hasValueLevelDescFields(value) || isDeclLikeObject(value.decl))) {
+        addEntry(`${currentPath}.finalDesc`, resolveValueLevelFinalDesc(value));
+      }
+
+      const keys = Object.keys(value);
+      keys.sort((a, b) => a.localeCompare(b));
+      for (const key of keys) {
+        if (key === "children") {
+          continue;
+        }
+        const nextPath = currentPath ? `${currentPath}.${key}` : key;
+        walk(value[key], nextPath);
+      }
+    };
+
+    walk(root, "");
+    return Array.from(out.entries()).map(([path, value]) => `${path} = ${value}`);
+  }
+
+  function openTemplatePathDump(contextObj, index, obj) {
+    const lines = collectTemplateDumpPathValues(contextObj);
+    const fallback = collectTemplateDumpPaths(contextObj).map((path) => `${path} =`);
+    const dumpText = (lines.length ? lines : fallback).join("\n");
+    const objectType = obj && obj.objectType ? String(obj.objectType) : "OBJECT";
+    const title = `Template Paths #${Number(index) + 1} ${objectType}`;
+
+    if (typeof openTextModal === "function") {
+      openTextModal(title, dumpText || "[No paths]");
+      return;
+    }
+
+    if (typeof setError === "function") {
+      setError("Path viewer is unavailable.");
+    }
+  }
+
+  function resolveTemplatePlaceholderValue(obj, tokenExpression) {
+    const token = String(tokenExpression || "").trim();
+    if (!token) {
+      return "";
+    }
+
+    if (token === "__DUMP__") {
+      return collectTemplateDumpPaths(obj).join("\n");
+    }
+    if (token === "__DUMP_VALUES__" || token === "__DUMP_WITH_VALUES__") {
+      return collectTemplateDumpPathValues(obj).join("\n");
+    }
+
+    const candidates = buildTemplatePathCandidates(token);
+
+    for (const candidate of candidates) {
+      const value = resolveTemplatePathValue(obj, candidate);
+      if (value !== undefined) {
+        return value;
+      }
+    }
+
+    return "";
+  }
+
+  function resolveTemplateText(rawText, obj) {
+    const templateText = String(rawText === undefined || rawText === null ? "" : rawText);
+    if (!templateText.includes("{")) {
+      return {
+        text: templateText,
+        hasPlaceholder: false,
+        hasTokenValue: false
+      };
+    }
+
+    let hasPlaceholder = false;
+    let hasTokenValue = false;
+    const text = templateText.replace(/\{([^{}]+)\}/g, (full, token) => {
+      hasPlaceholder = true;
+      const resolved = resolveTemplatePlaceholderValue(obj, token);
+      const resolvedText = stringifyTemplateResolvedValue(resolved);
+      if (resolvedText !== "") {
+        hasTokenValue = true;
+      }
+      return resolvedText;
+    });
+
+    return {
+      text,
+      hasPlaceholder,
+      hasTokenValue
+    };
+  }
+
+  function parseSingleTemplatePlaceholderToken(rawText) {
+    const text = String(rawText === undefined || rawText === null ? "" : rawText).trim();
+    if (!text) {
+      return "";
+    }
+    const match = text.match(/^\{([^{}]+)\}$/);
+    if (!match || !match[1]) {
+      return "";
+    }
+    return String(match[1] || "").trim();
+  }
+
+  function buildTemplateDeclTokenCandidates(tokenExpression) {
+    const token = String(tokenExpression || "").trim();
+    if (!token) {
+      return [];
+    }
+
+    const out = new Set();
+    const add = (value) => {
+      const next = String(value || "").trim();
+      if (next) {
+        out.add(next);
+      }
+    };
+
+    add(token);
+
+    if (/\.decl\.finaldesc$/i.test(token)) {
+      add(token.replace(/\.finaldesc$/i, ""));
+    }
+
+    if (/\.finaldesc$/i.test(token)) {
+      const base = token.replace(/\.finaldesc$/i, "");
+      add(base);
+      if (!/\.decl$/i.test(base)) {
+        add(base + ".decl");
+      }
+      add(base + ".declRef");
+    }
+
+    if (/\.desc$/i.test(token)) {
+      const base = token.replace(/\.desc$/i, "");
+      add(base);
+      if (!/\.decl$/i.test(base)) {
+        add(base + ".decl");
+      }
+    }
+
+    if (/^values\./i.test(token) && !/\.decl(\.|$)/i.test(token)) {
+      add(token + ".decl");
+    }
+
+    const lowered = token.toLowerCase();
+    if (lowered === "values.condition.finaldesc" || lowered === "values.condition") {
+      add("values.condition");
+      add("values.condition.leftOperand");
+      add("values.condition.leftOperand.decl");
+      add("values.condition.rightOperand");
+      add("values.condition.rightOperand.decl");
+    }
+
+    if (lowered.includes(".conditions")) {
+      const withoutFinal = token.replace(/\.finaldesc$/i, "");
+      add(withoutFinal);
+      add(withoutFinal + ".leftOperand");
+      add(withoutFinal + ".leftOperand.decl");
+      add(withoutFinal + ".rightOperand");
+      add(withoutFinal + ".rightOperand.decl");
+    }
+
+    return Array.from(out);
+  }
+
+  function collectTemplateEditableDeclsFromResolvedValue(value, outList, depth, seenValues) {
+    const out = Array.isArray(outList) ? outList : [];
+    const currentDepth = Number(depth) || 0;
+    const seen = seenValues instanceof Set ? seenValues : new Set();
+
+    if (value === null || value === undefined) {
+      return out;
+    }
+    if (currentDepth > 5) {
+      return out;
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        collectTemplateEditableDeclsFromResolvedValue(item, out, currentDepth + 1, seen);
+      }
+      return out;
+    }
+
+    if (isDeclLikeObject(value)) {
+      out.push(value);
+      return out;
+    }
+
+    if (typeof value !== "object") {
+      return out;
+    }
+
+    if (seen.has(value)) {
+      return out;
+    }
+    seen.add(value);
+
+    if (isDeclLikeObject(value.decl)) {
+      out.push(value.decl);
+    }
+
+    for (const key of Object.keys(value)) {
+      if (key === "decl" || key === "desc" || key === "finalDesc" || key === "codeDesc" || key === "userDesc") {
+        continue;
+      }
+      collectTemplateEditableDeclsFromResolvedValue(value[key], out, currentDepth + 1, seen);
+    }
+    return out;
+  }
+
+  function getTemplateEditableDeclCandidatesFromResolvedValue(value) {
+    return dedupeTemplateDecls(collectTemplateEditableDeclsFromResolvedValue(value, []));
+  }
+
+  function getTemplateEditableDeclFromResolvedValue(value) {
+    const candidates = getTemplateEditableDeclCandidatesFromResolvedValue(value);
+    return candidates.length ? candidates[0] : null;
+  }
+
+  function resolveTemplateEditableDeclCandidatesFromToken(contextObj, token) {
+    const out = [];
+    const candidates = buildTemplateDeclTokenCandidates(token);
+    for (const candidate of candidates) {
+      const resolved = resolveTemplatePlaceholderValue(contextObj, candidate);
+      const decls = getTemplateEditableDeclCandidatesFromResolvedValue(resolved);
+      if (decls.length) {
+        out.push(...decls);
+      }
+    }
+    return dedupeTemplateDecls(out);
+  }
+
+  function resolveTemplateEditableDeclFromToken(contextObj, token) {
+    const candidates = resolveTemplateEditableDeclCandidatesFromToken(contextObj, token);
+    return candidates.length ? candidates[0] : null;
+  }
+
+  function createTemplateCellModel() {
+    return {
+      text: "",
+      style: {},
+      hidden: false,
+      rowspan: 1,
+      colspan: 1,
+      hasPlaceholder: false,
+      hasTokenValue: false,
+      meta: null
+    };
+  }
+
+  function buildTemplateCellStyle(rangeConfig, position) {
+    const cfg = rangeConfig && typeof rangeConfig === "object" ? rangeConfig : {};
+    const style = {};
+
+    const background = normalizeTemplateColorValue(cfg.background);
+    if (background) {
+      style["background-color"] = background;
+    }
+
+    const fontColor = normalizeTemplateColorValue(cfg["font color"]);
+    if (fontColor) {
+      style.color = fontColor;
+    }
+
+    const fontSize = Number(cfg["font size"]);
+    if (Number.isFinite(fontSize) && fontSize > 0) {
+      style["font-size"] = `${fontSize}pt`;
+    }
+
+    const fontFamilyRaw = String(cfg["font family"] || "").trim();
+    if (fontFamilyRaw && normalizeTemplateAliasToken(fontFamilyRaw) !== "default") {
+      style["font-family"] = fontFamilyRaw;
+    }
+
+    if (cfg.bold === true) {
+      style["font-weight"] = "700";
+    }
+    if (cfg.italic === true) {
+      style["font-style"] = "italic";
+    }
+    if (cfg.underline === true) {
+      style["text-decoration"] = "underline";
+    }
+
+    const align = normalizeTemplateAlignValue(cfg.align);
+    if (align) {
+      style["text-align"] = align;
+    }
+
+    const valign = normalizeTemplateVAlignValue(cfg.valign);
+    if (valign) {
+      style["vertical-align"] = valign;
+    }
+
+    if (cfg.wrap === true) {
+      style["white-space"] = "pre-wrap";
+    } else if (cfg.wrap === false) {
+      style["white-space"] = "nowrap";
+    }
+
+    const border = normalizeTemplateBorderValue(cfg.border);
+    if (border === "outside-thin") {
+      const borderLine = "0.5pt solid #000000";
+      if (position && position.isMergeAnchor) {
+        style.border = borderLine;
+      } else {
+        style["border-top"] = position && position.isTop ? borderLine : "none";
+        style["border-right"] = position && position.isRight ? borderLine : "none";
+        style["border-bottom"] = position && position.isBottom ? borderLine : "none";
+        style["border-left"] = position && position.isLeft ? borderLine : "none";
+      }
+    } else if (border) {
+      style.border = border;
+    }
+
+    return style;
+  }
+
+  function parseTemplateOptionBoolean(value, fallback) {
+    if (typeof value === "boolean") {
+      return value;
+    }
+    if (typeof value === "number") {
+      if (value === 1) {
+        return true;
+      }
+      if (value === 0) {
+        return false;
+      }
+      return fallback;
+    }
+    const token = String(value || "").trim().toLowerCase();
+    if (!token) {
+      return fallback;
+    }
+    if (token === "1" || token === "true" || token === "yes" || token === "y" || token === "on") {
+      return true;
+    }
+    if (token === "0" || token === "false" || token === "no" || token === "n" || token === "off") {
+      return false;
+    }
+    return fallback;
+  }
+
+  function parseTemplateOptionNumber(value, fallback, min, max) {
+    const fallbackValue = Number.isFinite(Number(fallback)) ? Number(fallback) : 0;
+    const minValue = Number.isFinite(Number(min)) ? Number(min) : fallbackValue;
+    const maxValue = Number.isFinite(Number(max)) ? Number(max) : fallbackValue;
+
+    let numeric = NaN;
+    if (typeof value === "number") {
+      numeric = value;
+    } else if (typeof value === "string") {
+      const token = value.trim();
+      if (token) {
+        numeric = Number(token);
+      }
+    }
+
+    if (!Number.isFinite(numeric)) {
+      return fallbackValue;
+    }
+
+    const normalized = Math.round(numeric);
+    return Math.max(minValue, Math.min(maxValue, normalized));
+  }
+
+  function getTemplateOptionByPath(source, path) {
+    if (!source || typeof source !== "object" || Array.isArray(source)) {
+      return undefined;
+    }
+    const parts = String(path || "").split(".").map((item) => String(item || "").trim()).filter(Boolean);
+    if (!parts.length) {
+      return undefined;
+    }
+
+    let current = source;
+    for (const part of parts) {
+      if (!current || typeof current !== "object" || Array.isArray(current)) {
+        return undefined;
+      }
+      if (!Object.prototype.hasOwnProperty.call(current, part)) {
+        return undefined;
+      }
+      current = current[part];
+    }
+    return current;
+  }
+
+  function readTemplateOptionValue(sources, paths) {
+    const sourceList = Array.isArray(sources) ? sources : [];
+    const pathList = Array.isArray(paths) ? paths : [];
+    for (const source of sourceList) {
+      for (const path of pathList) {
+        const value = getTemplateOptionByPath(source, path);
+        if (value !== undefined) {
+          return value;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  function normalizeTemplatePreviewOptions(optionSource, templateDef, rangeSource) {
+    const sources = [optionSource, templateDef, rangeSource];
+    const hideEmptyRows = parseTemplateOptionBoolean(readTemplateOptionValue(sources, [
+      "hideEmptyRows",
+      "removeEmptyRows",
+      "compact.removeEmptyRows"
+    ]), true);
+    const hideRowsWithoutValues = parseTemplateOptionBoolean(readTemplateOptionValue(sources, [
+      "hideRowsWithoutValues",
+      "removeEmptyRowsAdvanced",
+      "removeEmptyRowsAdv",
+      "compact.removeEmptyRowsAdvanced",
+      "compact.removeEmptyRowsAdv"
+    ]), true);
+    const expandMultilineRows = parseTemplateOptionBoolean(readTemplateOptionValue(sources, [
+      "expandMultilineRows",
+      "expandArrayRows",
+      "arrayToRows"
+    ]), false);
+    const squareCells = parseTemplateOptionBoolean(readTemplateOptionValue(sources, [
+      "squareCells",
+      "squareCellsEnabled",
+      "fixedSquareCells"
+    ]), true);
+    const squareCellSize = parseTemplateOptionNumber(readTemplateOptionValue(sources, [
+      "squareCellSize",
+      "squareCellSizePx",
+      "cellSize",
+      "cellSizePx"
+    ]), 18, 16, 240);
+
+    return {
+      hideEmptyRows,
+      hideRowsWithoutValues,
+      expandMultilineRows,
+      squareCells,
+      squareCellSize
+    };
+  }
+
+  function isTemplateRangeMetaKey(rawKey) {
+    const key = String(rawKey || "").trim().toLowerCase();
+    if (!key) {
+      return false;
+    }
+    return (
+      key === "_options"
+      || key === "options"
+      || key === "ranges"
+      || key === "compact"
+      || key === "hideemptyrows"
+      || key === "hiderowswithoutvalues"
+      || key === "expandmultilinerows"
+      || key === "removeemptyrows"
+      || key === "removeemptyrowsadvanced"
+      || key === "removeemptyrowsadv"
+      || key === "expandarrayrows"
+      || key === "arraytorows"
+      || key === "squarecells"
+      || key === "squarecellsenabled"
+      || key === "fixedsquarecells"
+      || key === "squarecellsize"
+      || key === "squarecellsizepx"
+      || key === "cellsize"
+      || key === "cellsizepx"
+    );
+  }
+
+  function resolveTemplateDefinitionForPreview(definition) {
+    if (!definition || typeof definition !== "object" || Array.isArray(definition)) {
+      return {
+        map: null,
+        options: normalizeTemplatePreviewOptions(null, null, null)
+      };
+    }
+
+    const hasRanges = definition.ranges && typeof definition.ranges === "object" && !Array.isArray(definition.ranges);
+    const rangeSource = hasRanges ? definition.ranges : definition;
+    const optionSource = (definition._options && typeof definition._options === "object" && !Array.isArray(definition._options))
+      ? definition._options
+      : ((definition.options && typeof definition.options === "object" && !Array.isArray(definition.options))
+        ? definition.options
+        : null);
+    const options = normalizeTemplatePreviewOptions(optionSource, definition, rangeSource);
+
+    const map = {};
+    for (const [key, value] of Object.entries(rangeSource)) {
+      if (isTemplateRangeMetaKey(key)) {
+        continue;
+      }
+      map[key] = value;
+    }
+
+    return { map, options };
+
+  }
+
+  function splitTemplateTextLines(text) {
+    const normalized = String(text === undefined || text === null ? "" : text)
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n");
+    if (normalized === "") {
+      return [""];
+    }
+    return normalized.split("\n");
+  }
+
+  function getTemplateTextLine(lines, index) {
+    const list = Array.isArray(lines) && lines.length ? lines : [""];
+    const idx = Number(index) || 0;
+    if (idx < list.length) {
+      return String(list[idx] || "");
+    }
+    return String(list[list.length - 1] || "");
+  }
+
+  function cloneTemplateMatrixCell(cell) {
+    if (!cell || typeof cell !== "object") {
+      return createTemplateCellModel();
+    }
+    return {
+      text: String(cell.text || ""),
+      style: { ...(cell.style && typeof cell.style === "object" ? cell.style : {}) },
+      hidden: Boolean(cell.hidden),
+      rowspan: Number(cell.rowspan) || 1,
+      colspan: Number(cell.colspan) || 1,
+      hasPlaceholder: Boolean(cell.hasPlaceholder),
+      hasTokenValue: Boolean(cell.hasTokenValue),
+      meta: cell && cell.meta && typeof cell.meta === "object" ? { ...cell.meta } : null
+    };
+  }
+
+  function expandTemplateMatrixRows(matrix) {
+    const rows = Array.isArray(matrix)
+      ? matrix.map((row) => (Array.isArray(row) ? row.map((cell) => cloneTemplateMatrixCell(cell)) : []))
+      : [];
+    if (!rows.length) {
+      return rows;
+    }
+
+    for (let rowIndex = rows.length - 1; rowIndex >= 0; rowIndex -= 1) {
+      const row = rows[rowIndex];
+      if (!Array.isArray(row) || !row.length) {
+        continue;
+      }
+
+      const hasMergedCells = row.some((cell) => cell && (cell.hidden || cell.rowspan > 1 || cell.colspan > 1));
+      if (hasMergedCells) {
+        continue;
+      }
+
+      const lineByCol = new Map();
+      let maxLines = 1;
+      for (let colIndex = 0; colIndex < row.length; colIndex += 1) {
+        const cell = row[colIndex];
+        if (!cell || cell.hidden) {
+          continue;
+        }
+        const lines = splitTemplateTextLines(cell.text);
+        lineByCol.set(colIndex, lines);
+        maxLines = Math.max(maxLines, lines.length);
+      }
+
+      if (maxLines <= 1) {
+        continue;
+      }
+
+      for (let colIndex = 0; colIndex < row.length; colIndex += 1) {
+        const cell = row[colIndex];
+        if (!cell || cell.hidden) {
+          continue;
+        }
+        const lines = lineByCol.get(colIndex) || [String(cell.text || "")];
+        cell.text = getTemplateTextLine(lines, 0);
+      }
+
+      const extraRows = [];
+      for (let lineIndex = 1; lineIndex < maxLines; lineIndex += 1) {
+        const extraRow = row.map((cell) => cloneTemplateMatrixCell(cell));
+        for (let colIndex = 0; colIndex < extraRow.length; colIndex += 1) {
+          const cell = extraRow[colIndex];
+          if (!cell || cell.hidden) {
+            continue;
+          }
+          const lines = lineByCol.get(colIndex) || [String(cell.text || "")];
+          cell.text = getTemplateTextLine(lines, lineIndex);
+        }
+        extraRows.push(extraRow);
+      }
+
+      if (extraRows.length) {
+        rows.splice(rowIndex + 1, 0, ...extraRows);
+      }
+    }
+
+    return rows;
+  }
+
+  function isTemplateRowBlank(row) {
+    const list = Array.isArray(row) ? row : [];
+    for (const cell of list) {
+      if (!cell || cell.hidden) {
+        continue;
+      }
+      if (String(cell.text || "").trim() !== "") {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function getTemplateRowPlaceholderState(row) {
+    const list = Array.isArray(row) ? row : [];
+    let hasPlaceholder = false;
+    let hasTokenValue = false;
+    for (const cell of list) {
+      if (!cell || cell.hidden) {
+        continue;
+      }
+      if (cell.hasPlaceholder) {
+        hasPlaceholder = true;
+      }
+      if (cell.hasTokenValue) {
+        hasTokenValue = true;
+      }
+    }
+    return { hasPlaceholder, hasTokenValue };
+  }
+
+  function compactTemplateMatrixRows(matrix, options) {
+    const rows = Array.isArray(matrix) ? matrix : [];
+    if (!rows.length) {
+      return rows;
+    }
+
+    const removeAdvanced = options && options.hideRowsWithoutValues === true;
+    const removeEmpty = removeAdvanced || (options && options.hideEmptyRows === true);
+    if (!removeAdvanced && !removeEmpty) {
+      return rows;
+    }
+
+    const out = [];
+    for (const row of rows) {
+      const rowBlank = isTemplateRowBlank(row);
+      if (removeAdvanced) {
+        const stateRow = getTemplateRowPlaceholderState(row);
+        if (rowBlank || (stateRow.hasPlaceholder && !stateRow.hasTokenValue)) {
+          continue;
+        }
+        out.push(row);
+        continue;
+      }
+
+      if (removeEmpty && rowBlank) {
+        continue;
+      }
+      out.push(row);
+    }
+
+    return out;
+  }
+
+  function applyTemplatePreviewOptions(matrix, options) {
+    let next = Array.isArray(matrix) ? matrix : [];
+    if (!next.length) {
+      return next;
+    }
+    if (options && options.expandMultilineRows === true) {
+      next = expandTemplateMatrixRows(next);
+    }
+    return compactTemplateMatrixRows(next, options);
+  }
+
+  function buildTemplateGridModel(obj, templateMap, templateOptions, metaOptions) {
+    const map = templateMap && typeof templateMap === "object" ? templateMap : {};
+    const options = templateOptions && typeof templateOptions === "object"
+      ? templateOptions
+      : normalizeTemplatePreviewOptions(null, null, null);
+    const modelMeta = metaOptions && typeof metaOptions === "object" ? metaOptions : {};
+    const modelTemplateKey = String(modelMeta.templateKey || "").trim();
+    const modelObjectType = String(modelMeta.objectType || "").trim();
+    const entries = [];
+    const errors = [];
+    let maxRow = 0;
+    let maxCol = 0;
+
+    for (const rangeKey of Object.keys(map)) {
+      if (isTemplateRangeMetaKey(rangeKey)) {
+        continue;
+      }
+      try {
+        const parsedRange = parseRangeKey(rangeKey);
+        entries.push({
+          rangeKey,
+          parsedRange,
+          config: map[rangeKey] && typeof map[rangeKey] === "object" ? map[rangeKey] : {}
+        });
+        maxRow = Math.max(maxRow, parsedRange.r2);
+        maxCol = Math.max(maxCol, parsedRange.c2);
+      } catch (err) {
+        errors.push(`${rangeKey}: ${err && err.message ? err.message : err}`);
+      }
+    }
+
+    if (!entries.length) {
+      return {
+        matrix: [],
+        maxRow: 0,
+        maxCol: 0,
+        errors
+      };
+    }
+
+    const matrix = Array.from({ length: maxRow }, () =>
+      Array.from({ length: maxCol }, () => createTemplateCellModel())
+    );
+
+    for (const entry of entries) {
+      const cfg = entry.config;
+      const range = entry.parsedRange;
+      const hasText = Object.prototype.hasOwnProperty.call(cfg, "text");
+      const rawText = hasText ? String(cfg.text === undefined || cfg.text === null ? "" : cfg.text) : "";
+      const textMeta = hasText ? resolveTemplateText(rawText, obj) : null;
+      const placeholderToken = hasText ? parseSingleTemplatePlaceholderToken(rawText) : "";
+      const cellMeta = hasText
+        ? {
+            rangeKey: String(entry.rangeKey || ""),
+            templateKey: modelTemplateKey,
+            rawText,
+            isSinglePlaceholder: Boolean(placeholderToken),
+            placeholderToken,
+            objectType: modelObjectType
+          }
+        : null;
+      const merge = cfg && cfg.merge === true;
+
+      if (merge) {
+        for (let row = range.r1; row <= range.r2; row += 1) {
+          for (let col = range.c1; col <= range.c2; col += 1) {
+            const cell = matrix[row - 1][col - 1];
+            if (!cell) {
+              continue;
+            }
+            const isAnchor = row === range.r1 && col === range.c1;
+            if (isAnchor) {
+              cell.hidden = false;
+              cell.rowspan = range.r2 - range.r1 + 1;
+              cell.colspan = range.c2 - range.c1 + 1;
+              if (hasText) {
+                cell.text = String(textMeta && textMeta.text ? textMeta.text : "");
+                cell.hasPlaceholder = cell.hasPlaceholder || Boolean(textMeta && textMeta.hasPlaceholder);
+                cell.hasTokenValue = cell.hasTokenValue || Boolean(textMeta && textMeta.hasTokenValue);
+                cell.meta = cellMeta ? { ...cellMeta } : cell.meta;
+              }
+              const cellStyle = buildTemplateCellStyle(cfg, {
+                isTop: true,
+                isRight: true,
+                isBottom: true,
+                isLeft: true,
+                isMergeAnchor: true
+              });
+              cell.style = { ...cell.style, ...cellStyle };
+            } else {
+              cell.hidden = true;
+              cell.rowspan = 1;
+              cell.colspan = 1;
+            }
+          }
+        }
+        continue;
+      }
+
+      for (let row = range.r1; row <= range.r2; row += 1) {
+        for (let col = range.c1; col <= range.c2; col += 1) {
+          const cell = matrix[row - 1][col - 1];
+          if (!cell) {
+            continue;
+          }
+          cell.hidden = false;
+          cell.rowspan = 1;
+          cell.colspan = 1;
+          if (hasText) {
+            cell.text = String(textMeta && textMeta.text ? textMeta.text : "");
+            cell.hasPlaceholder = cell.hasPlaceholder || Boolean(textMeta && textMeta.hasPlaceholder);
+            cell.hasTokenValue = cell.hasTokenValue || Boolean(textMeta && textMeta.hasTokenValue);
+            cell.meta = cellMeta ? { ...cellMeta } : cell.meta;
+          }
+          const cellStyle = buildTemplateCellStyle(cfg, {
+            isTop: row === range.r1,
+            isRight: col === range.c2,
+            isBottom: row === range.r2,
+            isLeft: col === range.c1,
+            isMergeAnchor: false
+          });
+          cell.style = { ...cell.style, ...cellStyle };
+        }
+      }
+    }
+
+    const compactedMatrix = applyTemplatePreviewOptions(matrix, options);
+    return {
+      matrix: compactedMatrix,
+      maxRow: compactedMatrix.length,
+      maxCol,
+      errors,
+      options
+    };
+  }
+
+  function renderTemplateTable(model, handlers) {
+    const matrix = model && Array.isArray(model.matrix) ? model.matrix : [];
+    if (!matrix.length) {
+      return null;
+    }
+    const options = model && model.options && typeof model.options === "object"
+      ? model.options
+      : normalizeTemplatePreviewOptions(null, null, null);
+    const squareCells = options.squareCells !== false;
+    const squareCellSize = parseTemplateOptionNumber(options.squareCellSize, 18, 16, 240);
+    const handleCellDblClick = handlers && typeof handlers.onCellDblClick === "function"
+      ? handlers.onCellDblClick
+      : null;
+    const invokeCellHandler = (handler, cellMeta, cellEl, ev) => {
+      if (typeof handler !== "function") {
+        return false;
+      }
+      try {
+        handler(cellMeta, cellEl, ev);
+        ev.__abapTemplateHandled = true;
+        ev.preventDefault();
+        ev.stopPropagation();
+        return true;
+      } catch (err) {
+        if (typeof setError === "function") {
+          setError("Template cell edit failed: " + (err && err.message ? err.message : String(err || "")));
+        }
+        return false;
+      }
+    };
+
+    const table = el("table", {
+      className: "template-preview-table",
+      attrs: {
+        style: squareCells
+          ? "border-collapse:collapse;table-layout:fixed;width:max-content;min-width:max-content;"
+          : "border-collapse:collapse;table-layout:fixed;width:max-content;min-width:100%;"
+      }
+    });
+    const tbody = el("tbody");
+
+    for (let rowIndex = 0; rowIndex < matrix.length; rowIndex += 1) {
+      const row = matrix[rowIndex];
+      const tr = el("tr");
+      for (let colIndex = 0; colIndex < row.length; colIndex += 1) {
+        const cell = row[colIndex];
+        if (!cell || cell.hidden) {
+          continue;
+        }
+
+        const td = document.createElement("td");
+        if (cell.rowspan > 1) {
+          td.rowSpan = cell.rowspan;
+        }
+        if (cell.colspan > 1) {
+          td.colSpan = cell.colspan;
+        }
+
+        const cellText = String(cell.text || "");
+        const textWrap = document.createElement("div");
+        textWrap.textContent = cellText;
+        const contentCssText = toInlineCssText(squareCells ? {
+          display: "block",
+          width: "100%",
+          height: "100%",
+          overflow: "visible",
+          "white-space": "nowrap",
+          "overflow-wrap": "normal",
+          "word-break": "normal",
+          "text-overflow": "clip",
+          "line-height": "1",
+          position: "relative",
+          "z-index": "1",
+          "pointer-events": "none"
+        } : {
+          display: "block",
+          width: "100%",
+          height: "100%"
+        });
+        if (contentCssText) {
+          textWrap.setAttribute("style", contentCssText);
+        }
+        td.appendChild(textWrap);
+        const colSpan = Math.max(1, Number(td.colSpan) || 1);
+        const rowSpan = Math.max(1, Number(td.rowSpan) || 1);
+        const baseMinWidth = squareCells ? `${squareCellSize}px` : "56px";
+        const baseMaxWidth = squareCells ? `${squareCellSize}px` : "360px";
+        const baseWidth = squareCells ? `${squareCellSize * colSpan}px` : "";
+        const baseMinHeight = squareCells ? `${squareCellSize}px` : "";
+        const baseHeight = squareCells ? `${squareCellSize * rowSpan}px` : "";
+        const baseTextOverflow = "";
+        const cssText = toInlineCssText({
+          border: "none",
+          "box-sizing": "border-box",
+          "font-size": "10pt",
+          "font-family": "\"MS PGothic\", \"MS UI Gothic\", Meiryo, sans-serif",
+          color: "#111111",
+          "background-color": "#ffffff",
+          ...cell.style,
+          "min-width": baseMinWidth,
+          "max-width": baseMaxWidth,
+          width: baseWidth,
+          "min-height": baseMinHeight,
+          height: baseHeight,
+          padding: squareCells ? "0" : (cell.style && cell.style.padding ? cell.style.padding : "4px 6px"),
+          "vertical-align": squareCells ? "middle" : (cell.style && cell.style["vertical-align"] ? cell.style["vertical-align"] : "top"),
+          "white-space": squareCells ? "normal" : (cell.style && cell.style["white-space"] ? cell.style["white-space"] : "pre-wrap"),
+          overflow: squareCells ? "visible" : (cell.style && cell.style.overflow ? cell.style.overflow : ""),
+          "text-overflow": squareCells ? "" : (cell.style && cell.style["text-overflow"] ? cell.style["text-overflow"] : baseTextOverflow),
+          "overflow-wrap": squareCells ? "normal" : (cell.style && cell.style["overflow-wrap"] ? cell.style["overflow-wrap"] : ""),
+          "word-break": squareCells ? "normal" : (cell.style && cell.style["word-break"] ? cell.style["word-break"] : ""),
+          "line-height": squareCells ? "1" : (cell.style && cell.style["line-height"] ? cell.style["line-height"] : ""),
+          position: squareCells ? "relative" : (cell.style && cell.style.position ? cell.style.position : "")
+        });
+        if (cssText) {
+          td.setAttribute("style", cssText);
+        }
+
+        const cellMeta = cell && cell.meta && typeof cell.meta === "object" ? cell.meta : null;
+        if (cellMeta && cellMeta.rangeKey) {
+          td.setAttribute("data-template-range-key", String(cellMeta.rangeKey));
+        }
+        if (handleCellDblClick) {
+          const fallbackMeta = cellMeta || {
+            rangeKey: String(td.getAttribute("data-template-range-key") || ""),
+            templateKey: String(table.getAttribute("data-template-key") || ""),
+            rawText: String(cell && cell.text ? cell.text : ""),
+            isSinglePlaceholder: false,
+            placeholderToken: "",
+            objectType: String(table.getAttribute("data-object-type") || "")
+          };
+          td.__templateCellMeta = fallbackMeta;
+          td.classList.add("template-preview-editable");
+          td.tabIndex = 0;
+          td.setAttribute("role", "button");
+          td.setAttribute("title", "Double-click to edit this template cell");
+          td.setAttribute("aria-label", "Edit template cell");
+          td.addEventListener("dblclick", (ev) => {
+            if (ev.__abapTemplateHandled) {
+              return;
+            }
+            invokeCellHandler(handleCellDblClick, fallbackMeta, td, ev);
+          });
+          td.addEventListener("keydown", (ev) => {
+            if (ev.__abapTemplateHandled) {
+              return;
+            }
+            if (ev.key !== "Enter" && ev.key !== " ") {
+              return;
+            }
+            invokeCellHandler(handleCellDblClick, fallbackMeta, td, ev);
+          });
+        }
+
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+
+    if (handleCellDblClick) {
+      table.addEventListener("dblclick", (ev) => {
+        if (ev.__abapTemplateHandled) {
+          return;
+        }
+        const target = ev.target && typeof ev.target.closest === "function"
+          ? ev.target.closest("td")
+          : null;
+        if (!target || !table.contains(target)) {
+          return;
+        }
+        const fallbackMeta = target.__templateCellMeta && typeof target.__templateCellMeta === "object"
+          ? target.__templateCellMeta
+          : {
+              rangeKey: String(target.getAttribute("data-template-range-key") || ""),
+              templateKey: String(table.getAttribute("data-template-key") || ""),
+              rawText: String(target.textContent || ""),
+              isSinglePlaceholder: false,
+              placeholderToken: "",
+              objectType: String(table.getAttribute("data-object-type") || "")
+            };
+        try {
+          handleCellDblClick(fallbackMeta, target, ev);
+          ev.__abapTemplateHandled = true;
+          ev.preventDefault();
+          ev.stopPropagation();
+        } catch (err) {
+          if (typeof setError === "function") {
+            setError("Template cell edit failed: " + (err && err.message ? err.message : String(err || "")));
+          }
+        }
+      });
+    }
+
+    table.appendChild(tbody);
+    return table;
+  }
+
+  async function copyHtmlWithFallback(html, plainText) {
+    const safeHtml = String(html || "");
+    const safeText = String(plainText || "");
+
+    if (
+      safeHtml
+      && navigator.clipboard
+      && typeof navigator.clipboard.write === "function"
+      && typeof window.ClipboardItem === "function"
+    ) {
+      const item = new window.ClipboardItem({
+        "text/html": new Blob([safeHtml], { type: "text/html" }),
+        "text/plain": new Blob([safeText], { type: "text/plain" })
+      });
+      await navigator.clipboard.write([item]);
+      return;
+    }
+
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      await navigator.clipboard.writeText(safeText);
+      return;
+    }
+
+    const temp = document.createElement("div");
+    temp.style.position = "fixed";
+    temp.style.left = "-99999px";
+
+    temp.style.top = "0";
+    temp.setAttribute("contenteditable", "true");
+    temp.innerHTML = safeHtml || safeText.replace(/\n/g, "<br>");
+    document.body.appendChild(temp);
+
+    const selection = window.getSelection();
+    if (!selection) {
+      document.body.removeChild(temp);
+      throw new Error("Clipboard selection is unavailable.");
+    }
+
+    selection.removeAllRanges();
+    const range = document.createRange();
+    range.selectNodeContents(temp);
+    selection.addRange(range);
+    const copied = document.execCommand("copy");
+    selection.removeAllRanges();
+    document.body.removeChild(temp);
+
+    if (!copied) {
+      throw new Error("Copy failed in this browser.");
+    }
+  }
+
+  async function copyHtmlWithFallback(html, plainText) {
+    const safeHtml = String(html || "");
+    const safeText = String(plainText || "");
+    const clipboard = typeof navigator !== "undefined" && navigator ? navigator.clipboard : null;
+    let lastClipboardError = null;
+
+    if (
+      safeHtml
+      && clipboard
+      && typeof clipboard.write === "function"
+      && typeof window.ClipboardItem === "function"
+    ) {
+      try {
+        const item = new window.ClipboardItem({
+          "text/html": new Blob([safeHtml], { type: "text/html" }),
+          "text/plain": new Blob([safeText], { type: "text/plain" })
+        });
+        await clipboard.write([item]);
+        return;
+      } catch (err) {
+        lastClipboardError = err;
+      }
+    }
+
+    if (clipboard && typeof clipboard.writeText === "function") {
+      try {
+        await clipboard.writeText(safeText);
+        return;
+      } catch (err) {
+        lastClipboardError = err;
+      }
+    }
+
+    const temp = document.createElement("div");
+    temp.style.position = "fixed";
+    temp.style.left = "-99999px";
+    temp.style.top = "0";
+    temp.setAttribute("contenteditable", "true");
+    temp.innerHTML = safeHtml || safeText.replace(/\n/g, "<br>");
+    document.body.appendChild(temp);
+
+    const selection = window.getSelection();
+    if (!selection) {
+      document.body.removeChild(temp);
+      if (lastClipboardError) {
+        throw lastClipboardError;
+      }
+      throw new Error("Clipboard selection is unavailable.");
+    }
+
+    selection.removeAllRanges();
+    const range = document.createRange();
+    range.selectNodeContents(temp);
+    selection.addRange(range);
+    const copied = document.execCommand("copy");
+    selection.removeAllRanges();
+    document.body.removeChild(temp);
+
+    if (!copied) {
+      if (lastClipboardError) {
+        throw lastClipboardError;
+      }
+      throw new Error("Copy failed in this browser.");
+    }
+  }
+
+  function resolveTemplateMapForObject(obj, config) {
+    const templates = config && typeof config === "object" && config.templates && typeof config.templates === "object"
+      ? config.templates
+      : {};
+    const objectType = obj && obj.objectType ? String(obj.objectType) : "";
+    if (objectType && Object.prototype.hasOwnProperty.call(templates, objectType)) {
+      const resolved = resolveTemplateDefinitionForPreview(templates[objectType]);
+      return { key: objectType, map: resolved.map, options: resolved.options };
+    }
+    if (Object.prototype.hasOwnProperty.call(templates, "DEFAULT")) {
+      const resolved = resolveTemplateDefinitionForPreview(templates.DEFAULT);
+      return { key: "DEFAULT", map: resolved.map, options: resolved.options };
+    }
+    const resolved = resolveTemplateDefinitionForPreview(null);
+    return { key: "", map: null, options: resolved.options };
+  }
+
+  function buildTemplatePlainTextFromBlock(block) {
+    if (!block) {
+      return "";
+    }
+    return String(block.innerText || block.textContent || "").trim();
+  }
+
+  function isTemplateCopyTableOnlyEnabled() {
+    return Boolean(els.templateCopyTableOnly && els.templateCopyTableOnly.checked);
+  }
+
+  function buildTemplateCopyPayloadFromBlock(block) {
+    if (!block || typeof block.cloneNode !== "function") {
+      return { node: null, text: "" };
+    }
+
+    const clone = block.cloneNode(true);
+    const actionButtons = clone.querySelectorAll("[data-template-action]");
+    for (const actionBtn of Array.from(actionButtons)) {
+      actionBtn.remove();
+    }
+
+    if (isTemplateCopyTableOnlyEnabled()) {
+      const table = clone.querySelector(".template-preview-table");
+      if (table) {
+        return {
+          node: table.cloneNode(true),
+          text: buildTemplatePlainTextFromBlock(table)
+        };
+      }
+    }
+
+    return {
+      node: clone,
+      text: buildTemplatePlainTextFromBlock(clone)
+    };
+  }
+
+  function getRenderableObjectListForTemplate() {
+    const out = [];
+    const roots = Array.isArray(state.renderObjects) ? state.renderObjects : [];
+
+    const appendNode = (obj, depth) => {
+      if (!obj || typeof obj !== "object") {
+        return;
+      }
+      out.push({ obj, depth: Math.max(0, Number(depth) || 0) });
+
+      const children = Array.isArray(obj.children) ? obj.children : [];
+      for (const child of children) {
+        appendNode(child, (Number(depth) || 0) + 1);
+      }
+    };
+
+    for (const root of roots) {
+      appendNode(root, 0);
+    }
+
+    return out;
+  }
+
+  function renderTemplatePreview() {
+    if (!els.templatePreviewOutput) {
+      return;
+    }
+
+    if (!state.data || !Array.isArray(state.renderObjects)) {
+      setTemplatePreviewMessage("No data loaded.");
+      return;
+    }
+
+    const config = state.templateConfig && typeof state.templateConfig === "object"
+      ? state.templateConfig
+      : getDefaultTemplateConfig();
+
+    const check = validateTemplateConfig(config);
+    if (!check.valid) {
+      setTemplatePreviewMessage("Template config is invalid.");
+      setTemplateConfigError(check.errors.join("\n"));
+      return;
+    }
+
+    const items = getRenderableObjectListForTemplate();
+    if (!items.length) {
+      setTemplatePreviewMessage("No renderable objects.");
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    for (let index = 0; index < items.length; index += 1) {
+      const item = items[index];
+      const obj = item.obj;
+      const depth = Math.max(0, Number(item.depth) || 0);
+      const templateContextObj = buildTemplateContextObject(obj, index + 1);
+      const resolved = resolveTemplateMapForObject(obj, config);
+
+      const blockAttrs = { "data-template-index": String(index), "data-depth": String(depth) };
+      const lineStart = Number(obj && obj.lineStart) || 0;
+      if (lineStart > 0) {
+        blockAttrs["data-line-start"] = String(lineStart);
+      }
+      const block = el("div", { className: "template-block", attrs: blockAttrs });
+      const indentPx = Math.min(120, depth * 12);
+      if (indentPx > 0) {
+        block.style.marginLeft = `${indentPx}px`;
+      } else {
+        block.style.marginLeft = "";
+      }
+      const header = el("div", { className: "template-block-header" });
+
+      const left = el("div");
+      const label = getObjectLabel(obj);
+      const titleText = `${index + 1}. ${String(obj.objectType || "OBJECT")}${label ? ` ${label}` : ""}`;
+      left.appendChild(el("h4", { className: "template-block-title", text: titleText }));
+      const meta = renderMeta(obj);
+      const keyText = resolved.key ? `template=${resolved.key}` : "template=missing";
+      left.appendChild(el("div", { className: "template-block-meta", text: [meta, keyText].filter(Boolean).join(" • ") }));
+      header.appendChild(left);
+
+      const actions = el("div", { className: "template-block-actions" });
+      const codeBtn = el("button", {
+        className: "secondary",
+        text: "Code",
+        attrs: { type: "button", "data-template-action": "code" }
+      });
+      codeBtn.addEventListener("click", () => {
+        const selectedIndex = String(index);
+        if (typeof setSelectedTemplateBlock === "function") {
+          setSelectedTemplateBlock(selectedIndex);
+        } else {
+          state.selectedTemplateIndex = selectedIndex;
+        }
+        if (lineStart > 0 && typeof selectCodeLines === "function") {
+          const lineEnd = Number(obj && obj.block && obj.block.lineEnd) || lineStart;
+          selectCodeLines(lineStart, lineEnd);
+        }
+      });
+      actions.appendChild(codeBtn);
+
+      const pathsBtn = el("button", {
+        className: "secondary",
+        text: "Paths",
+        attrs: { type: "button", "data-template-action": "paths" }
+      });
+      pathsBtn.addEventListener("click", (ev) => {
+        if (ev && typeof ev.stopPropagation === "function") {
+          ev.stopPropagation();
+        }
+        openTemplatePathDump(templateContextObj, index, obj);
+      });
+      actions.appendChild(pathsBtn);
+
+      const copyBtn = el("button", {
+        className: "secondary",
+        text: "Copy",
+        attrs: { type: "button", "data-template-action": "copy" }
+      });
+      copyBtn.addEventListener("click", async () => {
+        try {
+          const payload = buildTemplateCopyPayloadFromBlock(block);
+          if (!payload.node) {
+            setError("Nothing to copy.");
+            return;
+          }
+          await copyHtmlWithFallback(payload.node.outerHTML, payload.text);
+          setError("");
+        } catch (err) {
+          setError(`Copy failed: ${err && err.message ? err.message : err}`);
+        }
+      });
+      actions.appendChild(copyBtn);
+      header.appendChild(actions);
+      block.appendChild(header);
+      block.addEventListener("click", () => {
+        const selectedIndex = String(index);
+        if (typeof setSelectedTemplateBlock === "function") {
+          setSelectedTemplateBlock(selectedIndex, { scroll: false });
+        } else {
+          state.selectedTemplateIndex = selectedIndex;
+        }
+      });
+
+      if (!resolved.map || typeof resolved.map !== "object") {
+        block.appendChild(el("div", { className: "template-empty", text: "[Missing template]" }));
+        fragment.appendChild(block);
+        continue;
+      }
+
+      const model = buildTemplateGridModel(templateContextObj, resolved.map, resolved.options, {
+      templateKey: resolved.key || "",
+      objectType: String(obj.objectType || "")
+    });
+      if (model.errors.length) {
+        block.appendChild(el("div", { className: "template-error", text: model.errors.join("\n") }));
+      }
+
+      const table = renderTemplateTable(model, isInteractive ? {
+      onCellDblClick: (cellMeta, cellEl) => {
+        const safeMeta = cellMeta && typeof cellMeta === "object"
+          ? cellMeta
+          : {
+              rangeKey: String(cellEl && typeof cellEl.getAttribute === "function" ? (cellEl.getAttribute("data-template-range-key") || "") : ""),
+              templateKey: String(resolved.key || ""),
+              rawText: String(cellEl && cellEl.textContent ? cellEl.textContent : ""),
+              isSinglePlaceholder: false,
+              placeholderToken: "",
+              objectType: String(obj.objectType || "")
+            };
+        try {
+          openCellUnifiedEditor(safeMeta);
+        } catch (err) {
+          if (typeof setError === "function") {
+            setError("Template cell edit failed: " + (err && err.message ? err.message : String(err || "")));
+          }
+        }
+      }
+    } : null);
+      if (table) {
+      table.setAttribute("data-template-key", String(resolved.key || ""));
+      table.setAttribute("data-object-type", String(obj.objectType || ""));
+      table.setAttribute("data-template-index", indexText);
+      block.appendChild(table);
+    } else {
+      block.appendChild(el("div", { className: "template-empty", text: "[Missing template]" }));
+    }
+
+      fragment.appendChild(block);
+    }
+
+    els.templatePreviewOutput.classList.remove("muted");
+    els.templatePreviewOutput.replaceChildren(fragment);
+    state.templatePreviewCache = { count: items.length };
+    if (state.selectedTemplateIndex !== "" && typeof setSelectedTemplateBlock === "function") {
+      setSelectedTemplateBlock(state.selectedTemplateIndex, { scroll: false });
+    }
+    if (typeof refreshInputGutterTargets === "function") {
+      refreshInputGutterTargets();
+    }
+  }
+
+  function syncTemplateEditorFromState() {
+    if (!els.templateConfigJson) {
+      return;
+    }
+    const pretty = safeJson(state.templateConfig || getDefaultTemplateConfig(), true);
+    state.templateConfigDraft = pretty;
+    els.templateConfigJson.value = pretty;
+  }
+
+  function applyTemplateConfigObject(config, options) {
+    const opts = options && typeof options === "object" ? options : {};
+    const check = validateTemplateConfig(config);
+    if (!check.valid) {
+      setTemplateConfigError(check.errors.join("\n"));
+      return false;
+    }
+
+    const next = cloneJsonValue(config);
+    if (!next || typeof next !== "object") {
+      setTemplateConfigError("Cannot clone template config.");
+      return false;
+    }
+
+    state.templateConfig = next;
+    if (opts.save !== false) {
+      saveTemplateConfig(next);
+    }
+    setTemplateConfigError("");
+    syncTemplateEditorFromState();
+    renderTemplatePreview();
+    return true;
+  }
+
+  function applyTemplateConfigFromEditor() {
+    const raw = els.templateConfigJson ? String(els.templateConfigJson.value || "").trim() : "";
+    if (!raw) {
+      setTemplateConfigError("Template config JSON is empty.");
+      return;
+    }
+
+    let parsed = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err) {
+      setTemplateConfigError(`JSON parse error: ${err && err.message ? err.message : err}`);
+      return;
+    }
+
+    applyTemplateConfigObject(parsed, { save: true });
+  }
+
+  function resetTemplateConfig() {
+    applyTemplateConfigObject(getDefaultTemplateConfig(), { save: true });
+  }
+
+  function exportTemplateConfig() {
+    const config = state.templateConfig || getDefaultTemplateConfig();
+    const content = safeJson(config, true);
+    const fileName = "abap-template-config.json";
+
+    try {
+      const blob = new Blob([content], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setError("");
+    } catch (err) {
+      setError(`Export failed: ${err && err.message ? err.message : err}`);
+    }
+  }
+
+  async function importTemplateConfigFromFile(file) {
+    if (!file) {
+      return;
+    }
+
+    let text = "";
+    try {
+      text = await file.text();
+    } catch (err) {
+      setTemplateConfigError(`Import failed: ${err && err.message ? err.message : err}`);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(text);
+      const applied = applyTemplateConfigObject(parsed, { save: true });
+      if (applied) {
+        setError("");
+      }
+    } catch (err) {
+      setTemplateConfigError(`Import JSON parse error: ${err && err.message ? err.message : err}`);
+    }
+  }
+
+  async function copyAllTemplateBlocks() {
+    if (!els.templatePreviewOutput) {
+      return;
+    }
+    const blocks = Array.from(els.templatePreviewOutput.querySelectorAll(".template-block"));
+    if (!blocks.length) {
+      setError("Nothing to copy.");
+      return;
+    }
+
+    const wrapper = document.createElement("div");
+    const plainLines = [];
+    const tableOnly = isTemplateCopyTableOnlyEnabled();
+    for (const block of blocks) {
+      const payload = buildTemplateCopyPayloadFromBlock(block);
+      if (!payload.node) {
+        continue;
+      }
+      wrapper.appendChild(payload.node);
+      if (tableOnly) {
+        wrapper.appendChild(document.createElement("br"));
+      }
+      plainLines.push(payload.text);
+    }
+
+    if (!wrapper.childNodes.length) {
+      setError("Nothing to copy.");
+      return;
+    }
+
+    await copyHtmlWithFallback(wrapper.innerHTML, plainLines.filter(Boolean).join("\n\n"));
+  }
+
+  function getTemplateVirtualState() {
+    if (!state.templateVirtual || typeof state.templateVirtual !== "object") {
+      state.templateVirtual = {
+        items: [],
+        itemCount: 0,
+        start: 0,
+        end: 0,
+        lastScrollTop: 0,
+        scrollDir: "down",
+        pendingRaf: 0,
+        isAdjustingScroll: false,
+        avgItemHeight: 140,
+        lineTargetMap: new Map(),
+        isInitialized: false
+      };
+    }
+    if (!(state.templateVirtual.lineTargetMap instanceof Map)) {
+      state.templateVirtual.lineTargetMap = new Map();
+    }
+    return state.templateVirtual;
+  }
+
+  function getTemplateVirtualConfig(container, avgItemHeight) {
+    const safeAvg = Math.max(1, Number(avgItemHeight) || 1);
+    const clientHeight = Math.max(0, Number(container && container.clientHeight) || 0);
+    const visibleEstimate = Math.max(1, Math.ceil(clientHeight / safeAvg));
+    const overscanCount = Math.max(2, Math.ceil(visibleEstimate * 0.5));
+    const batchCount = Math.max(4, Math.ceil(visibleEstimate * 0.5));
+    const targetCount = visibleEstimate + (overscanCount * 2);
+    const maxCount = targetCount + (batchCount * 2);
+    const edgeThresholdPx = Math.max(40, Math.round(clientHeight * 0.2));
+    return { visibleEstimate, overscanCount, batchCount, targetCount, maxCount, edgeThresholdPx };
+  }
+
+  function measureTemplateOuterHeight(node) {
+    if (!node || typeof node.getBoundingClientRect !== "function") {
+      return 0;
+    }
+    const rect = node.getBoundingClientRect();
+    let marginTop = 0;
+    let marginBottom = 0;
+    try {
+      const style = window.getComputedStyle(node);
+      marginTop = Number.parseFloat(style && style.marginTop ? style.marginTop : "0") || 0;
+      marginBottom = Number.parseFloat(style && style.marginBottom ? style.marginBottom : "0") || 0;
+    } catch {
+      // ignore
+    }
+    return Math.max(0, rect.height + marginTop + marginBottom);
+  }
+
+  function updateTemplateAverageHeight(virtual, heights) {
+    const list = Array.isArray(heights) ? heights.filter((v) => Number(v) > 0) : [];
+    if (!list.length) {
+      return;
+    }
+    const sampleAvg = list.reduce((sum, value) => sum + Number(value || 0), 0) / list.length;
+    const prev = Math.max(60, Number(virtual.avgItemHeight) || 140);
+    const next = Math.max(60, ((prev * 0.8) + (sampleAvg * 0.2)));
+    virtual.avgItemHeight = Math.round(next);
+  }
+
+  function buildTemplateLineTargetMap(items) {
+    const map = new Map();
+    const list = Array.isArray(items) ? items : [];
+    for (let index = 0; index < list.length; index += 1) {
+      const item = list[index];
+      const obj = item && item.obj ? item.obj : null;
+      if (!obj) {
+        continue;
+      }
+      const line = Number(obj.lineStart) || 0;
+      if (!line || map.has(line)) {
+        continue;
+      }
+      map.set(line, { kind: "template", index: String(index) });
+    }
+    return map;
+  }
+
+  function buildTemplateBlockElement(item, absIndex, config, interactive) {
+    const row = item && typeof item === "object" ? item : null;
+    const obj = row && row.obj ? row.obj : null;
+    if (!obj) {
+      return null;
+    }
+
+    const isInteractive = interactive !== false;
+    const depth = Math.max(0, Number(row.depth) || 0);
+    const lineStart = Number(obj.lineStart) || 0;
+    const indexText = String(absIndex);
+    const templateContextObj = buildTemplateContextObject(obj, absIndex + 1);
+    const resolved = resolveTemplateMapForObject(obj, config);
+    const selected = state.selectedTemplateIndex !== "" && state.selectedTemplateIndex === indexText;
+    const blockAttrs = { "data-template-index": indexText, "data-depth": String(depth) };
+    if (lineStart > 0) {
+      blockAttrs["data-line-start"] = String(lineStart);
+    }
+    const block = el("div", { className: `template-block${selected ? " selected" : ""}`, attrs: blockAttrs });
+    const indentPx = Math.min(120, depth * 12);
+    if (indentPx > 0) {
+      block.style.marginLeft = `${indentPx}px`;
+    } else {
+      block.style.marginLeft = "";
+    }
+
+    const header = el("div", { className: "template-block-header" });
+    const left = el("div");
+    const label = getObjectLabel(obj);
+    const titleText = `${absIndex + 1}. ${String(obj.objectType || "OBJECT")}${label ? ` ${label}` : ""}`;
+    left.appendChild(el("h4", { className: "template-block-title", text: titleText }));
+    const meta = renderMeta(obj);
+    const keyText = resolved.key ? `template=${resolved.key}` : "template=missing";
+    left.appendChild(el("div", { className: "template-block-meta", text: [meta, keyText].filter(Boolean).join(" • ") }));
+    header.appendChild(left);
+
+    if (isInteractive) {
+      const actions = el("div", { className: "template-block-actions" });
+      const codeBtn = el("button", {
+        className: "secondary",
+        text: "Code",
+        attrs: { type: "button", "data-template-action": "code" }
+      });
+      codeBtn.addEventListener("click", () => {
+        if (typeof setSelectedTemplateBlock === "function") {
+          setSelectedTemplateBlock(indexText);
+        } else {
+          state.selectedTemplateIndex = indexText;
+        }
+        if (lineStart > 0 && typeof selectCodeLines === "function") {
+          const lineEnd = Number(obj && obj.block && obj.block.lineEnd) || lineStart;
+          selectCodeLines(lineStart, lineEnd);
+        }
+      });
+      actions.appendChild(codeBtn);
+
+      const pathsBtn = el("button", {
+        className: "secondary",
+        text: "Paths",
+        attrs: { type: "button", "data-template-action": "paths" }
+      });
+      pathsBtn.addEventListener("click", (ev) => {
+        if (ev && typeof ev.stopPropagation === "function") {
+          ev.stopPropagation();
+        }
+        openTemplatePathDump(templateContextObj, absIndex, obj);
+      });
+      actions.appendChild(pathsBtn);
+
+      const copyBtn = el("button", {
+        className: "secondary",
+        text: "Copy",
+        attrs: { type: "button", "data-template-action": "copy" }
+      });
+      copyBtn.addEventListener("click", async () => {
+        try {
+          const payload = buildTemplateCopyPayloadFromBlock(block);
+          if (!payload.node) {
+            setError("Nothing to copy.");
+            return;
+          }
+          await copyHtmlWithFallback(payload.node.outerHTML, payload.text);
+          setError("");
+        } catch (err) {
+          setError(`Copy failed: ${err && err.message ? err.message : err}`);
+        }
+      });
+      actions.appendChild(copyBtn);
+      header.appendChild(actions);
+
+      block.addEventListener("click", () => {
+        if (typeof setSelectedTemplateBlock === "function") {
+          setSelectedTemplateBlock(indexText, { scroll: false });
+        } else {
+          state.selectedTemplateIndex = indexText;
+        }
+      });
+    }
+
+    block.appendChild(header);
+
+    if (!resolved.map || typeof resolved.map !== "object") {
+      block.appendChild(el("div", { className: "template-empty", text: "[Missing template]" }));
+      return block;
+    }
+
+    const model = buildTemplateGridModel(templateContextObj, resolved.map, resolved.options, {
+      templateKey: resolved.key || "",
+      objectType: String(obj.objectType || "")
+    });
+    if (model.errors.length) {
+      block.appendChild(el("div", { className: "template-error", text: model.errors.join("\n") }));
+    }
+
+    const openCellUnifiedEditor = (cellMeta) => {
+      if (!cellMeta || typeof cellMeta !== "object") {
+        return;
+      }
+      const openUnifiedEditorModal = (typeof openTemplateCellUnifiedEditModal === "function")
+        ? openTemplateCellUnifiedEditModal
+        : ((typeof window !== "undefined" && typeof window.openTemplateCellUnifiedEditModal === "function")
+          ? window.openTemplateCellUnifiedEditModal
+          : null);
+      if (!openUnifiedEditorModal) {
+        return;
+      }
+
+      const templateKey = String(cellMeta.templateKey || resolved.key || "").trim();
+      const rangeKey = String(cellMeta.rangeKey || "").trim();
+      const currentText = cellMeta.rawText === undefined || cellMeta.rawText === null
+        ? ""
+        : String(cellMeta.rawText);
+      const token = String(cellMeta.placeholderToken || "").trim();
+
+      const getDescOverrideEntrySafe = (declKey) => {
+        if (!declKey) {
+          return null;
+        }
+        if (typeof getDescOverrideEntry === "function") {
+          return getDescOverrideEntry(declKey);
+        }
+        const rawOverride = state && state.descOverrides ? state.descOverrides[declKey] : null;
+        if (rawOverride === undefined || rawOverride === null) {
+          return null;
+        }
+        if (typeof rawOverride === "string") {
+          return { text: rawOverride, noNormalize: false };
+        }
+        if (typeof rawOverride === "object") {
+          return {
+            text: String(rawOverride.text || ""),
+            noNormalize: rawOverride.noNormalize === true
+          };
+        }
+        return null;
+      };
+
+      let targetDeclCandidates = [];
+      if (token) {
+        try {
+          const resolvedValue = resolveTemplatePlaceholderValue(templateContextObj, token);
+          targetDeclCandidates = getTemplateEditableDeclCandidatesFromResolvedValue(resolvedValue);
+          if (!targetDeclCandidates.length) {
+            targetDeclCandidates = resolveTemplateEditableDeclCandidatesFromToken(templateContextObj, token);
+          }
+        } catch {
+          targetDeclCandidates = [];
+        }
+      }
+      targetDeclCandidates = dedupeTemplateDecls(targetDeclCandidates);
+
+      const modalDeclCandidates = [];
+      for (let index = 0; index < targetDeclCandidates.length; index += 1) {
+        const decl = targetDeclCandidates[index];
+        if (!decl || typeof decl !== "object") {
+          continue;
+        }
+        let declKey = "";
+        try {
+          declKey = typeof getDeclOverrideStorageKey === "function" ? getDeclOverrideStorageKey(decl) : "";
+        } catch {
+          declKey = "";
+        }
+        const descEntry = getDescOverrideEntrySafe(declKey);
+        const techName = typeof getDeclTechName === "function" ? getDeclTechName(decl) : String(decl && decl.name ? decl.name : "");
+        const scopeName = String(decl && decl.scopeLabel ? decl.scopeLabel : "").trim();
+        const label = scopeName ? (techName || "(unknown)") + " @ " + scopeName : (techName || "(unknown)");
+        modalDeclCandidates.push({
+          decl,
+          declKey,
+          label,
+          currentDesc: String(descEntry && descEntry.text ? descEntry.text : ""),
+          skipNormalize: Boolean(descEntry && descEntry.noNormalize),
+          selected: index === 0
+        });
+      }
+
+      openUnifiedEditorModal({
+        metadata: {
+          objectType: String(cellMeta.objectType || obj.objectType || ""),
+          templateKey,
+          rangeKey,
+          token
+        },
+        textPart: {
+          templateKey,
+          rangeKey,
+          objectType: String(cellMeta.objectType || obj.objectType || ""),
+          currentText,
+          onSaveText: ({ text: nextText }) => {
+            if (!templateKey || !rangeKey) {
+              return { ok: false, error: "Missing template key or range key." };
+            }
+            const baseConfig = state.templateConfig && typeof state.templateConfig === "object"
+              ? state.templateConfig
+              : getDefaultTemplateConfig();
+            const nextConfig = {
+              ...baseConfig,
+              templates: { ...(baseConfig.templates && typeof baseConfig.templates === "object" ? baseConfig.templates : {}) }
+            };
+            const currentTemplate = nextConfig.templates[templateKey];
+            const nextTemplate = currentTemplate && typeof currentTemplate === "object" && !Array.isArray(currentTemplate)
+              ? { ...currentTemplate }
+              : {};
+            const existingCell = nextTemplate[rangeKey];
+            const nextCell = existingCell && typeof existingCell === "object" && !Array.isArray(existingCell)
+              ? { ...existingCell }
+              : {};
+            nextCell.text = String(nextText === undefined || nextText === null ? "" : nextText);
+            nextTemplate[rangeKey] = nextCell;
+            nextConfig.templates[templateKey] = nextTemplate;
+            const applied = applyTemplateConfigObject(nextConfig, { save: true });
+            if (!applied) {
+              return { ok: false, error: "Failed to apply template config." };
+            }
+            setError("");
+            return { ok: true };
+          }
+        },
+        descPart: {
+          token,
+          declCandidates: modalDeclCandidates,
+          onSaveDesc: ({ decl, text: nextDesc, skipNormalize }) => {
+            if (!decl || typeof decl !== "object") {
+              return { ok: false, error: "Decl target is unavailable." };
+            }
+            if (typeof getDeclOverrideStorageKey !== "function" || typeof saveDescOverrides !== "function") {
+              return { ok: false, error: "Description override helpers are unavailable." };
+            }
+            const declKey = getDeclOverrideStorageKey(decl);
+            if (!declKey) {
+              return { ok: false, error: "Decl key is unavailable." };
+            }
+            const raw = String(nextDesc === undefined || nextDesc === null ? "" : nextDesc);
+            const trimmed = raw.trim();
+            const stored = skipNormalize ? trimmed : stripDeclCategoryPrefix(trimmed);
+            if (!stored) {
+              delete state.descOverrides[declKey];
+            } else {
+              state.descOverrides[declKey] = skipNormalize ? { text: stored, noNormalize: true } : stored;
+            }
+            const saved = saveDescOverrides();
+            if (saved === false) {
+              return { ok: false, error: "Failed to persist description override." };
+            }
+            state.haystackById = buildSearchIndex(state.renderObjects);
+            if (typeof renderOutput === "function") {
+              renderOutput();
+            }
+            if (typeof renderTemplatePreview === "function") {
+              renderTemplatePreview();
+            }
+            if (typeof renderDeclDescPanelUi === "function" && state.rightTab === "descriptions") {
+              renderDeclDescPanelUi();
+            }
+            return { ok: true };
+          }
+        }
+      });
+    };
+
+    const table = renderTemplateTable(model, isInteractive ? {
+      onCellDblClick: (cellMeta) => {
+        if (!cellMeta || typeof cellMeta !== "object") {
+          return;
+        }
+        openCellUnifiedEditor(cellMeta);
+      }
+    } : null);
+    if (table) {
+      block.appendChild(table);
+    } else {
+      block.appendChild(el("div", { className: "template-empty", text: "[Missing template]" }));
+    }
+
+    return block;
+  }
+
+  function buildTemplateBlockCopyPayload(item, absIndex, config, tableOnly) {
+    const block = buildTemplateBlockElement(item, absIndex, config, false);
+    if (!block || typeof block.cloneNode !== "function") {
+      return { node: null, text: "" };
+    }
+
+    const clone = block.cloneNode(true);
+    const actionButtons = clone.querySelectorAll("[data-template-action]");
+    for (const actionBtn of Array.from(actionButtons)) {
+      actionBtn.remove();
+    }
+
+    if (tableOnly) {
+      const table = clone.querySelector(".template-preview-table");
+      if (table) {
+        return {
+          node: table.cloneNode(true),
+          text: buildTemplatePlainTextFromBlock(table)
+        };
+      }
+    }
+
+    return {
+      node: clone,
+      text: buildTemplatePlainTextFromBlock(clone)
+    };
+  }
+
+  function getTemplateEstimatedItemHeight(virtual) {
+    return Math.max(24, Number(virtual && virtual.avgItemHeight) || 140);
+  }
+
+  function computeTemplateVirtualRangeFromScroll(scrollTop) {
+    const virtual = getTemplateVirtualState();
+    const total = Number(virtual.itemCount) || 0;
+    if (!els.templatePreviewOutput || !total) {
+      return { start: 0, end: 0 };
+    }
+
+    const estimatedHeight = getTemplateEstimatedItemHeight(virtual);
+    const metrics = getTemplateVirtualConfig(els.templatePreviewOutput, estimatedHeight);
+    if (total <= metrics.targetCount) {
+      return { start: 0, end: total };
+    }
+
+    const top = Math.max(0, Number(scrollTop) || 0);
+    const firstVisible = Math.max(0, Math.floor(top / estimatedHeight));
+    let start = Math.max(0, firstVisible - metrics.overscanCount);
+    let end = Math.min(total, start + metrics.targetCount);
+    if ((end - start) < metrics.targetCount) {
+      start = Math.max(0, end - metrics.targetCount);
+    }
+
+    return { start, end };
+  }
+
+  function renderTemplateVirtualRangeReplace(options) {
+    if (!els.templatePreviewOutput) {
+      return;
+    }
+
+    const opts = options && typeof options === "object" ? options : {};
+    const virtual = getTemplateVirtualState();
+    const items = Array.isArray(virtual.items) ? virtual.items : [];
+    const total = items.length;
+    const start = Math.max(0, Math.min(total, Number(virtual.start) || 0));
+    const end = Math.max(start, Math.min(total, Number(virtual.end) || 0));
+    const estimatedHeight = getTemplateEstimatedItemHeight(virtual);
+    const config = virtual.config && typeof virtual.config === "object"
+      ? virtual.config
+      : getDefaultTemplateConfig();
+
+    const frag = document.createDocumentFragment();
+    const topSpacer = document.createElement("div");
+    topSpacer.className = "virtual-spacer template-virtual-spacer-top";
+    topSpacer.style.height = String(Math.max(0, Math.round(start * estimatedHeight))) + "px";
+    topSpacer.setAttribute("aria-hidden", "true");
+    frag.appendChild(topSpacer);
+
+    const heights = [];
+    for (let index = start; index < end; index += 1) {
+      const block = buildTemplateBlockElement(items[index], index, config, true);
+      if (!block) {
+        continue;
+      }
+      frag.appendChild(block);
+      heights.push(measureTemplateOuterHeight(block));
+    }
+
+    const bottomSpacer = document.createElement("div");
+    bottomSpacer.className = "virtual-spacer template-virtual-spacer-bottom";
+    bottomSpacer.style.height = String(Math.max(0, Math.round((total - end) * estimatedHeight))) + "px";
+    bottomSpacer.setAttribute("aria-hidden", "true");
+    frag.appendChild(bottomSpacer);
+
+    els.templatePreviewOutput.classList.remove("muted");
+    els.templatePreviewOutput.replaceChildren(frag);
+    updateTemplateAverageHeight(virtual, heights);
+
+    if (opts.preserveScroll) {
+      const maxTop = Math.max(0, Number(els.templatePreviewOutput.scrollHeight || 0) - Number(els.templatePreviewOutput.clientHeight || 0));
+      els.templatePreviewOutput.scrollTop = Math.max(0, Math.min(maxTop, Number(opts.scrollTop) || 0));
+    } else {
+      els.templatePreviewOutput.scrollTop = Math.max(0, Number(opts.scrollTop) || 0);
+    }
+    virtual.lastScrollTop = Number(els.templatePreviewOutput.scrollTop || 0) || 0;
+  }
+
+  function initTemplateVirtualWindow(items, config, options) {
+    const opts = options && typeof options === "object" ? options : {};
+    const virtual = getTemplateVirtualState();
+    const list = Array.isArray(items) ? items : [];
+
+    if (virtual.pendingRaf) {
+      cancelAnimationFrame(virtual.pendingRaf);
+      virtual.pendingRaf = 0;
+    }
+
+    virtual.items = list;
+    virtual.itemCount = list.length;
+    virtual.lineTargetMap = buildTemplateLineTargetMap(list);
+    virtual.start = 0;
+    virtual.end = 0;
+    virtual.lastScrollTop = 0;
+    virtual.scrollDir = "down";
+    virtual.isAdjustingScroll = false;
+    virtual.isInitialized = list.length > 0;
+    virtual.config = config && typeof config === "object" ? config : getDefaultTemplateConfig();
+
+    if (!list.length) {
+      return;
+    }
+
+    const metrics = getTemplateVirtualConfig(els.templatePreviewOutput, virtual.avgItemHeight);
+    const total = list.length;
+    let start = 0;
+    let end = Math.min(total, metrics.targetCount);
+
+    const selectedIndex = state.selectedTemplateIndex !== ""
+      ? Number(state.selectedTemplateIndex)
+      : Number.NaN;
+    if (Number.isFinite(selectedIndex) && selectedIndex >= 0 && selectedIndex < total) {
+      start = Math.max(0, selectedIndex - Math.floor(metrics.targetCount / 2));
+      end = Math.min(total, start + metrics.targetCount);
+      if ((end - start) < metrics.targetCount) {
+        start = Math.max(0, end - metrics.targetCount);
+      }
+    } else if (opts.preserveScroll === true) {
+      const range = computeTemplateVirtualRangeFromScroll(Number(opts.scrollTop) || 0);
+      start = range.start;
+      end = range.end;
+    }
+
+    virtual.start = start;
+    virtual.end = end;
+    renderTemplateVirtualRangeReplace({
+      preserveScroll: true,
+      scrollTop: opts.preserveScroll === true ? (Number(opts.scrollTop) || 0) : 0
+    });
+  }
+
+  function ensureTemplateWindowContainsIndex(index) {
+    const absIndex = Number(index);
+    if (!Number.isFinite(absIndex) || absIndex < 0 || !els.templatePreviewOutput) {
+      return false;
+    }
+    const virtual = getTemplateVirtualState();
+    const total = Number(virtual.itemCount) || 0;
+    if (!virtual.isInitialized || !total || absIndex >= total) {
+      return false;
+    }
+    if (absIndex >= virtual.start && absIndex < virtual.end) {
+      return true;
+    }
+
+    const metrics = getTemplateVirtualConfig(els.templatePreviewOutput, virtual.avgItemHeight);
+    let start = Math.max(0, absIndex - Math.floor(metrics.targetCount / 2));
+    let end = Math.min(total, start + metrics.targetCount);
+    if ((end - start) < metrics.targetCount) {
+      start = Math.max(0, end - metrics.targetCount);
+    }
+
+    virtual.start = start;
+    virtual.end = end;
+    const targetTop = Math.max(0, Math.round(start * getTemplateEstimatedItemHeight(virtual)));
+    renderTemplateVirtualRangeReplace({ preserveScroll: false, scrollTop: targetTop });
+    return true;
+  }
+
+  function processTemplateVirtualScrollFrame() {
+    if (!els.templatePreviewOutput) {
+      return;
+    }
+    const virtual = getTemplateVirtualState();
+    const total = Number(virtual.itemCount) || 0;
+    if (!virtual.isInitialized || !total) {
+      return;
+    }
+
+    const currentTop = Number(els.templatePreviewOutput.scrollTop || 0) || 0;
+    const prevTop = Number(virtual.lastScrollTop || 0) || 0;
+    virtual.scrollDir = currentTop >= prevTop ? "down" : "up";
+    virtual.lastScrollTop = currentTop;
+
+    const range = computeTemplateVirtualRangeFromScroll(currentTop);
+    if (range.start === virtual.start && range.end === virtual.end) {
+      return;
+    }
+
+    virtual.start = range.start;
+    virtual.end = range.end;
+    renderTemplateVirtualRangeReplace({ preserveScroll: true, scrollTop: currentTop });
+  }
+
+  function scheduleTemplateVirtualScroll() {
+    const virtual = getTemplateVirtualState();
+    if (virtual.pendingRaf) {
+      return;
+    }
+    virtual.pendingRaf = requestAnimationFrame(() => {
+      virtual.pendingRaf = 0;
+      processTemplateVirtualScrollFrame();
+    });
+  }
+
+  function handleTemplateVirtualScroll() {
+    scheduleTemplateVirtualScroll();
+  }
+
+function resetTemplateVirtualState() {
+    const virtual = getTemplateVirtualState();
+    if (virtual.pendingRaf) {
+      cancelAnimationFrame(virtual.pendingRaf);
+      virtual.pendingRaf = 0;
+    }
+    virtual.items = [];
+    virtual.itemCount = 0;
+    virtual.start = 0;
+    virtual.end = 0;
+    virtual.lastScrollTop = 0;
+    virtual.scrollDir = "down";
+    virtual.isAdjustingScroll = false;
+    virtual.lineTargetMap = new Map();
+    virtual.isInitialized = false;
+  }
+
+  function renderTemplatePreview() {
+    if (!els.templatePreviewOutput) {
+      return;
+    }
+
+    if (!state.data || !Array.isArray(state.renderObjects)) {
+      resetTemplateVirtualState();
+      setTemplatePreviewMessage("No data loaded.");
+      if (typeof refreshInputGutterTargets === "function") {
+        refreshInputGutterTargets();
+      }
+      return;
+    }
+
+    const config = state.templateConfig && typeof state.templateConfig === "object"
+      ? state.templateConfig
+      : getDefaultTemplateConfig();
+
+    const check = validateTemplateConfig(config);
+    if (!check.valid) {
+      resetTemplateVirtualState();
+      setTemplatePreviewMessage("Template config is invalid.");
+      setTemplateConfigError(check.errors.join("\n"));
+      if (typeof refreshInputGutterTargets === "function") {
+        refreshInputGutterTargets();
+      }
+      return;
+    }
+
+    const items = getRenderableObjectListForTemplate();
+    if (!items.length) {
+      resetTemplateVirtualState();
+      setTemplatePreviewMessage("No renderable objects.");
+      if (typeof refreshInputGutterTargets === "function") {
+        refreshInputGutterTargets();
+      }
+      return;
+    }
+
+    const scrollTop = Number(els.templatePreviewOutput.scrollTop || 0) || 0;
+    initTemplateVirtualWindow(items, config, { preserveScroll: true, scrollTop });
+    state.templatePreviewCache = { count: items.length };
+
+    if (state.selectedTemplateIndex !== "" && typeof setSelectedTemplateBlock === "function") {
+      setSelectedTemplateBlock(state.selectedTemplateIndex, { scroll: false, ensure: false });
+    }
+    if (typeof refreshInputGutterTargets === "function") {
+      refreshInputGutterTargets();
+    }
+  }
+
+  async function copyAllTemplateBlocks() {
+    const virtual = getTemplateVirtualState();
+    const items = Array.isArray(virtual.items) && virtual.items.length
+      ? virtual.items
+      : getRenderableObjectListForTemplate();
+    if (!items.length) {
+      setError("Nothing to copy.");
+      return;
+    }
+
+    const config = virtual.config && typeof virtual.config === "object"
+      ? virtual.config
+      : (state.templateConfig && typeof state.templateConfig === "object"
+        ? state.templateConfig
+        : getDefaultTemplateConfig());
+
+    const wrapper = document.createElement("div");
+    const plainLines = [];
+    const tableOnly = isTemplateCopyTableOnlyEnabled();
+    for (let index = 0; index < items.length; index += 1) {
+      const payload = buildTemplateBlockCopyPayload(items[index], index, config, tableOnly);
+      if (!payload.node) {
+        continue;
+      }
+      wrapper.appendChild(payload.node);
+      if (tableOnly) {
+        wrapper.appendChild(document.createElement("br"));
+      }
+      plainLines.push(payload.text);
+    }
+
+    if (!wrapper.childNodes.length) {
+      setError("Nothing to copy.");
+      return;
+    }
+
+    await copyHtmlWithFallback(wrapper.innerHTML, plainLines.filter(Boolean).join("\n\n"));
+  }
+
+window.AbapViewerModules.factories = window.AbapViewerModules.factories || {};
+window.AbapViewerModules.factories["03-template-preview"] = function registerTemplatePreview(runtime) {
+  const targetRuntime = runtime || (window.AbapViewerRuntime = window.AbapViewerRuntime || {});
+  targetRuntime.api = targetRuntime.api || {};
+  targetRuntime.api.renderTemplatePreview = renderTemplatePreview;
+  targetRuntime.api.applyTemplateConfigFromEditor = applyTemplateConfigFromEditor;
+  window.AbapViewerModules.parts["03-template-preview"] = true;
+};
+window.AbapViewerModules.factories["03-template-preview"](window.AbapViewerRuntime);

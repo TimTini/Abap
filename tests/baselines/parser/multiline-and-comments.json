@@ -1,0 +1,548 @@
+{
+  "file": "multiline-and-comments.abap",
+  "objects": [
+    {
+      "block": null,
+      "children": [],
+      "comment": "leading-comment",
+      "extras": {
+        "performCall": {
+          "changing": [],
+          "form": "do_work",
+          "ifCondition": "",
+          "ifConditions": [],
+          "program": "",
+          "tables": [],
+          "using": []
+        }
+      },
+      "file": "multiline-and-comments.abap",
+      "keywords": {
+        "stmt": {
+          "label": "stmt",
+          "text": "PERFORM"
+        }
+      },
+      "lineStart": 4,
+      "objectType": "PERFORM",
+      "raw": "PERFORM do_work.",
+      "segmentIndex": 0,
+      "values": {
+        "form": {
+          "codeDesc": "leading-comment",
+          "label": "form-name",
+          "name": "form",
+          "userDesc": "",
+          "value": "do_work"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "multiline-and-comments.abap",
+      "keywords": {
+        "stmt": {
+          "label": "stmt",
+          "text": "DATA"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        },
+        "value": {
+          "label": "value",
+          "text": "VALUE"
+        }
+      },
+      "lineStart": 7,
+      "objectType": "DATA",
+      "raw": "DATA lv_text TYPE string VALUE |A, B|.",
+      "segmentIndex": 0,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "lv_text",
+            "file": "multiline-and-comments.abap",
+            "lineStart": 7,
+            "raw": "DATA lv_text TYPE string VALUE |A, B|.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "lv_text",
+          "label": "var-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "lv_text"
+        },
+        "type": {
+          "codeDesc": "",
+          "label": "type-name",
+          "name": "type",
+          "userDesc": "",
+          "value": "string"
+        },
+        "value": {
+          "codeDesc": "",
+          "label": "value",
+          "name": "value",
+          "userDesc": "",
+          "value": "|A, B|"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "multiline-and-comments.abap",
+      "keywords": {
+        "stmt": {
+          "label": "stmt",
+          "text": "DATA"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        },
+        "value": {
+          "label": "value",
+          "text": "VALUE"
+        }
+      },
+      "lineStart": 8,
+      "objectType": "DATA",
+      "raw": "DATA lv_other TYPE string VALUE |C|.",
+      "segmentIndex": 0,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "lv_other",
+            "file": "multiline-and-comments.abap",
+            "lineStart": 8,
+            "raw": "DATA lv_other TYPE string VALUE |C|.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "lv_other",
+          "label": "var-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "lv_other"
+        },
+        "type": {
+          "codeDesc": "",
+          "label": "type-name",
+          "name": "type",
+          "userDesc": "",
+          "value": "string"
+        },
+        "value": {
+          "codeDesc": "",
+          "label": "value",
+          "name": "value",
+          "userDesc": "",
+          "value": "|C|"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "multiline-and-comments.abap",
+      "keywords": {
+        "assign": {
+          "label": "assign",
+          "text": "="
+        }
+      },
+      "lineStart": 10,
+      "objectType": "ASSIGNMENT",
+      "raw": "lv_message = 'A\"B'.",
+      "segmentIndex": 0,
+      "values": {
+        "expr": {
+          "codeDesc": "",
+          "label": "expr",
+          "name": "expr",
+          "userDesc": "",
+          "value": "'A\"B'"
+        },
+        "op": {
+          "codeDesc": "",
+          "label": "op",
+          "name": "op",
+          "userDesc": "",
+          "value": "="
+        },
+        "target": {
+          "codeDesc": "",
+          "label": "target",
+          "name": "target",
+          "userDesc": "",
+          "value": "lv_message"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "multiline-and-comments.abap",
+      "keywords": {
+        "assign": {
+          "label": "assign",
+          "text": "="
+        }
+      },
+      "lineStart": 11,
+      "objectType": "ASSIGNMENT",
+      "raw": "lv_template = |A \" B|.",
+      "segmentIndex": 0,
+      "values": {
+        "expr": {
+          "codeDesc": "",
+          "label": "expr",
+          "name": "expr",
+          "userDesc": "",
+          "value": "|A \" B|"
+        },
+        "op": {
+          "codeDesc": "",
+          "label": "op",
+          "name": "op",
+          "userDesc": "",
+          "value": "="
+        },
+        "target": {
+          "codeDesc": "",
+          "label": "target",
+          "name": "target",
+          "userDesc": "",
+          "value": "lv_template"
+        }
+      }
+    },
+    {
+      "block": {
+        "endKeyword": "ENDFORM",
+        "endRaw": "ENDFORM.",
+        "lineEnd": 17
+      },
+      "children": [
+        {
+          "block": {
+            "endKeyword": "ENDIF",
+            "endRaw": "ENDIF.",
+            "lineEnd": 16
+          },
+          "children": [
+            {
+              "block": null,
+              "children": [],
+              "comment": "",
+              "extras": null,
+              "file": "multiline-and-comments.abap",
+              "keywords": {
+                "assign": {
+                  "label": "assign",
+                  "text": "="
+                }
+              },
+              "lineStart": 15,
+              "objectType": "ASSIGNMENT",
+              "raw": "lv_other = |done|.",
+              "segmentIndex": 0,
+              "values": {
+                "expr": {
+                  "codeDesc": "",
+                  "label": "expr",
+                  "name": "expr",
+                  "userDesc": "",
+                  "value": "|done|"
+                },
+                "op": {
+                  "codeDesc": "",
+                  "label": "op",
+                  "name": "op",
+                  "userDesc": "",
+                  "value": "="
+                },
+                "target": {
+                  "codeDesc": "",
+                  "decl": {
+                    "objectType": "DATA",
+                    "name": "lv_other",
+                    "file": "multiline-and-comments.abap",
+                    "lineStart": 8,
+                    "raw": "DATA lv_other TYPE string VALUE |C|.",
+                    "comment": "",
+                    "scopeLabel": "GLOBAL",
+                    "scopeType": "GLOBAL",
+                    "scopeName": "",
+                    "structName": "",
+                    "structObjectType": "",
+                    "structLineStart": 0,
+                    "fieldPath": "",
+                    "traceFile": "",
+                    "traceLineStart": 0,
+                    "synthetic": false
+                  },
+                  "declRef": "lv_other",
+                  "label": "target",
+                  "name": "target",
+                  "userDesc": "",
+                  "value": "lv_other"
+                }
+              }
+            }
+          ],
+          "comment": "",
+          "extras": {
+            "ifCondition": {
+              "conditionRaw": "lv_text IS NOT INITIAL OR lv_other = |C|",
+              "conditions": [
+                {
+                  "comparisonOperator": "IS",
+                  "leftOperand": "lv_text",
+                  "leftOperandDecl": {
+                    "objectType": "DATA",
+                    "name": "lv_text",
+                    "file": "multiline-and-comments.abap",
+                    "lineStart": 7,
+                    "raw": "DATA lv_text TYPE string VALUE |A, B|.",
+                    "comment": "",
+                    "scopeLabel": "GLOBAL",
+                    "scopeType": "GLOBAL",
+                    "scopeName": "",
+                    "structName": "",
+                    "structObjectType": "",
+                    "structLineStart": 0,
+                    "fieldPath": "",
+                    "traceFile": "",
+                    "traceLineStart": 0,
+                    "synthetic": false
+                  },
+                  "leftOperandRef": "lv_text",
+                  "logicalConnector": "OR",
+                  "rightOperand": "NOT INITIAL",
+                  "rightOperandDecl": {
+                    "objectType": "SYSTEM",
+                    "name": "NOT INITIAL",
+                    "file": "",
+                    "lineStart": 0,
+                    "raw": "",
+                    "comment": "",
+                    "scopeLabel": "SYSTEM",
+                    "scopeType": "SYSTEM",
+                    "scopeName": "",
+                    "structName": "",
+                    "structObjectType": "",
+                    "structLineStart": 0,
+                    "fieldPath": "",
+                    "traceFile": "",
+                    "traceLineStart": 0,
+                    "synthetic": false
+                  }
+                },
+                {
+                  "comparisonOperator": "=",
+                  "leftOperand": "lv_other",
+                  "leftOperandDecl": {
+                    "objectType": "DATA",
+                    "name": "lv_other",
+                    "file": "multiline-and-comments.abap",
+                    "lineStart": 8,
+                    "raw": "DATA lv_other TYPE string VALUE |C|.",
+                    "comment": "",
+                    "scopeLabel": "GLOBAL",
+                    "scopeType": "GLOBAL",
+                    "scopeName": "",
+                    "structName": "",
+                    "structObjectType": "",
+                    "structLineStart": 0,
+                    "fieldPath": "",
+                    "traceFile": "",
+                    "traceLineStart": 0,
+                    "synthetic": false
+                  },
+                  "leftOperandRef": "lv_other",
+                  "logicalConnector": "",
+                  "rightOperand": "|C|",
+                  "rightOperandDecl": {
+                    "objectType": "CONDITION_VALUE",
+                    "name": "|C|",
+                    "file": "",
+                    "lineStart": 0,
+                    "raw": "|C|",
+                    "comment": "",
+                    "scopeLabel": "CONDITION",
+                    "scopeType": "SYSTEM",
+                    "scopeName": "",
+                    "structName": "",
+                    "structObjectType": "",
+                    "structLineStart": 0,
+                    "fieldPath": "",
+                    "traceFile": "",
+                    "traceLineStart": 0,
+                    "synthetic": false
+                  }
+                }
+              ]
+            }
+          },
+          "file": "multiline-and-comments.abap",
+          "keywords": {
+            "initial": {
+              "label": "initial",
+              "text": "INITIAL"
+            },
+            "is": {
+              "label": "is",
+              "text": "IS"
+            },
+            "not": {
+              "label": "not",
+              "text": "NOT"
+            },
+            "or": {
+              "label": "or",
+              "text": "OR"
+            },
+            "stmt": {
+              "label": "stmt",
+              "text": "IF"
+            }
+          },
+          "lineStart": 14,
+          "objectType": "IF",
+          "raw": "IF lv_text IS NOT INITIAL OR lv_other = |C|.",
+          "segmentIndex": 0,
+          "values": {
+            "condition": {
+              "codeDesc": "",
+              "decl": {
+                "objectType": "DATA",
+                "name": "lv_text",
+                "file": "multiline-and-comments.abap",
+                "lineStart": 7,
+                "raw": "DATA lv_text TYPE string VALUE |A, B|.",
+                "comment": "",
+                "scopeLabel": "GLOBAL",
+                "scopeType": "GLOBAL",
+                "scopeName": "",
+                "structName": "",
+                "structObjectType": "",
+                "structLineStart": 0,
+                "fieldPath": "",
+                "traceFile": "",
+                "traceLineStart": 0,
+                "synthetic": false
+              },
+              "declRef": "lv_text",
+              "label": "condition",
+              "name": "condition",
+              "userDesc": "",
+              "value": "lv_text IS NOT INITIAL OR lv_other = |C|"
+            }
+          }
+        }
+      ],
+      "comment": "",
+      "extras": {
+        "form": {
+          "exceptions": [],
+          "name": "do_work",
+          "nameFromComment": "",
+          "params": []
+        }
+      },
+      "file": "multiline-and-comments.abap",
+      "keywords": {
+        "stmt": {
+          "label": "stmt",
+          "text": "FORM"
+        }
+      },
+      "lineStart": 13,
+      "objectType": "FORM",
+      "raw": "FORM do_work.",
+      "segmentIndex": 0,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "label": "form-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "do_work"
+        }
+      }
+    }
+  ],
+  "decls": [
+    {
+      "objectType": "DATA",
+      "name": "lv_text",
+      "file": "multiline-and-comments.abap",
+      "lineStart": 7,
+      "raw": "DATA lv_text TYPE string VALUE |A, B|.",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "DATA",
+      "name": "lv_other",
+      "file": "multiline-and-comments.abap",
+      "lineStart": 8,
+      "raw": "DATA lv_other TYPE string VALUE |C|.",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    }
+  ]
+}

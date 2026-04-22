@@ -1,0 +1,19 @@
+{
+  "name": "abap-viewer-regression-tests",
+  "private": true,
+  "version": "0.0.0-test",
+  "scripts": {
+    "build:baselines": "node tests/build-regression-baselines.js",
+    "test:parser": "node tests/parser-regression.js && node tests/parser-contracts.js",
+    "test:runtime": "node tests/runtime-bundle-contracts.js",
+    "test:viewer": "node tests/viewer-contracts.js",
+    "test:contracts": "node tests/parser-contracts.js && node tests/runtime-bundle-contracts.js && node tests/viewer-contracts.js",
+    "test:all": "npm run test:parser && npm run test:runtime && npm run test:viewer && node --check shared/abap-parser.js && node --check viewer/app.js"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.3"
+  },
+  "dependencies": {
+    "playwright": "^1.59.1"
+  }
+}

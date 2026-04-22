@@ -6,3 +6,6 @@ tmp-*.js
 # OS/editor noise
 .DS_Store
 Thumbs.db
+
+# Local package installs
+node_modules/

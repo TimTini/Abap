@@ -1,10 +1,392 @@
-"use strict";
+      const startKeyword = config.match && config.match.startKeyword;
+      if (startKeyword && isChainedStatementStart(statement.raw, startKeyword)) {
+        const chainedStatements = splitChainedStatementWithMeta(statement, startKeyword);
+        const chainedObjects = [];
+        const structStack = [];
 
-(function (root) {
-  const globalRoot = root || (typeof globalThis !== "undefined" ? globalThis : this);
-  const registry = globalRoot.__AbapSourceParts = globalRoot.__AbapSourceParts || {};
-  const targetKey = "shared/abap-parser.js";
-  const partKey = "shared/abap-parser/02-config.js";
-  const bucket = registry[targetKey] = registry[targetKey] || {};
-  bucket[partKey] = "      const startKeyword = config.match && config.match.startKeyword;\n      if (startKeyword && isChainedStatementStart(statement.raw, startKeyword)) {\n        const chainedStatements = splitChainedStatementWithMeta(statement, startKeyword);\n        const chainedObjects = [];\n        const structStack = [];\n\n        for (const segment of chainedStatements) {\n          const raw = segment && typeof segment === \"object\" ? segment.raw : segment;\n          const overrides = segment && typeof segment === \"object\"\n            ? {\n                lineStart: segment.lineStart || null,\n                comment: segment.comment || \"\",\n                commentLines: Array.isArray(segment.commentLines) ? segment.commentLines : []\n              }\n            : null;\n\n          const obj = buildObjectFromRaw(raw, config, statement, fileName, nextId(), parentId, overrides);\n          if (!obj) {\n            continue;\n          }\n\n          const segTokens = tokenize(raw);\n          const marker = detectStructMarkerFromTokens(segTokens, startKeyword);\n          if (marker) {\n            const normalizedName = normalizeIdentifierCandidate(marker.name);\n            const nameUpper = normalizedName ? normalizedName.toUpperCase() : \"\";\n            const rootUpper = structStack.length ? structStack[0].nameUpper : nameUpper;\n            const isRootBegin = marker.kind === \"BEGIN\" && structStack.length === 0;\n\n            if (marker.kind === \"BEGIN\") {\n              structStack.push({ nameUpper, name: normalizedName || marker.name });\n            } else if (marker.kind === \"END\") {\n              // Pop 1 level when names match; otherwise just pop once (best-effort).\n              if (structStack.length) {\n                const top = structStack[structStack.length - 1];\n                if (top && top.nameUpper && top.nameUpper === nameUpper) {\n                  structStack.pop();\n                } else {\n                  structStack.pop();\n                }\n              }\n            }\n\n            attachStructMeta(obj, {\n              kind: marker.kind,\n              rootNameUpper: rootUpper || nameUpper,\n              depth: marker.kind === \"BEGIN\" ? structStack.length : structStack.length + 1,\n              isDecl: isRootBegin\n            });\n          } else if (structStack.length) {\n            attachStructMeta(obj, {\n              kind: \"FIELD\",\n              rootNameUpper: structStack[0].nameUpper,\n              depth: structStack.length,\n              isDecl: false\n            });\n          } else {\n            attachStructMeta(obj, null);\n          }\n\n          chainedObjects.push(obj);\n        }\n\n        return chainedObjects.length ? chainedObjects : null;\n      }\n\n      const object = buildObjectFromRaw(statement.raw, config, statement, fileName, nextId(), parentId);\n      if (object && startKeyword) {\n        const marker = detectStructMarkerFromTokens(tokenize(statement.raw), startKeyword);\n        if (marker) {\n          const normalizedName = normalizeIdentifierCandidate(marker.name);\n          const nameUpper = normalizedName ? normalizedName.toUpperCase() : \"\";\n          attachStructMeta(object, {\n            kind: marker.kind,\n            rootNameUpper: nameUpper,\n            depth: 1,\n            isDecl: marker.kind === \"BEGIN\"\n          });\n        } else {\n          attachStructMeta(object, null);\n        }\n      }\n      return object ? [object] : null;\n    }\n\n    return null;\n  }\n\n  function detectStructMarkerFromTokens(tokens, startKeyword) {\n    if (!startKeyword || !Array.isArray(tokens) || tokens.length < 4) {\n      return null;\n    }\n\n    if (!tokens[0] || tokens[0].upper !== String(startKeyword).toUpperCase()) {\n      return null;\n    }\n\n    const t1 = tokens[1] ? tokens[1].upper : \"\";\n    const t2 = tokens[2] ? tokens[2].upper : \"\";\n    const t3 = tokens[3] ? tokens[3].raw : \"\";\n\n    if (t1 === \"BEGIN\" && t2 === \"OF\" && t3) {\n      return { kind: \"BEGIN\", name: t3 };\n    }\n\n    if (t1 === \"END\" && t2 === \"OF\" && t3) {\n      return { kind: \"END\", name: t3 };\n    }\n\n    return null;\n  }\n\n  function attachStructMeta(obj, meta) {\n    if (!obj) {\n      return;\n    }\n\n    if (!meta) {\n      return;\n    }\n\n    const existingExtras = obj.extras && typeof obj.extras === \"object\" ? obj.extras : null;\n    obj.extras = {\n      ...(existingExtras || {}),\n      structDef: {\n        kind: meta.kind || \"\",\n        rootNameUpper: meta.rootNameUpper || \"\",\n        depth: Number(meta.depth || 0) || 0,\n        isDecl: Boolean(meta.isDecl)\n      }\n    };\n  }\n\n  function matchesConfig(tokens, config, raw) {\n    const match = config.match || {};\n    const matchType = match.type ? String(match.type).trim().toLowerCase() : \"\";\n    if (matchType === \"assignment\") {\n      return isAssignmentStatement(tokens) && !isMethodCallExpressionStatement(raw);\n    }\n    if (matchType === \"methodcallexpr\") {\n      return isMethodCallExpressionStatement(raw);\n    }\n    if (match.startTokens && match.startTokens.length) {\n      return matchesTokens(tokens, 0, match.startTokens);\n    }\n\n    const startKeyword = match.startKeyword;\n    if (startKeyword) {\n      return tokens[0].upper === startKeyword;\n    }\n\n    return false;\n  }\n\n  function buildObjectFromRaw(raw, config, statement, fileName, id, parentId, overrides) {\n    return buildObjectFromRawWithOverrides(raw, config, statement, fileName, id, parentId, overrides || null);\n  }\n\n  function buildObjectFromRawWithOverrides(raw, config, statement, fileName, id, parentId, overrides) {\n    const tokens = tokenize(raw);\n    if (tokens.length === 0) {\n      return null;\n    }\n\n    const commentText = overrides && typeof overrides.comment === \"string\" ? overrides.comment : statement.comment;\n    const commentLines = overrides && Array.isArray(overrides.commentLines)\n      ? overrides.commentLines\n      : statement.commentLines || [];\n    const lineStart = overrides && overrides.lineStart ? Number(overrides.lineStart) || null : statement.lineStart;\n\n    const keywordEntries = detectKeywords(tokens, config);\n    const match = config.match || {};\n    const matchType = match.type ? String(match.type).trim().toLowerCase() : \"\";\n    let valueEntries = [];\n    if (matchType === \"assignment\") {\n      valueEntries = captureAssignmentValues(tokens, commentText);\n    } else if (matchType === \"methodcallexpr\") {\n      valueEntries = captureMethodCallExpressionValues(raw, commentText);\n    } else {\n      valueEntries = captureValues(tokens, config, commentText);\n    }\n\n    const keywords = groupEntriesByKey(keywordEntries, \"label\");\n    const values = groupEntriesByKey(valueEntries, \"name\");\n\n    const extras = buildExtras(config, {\n      raw,\n      values,\n      commentLines\n    });\n    const block = config.block && config.block.endKeyword\n      ? {\n          endKeyword: config.block.endKeyword,\n          endRaw: \"\",\n          lineEnd: null\n        }\n      : null;\n\n    return new AbapObject({\n      id,\n      parent: parentId,\n      objectType: config.object,\n      file: fileName,\n      lineStart,\n      raw,\n      block,\n      extras,\n      comment: commentText,\n      keywords,\n      values,\n      children: []\n    });\n  }\n\n  function isAssignmentStatement(tokens) {\n    if (!Array.isArray(tokens) || tokens.length < 3) {\n      return false;\n    }\n\n    const op = tokens[1] && tokens[1].upper ? tokens[1].upper : \"\";\n    const assignmentOps = new Set([\"=\", \"+=\", \"-=\", \"*=\", \"/=\", \"?=\"]);\n    return assignmentOps.has(op);\n  }\n\n  function isMethodCallExpressionStatement(raw) {\n    return Boolean(parseMethodCallExpressionFromRaw(raw));\n  }\n\n  function buildExtras(config, context) {\n    const extrasConfig = config.extras || null;\n    if (!extrasConfig || !extrasConfig.type) {\n      return null;\n    }\n\n    if (extrasConfig.type === \"form\") {\n      return buildFormExtras(context);\n    }\n\n    if (extrasConfig.type === \"callFunction\") {\n      return buildCallFunctionExtras(context);\n    }\n\n    if (extrasConfig.type === \"callMethod\") {\n      return buildCallMethodExtras(context);\n    }\n\n    if (extrasConfig.type === \"callMethodExpr\") {\n      return buildCallMethodExprExtras(context);\n    }\n\n    if (extrasConfig.type === \"methodSignature\") {\n      return buildMethodSignatureExtras(context);\n    }\n\n    if (extrasConfig.type === \"performCall\") {\n      return buildPerformCallExtras(context);\n    }\n\n    if (extrasConfig.type === \"ifCondition\") {\n      return buildIfConditionExtras(context);\n    }\n\n    if (extrasConfig.type === \"selectStatement\") {\n      return buildSelectExtras(context);\n    }\n\n    if (extrasConfig.type === \"readTable\") {\n      return buildReadTableExtras(context);\n    }\n\n    if (extrasConfig.type === \"loopAtItab\") {\n      return buildLoopAtItabExtras(context);\n    }\n\n    if (extrasConfig.type === \"modifyItab\") {\n      return buildModifyItabExtras(context);\n    }\n\n    if (extrasConfig.type === \"deleteItab\") {\n      return buildDeleteItabExtras(context);\n    }\n\n    return null;\n  }\n\n  function buildFormExtras({ raw, values, commentLines }) {\n    const map = valuesToFirstValueMap(values);\n    const formName = map.name || \"\";\n\n    const commentInfo = parseFormDocComment(commentLines || []);\n    const signature = parseFormSignature(map);\n\n    const docsByNameUpper = new Map(\n      commentInfo.params.map((param) => [param.name.toUpperCase(), param])\n    );\n\n    const params = signature.params.map((param) => {\n      const doc = docsByNameUpper.get(param.name.toUpperCase());\n      return {\n        ...param,\n        doc: doc ? { direction: doc.direction, text: doc.text } : null\n      };\n    });\n\n    const docOnly = commentInfo.params\n      .filter((param) => !signature.namesUpper.has(param.name.toUpperCase()))\n      .map((param) => ({\n        name: param.name,\n        section: \"DOC_ONLY\",\n        typing: null,\n        doc: { direction: param.direction, text: param.text }\n      }));\n\n    return {\n      form: {\n        name: formName,\n        nameFromComment: commentInfo.formName || \"\",\n        params: [...params, ...docOnly],\n        exceptions: signature.exceptions\n      }\n    };\n  }\n\n  function buildCallFunctionExtras({ values }) {\n    const map = valuesToFirstValueMap(values);\n\n    return {\n      callFunction: {\n        name: map.name || \"\",\n        destination: map.destination || \"\",\n        exporting: parseAssignments(map.exportingRaw || \"\"),\n        importing: parseAssignments(map.importingRaw || \"\"),\n        changing: parseAssignments(map.changingRaw || \"\"),\n        tables: parseAssignments(map.tablesRaw || \"\"),\n        exceptions: parseAssignments(map.exceptionsRaw || \"\")\n      }\n    };\n  }\n\n  function buildCallMethodExtras({ values }) {\n    const map = valuesToFirstValueMap(values);\n\n    return {\n      callMethod: {\n        target: map.target || \"\",\n        exporting: parseAssignments(map.exportingRaw || \"\"),\n        importing: parseAssignments(map.importingRaw || \"\"),\n        changing: parseAssignments(map.changingRaw || \"\"),\n        receiving: parseAssignments(map.receivingRaw || \"\"),\n        exceptions: parseAssignments(map.exceptionsRaw || \"\")\n      }\n    };\n  }\n\n  function buildCallMethodExprExtras({ raw, values }) {\n    const map = valuesToFirstValueMap(values);\n    const parsed = parseMethodCallExpressionFromRaw(raw);\n    const sections = parsed ? parsed.sectionRawByName : {\n      exportingRaw: \"\",\n      importingRaw: \"\",\n      changingRaw: \"\",\n      receivingRaw: \"\",\n      exceptionsRaw: \"\"\n    };\n\n    const receivingRaw = map.receivingRaw\n      || sections.receivingRaw\n      || (parsed && parsed.receivingTarget ? `result = ${parsed.receivingTarget}` : \"\");\n\n    return {\n      callMethod: {\n        target: map.target || (parsed ? parsed.callTarget : \"\"),\n        exporting: parseAssignments(map.exportingRaw || sections.exportingRaw || \"\"),\n        importing: parseAssignments(map.importingRaw || sections.importingRaw || \"\"),\n        changing: parseAssignments(map.changingRaw || sections.changingRaw || \"\"),\n        receiving: parseAssignments(receivingRaw),\n        exceptions: parseAssignments(map.exceptionsRaw || sections.exceptionsRaw || \"\")\n      }\n    };\n  }\n\n  function buildMethodSignatureExtras({ values }) {\n    const map = valuesToFirstValueMap(values);\n    const signature = parseMethodSignature(map);\n\n    return {\n      methodSignature: signature\n    };\n  }\n\n  function parseMethodSignature(valueMap) {\n    const importingParams = parseFormParamDefs(\"IMPORTING\", valueMap.importingRaw || \"\");\n";
-})(typeof globalThis !== "undefined" ? globalThis : (typeof self !== "undefined" ? self : this));
+        for (const segment of chainedStatements) {
+          const raw = segment && typeof segment === "object" ? segment.raw : segment;
+          const overrides = segment && typeof segment === "object"
+            ? {
+                lineStart: segment.lineStart || null,
+                comment: segment.comment || "",
+                commentLines: Array.isArray(segment.commentLines) ? segment.commentLines : []
+              }
+            : null;
+
+          const obj = buildObjectFromRaw(raw, config, statement, fileName, nextId(), parentId, overrides);
+          if (!obj) {
+            continue;
+          }
+
+          const segTokens = tokenize(raw);
+          const marker = detectStructMarkerFromTokens(segTokens, startKeyword);
+          if (marker) {
+            const normalizedName = normalizeIdentifierCandidate(marker.name);
+            const nameUpper = normalizedName ? normalizedName.toUpperCase() : "";
+            const rootUpper = structStack.length ? structStack[0].nameUpper : nameUpper;
+            const isRootBegin = marker.kind === "BEGIN" && structStack.length === 0;
+
+            if (marker.kind === "BEGIN") {
+              structStack.push({ nameUpper, name: normalizedName || marker.name });
+            } else if (marker.kind === "END") {
+              // Pop 1 level when names match; otherwise just pop once (best-effort).
+              if (structStack.length) {
+                const top = structStack[structStack.length - 1];
+                if (top && top.nameUpper && top.nameUpper === nameUpper) {
+                  structStack.pop();
+                } else {
+                  structStack.pop();
+                }
+              }
+            }
+
+            attachStructMeta(obj, {
+              kind: marker.kind,
+              rootNameUpper: rootUpper || nameUpper,
+              depth: marker.kind === "BEGIN" ? structStack.length : structStack.length + 1,
+              isDecl: isRootBegin
+            });
+          } else if (structStack.length) {
+            attachStructMeta(obj, {
+              kind: "FIELD",
+              rootNameUpper: structStack[0].nameUpper,
+              depth: structStack.length,
+              isDecl: false
+            });
+          } else {
+            attachStructMeta(obj, null);
+          }
+
+          chainedObjects.push(obj);
+        }
+
+        return chainedObjects.length ? chainedObjects : null;
+      }
+
+      const object = buildObjectFromRaw(statement.raw, config, statement, fileName, nextId(), parentId);
+      if (object && startKeyword) {
+        const marker = detectStructMarkerFromTokens(tokenize(statement.raw), startKeyword);
+        if (marker) {
+          const normalizedName = normalizeIdentifierCandidate(marker.name);
+          const nameUpper = normalizedName ? normalizedName.toUpperCase() : "";
+          attachStructMeta(object, {
+            kind: marker.kind,
+            rootNameUpper: nameUpper,
+            depth: 1,
+            isDecl: marker.kind === "BEGIN"
+          });
+        } else {
+          attachStructMeta(object, null);
+        }
+      }
+      return object ? [object] : null;
+    }
+
+    return null;
+  }
+
+  function detectStructMarkerFromTokens(tokens, startKeyword) {
+    if (!startKeyword || !Array.isArray(tokens) || tokens.length < 4) {
+      return null;
+    }
+
+    if (!tokens[0] || tokens[0].upper !== String(startKeyword).toUpperCase()) {
+      return null;
+    }
+
+    const t1 = tokens[1] ? tokens[1].upper : "";
+    const t2 = tokens[2] ? tokens[2].upper : "";
+    const t3 = tokens[3] ? tokens[3].raw : "";
+
+    if (t1 === "BEGIN" && t2 === "OF" && t3) {
+      return { kind: "BEGIN", name: t3 };
+    }
+
+    if (t1 === "END" && t2 === "OF" && t3) {
+      return { kind: "END", name: t3 };
+    }
+
+    return null;
+  }
+
+  function attachStructMeta(obj, meta) {
+    if (!obj) {
+      return;
+    }
+
+    if (!meta) {
+      return;
+    }
+
+    const existingExtras = obj.extras && typeof obj.extras === "object" ? obj.extras : null;
+    obj.extras = {
+      ...(existingExtras || {}),
+      structDef: {
+        kind: meta.kind || "",
+        rootNameUpper: meta.rootNameUpper || "",
+        depth: Number(meta.depth || 0) || 0,
+        isDecl: Boolean(meta.isDecl)
+      }
+    };
+  }
+
+  function matchesConfig(tokens, config, raw) {
+    const match = config.match || {};
+    const matchType = match.type ? String(match.type).trim().toLowerCase() : "";
+    if (matchType === "assignment") {
+      return isAssignmentStatement(tokens) && !isMethodCallExpressionStatement(raw);
+    }
+    if (matchType === "methodcallexpr") {
+      return isMethodCallExpressionStatement(raw);
+    }
+    if (match.startTokens && match.startTokens.length) {
+      return matchesTokens(tokens, 0, match.startTokens);
+    }
+
+    const startKeyword = match.startKeyword;
+    if (startKeyword) {
+      return tokens[0].upper === startKeyword;
+    }
+
+    return false;
+  }
+
+  function buildObjectFromRaw(raw, config, statement, fileName, id, parentId, overrides) {
+    return buildObjectFromRawWithOverrides(raw, config, statement, fileName, id, parentId, overrides || null);
+  }
+
+  function buildObjectFromRawWithOverrides(raw, config, statement, fileName, id, parentId, overrides) {
+    const tokens = tokenize(raw);
+    if (tokens.length === 0) {
+      return null;
+    }
+
+    const commentText = overrides && typeof overrides.comment === "string" ? overrides.comment : statement.comment;
+    const commentLines = overrides && Array.isArray(overrides.commentLines)
+      ? overrides.commentLines
+      : statement.commentLines || [];
+    const lineStart = overrides && overrides.lineStart ? Number(overrides.lineStart) || null : statement.lineStart;
+
+    const keywordEntries = detectKeywords(tokens, config);
+    const match = config.match || {};
+    const matchType = match.type ? String(match.type).trim().toLowerCase() : "";
+    let valueEntries = [];
+    if (matchType === "assignment") {
+      valueEntries = captureAssignmentValues(tokens, commentText);
+    } else if (matchType === "methodcallexpr") {
+      valueEntries = captureMethodCallExpressionValues(raw, commentText);
+    } else {
+      valueEntries = captureValues(tokens, config, commentText);
+    }
+
+    const keywords = groupEntriesByKey(keywordEntries, "label");
+    const values = groupEntriesByKey(valueEntries, "name");
+
+    const extras = buildExtras(config, {
+      raw,
+      values,
+      commentLines
+    });
+    const block = config.block && config.block.endKeyword
+      ? {
+          endKeyword: config.block.endKeyword,
+          endRaw: "",
+          lineEnd: null
+        }
+      : null;
+
+    return new AbapObject({
+      id,
+      parent: parentId,
+      objectType: config.object,
+      file: fileName,
+      lineStart,
+      raw,
+      block,
+      extras,
+      comment: commentText,
+      keywords,
+      values,
+      children: []
+    });
+  }
+
+  function isAssignmentStatement(tokens) {
+    if (!Array.isArray(tokens) || tokens.length < 3) {
+      return false;
+    }
+
+    const op = tokens[1] && tokens[1].upper ? tokens[1].upper : "";
+    const assignmentOps = new Set(["=", "+=", "-=", "*=", "/=", "?="]);
+    return assignmentOps.has(op);
+  }
+
+  function isMethodCallExpressionStatement(raw) {
+    return Boolean(parseMethodCallExpressionFromRaw(raw));
+  }
+
+  function buildExtras(config, context) {
+    const extrasConfig = config.extras || null;
+    if (!extrasConfig || !extrasConfig.type) {
+      return null;
+    }
+
+    if (extrasConfig.type === "form") {
+      return buildFormExtras(context);
+    }
+
+    if (extrasConfig.type === "callFunction") {
+      return buildCallFunctionExtras(context);
+    }
+
+    if (extrasConfig.type === "callMethod") {
+      return buildCallMethodExtras(context);
+    }
+
+    if (extrasConfig.type === "callMethodExpr") {
+      return buildCallMethodExprExtras(context);
+    }
+
+    if (extrasConfig.type === "methodSignature") {
+      return buildMethodSignatureExtras(context);
+    }
+
+    if (extrasConfig.type === "performCall") {
+      return buildPerformCallExtras(context);
+    }
+
+    if (extrasConfig.type === "ifCondition") {
+      return buildIfConditionExtras(context);
+    }
+
+    if (extrasConfig.type === "selectStatement") {
+      return buildSelectExtras(context);
+    }
+
+    if (extrasConfig.type === "readTable") {
+      return buildReadTableExtras(context);
+    }
+
+    if (extrasConfig.type === "loopAtItab") {
+      return buildLoopAtItabExtras(context);
+    }
+
+    if (extrasConfig.type === "modifyItab") {
+      return buildModifyItabExtras(context);
+    }
+
+    if (extrasConfig.type === "deleteItab") {
+      return buildDeleteItabExtras(context);
+    }
+
+    return null;
+  }
+
+  function buildFormExtras({ raw, values, commentLines }) {
+    const map = valuesToFirstValueMap(values);
+    const formName = map.name || "";
+
+    const commentInfo = parseFormDocComment(commentLines || []);
+    const signature = parseFormSignature(map);
+
+    const docsByNameUpper = new Map(
+      commentInfo.params.map((param) => [param.name.toUpperCase(), param])
+    );
+
+    const params = signature.params.map((param) => {
+      const doc = docsByNameUpper.get(param.name.toUpperCase());
+      return {
+        ...param,
+        doc: doc ? { direction: doc.direction, text: doc.text } : null
+      };
+    });
+
+    const docOnly = commentInfo.params
+      .filter((param) => !signature.namesUpper.has(param.name.toUpperCase()))
+      .map((param) => ({
+        name: param.name,
+        section: "DOC_ONLY",
+        typing: null,
+        doc: { direction: param.direction, text: param.text }
+      }));
+
+    return {
+      form: {
+        name: formName,
+        nameFromComment: commentInfo.formName || "",
+        params: [...params, ...docOnly],
+        exceptions: signature.exceptions
+      }
+    };
+  }
+
+  function buildCallFunctionExtras({ values }) {
+    const map = valuesToFirstValueMap(values);
+
+    return {
+      callFunction: {
+        name: map.name || "",
+        destination: map.destination || "",
+        exporting: parseAssignments(map.exportingRaw || ""),
+        importing: parseAssignments(map.importingRaw || ""),
+        changing: parseAssignments(map.changingRaw || ""),
+        tables: parseAssignments(map.tablesRaw || ""),
+        exceptions: parseAssignments(map.exceptionsRaw || "")
+      }
+    };
+  }
+
+  function buildCallMethodExtras({ values }) {
+    const map = valuesToFirstValueMap(values);
+
+    return {
+      callMethod: {
+        target: map.target || "",
+        exporting: parseAssignments(map.exportingRaw || ""),
+        importing: parseAssignments(map.importingRaw || ""),
+        changing: parseAssignments(map.changingRaw || ""),
+        receiving: parseAssignments(map.receivingRaw || ""),
+        exceptions: parseAssignments(map.exceptionsRaw || "")
+      }
+    };
+  }
+
+  function buildCallMethodExprExtras({ raw, values }) {
+    const map = valuesToFirstValueMap(values);
+    const parsed = parseMethodCallExpressionFromRaw(raw);
+    const sections = parsed ? parsed.sectionRawByName : {
+      exportingRaw: "",
+      importingRaw: "",
+      changingRaw: "",
+      receivingRaw: "",
+      exceptionsRaw: ""
+    };
+
+    const receivingRaw = map.receivingRaw
+      || sections.receivingRaw
+      || (parsed && parsed.receivingTarget ? `result = ${parsed.receivingTarget}` : "");
+
+    return {
+      callMethod: {
+        target: map.target || (parsed ? parsed.callTarget : ""),
+        exporting: parseAssignments(map.exportingRaw || sections.exportingRaw || ""),
+        importing: parseAssignments(map.importingRaw || sections.importingRaw || ""),
+        changing: parseAssignments(map.changingRaw || sections.changingRaw || ""),
+        receiving: parseAssignments(receivingRaw),
+        exceptions: parseAssignments(map.exceptionsRaw || sections.exceptionsRaw || "")
+      }
+    };
+  }
+
+  function buildMethodSignatureExtras({ values }) {
+    const map = valuesToFirstValueMap(values);
+    const signature = parseMethodSignature(map);
+
+    return {
+      methodSignature: signature
+    };
+  }
+
+  function parseMethodSignature(valueMap) {
+    const importingParams = parseFormParamDefs("IMPORTING", valueMap.importingRaw || "");

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -139,6 +140,7 @@ def main() -> int:
     repo_root = Path(__file__).resolve().parent.parent
     default_in = repo_root / "viewer" / "index.html"
     default_out = repo_root / "viewer" / "index.inline.html"
+    runtime_builder = repo_root / "scripts" / "build-runtime-bundles.js"
 
     parser = argparse.ArgumentParser(description="Inline viewer HTML into a single file (offline).")
     parser.add_argument("--input", type=Path, default=default_in, help="Path to viewer index.html")
@@ -151,6 +153,18 @@ def main() -> int:
     if not input_path.exists():
         print(f"Input not found: {input_path}", file=sys.stderr)
         return 2
+
+    if runtime_builder.exists():
+        try:
+            subprocess.run(
+                ["node", str(runtime_builder)],
+                cwd=repo_root,
+                check=True,
+                text=True
+            )
+        except subprocess.CalledProcessError as exc:
+            print(f"Runtime bundle build failed with exit code {exc.returncode}", file=sys.stderr)
+            return exc.returncode or 1
 
     base_dir = input_path.resolve().parent
     html = _read_text(input_path)
