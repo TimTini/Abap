@@ -581,7 +581,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     state.settings = normalizeSettings(next);
     saveSettings(state.settings);
-    state.haystackById = buildSearchIndex(state.renderObjects);
     renderOutput();
   }
 
@@ -589,7 +588,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     state.settings = normalizeSettings(DEFAULT_SETTINGS);
     saveSettings(state.settings);
     renderSettingsModalUi();
-    state.haystackById = buildSearchIndex(state.renderObjects);
     renderOutput();
   }
 
@@ -872,7 +870,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return String(getDeclTechName(decl) || "").trim();
   }
 
-  function getFinalDeclAtomicDescNormalized(decl) {
+  function getFinalDeclAtomicDesc(decl) {
     if (!decl || typeof decl !== "object") {
       return "";
     }
@@ -880,20 +878,24 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const overrideEntry = getDeclOverrideEntry(decl);
     const overrideText = overrideEntry.text ? String(overrideEntry.text) : "";
     if (overrideText) {
-      return normalizeDeclDescByTemplate(decl, overrideText);
+      return overrideText;
     }
 
     const codeDesc = getDeclCodeDesc(decl);
     if (codeDesc) {
-      return normalizeDeclDescByTemplate(decl, codeDesc);
+      return codeDesc;
     }
 
-    const techId = String(getDeclTechName(decl) || "").trim();
-    if (!techId) {
+    return String(getDeclTechName(decl) || "").trim();
+  }
+
+  function getFinalDeclAtomicDescNormalized(decl) {
+    const atomicDesc = getFinalDeclAtomicDesc(decl);
+    if (!atomicDesc) {
       return "";
     }
 
-    return normalizeDeclDescByTemplate(decl, techId);
+    return normalizeDeclDescByTemplate(decl, atomicDesc);
   }
 
   function buildStructDeclFromFieldDecl(decl) {
@@ -984,25 +986,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return `${structPart}-${itemPart}`;
   }
 
-  function getDeclTechNameSafe(decl) {
-    if (!decl || typeof decl !== "object") {
-      return "";
-    }
-    return String(getDeclTechName(decl) || decl.name || "").trim();
-  }
-
-  function isTechnicalFallbackDesc(decl, text) {
-    const candidate = String(text || "").trim();
-    if (!candidate) {
-      return false;
-    }
-    const tech = getDeclTechNameSafe(decl);
-    if (!tech) {
-      return false;
-    }
-    return candidate.toUpperCase() === tech.toUpperCase();
-  }
-
   function formatStructFieldDesc(decl) {
     if (!isStructFieldDecl(decl)) {
       return getEffectiveDeclAtomicDesc(decl);
@@ -1054,8 +1037,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     const structDecl = buildStructDeclFromFieldDecl(decl);
     const structTextRaw = structDecl ? String(getFinalDeclAtomicDescNormalized(structDecl) || "").trim() : "";
-    const itemTextRaw = String(getFinalDeclAtomicDescNormalized(decl) || "").trim();
-    const structText = stripDeclCategoryPrefix(structTextRaw);
+    const itemTextRaw = String(getFinalDeclAtomicDesc(decl) || "").trim();
+    const structText = structTextRaw;
     const itemTextNormalized = stripDeclCategoryPrefix(itemTextRaw);
     const itemText = stripStructNamePrefixFromItemText(itemTextNormalized, String(decl.structName || "").trim());
 
@@ -1081,17 +1064,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       return getFinalDeclAtomicDescNormalized(decl);
     }
 
-    const composed = sanitizeStructCompositeText(formatStructFieldFinalDesc(decl), decl);
-    if (!composed) {
-      return "";
-    }
-
-    if (isTechnicalFallbackDesc(decl, composed)) {
-      return composed;
-    }
-
-    const normalized = normalizeDeclDescByTemplate(decl, composed);
-    return normalized || composed;
+    return String(formatStructFieldFinalDesc(decl) || "").trim();
   }
 
   function openEditModal({ mode, key, structKey, itemKey, label, hint, initialValue, structValue, itemValue, skipNormalize }) {
@@ -1221,7 +1194,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     saveDescOverrides();
-    state.haystackById = buildSearchIndex(state.renderObjects);
     renderOutput();
     if (state.rightTab === "template") {
       if (typeof renderTemplatePreview === "function") {
@@ -1330,34 +1302,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     } catch {
       return "";
     }
-  }
-
-  function sanitizeXmlText(value) {
-    const text = String(value ?? "");
-    // Keep: TAB (0x9), LF (0xA), CR (0xD)
-    return text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
-  }
-
-  function escapeXmlText(value) {
-    return sanitizeXmlText(value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&apos;");
-  }
-
-  function toXmlTagName(key) {
-    const raw = String(key || "").trim();
-    if (!raw) {
-      return "value";
-    }
-
-    const normalized = raw.replace(/[^A-Za-z0-9_:-]/g, "_");
-    if (!/^[A-Za-z_]/.test(normalized)) {
-      return `_${normalized}`;
-    }
-    return normalized;
   }
 
   function getArrayItemTagName(keyHint) {
@@ -1668,13 +1612,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     return next;
-  }
-
-  function normalizeXmlObjectId(value) {
-    if (value === null || value === undefined) {
-      return "";
-    }
-    return String(value);
   }
 
   function getFormNameFromNode(node) {
@@ -2099,252 +2036,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return output;
   }
 
-  function buildXmlExportRoots(objects) {
-    const input = Array.isArray(objects) ? objects : [];
-    if (!input.length) {
-      return [];
-    }
-
-    const nodeById = new Map();
-    const idOrder = [];
-    const childIdsByParentId = new Map();
-    const topLevelNoIdNodes = [];
-
-    const pushChildId = (parentId, childId) => {
-      if (!parentId || !childId) {
-        return;
-      }
-      if (!childIdsByParentId.has(parentId)) {
-        childIdsByParentId.set(parentId, []);
-      }
-      const list = childIdsByParentId.get(parentId);
-      if (!list.includes(childId)) {
-        list.push(childId);
-      }
-    };
-
-    const stack = input
-      .filter((node) => node && typeof node === "object")
-      .map((node) => ({ node, isTopLevel: true }));
-
-    while (stack.length) {
-      const item = stack.pop();
-      const node = item && item.node;
-      if (!node || typeof node !== "object") {
-        continue;
-      }
-
-      const nodeId = normalizeXmlObjectId(node.id);
-      if (!nodeId) {
-        if (item.isTopLevel) {
-          topLevelNoIdNodes.push(node);
-        }
-      } else if (!nodeById.has(nodeId)) {
-        nodeById.set(nodeId, node);
-        idOrder.push(nodeId);
-      }
-
-      const parentId = normalizeXmlObjectId(node.parent);
-      if (nodeId && parentId) {
-        pushChildId(parentId, nodeId);
-      }
-
-      const children = Array.isArray(node.children) ? node.children : [];
-      for (let index = children.length - 1; index >= 0; index -= 1) {
-        const child = children[index];
-        if (!child || typeof child !== "object") {
-          continue;
-        }
-        const childId = normalizeXmlObjectId(child.id);
-        if (nodeId && childId) {
-          pushChildId(nodeId, childId);
-        }
-        stack.push({ node: child, isTopLevel: false });
-      }
-    }
-
-    if (!nodeById.size) {
-      return input.slice();
-    }
-
-    const cloneNodeNoId = (node, seenNoId) => {
-      if (!node || typeof node !== "object") {
-        return node;
-      }
-      if (seenNoId.has(node)) {
-        return null;
-      }
-
-      const nextSeenNoId = new Set(seenNoId);
-      nextSeenNoId.add(node);
-
-      const out = {};
-      for (const key of Object.keys(node)) {
-        if (key === "children") {
-          continue;
-        }
-        out[key] = node[key];
-      }
-
-      const children = Array.isArray(node.children) ? node.children : [];
-      const outChildren = [];
-      for (const child of children) {
-        if (!child || typeof child !== "object") {
-          continue;
-        }
-        const childId = normalizeXmlObjectId(child.id);
-        if (childId) {
-          // ID-based children are wired later from parent map.
-          continue;
-        }
-        const cloned = cloneNodeNoId(child, nextSeenNoId);
-        if (cloned) {
-          outChildren.push(cloned);
-        }
-      }
-
-      if (outChildren.length) {
-        out.children = outChildren;
-      } else if (Array.isArray(node.children) && node.children.length === 0) {
-        out.children = [];
-      }
-
-      return out;
-    };
-
-    const cloneNodeById = (nodeId, ancestorIds, emittedIds) => {
-      if (!nodeId || !nodeById.has(nodeId)) {
-        return null;
-      }
-      if (ancestorIds.has(nodeId)) {
-        return null;
-      }
-      if (emittedIds && emittedIds.has(nodeId)) {
-        return null;
-      }
-
-      const node = nodeById.get(nodeId);
-      const nextAncestors = new Set(ancestorIds);
-      nextAncestors.add(nodeId);
-      if (emittedIds) {
-        emittedIds.add(nodeId);
-      }
-
-      const out = {};
-      for (const key of Object.keys(node)) {
-        if (key === "children") {
-          continue;
-        }
-        out[key] = node[key];
-      }
-
-      const outChildren = [];
-
-      const explicitChildren = Array.isArray(node.children) ? node.children : [];
-      for (const child of explicitChildren) {
-        if (!child || typeof child !== "object") {
-          continue;
-        }
-        const childId = normalizeXmlObjectId(child.id);
-        if (childId) {
-          continue;
-        }
-        const clonedNoId = cloneNodeNoId(child, new Set());
-        if (clonedNoId) {
-          outChildren.push(clonedNoId);
-        }
-      }
-
-      const childIds = childIdsByParentId.get(nodeId) || [];
-      for (const childId of childIds) {
-        const cloned = cloneNodeById(childId, nextAncestors, emittedIds);
-        if (cloned) {
-          outChildren.push(cloned);
-        }
-      }
-
-      if (outChildren.length) {
-        out.children = outChildren;
-      } else if (Array.isArray(node.children) && node.children.length === 0) {
-        out.children = [];
-      }
-
-      return out;
-    };
-
-    const isRootId = (nodeId) => {
-      const node = nodeById.get(nodeId);
-      if (!node) {
-        return false;
-      }
-      const parentId = normalizeXmlObjectId(node.parent);
-      return !parentId || !nodeById.has(parentId);
-    };
-
-    const rootIds = [];
-    const addedRootIds = new Set();
-    const addRootId = (nodeId) => {
-      if (!nodeId || addedRootIds.has(nodeId) || !nodeById.has(nodeId)) {
-        return;
-      }
-      addedRootIds.add(nodeId);
-      rootIds.push(nodeId);
-    };
-
-    for (const topNode of input) {
-      const topId = normalizeXmlObjectId(topNode && topNode.id);
-      if (topId && isRootId(topId)) {
-        addRootId(topId);
-      }
-    }
-
-    for (const nodeId of idOrder) {
-      if (isRootId(nodeId)) {
-        addRootId(nodeId);
-      }
-    }
-
-    const reachableIds = new Set();
-    const markReachable = (nodeId) => {
-      if (!nodeId || reachableIds.has(nodeId) || !nodeById.has(nodeId)) {
-        return;
-      }
-      reachableIds.add(nodeId);
-      const childIds = childIdsByParentId.get(nodeId) || [];
-      for (const childId of childIds) {
-        markReachable(childId);
-      }
-    };
-
-    for (const rootId of rootIds) {
-      markReachable(rootId);
-    }
-
-    for (const nodeId of idOrder) {
-      if (!reachableIds.has(nodeId)) {
-        addRootId(nodeId);
-        markReachable(nodeId);
-      }
-    }
-
-    const roots = [];
-    const emittedIds = new Set();
-    for (const node of topLevelNoIdNodes) {
-      const cloned = cloneNodeNoId(node, new Set());
-      if (cloned) {
-        roots.push(cloned);
-      }
-    }
-    for (const rootId of rootIds) {
-      const cloned = cloneNodeById(rootId, new Set(), emittedIds);
-      if (cloned) {
-        roots.push(cloned);
-      }
-    }
-
-    return roots;
-  }
-
   function isDeclLikeObject(value) {
     if (!value || typeof value !== "object") {
       return false;
@@ -2353,29 +2044,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       typeof value.objectType === "string" &&
       typeof value.name === "string" &&
       typeof value.scopeLabel === "string"
-    );
-  }
-
-  function isDeclHintKey(keyHint) {
-    const key = String(keyHint || "").trim();
-    if (!key) {
-      return false;
-    }
-    return /decl$/i.test(key);
-  }
-
-  function isDeclObjectForXml(keyHint, value) {
-    if (isDeclLikeObject(value)) {
-      return true;
-    }
-    if (!isDeclHintKey(keyHint) || !value || typeof value !== "object" || Array.isArray(value)) {
-      return false;
-    }
-    return (
-      typeof value.name === "string" ||
-      typeof value.objectType === "string" ||
-      typeof value.scopeLabel === "string" ||
-      typeof value.comment === "string"
     );
   }
 

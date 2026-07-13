@@ -36,37 +36,37 @@
       "index": "0",
       "lineStart": 3,
       "selected": false,
-      "textPreview": "Câu lệnh |  |  |  |  | "
+      "textPreview": "TYPES |  |  |  |  | "
     },
     {
       "index": "1",
       "lineStart": 4,
       "selected": false,
-      "textPreview": "Câu lệnh |  |  |  |  | "
+      "textPreview": "TYPES |  |  |  |  | "
     },
     {
       "index": "2",
       "lineStart": 5,
       "selected": false,
-      "textPreview": "Câu lệnh |  |  |  |  | "
+      "textPreview": "TYPES |  |  |  |  | "
     },
     {
       "index": "3",
       "lineStart": 6,
       "selected": false,
-      "textPreview": "Câu lệnh |  |  |  |  | "
+      "textPreview": "TYPES |  |  |  |  | "
     },
     {
       "index": "4",
       "lineStart": 8,
       "selected": false,
-      "textPreview": "Câu lệnh |  |  |  |  | "
+      "textPreview": "DATA |  |  |  |  | "
     },
     {
       "index": "5",
       "lineStart": 9,
       "selected": false,
-      "textPreview": "Câu lệnh |  |  |  |  | "
+      "textPreview": "PARAMETERS |  |  |  |  | "
     },
     {
       "index": "6",
@@ -84,7 +84,7 @@
       "index": "8",
       "lineStart": 14,
       "selected": false,
-      "textPreview": " |  |  |  |  | "
+      "textPreview": "PERFORM |  |  |  |  | "
     },
     {
       "index": "9",

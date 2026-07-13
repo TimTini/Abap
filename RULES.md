@@ -16,10 +16,9 @@ Lưu ý:
 - Sau khi sửa/thêm rule: chạy `node scripts/build-viewer-configs.js`
 - Viewer sẽ load từ: `viewer/configs.generated/*.js` (auto-generate, **không sửa tay**)
 
-### Custom rules (từ UI, để thử nhanh/override)
-- Mở `viewer/index.html` → bấm **Rules**
-- Save rule sẽ lưu vào `localStorage` với key: `abap-parser-viewer.customConfigs.v1`
-- Khi parse, custom rules được ưu tiên trước built-in rules (override được).
+### Chỉnh rule trong Viewer
+- Viewer chỉ dùng **built-in** (`AbapParser.getConfigs()` từ `viewer/configs.generated/*`).
+- Muốn thêm/sửa rule: chỉnh `configs/*.json`, chạy `node scripts/build-viewer-configs.js`, rebuild viewer bundles nếu cần theo `AGENTS.md`.
 
 ## 2) Rule config JSON: schema tổng quát
 
@@ -245,27 +244,16 @@ Mỗi object trong `objects[]` (cũng xuất hiện trong `children[]`):
 }
 ```
 
-## 8) Output XML (Export XML trong Viewer)
+## 8) `finalDesc` và template paths
 
-Viewer export dạng:
-```xml
-<abapflowObjects>
-  <file>...</file>
-  <objects>
-    <object>...</object>
-  </objects>
-</abapflowObjects>
-```
+Viewer không còn **Export XML**. `finalDesc` vẫn dùng cho template placeholders (vd: `values.name.finalDesc`).
 
-Lưu ý cho Excel:
-- VBA hiện dùng XPath `/abapflowObjects/objects/object` và đọc chủ yếu: `id`, `objectType`, `lineStart`, `raw`.
-- “Routine key” trong Excel được lấy ưu tiên từ `values/<name>/value` với key `name|target|form`, hoặc fallback trong `extras.callFunction.name`, `extras.callMethod.target`, `extras.performCall.form`, `extras.form.name`, `extras.methodSignature.name`.
-  - Nếu bạn thêm statement mới mà muốn Excel nhận đúng routine key: nên tạo `captureRules` có `name` là `name` hoặc `target` hoặc `form` (hoặc update VBA).
-- `finalDesc`: trong XML, nếu 1 value entry có `decl` thì Viewer sẽ thêm node `<finalDesc>` (ưu tiên user desc nếu có, fallback code desc). Normalize theo template; riêng user desc nếu bật `Skip normalization` khi edit thì giữ nguyên text user nhập. Dùng tiện cho placeholder (vd: `values.name.finalDesc`).
+- `finalDesc` ưu tiên user desc (nếu có), fallback code desc, rồi technical id.
+- Normalize theo template rules; riêng user desc nếu bật `Skip normalization` khi edit thì giữ nguyên text user nhập.
 
+Excel VBA (`excel/modAbapTemplateTool.bas`) vẫn đọc XML cũ nếu bạn đã export trước đó; không còn tạo XML mới từ Viewer.
 ## 9) Quy trình thêm rule mới (khuyến nghị)
 
-1) (Nhanh) Mở `viewer/index.html` → **Rules** → New → chỉnh JSON → Save → Render để test.
-2) (Chính thức) Tạo file `configs/<your-rule>.json`.
-3) Chạy `node scripts/build-viewer-configs.js`.
-4) Reload `viewer/index.html` và test lại.
+1) Tạo/sửa file `configs/<your-rule>.json`.
+2) Chạy `node scripts/build-viewer-configs.js`.
+3) Reload `viewer/index.html` và test lại.

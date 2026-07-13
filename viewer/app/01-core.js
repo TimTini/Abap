@@ -8,21 +8,13 @@ window.AbapViewerRuntime = window.AbapViewerRuntime || {};
 window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
 
   const els = {
-    fileInput: document.getElementById("fileInput"),
     parseBtn: document.getElementById("parseBtn"),
-    searchInput: document.getElementById("searchInput"),
-    typeFilter: document.getElementById("typeFilter"),
-    showRaw: document.getElementById("showRaw"),
-    showKeywords: document.getElementById("showKeywords"),
-    showValues: document.getElementById("showValues"),
-    showExtras: document.getElementById("showExtras"),
     themeToggle: document.getElementById("themeToggle"),
     expandAllBtn: document.getElementById("expandAllBtn"),
     collapseAllBtn: document.getElementById("collapseAllBtn"),
     clearFiltersBtn: document.getElementById("clearFiltersBtn"),
     descBtn: document.getElementById("descBtn"),
     settingsBtn: document.getElementById("settingsBtn"),
-    exportXmlBtn: document.getElementById("exportXmlBtn"),
     inputText: document.getElementById("inputText"),
     inputGutter: document.getElementById("inputGutter"),
     inputGutterContent: document.getElementById("inputGutterContent"),
@@ -71,17 +63,6 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     editSaveBtn: document.getElementById("editSaveBtn"),
     editClearBtn: document.getElementById("editClearBtn"),
     editCancelBtn: document.getElementById("editCancelBtn"),
-    rulesBtn: document.getElementById("rulesBtn"),
-    rulesModal: document.getElementById("rulesModal"),
-    rulesSelect: document.getElementById("rulesSelect"),
-    rulesTemplate: document.getElementById("rulesTemplate"),
-    rulesError: document.getElementById("rulesError"),
-    rulesJson: document.getElementById("rulesJson"),
-    rulesNewBtn: document.getElementById("rulesNewBtn"),
-    rulesSaveBtn: document.getElementById("rulesSaveBtn"),
-    rulesDeleteBtn: document.getElementById("rulesDeleteBtn"),
-    rulesDownloadBtn: document.getElementById("rulesDownloadBtn"),
-    rulesCloseBtn: document.getElementById("rulesCloseBtn"),
     settingsModal: document.getElementById("settingsModal"),
     settingsNormalizeDesc: document.getElementById("settingsNormalizeDesc"),
     settingsDeclTypes: document.getElementById("settingsDeclTypes"),
@@ -89,7 +70,10 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     settingsNameTemplates: document.getElementById("settingsNameTemplates"),
     settingsSaveBtn: document.getElementById("settingsSaveBtn"),
     settingsResetBtn: document.getElementById("settingsResetBtn"),
-    settingsCloseBtn: document.getElementById("settingsCloseBtn")
+    settingsCloseBtn: document.getElementById("settingsCloseBtn"),
+    appHeader: document.getElementById("appHeader"),
+    appControls: document.getElementById("appControls"),
+    appContainer: document.querySelector(".container")
   };
 
   const state = {
@@ -100,12 +84,6 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     inputGutterButtonsByLine: new Map(),
     inputGutterTargetsByLine: new Map(),
     theme: "dark",
-    query: "",
-    type: "",
-    showRaw: true,
-    showKeywords: true,
-    showValues: true,
-    showExtras: false,
     rightTab: "template",
     templateConfig: null,
     templateConfigDraft: "",
@@ -117,10 +95,7 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     descOverrides: {},
     descOverridesLegacy: {},
     activeEdit: null,
-    haystackById: new Map(),
     inputLineOffsets: [],
-    customRules: [],
-    activeRuleId: "",
     settings: null,
     layoutLeftPane: 48,
     outputVirtual: {
@@ -166,7 +141,6 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
 
   const DESC_STORAGE_KEY_V2 = "abap-parser-viewer.declDescOverrides.v2";
   const DESC_STORAGE_KEY_LEGACY_V1 = "abap-parser-viewer.descOverrides.v1";
-  const RULES_STORAGE_KEY_V1 = "abap-parser-viewer.customConfigs.v1";
   const SETTINGS_STORAGE_KEY_V1 = "abap-parser-viewer.settings.v1";
   const TEMPLATE_CONFIG_STORAGE_KEY_V1 = "abap-parser-viewer.templateConfig.v1";
   const THEME_STORAGE_KEY_V1 = "abap-parser-viewer.theme.v1";
@@ -1526,57 +1500,88 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     squareCellSize: 18
   };
 
-  function createGenericStatementTemplate(templateKey) {
-    const keyText = String(templateKey || "").trim();
+  function createKeywordDescriptionTemplate() {
     return {
-      _options: { ...TEMPLATE_PREVIEW_DEFAULT_OPTIONS },
-      "A1:G1": createTemplateBaseStyle("#dbeef4"),
+      _options: {
+        hideEmptyRows: true,
+        hideRowsWithoutValues: false,
+        expandMultilineRows: true
+      },
+      "A1:T1": createTemplateBaseStyle("#dbeef4"),
       A1: {
-        text: "Câu lệnh"
+        text: "{rows.keyword}"
       },
-      "H1:AY1": createTemplateBaseStyle("default"),
-      H1: {
-        text: "{keywords.stmt.text}{objectType}"
+      "U1:AN1": createTemplateBaseStyle("#ffffff"),
+      U1: {
+        text: "{rows.finalDesc}"
+      }
+    };
+  }
+
+  const UNIFIED_KEYWORD_ROW_TEMPLATE_V1 = createKeywordDescriptionTemplate();
+
+  const ASSIGNMENT_ROW_TEMPLATE_V1 = {
+    _options: {
+      hideEmptyRows: true,
+      hideRowsWithoutValues: true,
+      expandMultilineRows: false
+    },
+    "A1:T1": createTemplateBaseStyle("#dbeef4"),
+    A1: {
+      text: "Đích"
+    },
+    "U1:AN1": createTemplateBaseStyle("#dbeef4"),
+    U1: {
+      text: "Nguồn"
+    },
+    "A2:T2": createTemplateBaseStyle("#ffffff"),
+    A2: {
+      text: "{values.target.finalDesc}"
+    },
+    "U2:AN2": createTemplateBaseStyle("#ffffff"),
+    U2: {
+      text: "{values.expr.finalDesc}"
+    }
+  };
+
+  function createConditionRowTemplate() {
+    return {
+      _options: {
+        hideEmptyRows: true,
+        hideRowsWithoutValues: true,
+        expandMultilineRows: true
       },
-      "A2:G2": createTemplateBaseStyle("#dbeef4"),
+      "A1:T1": createTemplateBaseStyle("#dbeef4"),
+      A1: {
+        text: "Điều kiện trái"
+      },
+      "U1:AN1": createTemplateBaseStyle("#dbeef4"),
+      U1: {
+        text: "Toán tử"
+      },
+      "AO1:BH1": createTemplateBaseStyle("#dbeef4"),
+      AO1: {
+        text: "Điều kiện phải"
+      },
+      "BI1:CB1": createTemplateBaseStyle("#dbeef4"),
+      BI1: {
+        text: "Kết nối"
+      },
+      "A2:T2": createTemplateBaseStyle("#ffffff"),
       A2: {
-        text: "Đối tượng"
+        text: "{extras.ifCondition.conditions.leftOperandDecl.finalDesc}"
       },
-      "H2:AY2": createTemplateBaseStyle("default"),
-      H2: {
-        text: "{values.name.finalDesc}{values.target.finalDesc}{values.form.finalDesc}{values.itab.finalDesc}{values.itabOrDbtab.finalDesc}"
+      "U2:AN2": createTemplateBaseStyle("#ffffff"),
+      U2: {
+        text: "{extras.ifCondition.conditions.comparisonOperator}"
       },
-      "A3:G3": createTemplateBaseStyle("#dbeef4"),
-      A3: {
-        text: "Nguồn / Đích"
+      "AO2:BH2": createTemplateBaseStyle("#ffffff"),
+      AO2: {
+        text: "{extras.ifCondition.conditions.rightOperandDecl.finalDesc}"
       },
-      "H3:AY3": createTemplateBaseStyle("default"),
-      H3: {
-        text: "{values.into.finalDesc}{values.from.finalDesc}{values.index.value}"
-      },
-      "A4:G4": createTemplateBaseStyle("#dbeef4"),
-      A4: {
-        text: "Điều kiện"
-      },
-      "H4:AY4": createTemplateBaseStyle("default"),
-      H4: {
-        text: "{values.condition.finalDesc}{values.where.finalDesc}{values.withKey.finalDesc}{values.withTableKey.finalDesc}"
-      },
-      "A5:G5": createTemplateBaseStyle("#dbeef4"),
-      A5: {
-        text: "Chi tiết"
-      },
-      "H5:AY5": createTemplateBaseStyle("default"),
-      H5: {
-        text: "{extras}"
-      },
-      "A6:G6": createTemplateBaseStyle("#dbeef4"),
-      A6: {
-        text: "Template key"
-      },
-      "H6:AY6": createTemplateBaseStyle("default"),
-      H6: {
-        text: keyText
+      "BI2:CB2": createTemplateBaseStyle("#ffffff"),
+      BI2: {
+        text: "{extras.ifCondition.conditions.logicalConnector}"
       }
     };
   }
@@ -1584,1541 +1589,33 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
   const TEMPLATE_DEFAULT_CONFIG_V1 = {
     version: 1,
     templates: {
-      DEFAULT: {
-        _options: {
-          hideEmptyRows: true,
-          hideRowsWithoutValues: true,
-          expandMultilineRows: false
-        },
-        "A1:F1": {
-          background: "mau xanh nhat",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        A1: {
-          text: "{keywords.stmt.text}"
-        },
-        "G1:W1": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        G1: {
-          text: "{values.name.finalDesc}"
-        }
-      },
-      ASSIGNMENT: {
-        "A1:F1": {
-          background: "mau xanh nhat",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        A1: {
-          text: "Đích"
-        },
-        "A2:F2": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        A2: {
-          text: "{values.target.decl.finalDesc}"
-        },
-        "G1:W1": {
-          background: "mau xanh nhat",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        G1: {
-          text: "Nguồn"
-        },
-        "G2:W2": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        G2: {
-          text: "{values.expr.decl.finalDesc}"
-        }
-      },
-      CALL_FUNCTION: {
-        _options: {
-          hideEmptyRows: true,
-          hideRowsWithoutValues: true,
-          expandMultilineRows: true
-        },
-        "A1:H1": createTemplateBaseStyle("#dbeef4"),
-        A1: {
-          text: "Function Module"
-        },
-        "I1:BG1": createTemplateBaseStyle("#ffffff"),
-        I1: {
-          text: "{values.name.finalDesc}"
-        },
-        "A2:H2": createTemplateBaseStyle("#dbeef4"),
-        A2: {
-          text: "Exporting"
-        },
-        "I2:P2": createTemplateBaseStyle("#ffffff"),
-        I2: {
-          text: "{extras.callFunction.exporting.name}"
-        },
-        "Q2:X2": createTemplateBaseStyle("#ffffff"),
-        Q2: {
-          text: "="
-        },
-        "Y2:BG2": createTemplateBaseStyle("#ffffff"),
-        Y2: {
-          text: "{extras.callFunction.exporting.valueDecl.finalDesc}"
-        },
-        "A3:H3": createTemplateBaseStyle("#dbeef4"),
-        A3: {
-          text: "Importing"
-        },
-        "I3:P3": createTemplateBaseStyle("#ffffff"),
-        I3: {
-          text: "{extras.callFunction.importing.name}"
-        },
-        "Q3:X3": createTemplateBaseStyle("#ffffff"),
-        Q3: {
-          text: "="
-        },
-        "Y3:BG3": createTemplateBaseStyle("#ffffff"),
-        Y3: {
-          text: "{extras.callFunction.importing.valueDecl.finalDesc}"
-        },
-        "A4:H4": createTemplateBaseStyle("#dbeef4"),
-        A4: {
-          text: "Tables"
-        },
-        "I4:P4": createTemplateBaseStyle("#ffffff"),
-        I4: {
-          text: "{extras.callFunction.tables.name}"
-        },
-        "Q4:X4": createTemplateBaseStyle("#ffffff"),
-        Q4: {
-          text: "="
-        },
-        "Y4:BG4": createTemplateBaseStyle("#ffffff"),
-        Y4: {
-          text: "{extras.callFunction.tables.valueDecl.finalDesc}"
-        },
-        "A5:H5": createTemplateBaseStyle("#dbeef4"),
-        A5: {
-          text: "Changing"
-        },
-        "I5:P5": createTemplateBaseStyle("#ffffff"),
-        I5: {
-          text: "{extras.callFunction.changing.name}"
-        },
-        "Q5:X5": createTemplateBaseStyle("#ffffff"),
-        Q5: {
-          text: "="
-        },
-        "Y5:BG5": createTemplateBaseStyle("#ffffff"),
-        Y5: {
-          text: "{extras.callFunction.changing.valueDecl.finalDesc}"
-        },
-        "A6:H6": createTemplateBaseStyle("#dbeef4"),
-        A6: {
-          text: "Exceptions"
-        },
-        "I6:P6": createTemplateBaseStyle("#ffffff"),
-        I6: {
-          text: "{extras.callFunction.exceptions.name}"
-        },
-        "Q6:X6": createTemplateBaseStyle("#ffffff"),
-        Q6: {
-          text: "="
-        },
-        "Y6:BG6": createTemplateBaseStyle("#ffffff"),
-        Y6: {
-          text: "{extras.callFunction.exceptions.valueDecl.finalDesc}"
-        }
-      },
-      APPEND: {
-        "A1:G1": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        A1: {
-          text: "Append"
-        },
-        "H1:Y1": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        H1: {
-          text: "{values.what.decl.finalDesc}"
-        },
-        "Z1:AD1": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        Z1: {
-          text: "To"
-        },
-        "AE1:AY1": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        AE1: {
-          text: "{values.to.decl.finalDesc}"
-        },
-        "A2:G2": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        A2: {
-          text: "{labels.sortedBy}"
-        },
-        "H2:AB2": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        H2: {
-          text: "{extras}"
-        }
-      },
-      READ_TABLE: {
-        _options: {
-          hideEmptyRows: true,
-          hideRowsWithoutValues: true,
-          expandMultilineRows: true
-        },
-        "A1:G1": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        A1: {
-          text: "ReadTable"
-        },
-        "H1:AB1": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        H1: {
-          text: "{values.itab.decl.finalDesc}"
-        },
-        "A2:G2": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        A2: {
-          text: "To"
-        },
-        "H2:AB2": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        H2: {
-          text: "{values.into.decl.finalDesc}"
-        },
-        "A3:G3": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        A3: {
-          text: "Điều kiện"
-        },
-        "H3:T3": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        H3: {
-          text: "{extras.readTable.conditions.leftOperand}"
-        },
-        "U3:W3": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        U3: {
-          text: "{extras.readTable.conditions.comparisonOperator}"
-        },
-        "X3:AR3": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        X3: {
-          text: "{extras.readTable.conditions.rightOperandDecl.finalDesc}"
-        },
-        "A4:U4": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        A4: {
-          text: "{keywords.binary-search.text}"
-        }
-      },
-      MODIFY_ITAB: {
-        _options: {
-          hideEmptyRows: true,
-
-          hideRowsWithoutValues: true,
-          expandMultilineRows: true
-        },
-        "A1:G1": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        A1: {
-          text: "Modify Table"
-        },
-        "H1:AB1": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        H1: {
-          text: "{values.itab.finalDesc}{values.itabOrDbtab.finalDesc}"
-        },
-        "A2:G2": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        A2: {
-          text: "From"
-        },
-        "H2:AB2": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        H2: {
-          text: "{values.from.finalDesc}"
-        },
-        "A3:G3": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        A3: {
-          text: "Transporting / Index"
-        },
-        "H3:AB3": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        H3: {
-          text: "{extras.modifyItab.transporting}{values.index.value}"
-        },
-        "A4:T4": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        A4: {
-          text: "Điều kiện trái"
-        },
-        "U4:W4": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        U4: {
-          text: "Điều kiện"
-        },
-        "X4:AD4": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        X4: {
-          text: "Điều kiện phải"
-        },
-        "AE4:AY4": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        AE4: {
-          text: "Logic connector"
-        },
-        "A5:T5": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        A5: {
-          text: "{extras.modifyItab.conditions.leftOperandDecl.finalDesc}"
-        },
-        "U5:W5": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        U5: {
-          text: "{extras.modifyItab.conditions.comparisonOperator}"
-        },
-        "X5:AD5": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        X5: {
-          text: "{extras.modifyItab.conditions.rightOperandDecl.finalDesc}"
-        },
-        "AE5:AY5": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        AE5: {
-          text: "{extras.modifyItab.conditions.logicalConnector}"
-        }
-      },
-      DELETE_ITAB: {
-        _options: {
-          hideEmptyRows: true,
-          hideRowsWithoutValues: true,
-          expandMultilineRows: true
-        },
-        "A1:G1": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        A1: {
-          text: "Delete Table"
-        },
-        "H1:AB1": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        H1: {
-          text: "{values.target.finalDesc}"
-        },
-        "A2:G2": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        A2: {
-          text: "From / Index"
-        },
-        "H2:AB2": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        H2: {
-          text: "{values.from.finalDesc}{values.index.value}"
-        },
-        "A3:T3": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        A3: {
-          text: "Điều kiện trái"
-        },
-        "U3:W3": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        U3: {
-          text: "Điều kiện"
-        },
-        "X3:AD3": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        X3: {
-          text: "Điều kiện phải"
-        },
-        "AE3:AY3": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        AE3: {
-          text: "Logic connector"
-        },
-        "A4:T4": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        A4: {
-          text: "{extras.deleteItab.conditions.leftOperandDecl.finalDesc}"
-        },
-        "U4:W4": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        U4: {
-          text: "{extras.deleteItab.conditions.comparisonOperator}"
-        },
-        "X4:AD4": {
-          background: "#ffffff",
-
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        X4: {
-          text: "{extras.deleteItab.conditions.rightOperandDecl.finalDesc}"
-        },
-        "AE4:AY4": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        AE4: {
-          text: "{extras.deleteItab.conditions.logicalConnector}"
-        }
-      },
-      LOOP_AT_ITAB: {
-        _options: {
-          hideEmptyRows: true,
-          hideRowsWithoutValues: true,
-          expandMultilineRows: true
-        },
-        "A1:X1": createTemplateBaseStyle("#dbeef4"),
-        A1: {
-          text: "Loop At"
-        },
-        "Y1:BA1": createTemplateBaseStyle("#dbeef4"),
-        Y1: {
-          text: "Into"
-        },
-        "BB1:BG1": createTemplateBaseStyle("#dbeef4"),
-        BB1: {
-          text: "Connection"
-        },
-        "A2:H2": createTemplateBaseStyle("#dbeef4"),
-        A2: {
-          text: "Điều kiện"
-        },
-        "I2:V2": createTemplateBaseStyle("#ffffff"),
-        I2: {
-          text: "{extras.loopAtItab.conditions.leftOperandDecl.finalDesc}"
-        },
-        "W2:X2": createTemplateBaseStyle("#dbeef4"),
-        W2: {
-          text: "{extras.loopAtItab.conditions.comparisonOperator}"
-        },
-        "Y2:BA2": createTemplateBaseStyle("#ffffff"),
-        Y2: {
-          text: "{extras.loopAtItab.conditions.rightOperandDecl.finalDesc}"
-        },
-        "BB2:BG2": createTemplateBaseStyle("#ffffff"),
-        BB2: {
-          text: "{extras.loopAtItab.conditions.logicalConnector}"
-        }
-      },
-      IF: {
-        _options: {
-          hideEmptyRows: true,
-          hideRowsWithoutValues: true,
-          expandMultilineRows: true
-        },
-        "A1:T1": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        A1: {
-          text: "Điều kiện trái"
-        },
-        "U1:W1": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        U1: {
-          text: "Điều kiện"
-        },
-        "X1:AD1": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        X1: {
-          text: "Điều kiện phải"
-        },
-        "AE1:AY1": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        AE1: {
-          text: "Logic connector"
-        },
-        "A2:T2": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        A2: {
-          text: "{extras.ifCondition.conditions.leftOperandDecl.finalDesc}"
-        },
-        "U2:W2": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        U2: {
-          text: "{extras.ifCondition.conditions.comparisonOperator}"
-        },
-        "X2:AD2": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        X2: {
-          text: "{extras.ifCondition.conditions.rightOperandDecl.finalDesc}"
-        },
-        "AE2:AY2": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        AE2: {
-          text: "{extras.ifCondition.conditions.logicalConnector}"
-        }
-      },
-      ELSEIF: {
-        _options: {
-          hideEmptyRows: true,
-          hideRowsWithoutValues: true,
-          expandMultilineRows: true
-        },
-        "A1:T1": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        A1: {
-          text: "Điều kiện trái"
-        },
-        "U1:W1": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        U1: {
-          text: "Điều kiện"
-        },
-        "X1:AD1": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        X1: {
-          text: "Điều kiện phải"
-        },
-        "AE1:AY1": {
-          background: "#dbeef4",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        AE1: {
-          text: "Logic connector"
-        },
-        "A2:T2": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        A2: {
-          text: "{extras.ifCondition.conditions.leftOperandDecl.finalDesc}"
-        },
-        "U2:W2": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        U2: {
-          text: "{extras.ifCondition.conditions.comparisonOperator}"
-        },
-        "X2:AD2": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        X2: {
-          text: "{extras.ifCondition.conditions.rightOperandDecl.finalDesc}"
-        },
-        "AE2:AY2": {
-          background: "#ffffff",
-          border: "outside-thin",
-          font: "MS PGothic",
-          "font color": "#111111",
-          "font size": 10,
-          "font family": "default",
-          bold: false,
-          italic: false,
-          underline: false,
-          merge: false,
-          align: "left",
-          valign: "top",
-          wrap: false
-        },
-        AE2: {
-          text: "{extras.ifCondition.conditions.logicalConnector}"
-        }
-      },
-      PERFORM: {
-        _options: {
-          hideEmptyRows: true,
-          hideRowsWithoutValues: true,
-          expandMultilineRows: true
-        },
-        "J1:X1": createTemplateBaseStyle("#dbeef4"),
-        J1: {
-          text: "ID"
-        },
-        "Y1:BG1": createTemplateBaseStyle("#dbeef4"),
-        Y1: {
-          text: "Text"
-        },
-        "A2:I2": createTemplateBaseStyle("#dbeef4"),
-        A2: {
-          text: "Subroutine"
-        },
-        "J2:X2": createTemplateBaseStyle("#ffffff"),
-        J2: {
-          text: "{values.form.decl.name}"
-        },
-        "Y2:BG2": createTemplateBaseStyle("#ffffff"),
-        Y2: {
-          text: "{values.form.finalDesc}"
-        },
-        "A3:I3": createTemplateBaseStyle("#dbeef4"),
-        A3: {
-          text: "Using"
-        },
-        "J3:X3": createTemplateBaseStyle("#ffffff"),
-        J3: {
-          text: "{extras.performCall.using.valueDecl.name}"
-        },
-        "Y3:BG3": createTemplateBaseStyle("#ffffff"),
-        Y3: {
-          text: "{extras.performCall.using.valueDecl.finalDesc}"
-        },
-        "A4:I4": createTemplateBaseStyle("#dbeef4"),
-        A4: {
-          text: "Changing"
-        },
-        "J4:X4": createTemplateBaseStyle("#ffffff"),
-        J4: {
-          text: "{extras.performCall.changing.valueDecl.name}"
-        },
-        "Y4:BG4": createTemplateBaseStyle("#ffffff"),
-        Y4: {
-          text: "{extras.performCall.changing.valueDecl.finalDesc}"
-        },
-        "A5:I5": createTemplateBaseStyle("#dbeef4"),
-        A5: {
-          text: "Tables"
-        },
-        "J5:X5": createTemplateBaseStyle("#ffffff"),
-        J5: {
-          text: "{extras.performCall.tables.valueDecl.name}"
-        },
-        "Y5:BG5": createTemplateBaseStyle("#ffffff"),
-        Y5: {
-          text: "{extras.performCall.tables.valueDecl.finalDesc}"
-        },
-        "A6:I6": createTemplateBaseStyle("#dbeef4"),
-        A6: {
-          text: "Raising"
-        },
-        "J6:X6": createTemplateBaseStyle("#ffffff"),
-
-        J6: {
-          text: "{extras.performCall.raising.name}"
-        },
-        "Y6:BG6": createTemplateBaseStyle("#ffffff"),
-        Y6: {
-          text: "{extras.performCall.raising.valueDecl.finalDesc}"
-        },
-        "A7:I7": createTemplateBaseStyle("#dbeef4"),
-        A7: {
-          text: "In Program"
-        },
-        "J7:X7": createTemplateBaseStyle("#ffffff"),
-        J7: {
-          text: "{values.program.decl.name}"
-        },
-        "Y7:BG7": createTemplateBaseStyle("#ffffff"),
-        Y7: {
-          text: "{values.program.finalDesc}"
-        }
-      },
-      MESSAGE: {
-        _options: {
-          hideEmptyRows: true,
-          hideRowsWithoutValues: true,
-          expandMultilineRows: true
-        },
-        "A1:I1": createTemplateBaseStyle("#dbeef4"),
-        A1: {
-          text: "Message Class"
-        },
-        "J1:V1": createTemplateBaseStyle("#ffffff"),
-        J1: {
-          text: "{values.messageClass.finalDesc}"
-        },
-        "W1:AB1": createTemplateBaseStyle("#dbeef4"),
-        W1: {
-          text: "Message Number"
-        },
-        "AC1:AJ1": createTemplateBaseStyle("#ffffff"),
-        AC1: {
-          text: "{values.messageNumber.finalDesc}"
-        },
-        "AK1:AQ1": createTemplateBaseStyle("#dbeef4"),
-        AK1: {
-          text: "Message Type"
-        },
-        "AR1:AX1": createTemplateBaseStyle("#ffffff"),
-        AR1: {
-          text: "{values.messageType.finalDesc}"
-        },
-        "AY1:BG1": createTemplateBaseStyle("#dbeef4"),
-        AY1: {
-          text: "Display Like"
-        },
-        "BH1:BZ1": createTemplateBaseStyle("#ffffff"),
-        BH1: {
-          text: "{values.displayLike.finalDesc}"
-        },
-        "A2:I2": createTemplateBaseStyle("#dbeef4"),
-        A2: {
-          text: "Message Text &1"
-        },
-        "J2:BZ2": createTemplateBaseStyle("#ffffff"),
-        J2: {
-          text: "{values.messageText1.finalDesc}"
-        },
-        "A3:I3": createTemplateBaseStyle("#dbeef4"),
-        A3: {
-          text: "Message Text &2"
-        },
-        "J3:BZ3": createTemplateBaseStyle("#ffffff"),
-        J3: {
-          text: "{values.messageText2.finalDesc}"
-        },
-        "A4:I4": createTemplateBaseStyle("#dbeef4"),
-        A4: {
-          text: "Message Text &3"
-        },
-        "J4:BZ4": createTemplateBaseStyle("#ffffff"),
-        J4: {
-          text: "{values.messageText3.finalDesc}"
-        },
-        "A5:I5": createTemplateBaseStyle("#dbeef4"),
-        A5: {
-          text: "Message Text &4"
-        },
-        "J5:BZ5": createTemplateBaseStyle("#ffffff"),
-        J5: {
-          text: "{values.messageText4.finalDesc}"
-        },
-        "A6:I6": createTemplateBaseStyle("#dbeef4"),
-        A6: {
-          text: "Message Display"
-        },
-        "J6:BZ6": createTemplateBaseStyle("#ffffff"),
-        J6: {
-          text: "{values.messageDisplay.finalDesc}"
-        },
-        "A7:I7": createTemplateBaseStyle("#dbeef4"),
-        A7: {
-          text: "Đích lưu"
-        },
-        "J7:BZ7": createTemplateBaseStyle("#ffffff"),
-        J7: {
-          text: "{values.messageDestination.finalDesc}"
-        }
-      }
+      DEFAULT: UNIFIED_KEYWORD_ROW_TEMPLATE_V1,
+      APPEND: createKeywordDescriptionTemplate(),
+      ASSIGNMENT: ASSIGNMENT_ROW_TEMPLATE_V1,
+      CALL_FUNCTION: createKeywordDescriptionTemplate(),
+      CASE: createKeywordDescriptionTemplate(),
+      CLEAR: createKeywordDescriptionTemplate(),
+      CONSTANTS: createKeywordDescriptionTemplate(),
+      DATA: createKeywordDescriptionTemplate(),
+      DELETE_ITAB: createKeywordDescriptionTemplate(),
+      DO: createKeywordDescriptionTemplate(),
+      ELSE: createKeywordDescriptionTemplate(),
+      ELSEIF: createConditionRowTemplate(),
+      "FIELD-SYMBOLS": createKeywordDescriptionTemplate(),
+      IF: createConditionRowTemplate(),
+      LOOP_AT_ITAB: createKeywordDescriptionTemplate(),
+      MODIFY_ITAB: createKeywordDescriptionTemplate(),
+      "MOVE-CORRESPONDING": createKeywordDescriptionTemplate(),
+      PARAMETERS: createKeywordDescriptionTemplate(),
+      PERFORM: createKeywordDescriptionTemplate(),
+      READ_TABLE: createKeywordDescriptionTemplate(),
+      SELECT: createKeywordDescriptionTemplate(),
+      "SELECT-OPTIONS": createKeywordDescriptionTemplate(),
+      SORT_ITAB: createKeywordDescriptionTemplate(),
+      TYPES: createKeywordDescriptionTemplate(),
+      WHEN: createKeywordDescriptionTemplate()
     }
   };
-
-  const TEMPLATE_GENERIC_KEYS = [
-    "CALL_FUNCTION",
-    "CALL_METHOD",
-    "CALL_TRANSACTION",
-    "CASE",
-    "CATCH",
-    "CLASS",
-    "CLASS-DATA",
-    "CLASS-METHODS",
-    "CLEANUP",
-    "CLEAR",
-    "CONSTANTS",
-    "DATA",
-    "DO",
-    "ELSE",
-    "FIELD-SYMBOLS",
-    "FORM",
-    "INSERT_ITAB",
-    "LOOP_AT_ITAB",
-    "METHOD",
-    "METHODS",
-    "MOVE",
-    "MOVE-CORRESPONDING",
-    "PARAMETERS",
-    "PERFORM",
-    "RANGES",
-    "SELECT",
-    "SELECT-OPTIONS",
-    "SORT_ITAB",
-    "STATICS",
-    "TRY",
-    "TYPES",
-    "WHEN"
-  ];
-
-  for (const key of TEMPLATE_GENERIC_KEYS) {
-    if (!Object.prototype.hasOwnProperty.call(TEMPLATE_DEFAULT_CONFIG_V1.templates, key)) {
-      TEMPLATE_DEFAULT_CONFIG_V1.templates[key] = createGenericStatementTemplate(key);
-    }
-  }
 
   for (const templateDef of Object.values(TEMPLATE_DEFAULT_CONFIG_V1.templates)) {
     if (!templateDef || typeof templateDef !== "object" || Array.isArray(templateDef)) {
@@ -3403,6 +1900,29 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
   function getDefaultTemplateConfig() {
     const cloned = cloneJsonValue(TEMPLATE_DEFAULT_CONFIG_V1);
     return cloned && typeof cloned === "object" ? cloned : { version: 1, templates: {} };
+  }
+
+  function mergeMissingDefaultTemplatesInPlace(config) {
+    if (!config || typeof config !== "object" || Array.isArray(config)) {
+      return false;
+    }
+    if (!config.templates || typeof config.templates !== "object" || Array.isArray(config.templates)) {
+      return false;
+    }
+
+    let changed = false;
+    for (const [templateKey, templateDef] of Object.entries(TEMPLATE_DEFAULT_CONFIG_V1.templates)) {
+      if (Object.prototype.hasOwnProperty.call(config.templates, templateKey)) {
+        continue;
+      }
+      const cloned = cloneJsonValue(templateDef);
+      if (!cloned || typeof cloned !== "object") {
+        continue;
+      }
+      config.templates[templateKey] = cloned;
+      changed = true;
+    }
+    return changed;
   }
 
   function normalizeTemplateAliasToken(value) {
@@ -3771,402 +2291,6 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     });
   }
 
-  function validateRuleConfig(config) {
-    if (!config || typeof config !== "object" || Array.isArray(config)) {
-      return "Config must be a JSON object.";
-    }
-
-    if (!config.object || typeof config.object !== "string") {
-      return "Missing config.object (string).";
-    }
-
-    if (!config.match || typeof config.match !== "object" || Array.isArray(config.match)) {
-      return "Missing config.match (object).";
-    }
-
-    const match = config.match;
-    const hasMatch =
-      (typeof match.startKeyword === "string" && match.startKeyword.trim()) ||
-      (typeof match.startPhrase === "string" && match.startPhrase.trim()) ||
-      (typeof match.type === "string" && match.type.trim());
-
-    if (!hasMatch) {
-      return "match must include startKeyword, startPhrase, or type.";
-    }
-
-    if (config.block !== undefined && config.block !== null) {
-      if (typeof config.block !== "object" || Array.isArray(config.block)) {
-        return "block must be an object (or null).";
-      }
-      if (typeof config.block.endKeyword !== "string" || !config.block.endKeyword.trim()) {
-        return "block.endKeyword must be a non-empty string.";
-      }
-    }
-
-    if (config.extras !== undefined && config.extras !== null) {
-      if (typeof config.extras !== "object" || Array.isArray(config.extras)) {
-        return "extras must be an object (or null).";
-      }
-      if (typeof config.extras.type !== "string" || !config.extras.type.trim()) {
-        return "extras.type must be a non-empty string.";
-      }
-    }
-
-    if (config.keywordLabels !== undefined && config.keywordLabels !== null) {
-      if (typeof config.keywordLabels !== "object" || Array.isArray(config.keywordLabels)) {
-        return "keywordLabels must be an object.";
-      }
-    }
-
-    if (config.keywordPhrases !== undefined && config.keywordPhrases !== null) {
-      if (typeof config.keywordPhrases !== "object" || Array.isArray(config.keywordPhrases)) {
-        return "keywordPhrases must be an object.";
-      }
-    }
-
-    if (config.captureRules !== undefined && config.captureRules !== null && !Array.isArray(config.captureRules)) {
-      return "captureRules must be an array.";
-    }
-
-    if (Array.isArray(config.captureRules)) {
-      for (const rule of config.captureRules) {
-        if (!rule || typeof rule !== "object" || Array.isArray(rule)) {
-          return "Each captureRules[] item must be an object.";
-        }
-        if (typeof rule.after !== "string" || !rule.after.trim()) {
-          return "Each captureRules[] item must have after (string).";
-        }
-        if (typeof rule.name !== "string" || !rule.name.trim()) {
-          return "Each captureRules[] item must have name (string).";
-        }
-      }
-    }
-
-    return "";
-  }
-
-  function generateRuleId() {
-    const time = Date.now();
-    const rand = Math.random().toString(16).slice(2, 10);
-    return `rule-${time}-${rand}`;
-  }
-
-  function normalizeCustomRules(list) {
-    const output = [];
-    const items = Array.isArray(list) ? list : [];
-
-    for (const item of items) {
-      if (!item || typeof item !== "object" || Array.isArray(item)) {
-
-        continue;
-      }
-
-      if (item.config && typeof item.config === "object" && !Array.isArray(item.config)) {
-        const id = item.id ? String(item.id) : generateRuleId();
-        output.push({ id, config: item.config });
-        continue;
-      }
-
-      if (typeof item.object === "string") {
-        output.push({ id: generateRuleId(), config: item });
-      }
-    }
-
-    return output;
-  }
-
-  function loadCustomRules() {
-    return normalizeCustomRules(loadStorageArray(RULES_STORAGE_KEY_V1));
-  }
-
-  function saveCustomRules() {
-    try {
-      localStorage.setItem(RULES_STORAGE_KEY_V1, JSON.stringify(state.customRules || []));
-    } catch {
-      // ignore
-    }
-  }
-
-  function setRulesError(message) {
-    if (!els.rulesError) {
-      return;
-    }
-    els.rulesError.textContent = message ? String(message) : "";
-  }
-
-  function getCustomConfigs() {
-    const output = [];
-    for (const rule of state.customRules || []) {
-      if (!rule || !rule.config) {
-        continue;
-      }
-      const error = validateRuleConfig(rule.config);
-      if (!error) {
-        output.push(rule.config);
-      }
-    }
-    return output;
-  }
-
-  function describeRuleOption(rule) {
-    if (!rule || !rule.config) {
-      return "(invalid rule)";
-    }
-
-    const objectType = rule.config.object ? String(rule.config.object) : "RULE";
-    const match = rule.config.match && typeof rule.config.match === "object" ? rule.config.match : {};
-    const summary = match.startPhrase
-      ? `startPhrase=${String(match.startPhrase)}`
-      : match.startKeyword
-        ? `startKeyword=${String(match.startKeyword)}`
-        : match.type
-          ? `type=${String(match.type)}`
-          : "match=?";
-
-    return `${objectType} (${summary})`;
-  }
-
-  function renderRulesSelect() {
-    if (!els.rulesSelect) {
-      return;
-    }
-
-    els.rulesSelect.replaceChildren();
-    els.rulesSelect.appendChild(el("option", { text: "(New rule)", attrs: { value: "" } }));
-
-    for (const rule of state.customRules || []) {
-      const id = rule && rule.id ? String(rule.id) : "";
-      if (!id) {
-        continue;
-      }
-      els.rulesSelect.appendChild(
-        el("option", {
-          text: describeRuleOption(rule),
-          attrs: { value: id }
-        })
-      );
-    }
-
-    els.rulesSelect.value = state.activeRuleId || "";
-  }
-
-  function selectRule(ruleId) {
-    const id = ruleId ? String(ruleId) : "";
-    state.activeRuleId = id;
-    setRulesError("");
-
-    if (!els.rulesJson) {
-      return;
-    }
-
-    if (!id) {
-      els.rulesJson.value = "";
-      return;
-    }
-
-    const rule = (state.customRules || []).find((r) => r && String(r.id) === id) || null;
-    if (!rule || !rule.config) {
-      els.rulesJson.value = "";
-      return;
-    }
-
-    try {
-      els.rulesJson.value = JSON.stringify(rule.config, null, 2);
-    } catch {
-      els.rulesJson.value = "";
-    }
-  }
-
-  function createRuleTemplate(kind) {
-    const type = String(kind || "startKeyword");
-
-    if (type === "assignment") {
-      return {
-        object: "ASSIGNMENT",
-        match: { type: "assignment" },
-        keywordLabels: {
-          "=": "assign",
-          "+=": "add-assign",
-          "-=": "sub-assign",
-          "*=": "mul-assign",
-          "/=": "div-assign",
-          "?=": "cast"
-        },
-        keywordPhrases: {},
-        captureRules: []
-      };
-    }
-
-    if (type === "startPhrase") {
-      return {
-        object: "MY_OBJECT",
-        match: { startPhrase: "MY PHRASE" },
-        keywordLabels: {
-          MY: "stmt"
-        },
-        keywordPhrases: {
-          "MY PHRASE": "my-phrase"
-        },
-        captureRules: [
-          { after: "MY PHRASE", name: "name", label: "name" }
-        ]
-      };
-    }
-
-    return {
-      object: "MY_OBJECT",
-      match: { startKeyword: "MYKEYWORD" },
-      keywordLabels: {
-        MYKEYWORD: "stmt"
-      },
-      keywordPhrases: {},
-      captureRules: [
-        { after: "MYKEYWORD", name: "name", label: "name" }
-      ]
-    };
-  }
-
-  function startNewRule() {
-    state.activeRuleId = "";
-    if (els.rulesSelect) {
-      els.rulesSelect.value = "";
-    }
-
-    const kind = els.rulesTemplate ? els.rulesTemplate.value : "startKeyword";
-    const template = createRuleTemplate(kind);
-
-    if (els.rulesJson) {
-      els.rulesJson.value = JSON.stringify(template, null, 2);
-      els.rulesJson.focus();
-    }
-
-    setRulesError("");
-  }
-
-  function readRuleFromEditor() {
-    const text = els.rulesJson ? els.rulesJson.value || "" : "";
-    const trimmed = text.trim();
-    if (!trimmed) {
-      return { config: null, error: "Rule JSON is empty." };
-    }
-
-    try {
-      const parsed = JSON.parse(trimmed);
-      const config = parsed;
-      const error = validateRuleConfig(config);
-      if (error) {
-        return { config: null, error };
-      }
-      return { config, error: "" };
-    } catch (err) {
-      return { config: null, error: `JSON parse error: ${err && err.message ? err.message : err}` };
-    }
-  }
-
-  function saveRuleFromEditor() {
-    const { config, error } = readRuleFromEditor();
-    if (error) {
-      setRulesError(error);
-      return;
-    }
-
-    setRulesError("");
-
-    if (state.activeRuleId) {
-      const target = (state.customRules || []).find((r) => r && String(r.id) === state.activeRuleId) || null;
-      if (target) {
-        target.config = config;
-      } else {
-        state.customRules.push({ id: state.activeRuleId, config });
-      }
-    } else {
-      const id = generateRuleId();
-      state.customRules.push({ id, config });
-      state.activeRuleId = id;
-    }
-
-    saveCustomRules();
-    renderRulesSelect();
-    if (els.rulesSelect) {
-      els.rulesSelect.value = state.activeRuleId || "";
-    }
-  }
-
-  function deleteActiveRule() {
-    if (!state.activeRuleId) {
-      setRulesError("Select a saved rule to delete.");
-      return;
-    }
-
-    state.customRules = (state.customRules || []).filter((r) => r && String(r.id) !== state.activeRuleId);
-    state.activeRuleId = "";
-    saveCustomRules();
-    renderRulesSelect();
-    if (els.rulesJson) {
-      els.rulesJson.value = "";
-    }
-    setRulesError("");
-  }
-
-  function downloadRuleFromEditor() {
-    const { config, error } = readRuleFromEditor();
-    if (error) {
-      setRulesError(error);
-      return;
-    }
-
-    setRulesError("");
-
-    const fileBase = config && config.object ? String(config.object).trim() : "rule";
-    const fileName = `${fileBase}.json`;
-    const content = JSON.stringify(config, null, 2);
-
-    try {
-      const blob = new Blob([content], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      setRulesError(`Download failed: ${err && err.message ? err.message : err}`);
-    }
-  }
-
-  function openRulesModal() {
-    if (!els.rulesModal) {
-      return;
-    }
-
-    if (!els.jsonModal.hidden) {
-      closeJsonModal();
-    }
-    if (!els.editModal.hidden) {
-      closeEditModal();
-    }
-
-    renderRulesSelect();
-    if (state.activeRuleId) {
-      selectRule(state.activeRuleId);
-    } else if (els.rulesJson && !els.rulesJson.value.trim()) {
-      startNewRule();
-    }
-
-    els.rulesModal.hidden = false;
-  }
-
-  function closeRulesModal() {
-    if (!els.rulesModal) {
-      return;
-    }
-
-    els.rulesModal.hidden = true;
-    setRulesError("");
-  }
-
   function renderSettingsModalUi() {
     if (!els.settingsModal) {
       return;
@@ -4257,9 +2381,6 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     if (!els.editModal.hidden) {
       closeEditModal();
     }
-    if (els.rulesModal && !els.rulesModal.hidden) {
-      closeRulesModal();
-    }
 
     renderSettingsModalUi();
     els.settingsModal.hidden = false;
@@ -4281,7 +2402,6 @@ window.AbapViewerModules.factories["01-core"] = function registerCore(runtime) {
   targetRuntime.constants = {
     DESC_STORAGE_KEY_V2,
     DESC_STORAGE_KEY_LEGACY_V1,
-    RULES_STORAGE_KEY_V1,
     SETTINGS_STORAGE_KEY_V1,
     TEMPLATE_CONFIG_STORAGE_KEY_V1,
     THEME_STORAGE_KEY_V1,
@@ -4300,15 +2420,3 @@ window.AbapViewerModules.factories["01-core"] = function registerCore(runtime) {
   window.AbapViewerModules.parts["01-core"] = true;
 };
 window.AbapViewerModules.factories["01-core"](window.AbapViewerRuntime);
-
-// bundled from: viewer/app/core/02-build-info.js
-
-// bundled from: viewer/app/core/03-storage.js
-
-// bundled from: viewer/app/core/04-template-config.js
-
-// bundled from: viewer/app/core/05-theme-layout.js
-
-// bundled from: viewer/app/core/06-rules.js
-
-// bundled from: viewer/app/core/07-settings-modal.js

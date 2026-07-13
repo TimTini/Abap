@@ -1,19 +1,30 @@
 {
   "review_meta": {
-    "version": "1.0",
-    "review_scope": "template config, template preview, square-cell layout, parser tách câu lệnh, contract tests",
-    "review_target": "viewer/app/05-main.js, viewer/app/template/01-path-resolver.js, viewer/index.html, shared/abap-parser/01-context.js, shared/abap-parser/09-public-api.js, tests/parser-regression.js, tests/viewer-contracts.js",
-    "review_time": "2026-03-29T19:16:44+07:00",
+    "version": "2.0",
+    "project_id": "abap-viewer",
+    "repo": "[redacted local path]",
+    "branch": "mainv2",
+    "commit": "[redacted]",
+    "pr_id": "",
+    "review_scope": "Applied repository hygiene fix for local .omx runtime/log files",
+    "review_target": ".gitignore, staged untrack of .omx runtime files, review_memory.json",
+    "review_time": "2026-04-24T15:20:57+07:00",
     "language": "vi",
     "summary_status": "pass_with_risk",
     "release_decision": "Có thể release nhưng có rủi ro cần chấp nhận"
   },
   "final_summary": {
-    "short_conclusion": "Các finding chính đã sửa; ô template vuông giữ height cố định và để text overflow hiển thị thay vì bị che; parser và viewer contract test đều qua; còn rủi ro legacy nhỏ cần theo dõi.",
+    "short_conclusion": "Đã thêm ignore cho .omx runtime/local memory files và untrack các .omx runtime files đã lỡ tracked; còn nên chạy secret scan history trước khi publish public hoặc release nhạy cảm.",
     "top_blockers": [],
     "top_logic_issues": [],
     "top_uiux_issues": [],
-    "top_improvements": []
+    "top_runtime_issues": [],
+    "top_data_issues": [],
+    "top_security_issues": [],
+    "top_improvements": [
+      "Duy trì ignore cho .omx runtime files.",
+      "Chạy secret scan history nếu repo từng được publish hoặc chuẩn bị release nhạy cảm."
+    ]
   },
   "findings": [
     {
@@ -27,16 +38,20 @@
         "line": "929-945",
         "function": "syncJsonToDraft",
         "component": "Template config modal",
-        "screen": "Template > JSON"
+        "screen": "Template > JSON",
+        "log_source": "",
+        "database_object": ""
       },
       "problem": "JSON nhập vào được validate trước khi chạy bước chuẩn hóa/di trú giá trị cũ. Các luồng load và restore khác lại normalize trước, nên config cũ có thể bị từ chối riêng ở đường import.",
       "plain_explanation": "Người dùng mở file cấu hình cũ có thể bị báo lỗi và không nạp được, dù app vốn có bước tự đổi dữ liệu cũ sang dạng mới.",
       "why_it_matters": "Đây là lỗi tương thích ngược: cấu hình đã lưu hoặc chia sẻ trước đó có thể không dùng lại được, preview cũng có thể bị chặn.",
       "impact": "Mất khả năng import config cũ; preview bị blank; người dùng phải sửa JSON thủ công hoặc xoá cấu hình.",
+      "evidence": "",
       "suggested_fix": "Chuẩn hóa payload trước rồi mới validate. Nếu normalize làm đổi dữ liệu, lưu lại bản đã chuẩn hóa và báo rõ cho người dùng.",
       "priority": "sua_ngay",
       "block_release": "khong",
       "confidence": "cao",
+      "evidence_level": "direct",
       "assumptions": [
         "Người dùng có thể import hoặc khôi phục config cũ từ bản trước."
       ],
@@ -50,6 +65,7 @@
         "import",
         "template-config"
       ],
+      "redaction_notes": [],
       "history": [
         "2026-03-29: fixed normalize-before-validate cho đường import JSON."
       ]
@@ -65,16 +81,20 @@
         "line": "9",
         "function": "tokenize",
         "component": "Tokenizer và statement splitter",
-        "screen": "Parser"
+        "screen": "Parser",
+        "log_source": "",
+        "database_object": ""
       },
       "problem": "Tokenizer và bộ tách câu lệnh chỉ bảo vệ chuỗi dạng '...' và |...|. Nếu ABAP đầu vào có literal dạng backtick, dấu chấm hoặc dấu nháy kép bên trong có thể bị hiểu nhầm là kết thúc câu lệnh hoặc comment.",
       "plain_explanation": "Nếu người dùng dán đoạn ABAP có chuỗi dùng dấu backtick, bộ tách câu lệnh có thể cắt nhầm thành nhiều mẩu nhỏ.",
       "why_it_matters": "Parse sai sẽ kéo theo sai tree, sai vị trí dòng, sai mapping description/template và sai export.",
       "impact": "Câu lệnh bị tách sai, output lệch, các chức năng dựa trên parse cũng sai theo.",
+      "evidence": "",
       "suggested_fix": "Nếu dialect mục tiêu có backtick literal, hãy dạy tokenizer và splitCodeIntoStatementSegments nhận dạng nó. Thêm test có dấu chấm và dấu nháy kép bên trong chuỗi.",
       "priority": "sua_som",
       "block_release": "khong",
       "confidence": "cao",
+      "evidence_level": "direct",
       "assumptions": [
         "ABAP đầu vào thực tế có thể chứa literal kiểu backtick."
       ],
@@ -88,6 +108,7 @@
         "string-literal",
         "edge-case"
       ],
+      "redaction_notes": [],
       "history": [
         "2026-03-29: fixed backtick literal parsing và thêm regression test."
       ]
@@ -103,16 +124,20 @@
         "line": "383-393",
         "function": "buildTemplateBlockElement",
         "component": "Template preview cell",
-        "screen": "Template preview"
+        "screen": "Template preview",
+        "log_source": "",
+        "database_object": ""
       },
       "problem": "Ô template đang được gắn vai trò nút bấm và mở modal sửa ngay khi click một lần. Với khu vực xem trước, thao tác này rất dễ gây sửa nhầm khi người dùng chỉ muốn nhìn hoặc copy nội dung.",
       "plain_explanation": "Người dùng chỉ muốn xem nhưng lại có thể vô tình mở chế độ sửa khi bấm vào ô.",
       "why_it_matters": "Một click nhầm có thể đưa người dùng vào màn hình sửa, làm họ đổi sai ô hoặc mất thời gian thoát ra.",
       "impact": "Dễ sửa nhầm, nhất là trên ô dày đặc hoặc trên màn hình chạm tay.",
+      "evidence": "",
       "suggested_fix": "Đổi sang double-click hoặc một nút Edit riêng. Nếu vẫn giữ single-click, cần tách rõ chế độ xem và chế độ sửa để tránh nhầm.",
       "priority": "sua_som",
       "block_release": "khong",
       "confidence": "cao",
+      "evidence_level": "direct",
       "assumptions": [],
       "needs_verification": false,
       "recheck_after_fix": [
@@ -124,6 +149,7 @@
         "template",
         "editing"
       ],
+      "redaction_notes": [],
       "history": [
         "2026-03-29: fixed template preview để chỉ mở editor bằng double-click."
       ]
@@ -139,16 +165,20 @@
         "line": "337-433",
         "function": "renderTemplateTable runtime patch",
         "component": "Template preview table",
-        "screen": "Template preview"
+        "screen": "Template preview",
+        "log_source": "",
+        "database_object": ""
       },
       "problem": "Ô template được đặt width và height bằng nhau ở style, nhưng browser vẫn kéo cột rộng hơn vì bảng giữ min-width 100%. Ngoài ra style từ cell config được spread sau cùng nên có thể đè mất white-space, overflow và padding của chế độ ô vuông. Khi text nằm trực tiếp trong td, việc chỉ bỏ overflow hidden ở td vẫn chưa đủ ổn định để hiện chữ đúng như mong muốn.",
       "plain_explanation": "Nhìn trong code tưởng là ô vuông rồi, nhưng khi render thật thì cột vẫn bị kéo to ra. Chỉ bỏ hidden ở ô chưa đủ; cần tách phần chữ ra khỏi box của ô để ô vẫn vuông mà chữ dài vẫn hiện ra.",
       "why_it_matters": "Template preview không phản ánh đúng layout người dùng mong muốn; người dùng Nhật muốn ô vuông sẽ thấy kết quả sai trực tiếp trên màn hình.",
       "impact": "Ô trong cùng một table có độ rộng khác nhau; text dài bị che; preview gây hiểu nhầm khi chỉnh template.",
+      "evidence": "",
       "suggested_fix": "Trong square mode, bỏ min-width 100% của table; ép lại width và height sau khi merge cell.style; giữ td là ô vuông cố định. Đưa text vào inner wrapper riêng với overflow visible, nowrap, clip, pointer-events none để chữ dài tràn ra hiển thị mà không làm ô cao lên và không chặn tương tác edit.",
       "priority": "sua_ngay",
       "block_release": "khong",
       "confidence": "cao",
+      "evidence_level": "direct",
       "assumptions": [],
       "needs_verification": false,
       "recheck_after_fix": [
@@ -164,44 +194,132 @@
         "layout",
         "square-cells"
       ],
+      "redaction_notes": [],
       "history": [
         "2026-03-29: fixed table stretch và ép square-cell rules sau cell.style; thêm contract test cho min-width, padding, nowrap, overflow.",
         "2026-03-29: đã thử đổi square cell sang min-height + wrap để text dài không bị hidden.",
         "2026-03-29: revert auto-height; giữ ô vuông cố định và cho text overflow visible qua inner wrapper.",
         "2026-03-29: bài học giữ lại: chỉ bỏ overflow hidden ở td là chưa đủ; cách ổn định là khóa td vuông cố định và cho text overflow ở wrapper con."
       ]
+    },
+    {
+      "id": "security-001",
+      "status": "fixed",
+      "type": "loi_rui_ro",
+      "severity": "cao",
+      "title": "Repo đang track log/state runtime của agent trong .omx",
+      "location": {
+        "file": ".omx/*, .gitignore",
+        "line": "git diff + git ls-files evidence",
+        "function": "",
+        "component": "Repository release hygiene / runtime state",
+        "screen": "",
+        "log_source": ".omx/logs/*.jsonl",
+        "database_object": ""
+      },
+      "problem": "Các file runtime state/log của oh-my-codex đang được Git theo dõi hoặc chưa bị ignore. Chúng thay đổi theo từng phiên làm việc và log preview có thể chứa prompt/output người dùng.",
+      "plain_explanation": "Đây giống như để nhật ký làm việc tạm thời vào gói release. Hôm nay chưa thấy secret thật, nhưng ngày khác log có thể chứa token, dữ liệu khách hàng hoặc nội dung nội bộ.",
+      "why_it_matters": "Runtime logs/state không phải product code. Nếu bị commit/publish, repo có thể rò dữ liệu nhạy cảm, tạo diff nhiễu, và làm release chứa trạng thái máy cá nhân thay vì artifact kiểm soát được.",
+      "impact": "Rò rỉ prompt/output preview hoặc thông tin nội bộ; release bị bẩn bởi timestamp/session id; review khó phân biệt thay đổi thật với nhiễu runtime.",
+      "evidence": "git ls-files cho thấy .omx/logs/*.jsonl, .omx/metrics.json và nhiều .omx/state/*.json đang tracked. git diff hiện chỉ đổi timestamp/counter/session state. .gitignore chưa ignore .omx. Log runtime có thể chứa input_preview/output_preview của agent turn.",
+      "suggested_fix": "Đã thêm .gitignore cho .omx runtime/local memory files và dùng git rm --cached để untrack các runtime files đã tracked. Trước public release vẫn nên chạy secret scan trên history nếu repo từng chứa log nhạy cảm.",
+      "priority": "sua_ngay",
+      "block_release": "khong",
+      "confidence": "cao",
+      "evidence_level": "direct",
+      "assumptions": [
+        "Release/PR có thể vô tình include các file .omx đang dirty hoặc untracked."
+      ],
+      "needs_verification": false,
+      "recheck_after_fix": [
+        "git ls-files .omx không còn liệt kê runtime logs/state/metrics.",
+        "git status không còn hiển thị .omx runtime files là modified/untracked.",
+        "git check-ignore xác nhận .omx logs/state/metrics/local memory bị ignore.",
+        "Secret scan history nếu repo đã từng publish hoặc chuẩn bị release nhạy cảm."
+      ],
+      "tags": [
+        "release",
+        "security",
+        "runtime-log",
+        "repo-hygiene",
+        "data-leak"
+      ],
+      "redaction_notes": [
+        "Không lưu/in nguyên văn nội dung prompt hoặc id phiên; bằng chứng chỉ mô tả loại trường log."
+      ],
+      "history": [
+        "2026-04-24T15:02:38+07:00: phát hiện trong review working tree; cần loại khỏi release trước khi merge/publish.",
+        "2026-04-24T15:20:57+07:00: fixed by ignoring .omx logs/state/metrics/local memory and untracking previously tracked runtime files from Git index."
+      ]
     }
   ],
   "logic_issues": [],
   "inconsistencies": [],
   "ui_ux_issues": [],
+  "runtime_evidence": [
+    "Runtime .omx files đã được untrack khỏi Git index; local files vẫn giữ trên máy.",
+    ".gitignore đã chặn .omx logs/state/metrics/local memory phát sinh mới."
+  ],
+  "log_checks": [
+    "Không in nguyên văn nội dung log/prompt.",
+    "Current-file secret scan thô trước fix không thấy secret rõ; vẫn nên dùng secret scanner chuyên dụng cho history nếu cần release public."
+  ],
+  "observability_gaps": [],
+  "mismatches_between_code_and_logs": [],
+  "mismatches_between_code_and_database": [],
+  "database_checks": [
+    "Không có database dump, query result hoặc snapshot dữ liệu hiện có để đối chiếu với logic code."
+  ],
+  "data_migration_risks": [],
+  "security_checks": [
+    "Đã thêm ignore rule cho .omx runtime files.",
+    "Đã untrack các .omx runtime files đã tracked trong index."
+  ],
+  "redacted_sensitive_data": [
+    "Không trích nguyên văn prompt/user content hoặc secret; bằng chứng log được mô tả ở mức field/path."
+  ],
   "improvements": [
-    "Giữ normalize-before-validate cho mọi luồng import template config.",
-    "Giữ regression test cho backtick literal và import legacy JSON.",
-    "Giữ template preview ở double-click để tránh sửa nhầm.",
-    "Giữ square-cell layout test để tránh table stretch quay lại."
+    "Có thể bổ sung CI/pre-commit check để chặn runtime files hoặc secret trong staged diff.",
+    "Có thể chạy secret scan history trước release public."
   ],
   "must_fix_now": [],
-  "missing_tests": [],
+  "missing_tests": [
+    {
+      "id": "release-check-001",
+      "title": "Pre-release check không cho runtime .omx logs/state lọt vào diff",
+      "reason": "Ngăn rò dữ liệu và diff nhiễu từ file local runtime.",
+      "priority": "cao",
+      "related_findings": [
+        "security-001"
+      ]
+    }
+  ],
   "remaining_risks": [
-    "Có thể còn các dạng config cũ khác chưa được normalize cùng một chỗ.",
-    "Có thể còn kiểu literal ABAP khác chưa có test parser."
+    "Nếu lịch sử git đã chứa .omx logs nhạy cảm trước đó, cần secret scan history và rotate secret nếu phát hiện."
   ],
   "open_assumptions": [
-    "ABAP đầu vào thực tế có dùng backtick literal.",
-    "Người dùng có nhu cầu import lại config cũ hoặc file JSON được chia sẻ từ bản trước."
+    ".omx runtime state/log không phải artifact bắt buộc của product release."
   ],
-  "recheck_items": [],
+  "recheck_items": [
+    "git status --short",
+    "git ls-files .omx",
+    "git check-ignore -v .omx/logs/example.jsonl .omx/state/example.json .omx/project-memory.json"
+  ],
   "copy_message_to_dev": [
-    "Giữ normalize-before-validate cho mọi luồng import template config.",
-    "Không mở editor template bằng single-click.",
-    "Duy trì regression test cho backtick literal và import legacy JSON."
+    "Giữ .omx runtime logs/state/metrics/local memory ngoài Git.",
+    "Không đưa prompt preview hoặc session state vào PR/release.",
+    "Chạy secret scan history nếu repo đã publish hoặc release có yêu cầu bảo mật cao."
   ],
   "raw_labels": {
     "has_logic_bug": false,
     "has_data_risk": false,
     "has_security_risk": false,
     "has_uiux_risk": false,
-    "has_release_blocker": false
+    "has_runtime_mismatch": false,
+    "has_observability_gap": false,
+    "has_database_mismatch": false,
+    "has_data_migration_risk": false,
+    "has_release_blocker": false,
+    "has_sensitive_data_redaction": true
   }
 }

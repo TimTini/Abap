@@ -29,6 +29,13 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (current.root && current.root.parentNode) {
       current.root.remove();
     }
+
+    if (current.restoreMainLayout) {
+      setMainLayoutVisible(true);
+    }
+    if (current.restoreMainChrome) {
+      setTemplateFormChromeHidden(false);
+    }
   }
 
   function openTemplateDynamicModal(titleText, options) {
@@ -73,6 +80,100 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     document.body.appendChild(root);
     activeTemplateDynamicModal = { root, cleanup: null };
+
+    return {
+      root,
+      content,
+      header,
+      actions,
+      body,
+      closeBtn,
+      setCleanup(cleanup) {
+        if (activeTemplateDynamicModal && activeTemplateDynamicModal.root === root) {
+          activeTemplateDynamicModal.cleanup = typeof cleanup === "function" ? cleanup : null;
+        }
+      }
+    };
+  }
+
+  function setMainLayoutVisible(isVisible) {
+    const layout = document.getElementById("mainLayout");
+    if (!layout) {
+      return;
+    }
+    layout.hidden = !isVisible;
+  }
+
+  function setTemplateFormChromeHidden(isHidden) {
+    const hidden = Boolean(isHidden);
+    const headerEl = document.getElementById("appHeader");
+    const controlsEl = document.getElementById("appControls");
+    if (headerEl) {
+      headerEl.hidden = hidden;
+    }
+    if (controlsEl) {
+      controlsEl.hidden = hidden;
+    }
+    const container = document.querySelector(".container");
+    if (container) {
+      container.classList.toggle("is-template-form-full", hidden);
+    }
+    document.body.classList.toggle("is-template-form-active", hidden);
+  }
+
+  function openTemplateDynamicPage(titleText, options) {
+    closeTemplateDynamicModal();
+    const opts = options && typeof options === "object" ? options : {};
+
+    const root = document.createElement("section");
+    root.className = "template-dynamic-page";
+
+    const content = document.createElement("div");
+    content.className = `template-dynamic-page-content ${opts.contentClass || ""}`.trim();
+    root.appendChild(content);
+
+    const header = document.createElement("div");
+    header.className = "modal-header";
+    content.appendChild(header);
+
+    const title = document.createElement("strong");
+    title.textContent = String(titleText || "Template");
+    header.appendChild(title);
+
+    const actions = document.createElement("div");
+    actions.className = "modal-actions";
+    header.appendChild(actions);
+
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "secondary";
+    closeBtn.textContent = "Back";
+    closeBtn.addEventListener("click", closeTemplateDynamicModal);
+    actions.appendChild(closeBtn);
+
+    const body = document.createElement("div");
+    body.className = "modal-body";
+    content.appendChild(body);
+
+    const parent = els.mainLayout && els.mainLayout.parentNode
+      ? els.mainLayout.parentNode
+      : document.querySelector(".container");
+    if (parent && els.mainLayout && els.mainLayout.nextSibling) {
+      parent.insertBefore(root, els.mainLayout.nextSibling);
+    } else if (parent) {
+      parent.appendChild(root);
+    } else {
+      document.body.appendChild(root);
+    }
+
+    setMainLayoutVisible(false);
+    setTemplateFormChromeHidden(true);
+    activeTemplateDynamicModal = {
+      root,
+      cleanup: null,
+      restoreMainLayout: true,
+      restoreMainChrome: true
+    };
 
     return {
       root,
@@ -699,8 +800,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
   }
 
   function openTemplateConfigModal() {
-    const modal = openTemplateDynamicModal("Template Form", { contentClass: "template-runtime-modal-content template-runtime-modal-wide" });
-    modal.closeBtn.textContent = "Cancel";
+    const modal = openTemplateDynamicPage("Template Form", { contentClass: "template-runtime-modal-content template-runtime-modal-wide" });
     modal.body.classList.add("template-config-modal-body");
     const prevJsonEl = els.templateConfigJson;
     const prevErrEl = els.templateConfigError;
@@ -717,26 +817,17 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     modal.body.appendChild(workspace);
     const editorPane = document.createElement("div");
     editorPane.className = "template-config-editor-pane";
-    workspace.appendChild(editorPane);
+    const workspaceSplit = document.createElement("div");
+    workspaceSplit.className = "template-config-workspace-split";
+    workspaceSplit.setAttribute("role", "separator");
+    workspaceSplit.setAttribute("tabindex", "0");
+    workspaceSplit.setAttribute("aria-label", "Resize editor and live preview");
 
-    const tabs = document.createElement("div");
-    tabs.className = "template-config-editor-tabs";
-    const formBtn = document.createElement("button");
-    formBtn.type = "button";
-    formBtn.className = "secondary";
-    formBtn.textContent = "Form";
-    const jsonBtn = document.createElement("button");
-    jsonBtn.type = "button";
-    jsonBtn.className = "secondary";
-    jsonBtn.textContent = "JSON (Advanced)";
-    tabs.appendChild(formBtn);
-    tabs.appendChild(jsonBtn);
-    editorPane.appendChild(tabs);
     const host = document.createElement("div");
     host.className = "template-config-editor-host";
-    editorPane.appendChild(host);
     const errEl = document.createElement("div");
     errEl.className = "template-error";
+    editorPane.appendChild(host);
     editorPane.appendChild(errEl);
 
     const previewPane = document.createElement("section");
@@ -759,7 +850,114 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     previewBody.className = "template-config-live-preview-body muted";
     previewBody.textContent = "Preview unavailable.";
     previewPane.appendChild(previewBody);
+    workspace.appendChild(editorPane);
+    workspace.appendChild(workspaceSplit);
     workspace.appendChild(previewPane);
+
+    const TEMPLATE_FORM_SPLIT_KEY = "abap-parser-viewer.templateFormEditorPct.v1";
+    let editorPct = 58;
+    try {
+      const saved = localStorage.getItem(TEMPLATE_FORM_SPLIT_KEY);
+      if (saved != null) {
+        const n = Number(saved);
+        if (Number.isFinite(n) && n >= 22 && n <= 78) {
+          editorPct = Math.round(n);
+        }
+      }
+    } catch {
+      // ignore
+    }
+    const templateFormMaxWidthMq = window.matchMedia("(max-width: 1180px)");
+    const applyTemplateWorkspaceSplit = () => {
+      const stacked = templateFormMaxWidthMq.matches;
+      workspaceSplit.setAttribute("aria-orientation", stacked ? "horizontal" : "vertical");
+      editorPane.style.flex = `0 0 ${editorPct}%`;
+      previewPane.style.flex = "1 1 0";
+      editorPane.style.minWidth = stacked ? "0" : "220px";
+      previewPane.style.minWidth = stacked ? "0" : "220px";
+      editorPane.style.minHeight = stacked ? "120px" : "0";
+      previewPane.style.minHeight = stacked ? "160px" : "0";
+    };
+    applyTemplateWorkspaceSplit();
+    const onTemplateFormSplitChanged = () => {
+      applyTemplateWorkspaceSplit();
+    };
+    if (typeof templateFormMaxWidthMq.addEventListener === "function") {
+      templateFormMaxWidthMq.addEventListener("change", onTemplateFormSplitChanged);
+    } else if (typeof templateFormMaxWidthMq.addListener === "function") {
+      templateFormMaxWidthMq.addListener(onTemplateFormSplitChanged);
+    }
+    let templateSplitDrag = null;
+    const endTemplateSplitDrag = (ev) => {
+      if (!templateSplitDrag) {
+        return;
+      }
+      if (ev && templateSplitDrag.pointerId != null && ev.pointerId !== templateSplitDrag.pointerId) {
+        return;
+      }
+      const pid = templateSplitDrag.pointerId;
+      templateSplitDrag = null;
+      workspace.classList.remove("is-resizing");
+      try {
+        localStorage.setItem(TEMPLATE_FORM_SPLIT_KEY, String(editorPct));
+      } catch {
+        // ignore
+      }
+      if (typeof workspaceSplit.releasePointerCapture === "function" && pid != null) {
+        try {
+          workspaceSplit.releasePointerCapture(pid);
+        } catch {
+          // ignore
+        }
+      }
+    };
+    workspaceSplit.addEventListener("pointerdown", (ev) => {
+      ev.preventDefault();
+      templateSplitDrag = { pointerId: ev.pointerId };
+      workspace.classList.add("is-resizing");
+      if (typeof workspaceSplit.setPointerCapture === "function") {
+        try {
+          workspaceSplit.setPointerCapture(ev.pointerId);
+        } catch {
+          // ignore
+        }
+      }
+    });
+    workspaceSplit.addEventListener("pointermove", (ev) => {
+      if (!templateSplitDrag || ev.pointerId !== templateSplitDrag.pointerId) {
+        return;
+      }
+      const rect = workspace.getBoundingClientRect();
+      const w = Math.max(1, rect.width);
+      const h = Math.max(1, rect.height);
+      const stacked = templateFormMaxWidthMq.matches;
+      const ratio = stacked
+        ? (ev.clientY - rect.top) / h
+        : (ev.clientX - rect.left) / w;
+      editorPct = Math.round(Math.min(78, Math.max(22, ratio * 100)));
+      applyTemplateWorkspaceSplit();
+    });
+    workspaceSplit.addEventListener("pointerup", endTemplateSplitDrag);
+    workspaceSplit.addEventListener("pointercancel", endTemplateSplitDrag);
+    workspaceSplit.addEventListener("keydown", (ev) => {
+      const step = ev.shiftKey ? 5 : 2;
+      const stacked = templateFormMaxWidthMq.matches;
+      if (!stacked && (ev.key === "ArrowLeft" || ev.key === "ArrowRight")) {
+        ev.preventDefault();
+        editorPct = ev.key === "ArrowLeft"
+          ? Math.max(22, editorPct - step)
+          : Math.min(78, editorPct + step);
+        applyTemplateWorkspaceSplit();
+        return;
+      }
+      if (stacked && (ev.key === "ArrowUp" || ev.key === "ArrowDown")) {
+        ev.preventDefault();
+        editorPct = ev.key === "ArrowUp"
+          ? Math.max(22, editorPct - step)
+          : Math.min(78, editorPct + step);
+        applyTemplateWorkspaceSplit();
+      }
+    });
 
     const OPTION_KEYS = new Set(["_options", "options", "ranges", "compact", "hideemptyrows", "hiderowswithoutvalues", "expandmultilinerows", "removeemptyrows", "removeemptyrowsadvanced", "removeemptyrowsadv", "expandarrayrows", "arraytorows"]);
     const FIELD_DEFS = [
@@ -821,8 +1019,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (!Object.keys(draft.templates).length) {
       draft.templates.DEFAULT = {};
     }
-    let activeTab = "form";
-    let jsonArea = null;
     let selKey = Object.keys(draft.templates)[0] || "DEFAULT";
     let selRange = "";
     els.templateConfigError = errEl;
@@ -846,35 +1042,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       previewBody.textContent = String(message || "").trim() || "Preview unavailable.";
     };
     const buildPreviewConfig = () => {
-      if (activeTab === "json" && jsonArea) {
-        const raw = String(jsonArea.value || "").trim();
-        if (!raw) {
-          return { config: null, message: "JSON draft is empty." };
-        }
-        let parsed = null;
-        try {
-          parsed = JSON.parse(raw);
-        } catch (err) {
-          return { config: null, message: `Preview paused: JSON parse error (${err && err.message ? err.message : err}).` };
-        }
-        const normalized = cloneJsonValue(parsed);
-        if (!normalized || typeof normalized !== "object" || Array.isArray(normalized)) {
-          return { config: null, message: "Preview paused: JSON root must be an object." };
-        }
-        normalizeTemplateConfigLegacyFieldsInPlace(normalized);
-        normalized.version = 1;
-        if (!normalized.templates || typeof normalized.templates !== "object" || Array.isArray(normalized.templates)) {
-          normalized.templates = {};
-        }
-        if (!Object.keys(normalized.templates).length) {
-          normalized.templates.DEFAULT = {};
-        }
-        const chk = validateTemplateConfig(normalized);
-        if (!chk.valid) {
-          return { config: null, message: `Preview paused: ${chk.errors[0] || "Template config is invalid."}` };
-        }
-        return { config: normalized, message: "" };
-      }
       const preCheck = validateDraft();
       if (!preCheck.ok) {
         return { config: null, message: preCheck.messages[0] || "Template draft is invalid." };
@@ -910,9 +1077,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       if (!previewConfig.config) {
         setPreviewState(
           activeKey ? `Key: ${activeKey}` : "",
-          activeTab === "json"
-            ? "JSON mode updates preview only when the draft is valid."
-            : "Fix validation issues to resume preview.",
+          "Fix validation issues to resume preview.",
           previewConfig.message || "Template config is invalid.",
           true
         );
@@ -974,9 +1139,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       previewMeta.textContent = activeKey
         ? `Key: ${activeKey} • showing ${renderedCount}/${matches.length} matching objects`
         : `Showing ${renderedCount}/${matches.length} objects`;
-      previewNote.textContent = activeTab === "json"
-        ? "JSON mode: preview refreshes whenever the draft becomes valid."
-        : "Form mode: preview refreshes while you type.";
+      previewNote.textContent = "Preview refreshes while you edit.";
       previewNote.classList.remove("is-warning");
       previewBody.classList.remove("muted");
       previewBody.replaceChildren(fragment);
@@ -1471,28 +1634,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       }
       return out;
     };
-    const syncJsonToDraft = () => {
-      if (!jsonArea) return true;
-      const raw = String(jsonArea.value || "").trim();
-      if (!raw) { showErr("Template config JSON is empty."); return false; }
-      let parsed = null;
-      try { parsed = JSON.parse(raw); } catch (er) { showErr(`JSON parse error: ${er && er.message ? er.message : er}`); return false; }
-      const normalized = cloneJsonValue(parsed);
-      if (!normalized || typeof normalized !== "object" || Array.isArray(normalized)) { showErr("Cannot load JSON draft."); return false; }
-      normalizeTemplateConfigLegacyFieldsInPlace(normalized);
-      const chk = validateTemplateConfig(normalized);
-      if (!chk.valid) { showErr(chk.errors.join("\n")); return false; }
-      draft = normalized;
-      if (!draft || typeof draft !== "object" || Array.isArray(draft)) { showErr("Cannot load JSON draft."); return false; }
-      if (!draft.templates || typeof draft.templates !== "object" || Array.isArray(draft.templates)) draft.templates = {};
-      if (!Object.keys(draft.templates).length) draft.templates.DEFAULT = {};
-      if (!Object.prototype.hasOwnProperty.call(draft.templates, selKey)) selKey = Object.keys(draft.templates)[0] || "DEFAULT";
-      selRange = "";
-      try { jsonArea.value = JSON.stringify(draft, null, 2); } catch { /* ignore */ }
-      showErr("");
-      return true;
-    };
-
     const columnNumberToLabel = (col) => {
       let n = Math.max(1, Math.floor(Number(col) || 1));
       let label = "";
@@ -1657,6 +1798,21 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       const current = String(text || "");
       return current ? `${current}${token}` : token;
     };
+    const applyDetailedFormatToCell = (cell, backgroundColor) => {
+      cell.background = backgroundColor;
+      cell.border = "outside-thin";
+      cell.font = "MS PGothic";
+      cell["font color"] = "#111111";
+      cell["font size"] = 10;
+      cell["font family"] = "default";
+      cell.bold = false;
+      cell.italic = false;
+      cell.underline = false;
+      cell.merge = false;
+      cell.align = "left";
+      cell.valign = "top";
+      cell.wrap = false;
+    };
     const applyPaletteToolToSelection = (tool, options) => {
       const type = String(tool || "").trim().toLowerCase();
       const opts = options && typeof options === "object" ? options : {};
@@ -1670,10 +1826,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       } else if (type === "placeholder") {
         const selectedPath = String(opts.placeholder || "").trim() || String(getTemplatePathSuggestionsForSelectedKey()[0] || "values.name.finalDesc");
         setSelectedCellField("text", insertPlaceholderIntoText(cell.text, selectedPath));
-      } else if (type === "format") {
-        if (!cell.background) setSelectedCellField("background", "#dbeef4");
-        if (!cell.border) setSelectedCellField("border", "outside-thin");
-        if (!cell["font color"]) setSelectedCellField("font color", "#111111");
+      } else if (type === "format-blue") {
+        applyDetailedFormatToCell(cell, "#dbeef4");
+      } else if (type === "format-white") {
+        applyDetailedFormatToCell(cell, "#ffffff");
       }
       showErr("");
       renderActive();
@@ -1845,7 +2001,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       const paletteItems = [
         { type: "text", title: "Text", desc: "Tạo text cell hoặc giữ text hiện có." },
         { type: "placeholder", title: "Placeholder", desc: "Chèn {path} vào text." },
-        { type: "format", title: "Format", desc: "Áp dụng background/border/font." }
+        { type: "format-blue", title: "Border vùng, nền xanh", desc: "Nền #dbeef4, border outside-thin, font MS PGothic 10." },
+        { type: "format-white", title: "Border vùng, nền trắng", desc: "Nền #ffffff, border outside-thin, font MS PGothic 10." }
       ];
       for (const item of paletteItems) {
         const btn = document.createElement("button");
@@ -1955,9 +2112,13 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
           renderBuilderCellContent(td, text);
           td.addEventListener("pointerdown", (ev) => {
             if (ev.button !== 0) return;
+            const currentSelection = getBuilderSelection();
+            const useShiftAnchor = Boolean(ev.shiftKey && currentSelection);
+            const anchorRow = useShiftAnchor ? currentSelection.r1 : row;
+            const anchorCol = useShiftAnchor ? currentSelection.c1 : col;
             builderDragging = true;
-            builderDragAnchor = { row, col };
-            selRange = makeRangeKeyFromBounds(row, col, row, col);
+            builderDragAnchor = { row: anchorRow, col: anchorCol };
+            selRange = makeRangeKeyFromBounds(anchorRow, anchorCol, row, col);
             showErr("");
             refreshGridSelectionClasses();
           });
@@ -1970,7 +2131,11 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
           td.addEventListener("keydown", (ev) => {
             if (ev.key !== "Enter" && ev.key !== " ") return;
             ev.preventDefault();
-            selRange = makeRangeKeyFromBounds(row, col, row, col);
+            const currentSelection = getBuilderSelection();
+            const useShiftAnchor = Boolean(ev.shiftKey && currentSelection);
+            const anchorRow = useShiftAnchor ? currentSelection.r1 : row;
+            const anchorCol = useShiftAnchor ? currentSelection.c1 : col;
+            selRange = makeRangeKeyFromBounds(anchorRow, anchorCol, row, col);
             renderActive();
           });
           td.addEventListener("dragover", (ev) => {
@@ -2242,52 +2407,16 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       host.replaceChildren(root);
     }
 
-    function renderJson() {
-      const root = document.createElement("div");
-      root.className = "template-config-json-tab";
-      const hint = document.createElement("div");
-      hint.className = "muted";
-      hint.textContent = "Advanced mode. Apply validates schema and keeps compatibility.";
-      root.appendChild(hint);
-      const ta = document.createElement("textarea");
-      ta.className = "template-config-json template-config-json-large";
-      ta.spellcheck = false;
-      ta.placeholder = "Template config JSON...";
-      ta.value = safeJson(draft, true);
-      ta.addEventListener("input", () => {
-        scheduleLivePreview(180);
-      });
-      ta.addEventListener("keydown", (ev) => { if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") { ev.preventDefault(); applyFromModal(); } });
-      root.appendChild(ta);
-      host.replaceChildren(root);
-      jsonArea = ta;
-      els.templateConfigJson = ta;
-      setTimeout(() => { ta.focus(); ta.setSelectionRange(0, 0); }, 0);
-    }
-
     function renderActive() {
       hideTemplateTokenSuggest();
       clearTemplateTokenSuggestionCache();
-      formBtn.classList.toggle("active", activeTab === "form");
-      jsonBtn.classList.toggle("active", activeTab === "json");
-      if (activeTab === "json") renderJson();
-      else { jsonArea = null; renderForm(); }
+      renderForm();
       renderLivePreview();
     }
 
-    function switchTab(next) {
-      const tab = next === "json" ? "json" : "form";
-      if (tab === activeTab) return;
-      if (activeTab === "json" && !syncJsonToDraft()) return;
-      activeTab = tab;
-      showErr("");
-      renderActive();
-    }
-
     function applyFromModal() {
-      if (activeTab === "json" && !syncJsonToDraft()) return;
       const preCheck = validateDraft();
-      if (!preCheck.ok) { showErr(preCheck.messages.join("\n")); if (activeTab !== "form") { activeTab = "form"; renderActive(); } return; }
+      if (!preCheck.ok) { showErr(preCheck.messages.join("\n")); return; }
       const nextConfig = serializeDraft();
       const chk = validateTemplateConfig(nextConfig);
       if (!chk.valid) { showErr(chk.errors.join("\n")); return; }
@@ -2298,8 +2427,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       closeTemplateDynamicModal();
     }
 
-    formBtn.addEventListener("click", () => switchTab("form"));
-    jsonBtn.addEventListener("click", () => switchTab("json"));
     applyBtn.addEventListener("click", applyFromModal);
     modal.root.addEventListener("keydown", (ev) => { if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") { ev.preventDefault(); applyFromModal(); } });
     renderActive();
@@ -2309,9 +2436,13 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       clearTemplateTokenSuggestionCache();
       document.removeEventListener("pointerup", stopBuilderDrag);
       document.removeEventListener("pointercancel", stopBuilderDrag);
+      if (typeof templateFormMaxWidthMq.removeEventListener === "function") {
+        templateFormMaxWidthMq.removeEventListener("change", onTemplateFormSplitChanged);
+      } else if (typeof templateFormMaxWidthMq.removeListener === "function") {
+        templateFormMaxWidthMq.removeListener(onTemplateFormSplitChanged);
+      }
       els.templateConfigJson = prevJsonEl || null;
       els.templateConfigError = prevErrEl || null;
-      jsonArea = null;
     });
   }
 
@@ -3100,7 +3231,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     };
 
     const rerenderAfterDescOverrideChange = () => {
-      state.haystackById = buildSearchIndex(state.renderObjects);
       if (typeof renderOutput === "function") {
         renderOutput();
       }
@@ -3873,7 +4003,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     const targetProp = String(options.targetProp || "decl");
     const currentDecl = entry[targetProp];
-    if (isDeclLikeRecordForSynthetic(currentDecl)) {
+    const currentDeclType = String(currentDecl && currentDecl.objectType || "").trim().toUpperCase();
+    const replaceableConditionPlaceholder = (
+      (targetProp === "leftOperandDecl" || targetProp === "rightOperandDecl")
+      && currentDeclType === "CONDITION_VALUE"
+    );
+    if (isDeclLikeRecordForSynthetic(currentDecl) && !replaceableConditionPlaceholder) {
       return false;
     }
 
@@ -4054,19 +4189,45 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return createdDecls.length;
   }
 
+  function clearParsedResultAfterFailure(message) {
+    state.data = null;
+    state.renderObjects = [];
+    state.templatePreviewCache = null;
+    state.selectedId = "";
+    state.selectedTemplateIndex = "";
+    state.selectedDeclKey = "";
+    if (state.collapsedIds instanceof Set) {
+      state.collapsedIds.clear();
+    }
+
+    if (typeof resetOutputVirtualState === "function") {
+      resetOutputVirtualState();
+    }
+    if (typeof resetTemplateVirtualState === "function") {
+      resetTemplateVirtualState();
+    }
+
+    setOutputMessage("No data loaded.");
+    setTemplatePreviewMessage("No data loaded.");
+    if (typeof renderDeclDescPanelUi === "function") {
+      renderDeclDescPanelUi();
+    }
+    refreshTemplateGuiFilterTypes();
+    refreshInputGutterTargets();
+    setError(message);
+  }
+
   function parseFromTextarea(fileName) {
     const content = els.inputText.value || "";
     const trimmed = content.trim();
     const isJsonInput = (trimmed.startsWith("{") || trimmed.startsWith("[")) && trimmed.length > 1;
     state.inputMode = isJsonInput ? "json" : "abap";
     rebuildInputGutter();
+    state.inputLineOffsets = computeLineOffsets(content);
     if (!trimmed) {
-      setError("Input is empty.");
-      setOutputMessage("No data loaded.");
+      clearParsedResultAfterFailure("Input is empty.");
       return;
     }
-
-    state.inputLineOffsets = computeLineOffsets(content);
 
     if (isJsonInput) {
       try {
@@ -4077,25 +4238,20 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         }
         state.data = parsed;
       } catch (err) {
-        setError(`JSON parse error: ${err && err.message ? err.message : err}`);
-        setOutputMessage("No data loaded.");
+        clearParsedResultAfterFailure(`JSON parse error: ${err && err.message ? err.message : err}`);
         return;
       }
     } else {
       if (!window.AbapParser || typeof window.AbapParser.parseAbapText !== "function") {
-        setError("AbapParser not loaded.");
-        setOutputMessage("No data loaded.");
+        clearParsedResultAfterFailure("AbapParser not loaded.");
         return;
       }
 
       try {
-        const builtInConfigs = typeof window.AbapParser.getConfigs === "function" ? window.AbapParser.getConfigs() : [];
-        const customConfigs = getCustomConfigs();
-        const configs = [...customConfigs, ...builtInConfigs];
+        const configs = typeof window.AbapParser.getConfigs === "function" ? window.AbapParser.getConfigs() : [];
         state.data = window.AbapParser.parseAbapText(content, configs, fileName || "");
       } catch (err) {
-        setError(`Parse error: ${err && err.message ? err.message : err}`);
-        setOutputMessage("No data loaded.");
+        clearParsedResultAfterFailure(`Parse error: ${err && err.message ? err.message : err}`);
         return;
       }
     }
@@ -4106,9 +4262,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     state.selectedId = "";
     state.selectedTemplateIndex = "";
     state.renderObjects = buildRenderableObjects(state.data && state.data.objects, RENDER_TREE_OPTIONS);
-    state.haystackById = buildSearchIndex(state.renderObjects);
-    populateTypeFilter(state.renderObjects);
     refreshTemplateGuiFilterTypes();
+    setError("");
     if (state.rightTab === "output") {
       renderOutput();
     } else if (state.rightTab === "descriptions") {
@@ -4119,12 +4274,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
   }
 
   function resetUi() {
-    els.searchInput.value = "";
-    els.typeFilter.value = "";
-    els.showRaw.checked = true;
-    els.showKeywords.checked = true;
-    els.showValues.checked = true;
-    els.showExtras.checked = false;
     state.collapsedIds.clear();
     state.selectedId = "";
   }
@@ -4144,13 +4293,15 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     renderBuildInfo();
     state.descOverrides = loadDescOverrides();
     state.descOverridesLegacy = loadLegacyDescOverrides();
-    state.customRules = loadCustomRules();
     state.settings = loadSettings();
     state.templateConfig = loadTemplateConfig();
     if (!state.templateConfig || typeof state.templateConfig !== "object" || Array.isArray(state.templateConfig)) {
       state.templateConfig = getDefaultTemplateConfig();
     }
-    if (normalizeTemplateConfigLegacyFieldsInPlace(state.templateConfig)) {
+    const templateLegacyFieldsChanged = normalizeTemplateConfigLegacyFieldsInPlace(state.templateConfig);
+    const templateDefaultsAdded = mergeMissingDefaultTemplatesInPlace(state.templateConfig);
+    const templateConfigChanged = templateLegacyFieldsChanged || templateDefaultsAdded;
+    if (templateConfigChanged) {
       try {
         localStorage.setItem(
           TEMPLATE_CONFIG_STORAGE_KEY_V1,
@@ -4214,12 +4365,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     els.parseBtn.addEventListener("click", () => parseFromTextarea("input.abap"));
-    els.searchInput.addEventListener("input", renderOutput);
-    els.typeFilter.addEventListener("change", renderOutput);
-    els.showRaw.addEventListener("change", renderOutput);
-    els.showKeywords.addEventListener("change", renderOutput);
-    els.showValues.addEventListener("change", renderOutput);
-    els.showExtras.addEventListener("change", renderOutput);
 
     els.expandAllBtn.addEventListener("click", () => {
       state.collapsedIds.clear();
@@ -4317,44 +4462,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       els.declDescMissingOnly.addEventListener("change", renderDeclDescPanelUi);
     }
 
-    if (els.rulesBtn) {
-      els.rulesBtn.addEventListener("click", openRulesModal);
-    }
-
     if (els.settingsBtn) {
       els.settingsBtn.addEventListener("click", openSettingsModal);
-    }
-
-    if (els.exportXmlBtn) {
-      els.exportXmlBtn.addEventListener("click", () => {
-        if (!state.data || !Array.isArray(state.data.objects)) {
-          setError("No parsed data to export. Click Render first.");
-          return;
-        }
-        setError("");
-        openTextModal("Export XML", buildAbapFlowXml(state.data));
-      });
-    }
-
-    els.fileInput.addEventListener("change", async (ev) => {
-      const file = ev.target && ev.target.files ? ev.target.files[0] : null;
-      if (!file) {
-        return;
-      }
-      const text = await file.text();
-      els.inputText.value = text;
-      parseFromTextarea(file.name || "");
-    });
-
-    if (els.rulesCloseBtn) {
-      els.rulesCloseBtn.addEventListener("click", closeRulesModal);
-    }
-    if (els.rulesModal) {
-      els.rulesModal.addEventListener("click", (ev) => {
-        if (ev.target === els.rulesModal) {
-          closeRulesModal();
-        }
-      });
     }
 
     if (els.settingsCloseBtn) {
@@ -4376,44 +4485,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         }
       });
     }
-    if (els.rulesNewBtn) {
-      els.rulesNewBtn.addEventListener("click", startNewRule);
-    }
-    if (els.rulesSaveBtn) {
-      els.rulesSaveBtn.addEventListener("click", saveRuleFromEditor);
-    }
-    if (els.rulesDeleteBtn) {
-      els.rulesDeleteBtn.addEventListener("click", deleteActiveRule);
-    }
-    if (els.rulesDownloadBtn) {
-      els.rulesDownloadBtn.addEventListener("click", downloadRuleFromEditor);
-    }
-    if (els.rulesSelect) {
-      els.rulesSelect.addEventListener("change", () => {
-        const id = els.rulesSelect.value || "";
-        if (!id) {
-          startNewRule();
-          return;
-        }
-        selectRule(id);
-      });
-    }
-    if (els.rulesTemplate) {
-      els.rulesTemplate.addEventListener("change", () => {
-        if (!state.activeRuleId) {
-          startNewRule();
-        }
-      });
-    }
-    if (els.rulesJson) {
-      els.rulesJson.addEventListener("keydown", (ev) => {
-        if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
-          ev.preventDefault();
-          saveRuleFromEditor();
-        }
-      });
-    }
-
     els.jsonCloseBtn.addEventListener("click", closeJsonModal);
     els.jsonModal.addEventListener("click", (ev) => {
       if (ev.target === els.jsonModal) {
@@ -4467,11 +4538,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
       if (!els.editModal.hidden) {
         closeEditModal();
-        return;
-      }
-
-      if (els.rulesModal && !els.rulesModal.hidden) {
-        closeRulesModal();
         return;
       }
 

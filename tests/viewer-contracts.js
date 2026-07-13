@@ -16,19 +16,932 @@ const fixturesDir = path.resolve(__dirname, "fixtures", "viewer");
 const baselineDir = path.resolve(__dirname, "baselines", "viewer");
 const allowedDir = path.resolve(__dirname, "allowed-deltas", "viewer");
 
+const STATEMENT_TEMPLATE_KEYS = [
+  "APPEND",
+  "ASSIGNMENT",
+  "CALL_FUNCTION",
+  "CASE",
+  "CLEAR",
+  "CONSTANTS",
+  "DATA",
+  "DELETE_ITAB",
+  "DO",
+  "ELSE",
+  "ELSEIF",
+  "FIELD-SYMBOLS",
+  "IF",
+  "LOOP_AT_ITAB",
+  "MODIFY_ITAB",
+  "MOVE-CORRESPONDING",
+  "PARAMETERS",
+  "PERFORM",
+  "READ_TABLE",
+  "SELECT",
+  "SELECT-OPTIONS",
+  "SORT_ITAB",
+  "TYPES",
+  "WHEN"
+];
+
 function findVisibleTemplateEditModal(window) {
   return Array.from(window.document.querySelectorAll(".modal"))
     .find((modal) => !modal.hidden && String(modal.textContent || "").includes("Edit Template Cell"));
 }
 
-function findVisibleTemplateConfigModal(window) {
-  return Array.from(window.document.querySelectorAll(".modal"))
-    .find((modal) => !modal.hidden && String(modal.textContent || "").includes("Template Form"));
+function findVisibleTemplateConfigPage(window) {
+  return Array.from(window.document.querySelectorAll(".template-dynamic-page, .modal"))
+    .find((root) => {
+      if (!root.isConnected || root.hidden) {
+        return false;
+      }
+      return String(root.textContent || "").includes("Template Form");
+    });
 }
 
 function findTemplateConfigRow(modal, labelText) {
   return Array.from(modal.querySelectorAll("tr"))
     .find((row) => String(row.textContent || "").includes(labelText));
+}
+
+async function waitForViewerUi(window) {
+  await new Promise((resolve) => window.setTimeout(resolve, 0));
+}
+
+async function assertFailedRenderClearsPreviousResult() {
+  const dom = await renderFixture([
+    "REPORT z_render_error.",
+    "DATA gv_total TYPE i.",
+    "gv_total = gv_total + 1."
+  ].join("\n"));
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+  assert(
+    String(els.templatePreviewOutput.textContent || "").includes("gv_total"),
+    "Expected a successful render before testing the failure path."
+  );
+
+  els.inputText.value = "{bad";
+  els.inputText.dispatchEvent(new window.Event("input", { bubbles: true }));
+  els.parseBtn.click();
+  await waitForViewerUi(window);
+
+  assert.strictEqual(state.data, null, "Expected failed Render to discard previously parsed data.");
+  assert.deepStrictEqual(Array.from(state.renderObjects || []), [], "Expected failed Render to discard render objects.");
+  assert.strictEqual(
+    String(els.templatePreviewOutput.textContent || "").trim(),
+    "No data loaded.",
+    "Expected the visible Template tab to clear stale output after a failed Render."
+  );
+  assert(
+    String(els.error.textContent || "").includes("JSON parse error"),
+    "Expected failed Render to keep a useful error message visible."
+  );
+
+  els.rightTabOutputBtn.click();
+  await waitForViewerUi(window);
+  assert.strictEqual(
+    String(els.output.textContent || "").trim(),
+    "No data loaded.",
+    "Expected switching tabs after a failed Render not to restore stale output."
+  );
+  assert(
+    String(els.error.textContent || "").includes("JSON parse error"),
+    "Expected switching tabs not to erase the Render error."
+  );
+
+  dom.window.close();
+}
+
+async function assertTemplateImportErrorIsVisible() {
+  const dom = await renderFixture("REPORT z_template_import.\nDATA gv_value TYPE i.");
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els } = runtime;
+
+  assert(els.templateConfigError, "Expected the Template panel to expose a permanent error area.");
+
+  const invalidFile = {
+    name: "invalid-template.json",
+    async text() {
+      return "{bad";
+    }
+  };
+  Object.defineProperty(els.templateImportInput, "files", {
+    configurable: true,
+    value: [invalidFile]
+  });
+  els.templateImportInput.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await waitForViewerUi(window);
+  await waitForViewerUi(window);
+
+  assert(
+    String(els.templateConfigError.textContent || "").includes("Import JSON parse error"),
+    "Expected invalid Template import to explain why it failed."
+  );
+
+  dom.window.close();
+}
+
+async function assertTemplateResetCanBeCancelled() {
+  const dom = await renderFixture("REPORT z_template_reset.\nDATA gv_value TYPE i.");
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
+  let confirmCalls = 0;
+
+  state.templateConfig.templates.DEFAULT["Z99"] = { text: "Keep my custom template" };
+  window.confirm = () => {
+    confirmCalls += 1;
+    return false;
+  };
+
+  els.templateResetBtn.click();
+  await waitForViewerUi(window);
+
+  assert.strictEqual(confirmCalls, 1, "Expected Reset default to ask for confirmation.");
+  assert(
+    state.templateConfig.templates.DEFAULT["Z99"],
+    "Expected cancelling Reset default to preserve the current template config."
+  );
+
+  dom.window.close();
+}
+
+async function assertIfInitialUsesConditionTemplate() {
+  const dom = await renderFixture([
+    "SELECT-OPTIONS so_date FOR sy-datum.",
+    "IF so_date[] IS INITIAL.",
+    "ENDIF."
+  ].join("\n"));
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
+
+  assert(
+    state.templateConfig.templates.IF,
+    "Expected IF to use its condition-specific template instead of the generic keyword template."
+  );
+
+  delete state.templateConfig.templates.IF;
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const ifTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="IF"]');
+  assert(ifTable, "Expected the IF template preview table to render.");
+
+  const nonEmptyCells = Array.from(ifTable.querySelectorAll("td"))
+    .map((cell) => String(cell.textContent || "").trim())
+    .filter(Boolean);
+  assert.deepStrictEqual(
+    nonEmptyCells,
+    ["Điều kiện trái", "Toán tử", "Điều kiện phải", "Kết nối", "so_date[]", "IS", "INITIAL"],
+    "Expected IF so_date[] IS INITIAL to render once as left operand, operator, and right operand."
+  );
+
+  dom.window.close();
+
+  const multiDom = await renderFixture([
+    "DATA lv_a TYPE string.",
+    "DATA lv_b TYPE string.",
+    "IF lv_a IS INITIAL OR lv_b IS NOT INITIAL.",
+    "ENDIF."
+  ].join("\n"));
+  const multiWindow = multiDom.window;
+  const multiEls = multiWindow.AbapViewerRuntime.els;
+  multiEls.rightTabTemplateBtn.click();
+  await waitForViewerUi(multiWindow);
+
+  const multiIfTable = multiEls.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="IF"]');
+  assert(multiIfTable, "Expected the multi-clause IF template preview table to render.");
+  const rowValues = Array.from(multiIfTable.querySelectorAll("tr")).map((row) => (
+    Array.from(row.querySelectorAll("td"))
+      .map((cell) => String(cell.textContent || "").trim())
+      .filter(Boolean)
+  ));
+  assert.deepStrictEqual(
+    rowValues,
+    [
+      ["Điều kiện trái", "Toán tử", "Điều kiện phải", "Kết nối"],
+      ["lv_a", "IS", "INITIAL", "OR"],
+      ["lv_b", "IS", "NOT INITIAL"]
+    ],
+    "Expected each IF clause to stay on its own row without repeating the previous connector."
+  );
+
+  multiDom.window.close();
+}
+
+function getTemplateTableRows(table) {
+  return Array.from(table.querySelectorAll("tr")).map((row) => (
+    Array.from(row.querySelectorAll("td"))
+      .map((cell) => String(cell.textContent || "").trim())
+      .filter(Boolean)
+  ));
+}
+
+async function assertPerformAndCallMultiValueRows() {
+  const source = [
+    "DATA iv_carrid TYPE string.",
+    "DATA iv_connid TYPE string.",
+    "DATA lv_next TYPE string.",
+    "DATA lv_occ_local TYPE string.",
+    "DATA lv_free TYPE string.",
+    "DATA cv_found TYPE string.",
+    "DATA cv_text TYPE string.",
+    "PERFORM frm_deep_chain_lvl04",
+    "  USING    iv_carrid",
+    "           iv_connid",
+    "           lv_next",
+    "           lv_occ_local",
+    "           lv_free",
+    "  CHANGING cv_found",
+    "           cv_text.",
+    "CALL FUNCTION 'Z_MULTI_VALUE'",
+    "  EXPORTING iv_carrid = iv_carrid",
+    "            iv_connid = iv_connid",
+    "            iv_limit = 5",
+    "            iv_calc = lv_next + 1",
+    "  IMPORTING ev_text = cv_text.",
+    "CALL METHOD lo_demo->run",
+    "  EXPORTING iv_next = lv_next",
+    "            iv_free = lv_free",
+    "  CHANGING  cv_text = cv_text.",
+    "METHODS do_work",
+    "  IMPORTING iv_first TYPE string",
+    "            iv_second TYPE string",
+    "  CHANGING  cv_first TYPE string",
+    "            cv_second TYPE string."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els } = window.AbapViewerRuntime;
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const performTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="PERFORM"]');
+  assert(performTable, "Expected PERFORM template table.");
+  assert.deepStrictEqual(getTemplateTableRows(performTable), [
+    ["PERFORM", "frm_deep_chain_lvl04"],
+    ["USING", "iv_carrid"],
+    ["USING", "iv_connid"],
+    ["USING", "lv_next"],
+    ["USING", "lv_occ_local"],
+    ["USING", "lv_free"],
+    ["CHANGING", "cv_found"],
+    ["CHANGING", "cv_text"]
+  ]);
+  for (const row of Array.from(performTable.querySelectorAll("tr"))) {
+    assert.strictEqual(row.querySelectorAll("td").length, 40, "Expected every expanded PERFORM row to keep 20 + 20 cells.");
+  }
+
+  const callFunctionTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="CALL_FUNCTION"]');
+  assert(callFunctionTable, "Expected CALL FUNCTION template table.");
+  assert.deepStrictEqual(getTemplateTableRows(callFunctionTable), [
+    ["CALL FUNCTION", "'Z_MULTI_VALUE'"],
+    ["EXPORTING", "iv_carrid = iv_carrid"],
+    ["EXPORTING", "iv_connid = iv_connid"],
+    ["EXPORTING", "iv_limit = 5"],
+    ["EXPORTING", "iv_calc = lv_next + 1"],
+    ["IMPORTING", "ev_text = cv_text"]
+  ]);
+
+  const callMethodTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="CALL_METHOD"]');
+  assert(callMethodTable, "Expected CALL METHOD template table.");
+  assert.deepStrictEqual(getTemplateTableRows(callMethodTable), [
+    ["CALL METHOD", "lo_demo->run"],
+    ["EXPORTING", "iv_next = lv_next"],
+    ["EXPORTING", "iv_free = lv_free"],
+    ["CHANGING", "cv_text = cv_text"]
+  ]);
+
+  const methodSignatureTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="METHODS"]');
+  assert(methodSignatureTable, "Expected METHODS signature template table.");
+  assert.deepStrictEqual(getTemplateTableRows(methodSignatureTable), [
+    ["METHODS", "do_work"],
+    ["IMPORTING", "iv_first"],
+    ["IMPORTING", "iv_second"],
+    ["CHANGING", "cv_first"],
+    ["CHANGING", "cv_second"]
+  ]);
+
+  dom.window.close();
+}
+
+async function assertExpandedPerformMultiValueRowsUseRootDescriptions() {
+  const source = [
+    "DATA gv_root_one TYPE string. \"Root one",
+    "DATA gv_root_two TYPE string. \"Root two",
+    "PERFORM frm_outer USING gv_root_one gv_root_two.",
+    "FORM frm_outer USING iv_outer_one TYPE string iv_outer_two TYPE string.",
+    "  PERFORM frm_inner USING iv_outer_one iv_outer_two.",
+    "ENDFORM.",
+    "FORM frm_inner USING iv_inner_one TYPE string iv_inner_two TYPE string.",
+    "  CLEAR iv_inner_one.",
+    "ENDFORM."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+  const rootPerform = (state.renderObjects || []).find((obj) => obj && obj.objectType === "PERFORM");
+  assert(rootPerform, "Expected root PERFORM object.");
+  const nestedPerform = (rootPerform.children || []).find((obj) => (
+    obj
+    && obj.objectType === "PERFORM"
+    && obj.extras
+    && obj.extras.performCall
+    && obj.extras.performCall.form === "frm_inner"
+  ));
+  assert(nestedPerform, "Expected nested PERFORM object expanded from frm_outer.");
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const nestedBlock = Array.from(els.templatePreviewOutput.querySelectorAll(".template-block"))
+    .find((block) => String(block.querySelector(".template-block-meta")?.textContent || "").includes(`#${nestedPerform.id}`));
+  assert(nestedBlock, "Expected Template block for nested PERFORM.");
+  assert.deepStrictEqual(getTemplateTableRows(nestedBlock.querySelector("table.template-preview-table")), [
+    ["PERFORM", "frm_inner"],
+    ["USING", "Root one"],
+    ["USING", "Root two"]
+  ]);
+
+  dom.window.close();
+}
+
+async function assertConditionListsExpandRows() {
+  const source = [
+    "DATA gv_a TYPE string.",
+    "DATA gv_b TYPE string.",
+    "DATA lt_rows TYPE TABLE OF string.",
+    "DATA ls_row TYPE string.",
+    "READ TABLE lt_rows WITH KEY col1 = gv_a col2 = gv_b INTO ls_row.",
+    "MODIFY lt_rows FROM ls_row TRANSPORTING col1 col2 WHERE col1 = gv_a AND col2 = gv_b.",
+    "SELECT col1, col2 FROM dbtab INTO TABLE @lt_rows WHERE col1 = @gv_a AND col2 = @gv_b HAVING col3 = @gv_a OR col4 = @gv_b."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els } = window.AbapViewerRuntime;
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const readTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="READ_TABLE"]');
+  assert.deepStrictEqual(getTemplateTableRows(readTable), [
+    ["READ TABLE", "lt_rows"],
+    ["WITH KEY", "col1 = gv_a AND"],
+    ["WITH KEY", "col2 = gv_b"],
+    ["INTO", "ls_row"]
+  ]);
+
+  const modifyTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="MODIFY_ITAB"]');
+  assert.deepStrictEqual(getTemplateTableRows(modifyTable), [
+    ["MODIFY", "lt_rows"],
+    ["FROM", "ls_row"],
+    ["TRANSPORTING", "col1"],
+    ["TRANSPORTING", "col2"],
+    ["WHERE", "col1 = gv_a AND"],
+    ["WHERE", "col2 = gv_b"]
+  ]);
+
+  const selectTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="SELECT"]');
+  assert.deepStrictEqual(getTemplateTableRows(selectTable), [
+    ["SELECT", "col1"],
+    ["SELECT", "col2"],
+    ["FROM", "dbtab"],
+    ["INTO TABLE", "@lt_rows"],
+    ["WHERE", "col1 = @gv_a AND"],
+    ["WHERE", "col2 = @gv_b"],
+    ["HAVING", "col3 = @gv_a OR"],
+    ["HAVING", "col4 = @gv_b"]
+  ]);
+
+  dom.window.close();
+}
+
+async function assertSafeRawListsExpandWithoutSplittingExpressions() {
+  const source = [
+    "DATA lt_rows TYPE TABLE OF string.",
+    "DATA ls_row TYPE string.",
+    "SELECT col1, concat_with_space( col2, col3, 1 ) AS text, col4 FROM dbtab INTO TABLE @lt_rows.",
+    "SORT lt_rows BY col1 col2.",
+    "MODIFY lt_rows FROM ls_row TRANSPORTING col1 col2."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els } = window.AbapViewerRuntime;
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const selectTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="SELECT"]');
+  assert.deepStrictEqual(getTemplateTableRows(selectTable), [
+    ["SELECT", "col1"],
+    ["SELECT", "concat_with_space( col2, col3, 1 ) AS text"],
+    ["SELECT", "col4"],
+    ["FROM", "dbtab"],
+    ["INTO TABLE", "@lt_rows"]
+  ]);
+
+  const sortTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="SORT_ITAB"]');
+  assert.deepStrictEqual(getTemplateTableRows(sortTable), [
+    ["SORT", "lt_rows"],
+    ["BY", "col1"],
+    ["BY", "col2"]
+  ]);
+
+  const modifyTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="MODIFY_ITAB"]');
+  assert.deepStrictEqual(getTemplateTableRows(modifyTable), [
+    ["MODIFY", "lt_rows"],
+    ["FROM", "ls_row"],
+    ["TRANSPORTING", "col1"],
+    ["TRANSPORTING", "col2"]
+  ]);
+
+  dom.window.close();
+}
+
+async function assertExpandedPerformTraceUsesRootDeclarations() {
+  const source = [
+    "TYPES: BEGIN OF ty_ctx,",
+    "         name TYPE string,",
+    "         city TYPE string,",
+    "       END OF ty_ctx.",
+    "DATA gv_root TYPE string.",
+    "DATA gv_other TYPE string.",
+    "DATA gv_change TYPE string.",
+    "DATA gv_change_other TYPE string.",
+    "DATA gs_root TYPE ty_ctx.",
+    "DATA gs_other TYPE ty_ctx.",
+    "DATA gt_root TYPE TABLE OF string.",
+    "DATA gt_other TYPE TABLE OF string.",
+    "PERFORM frm_outer USING gv_root gs_root CHANGING gv_change TABLES gt_root.",
+    "PERFORM frm_outer USING gv_other gs_other CHANGING gv_change_other TABLES gt_other.",
+    "PERFORM frm_literal USING 'X'.",
+    "PERFORM frm_external IN PROGRAM zother USING gv_root.",
+    "FORM frm_outer USING iv_outer TYPE string is_outer TYPE ty_ctx",
+    "               CHANGING cv_outer TYPE string",
+    "               TABLES tt_outer.",
+    "  DATA lv_local TYPE string.",
+    "  lv_local = iv_outer.",
+    "  PERFORM frm_local USING lv_local.",
+    "  PERFORM frm_inner USING iv_outer is_outer CHANGING cv_outer TABLES tt_outer.",
+    "ENDFORM.",
+    "FORM frm_local USING iv_local TYPE string.",
+    "  CLEAR iv_local.",
+    "ENDFORM.",
+    "FORM frm_inner USING iv_inner TYPE string is_inner TYPE ty_ctx",
+    "               CHANGING cv_inner TYPE string",
+    "               TABLES tt_inner.",
+    "  iv_inner = iv_inner && '-x'.",
+    "  is_inner-city = is_inner-name.",
+    "  cv_inner = iv_inner.",
+    "  APPEND iv_inner TO tt_inner.",
+    "  IF iv_inner IS INITIAL OR is_inner-city IS NOT INITIAL.",
+    "  ENDIF.",
+    "  IF iv_inner = cv_inner AND is_inner-city = is_inner-name.",
+    "  ENDIF.",
+    "ENDFORM.",
+    "FORM frm_literal USING iv_literal TYPE string.",
+    "  CLEAR iv_literal.",
+    "ENDFORM."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
+
+  const performRoots = (Array.isArray(state.renderObjects) ? state.renderObjects : [])
+    .filter((obj) => obj && obj.objectType === "PERFORM");
+  assert.strictEqual(performRoots.length, 4, "Expected two normal, one literal, and one external PERFORM root.");
+
+  const findDescendant = (root, predicate) => {
+    const stack = root ? [root] : [];
+    while (stack.length) {
+      const current = stack.shift();
+      if (predicate(current)) {
+        return current;
+      }
+      stack.unshift(...(Array.isArray(current && current.children) ? current.children : []));
+    }
+    return null;
+  };
+  const findByRaw = (root, raw) => findDescendant(root, (obj) => String(obj && obj.raw || "").trim() === raw);
+  const getBindingNames = (obj, paramName) => {
+    const binding = obj && obj.__abapPerformTraceBinding;
+    const decls = binding && binding.byParamUpper && typeof binding.byParamUpper.get === "function"
+      ? binding.byParamUpper.get(String(paramName || "").toUpperCase())
+      : [];
+    return Array.from(decls || [], (decl) => String(decl && decl.name || ""));
+  };
+
+  const firstIf = findByRaw(performRoots[0], "IF iv_inner IS INITIAL OR is_inner-city IS NOT INITIAL.");
+  const secondIf = findByRaw(performRoots[1], "IF iv_inner IS INITIAL OR is_inner-city IS NOT INITIAL.");
+  assert(firstIf && secondIf, "Expected each normal PERFORM path to expand into the inner IF.");
+  assert.deepStrictEqual(getBindingNames(firstIf, "iv_inner"), ["iv_outer", "gv_root"]);
+  assert.deepStrictEqual(getBindingNames(firstIf, "is_inner"), ["is_outer", "gs_root"]);
+  assert.deepStrictEqual(getBindingNames(firstIf, "cv_inner"), ["cv_outer", "gv_change"]);
+  assert.deepStrictEqual(getBindingNames(firstIf, "tt_inner"), ["tt_outer", "gt_root"]);
+  assert.deepStrictEqual(getBindingNames(secondIf, "iv_inner"), ["iv_outer", "gv_other"]);
+  assert.deepStrictEqual(getBindingNames(secondIf, "is_inner"), ["is_outer", "gs_other"]);
+
+  const externalPerform = performRoots[3];
+  assert.strictEqual(
+    Array.isArray(externalPerform.children) ? externalPerform.children.length : 0,
+    0,
+    "Expected PERFORM IN PROGRAM to remain unresolved and unexpanded."
+  );
+
+  try {
+    Object.defineProperty(els.templatePreviewOutput, "clientHeight", { configurable: true, value: 100000 });
+  } catch {
+    // JSDOM may already expose a configurable size; virtual rendering still works for this small fixture.
+  }
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const findTemplateTable = (obj) => {
+    const idText = "#" + String(obj && obj.id || "");
+    const block = Array.from(els.templatePreviewOutput.querySelectorAll(".template-block"))
+      .find((candidate) => String(candidate.querySelector(".template-block-meta")?.textContent || "").includes(idText));
+    return block ? block.querySelector("table.template-preview-table") : null;
+  };
+  const assertTemplateRows = (root, raw, expectedRows) => {
+    const obj = findByRaw(root, raw);
+    assert(obj, `Expected expanded object for ${raw}`);
+    const table = findTemplateTable(obj);
+    assert(table, `Expected Template preview table for ${raw}`);
+    assert.deepStrictEqual(getTemplateTableRows(table), expectedRows);
+  };
+
+  assertTemplateRows(performRoots[0], "iv_inner = iv_inner && '-x'.", [
+    ["Đích", "Nguồn"],
+    ["gv_root", "gv_root && '-x'"]
+  ]);
+  assertTemplateRows(performRoots[0], "is_inner-city = is_inner-name.", [
+    ["Đích", "Nguồn"],
+    ["gs_root-city", "gs_root-name"]
+  ]);
+  assertTemplateRows(performRoots[0], "cv_inner = iv_inner.", [
+    ["Đích", "Nguồn"],
+    ["gv_change", "gv_root"]
+  ]);
+  assertTemplateRows(performRoots[0], "APPEND iv_inner TO tt_inner.", [
+    ["APPEND", "gv_root"],
+    ["TO", "gt_root"]
+  ]);
+  assertTemplateRows(performRoots[0], "IF iv_inner IS INITIAL OR is_inner-city IS NOT INITIAL.", [
+    ["Điều kiện trái", "Toán tử", "Điều kiện phải", "Kết nối"],
+    ["gv_root", "IS", "INITIAL", "OR"],
+    ["gs_root-city", "IS", "NOT INITIAL"]
+  ]);
+  assertTemplateRows(performRoots[0], "IF iv_inner = cv_inner AND is_inner-city = is_inner-name.", [
+    ["Điều kiện trái", "Toán tử", "Điều kiện phải", "Kết nối"],
+    ["gv_root", "=", "gv_change", "AND"],
+    ["gs_root-city", "=", "gs_root-name"]
+  ]);
+  assertTemplateRows(performRoots[1], "iv_inner = iv_inner && '-x'.", [
+    ["Đích", "Nguồn"],
+    ["gv_other", "gv_other && '-x'"]
+  ]);
+  assertTemplateRows(performRoots[1], "is_inner-city = is_inner-name.", [
+    ["Đích", "Nguồn"],
+    ["gs_other-city", "gs_other-name"]
+  ]);
+  assertTemplateRows(performRoots[0], "CLEAR iv_local.", [["CLEAR", "lv_local"]]);
+  assertTemplateRows(performRoots[2], "CLEAR iv_literal.", [["CLEAR", "iv_literal"]]);
+
+  try {
+    Object.defineProperty(els.output, "clientHeight", { configurable: true, value: 100000 });
+  } catch {
+    // Keep the normal virtual viewport when JSDOM does not allow overriding it.
+  }
+  els.rightTabOutputBtn.click();
+  await waitForViewerUi(window);
+
+  const firstIfCard = Array.from(els.output.querySelectorAll(".card"))
+    .find((card) => String(card.dataset.id || "") === String(firstIf.id));
+  assert(firstIfCard, "Expected Output card for the first expanded IF.");
+  const conditionRows = Array.from(firstIfCard.querySelectorAll(".extras table tbody tr"));
+  assert.strictEqual(conditionRows.length, 2, "Expected two IF condition rows in Output.");
+  const getDeclNamesFromCell = (cell) => Array.from(cell?.firstElementChild?.children || [], (line) => (
+    String(line.textContent || "").trim()
+  ));
+  assert.deepStrictEqual(
+    getDeclNamesFromCell(conditionRows[0].cells[5]),
+    ["iv_inner", "iv_outer", "gv_root"],
+    "Expected Output to keep the complete scalar trace chain."
+  );
+  assert.deepStrictEqual(
+    getDeclNamesFromCell(conditionRows[1].cells[5]),
+    ["is_inner-city", "is_outer-city", "gs_root-city"],
+    "Expected Output to keep the complete structure-field trace chain."
+  );
+
+  dom.window.close();
+}
+
+async function assertStructFieldFinalDescNormalizesParentOnly() {
+  const source = [
+    "TYPES: BEGIN OF ty_order,",
+    "         item TYPE string,",
+    "         BEGIN OF address,",
+    "           city TYPE string,",
+    "         END OF address,",
+    "       END OF ty_order.",
+    "DATA lds_order TYPE ty_order.",
+    "DATA lv_result TYPE string.",
+    "lv_result = lds_order-item && '-x'.",
+    "PERFORM frm_outer USING lds_order CHANGING lv_result.",
+    "FORM frm_outer USING ids_outer TYPE ty_order CHANGING cv_outer TYPE string.",
+    "  PERFORM frm_inner USING ids_outer CHANGING cv_outer.",
+    "ENDFORM.",
+    "FORM frm_inner USING ids_inner TYPE ty_order CHANGING cv_inner TYPE string.",
+    "  cv_inner = ids_inner-item.",
+    "ENDFORM."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
+  const { getEffectiveDeclDesc, getFinalDeclDesc, resolveValueLevelFinalDesc } = runtime.api;
+  const decls = Array.isArray(state.data && state.data.decls) ? state.data.decls : [];
+  const findDecl = (name) => decls.find((decl) => String(decl && decl.name || "") === name);
+  const parentDecl = findDecl("lds_order");
+  const itemDecl = findDecl("lds_order-item");
+  const nestedItemDecl = findDecl("lds_order-address-city");
+
+  assert(parentDecl && itemDecl && nestedItemDecl, "Expected parent, direct item, and nested item declarations.");
+  assert.strictEqual(typeof window.getDeclOverrideStorageKey, "function");
+
+  state.settings.nameTemplatesByCode.DS = "PARENT[{{desc}}]";
+  state.settings.structDescTemplate = "{{struct}}-{{item}}";
+  state.descOverrides[window.getDeclOverrideStorageKey(parentDecl)] = "Đơn hàng";
+  state.descOverrides[window.getDeclOverrideStorageKey(itemDecl)] = "Mặt hàng";
+  state.descOverrides[window.getDeclOverrideStorageKey(nestedItemDecl)] = "Địa chỉ-Thành phố";
+
+  assert.strictEqual(getFinalDeclDesc(parentDecl), "PARENT[Đơn hàng]");
+  assert.strictEqual(
+    getFinalDeclDesc(itemDecl),
+    "PARENT[Đơn hàng]-Mặt hàng",
+    "Expected only the parent portion of a structure field finalDesc to use name normalization."
+  );
+  assert.strictEqual(
+    getFinalDeclDesc(nestedItemDecl),
+    "PARENT[Đơn hàng]-Địa chỉ-Thành phố",
+    "Expected nested structure items not to apply name normalization."
+  );
+
+  const directAssignment = (Array.isArray(state.renderObjects) ? state.renderObjects : [])
+    .find((obj) => String(obj && obj.raw || "").trim() === "lv_result = lds_order-item && '-x'.");
+  assert(directAssignment && directAssignment.values && directAssignment.values.expr, "Expected direct assignment expression.");
+  assert.strictEqual(
+    resolveValueLevelFinalDesc(directAssignment.values.expr),
+    "PARENT[Đơn hàng]-Mặt hàng && '-x'",
+    "Expected expression finalDesc to preserve the expression while normalizing only the field parent."
+  );
+
+  assert.strictEqual(
+    getEffectiveDeclDesc(itemDecl),
+    "PARENT[Đơn hàng]-PARENT[Mặt hàng]",
+    "Expected the existing .desc behavior to remain unchanged."
+  );
+  assert.strictEqual(
+    /\{[^{}]*\.desc\}/i.test(JSON.stringify(state.templateConfig && state.templateConfig.templates || {})),
+    false,
+    "Expected committed Viewer templates to keep using finalDesc rather than desc."
+  );
+
+  const performRoot = (Array.isArray(state.renderObjects) ? state.renderObjects : [])
+    .find((obj) => obj && obj.objectType === "PERFORM");
+  assert(performRoot, "Expected expanded PERFORM root.");
+  const findDescendantByRaw = (root, raw) => {
+    const stack = root ? [root] : [];
+    while (stack.length) {
+      const current = stack.shift();
+      if (String(current && current.raw || "").trim() === raw) {
+        return current;
+      }
+      stack.unshift(...(Array.isArray(current && current.children) ? current.children : []));
+    }
+    return null;
+  };
+  const tracedAssignment = findDescendantByRaw(performRoot, "cv_inner = ids_inner-item.");
+  assert(tracedAssignment, "Expected structure-field assignment inside expanded PERFORM.");
+
+  try {
+    Object.defineProperty(els.templatePreviewOutput, "clientHeight", { configurable: true, value: 100000 });
+  } catch {
+    // The small fixture still renders with JSDOM's default virtual viewport.
+  }
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+  const tracedBlock = Array.from(els.templatePreviewOutput.querySelectorAll(".template-block"))
+    .find((block) => String(block.querySelector(".template-block-meta")?.textContent || "")
+      .includes(`#${tracedAssignment.id}`));
+  assert(tracedBlock, "Expected Template block for traced structure-field assignment.");
+  assert.deepStrictEqual(getTemplateTableRows(tracedBlock.querySelector("table.template-preview-table")), [
+    ["Đích", "Nguồn"],
+    ["lv_result", "PARENT[Đơn hàng]-Mặt hàng"]
+  ]);
+
+  dom.window.close();
+}
+
+async function assertStatementSpecificTwentyCellTemplates() {
+  const source = [
+    "TYPES ty_text TYPE string.",
+    "DATA lv_a TYPE string.",
+    "DATA lv_b TYPE string.",
+    "DATA lt_rows TYPE TABLE OF string.",
+    "DATA ls_row TYPE string.",
+    "CONSTANTS gc_flag TYPE abap_bool VALUE abap_true.",
+    "PARAMETERS p_user TYPE syuname.",
+    "SELECT-OPTIONS s_user FOR sy-uname.",
+    "FIELD-SYMBOLS <ls_any> TYPE any.",
+    "lv_a = lv_b.",
+    "CLEAR lv_a.",
+    "APPEND ls_row TO lt_rows.",
+    "READ TABLE lt_rows WITH KEY table_line = lv_a INTO ls_row.",
+    "MODIFY lt_rows FROM ls_row WHERE table_line = lv_a.",
+    "DELETE lt_rows WHERE table_line = lv_a.",
+    "SORT lt_rows BY table_line.",
+    "MOVE-CORRESPONDING ls_row TO lv_b.",
+    "CALL FUNCTION 'Z_DEMO' EXPORTING iv_user = p_user IMPORTING ev_text = lv_b.",
+    "PERFORM missing_form USING lv_a.",
+    "SELECT * FROM usr02 INTO TABLE lt_rows WHERE bname = p_user.",
+    "DO 1 TIMES.",
+    "ENDDO.",
+    "LOOP AT lt_rows INTO ls_row.",
+    "ENDLOOP.",
+    "CASE lv_a.",
+    "WHEN 'A'.",
+    "ENDCASE.",
+    "IF lv_a IS INITIAL.",
+    "ELSEIF lv_b IS NOT INITIAL.",
+    "ELSE.",
+    "ENDIF."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
+
+  for (const templateKey of STATEMENT_TEMPLATE_KEYS) {
+    assert(
+      Object.prototype.hasOwnProperty.call(state.templateConfig.templates, templateKey),
+      `Expected a dedicated template config for ${templateKey}.`
+    );
+  }
+
+  const genericKeys = STATEMENT_TEMPLATE_KEYS.filter((key) => !["ASSIGNMENT", "IF", "ELSEIF"].includes(key));
+  for (const templateKey of genericKeys) {
+    const template = state.templateConfig.templates[templateKey];
+    assert(template["A1:T1"], `Expected ${templateKey} keyword frame to span A:T.`);
+    assert(template["U1:AN1"], `Expected ${templateKey} description frame to span U:AN.`);
+    assert.strictEqual(template.A1.text, "{rows.keyword}");
+    assert.strictEqual(template.U1.text, "{rows.finalDesc}");
+  }
+
+  const assignment = state.templateConfig.templates.ASSIGNMENT;
+  assert.strictEqual(assignment.A1.text, "Đích");
+  assert.strictEqual(assignment.U1.text, "Nguồn");
+  assert.strictEqual(assignment.A2.text, "{values.target.finalDesc}");
+  assert.strictEqual(assignment.U2.text, "{values.expr.finalDesc}");
+  for (const rangeKey of ["A1:T1", "U1:AN1", "A2:T2", "U2:AN2"]) {
+    assert(assignment[rangeKey], `Expected ASSIGNMENT range ${rangeKey}.`);
+  }
+
+  for (const templateKey of ["IF", "ELSEIF"]) {
+    const conditionTemplate = state.templateConfig.templates[templateKey];
+    for (const rangeKey of [
+      "A1:T1", "U1:AN1", "AO1:BH1", "BI1:CB1",
+      "A2:T2", "U2:AN2", "AO2:BH2", "BI2:CB2"
+    ]) {
+      assert(conditionTemplate[rangeKey], `Expected ${templateKey} range ${rangeKey}.`);
+    }
+  }
+
+  Object.defineProperty(els.templatePreviewOutput, "clientHeight", {
+    configurable: true,
+    get() {
+      return 100000;
+    }
+  });
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  for (const templateKey of STATEMENT_TEMPLATE_KEYS) {
+    const table = els.templatePreviewOutput.querySelector(`.template-preview-table[data-object-type="${templateKey}"]`);
+    assert(table, `Expected a rendered template table for ${templateKey}.`);
+    assert.strictEqual(
+      table.getAttribute("data-template-key"),
+      templateKey,
+      `Expected ${templateKey} to render with its dedicated config instead of DEFAULT.`
+    );
+    const expectedCellCount = ["IF", "ELSEIF"].includes(templateKey) ? 80 : 40;
+    for (const row of Array.from(table.querySelectorAll("tr"))) {
+      assert.strictEqual(row.querySelectorAll("td").length, expectedCellCount, `${templateKey} row width mismatch.`);
+    }
+  }
+
+  const readTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="READ_TABLE"]');
+  assert.deepStrictEqual(getTemplateTableRows(readTable), [
+    ["READ TABLE", "lt_rows"],
+    ["WITH KEY", "table_line = lv_a"],
+    ["INTO", "ls_row"]
+  ]);
+
+  const appendTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="APPEND"]');
+  assert.deepStrictEqual(getTemplateTableRows(appendTable), [
+    ["APPEND", "ls_row"],
+    ["TO", "lt_rows"]
+  ]);
+
+  const moveTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="MOVE-CORRESPONDING"]');
+  assert.deepStrictEqual(getTemplateTableRows(moveTable), [
+    ["MOVE-CORRESPONDING", "ls_row"],
+    ["TO", "lv_b"]
+  ]);
+
+  const callFunctionTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="CALL_FUNCTION"]');
+  assert.deepStrictEqual(getTemplateTableRows(callFunctionTable), [
+    ["CALL FUNCTION", "'Z_DEMO'"],
+    ["EXPORTING", "iv_user = p_user"],
+    ["IMPORTING", "ev_text = lv_b"]
+  ]);
+
+  const loopTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="LOOP_AT_ITAB"]');
+  assert.deepStrictEqual(getTemplateTableRows(loopTable), [
+    ["LOOP AT", "lt_rows"],
+    ["INTO", "ls_row"]
+  ]);
+
+  const selectTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="SELECT"]');
+  assert.deepStrictEqual(getTemplateTableRows(selectTable), [
+    ["SELECT", "*"],
+    ["FROM", "usr02"],
+    ["INTO TABLE", "lt_rows"],
+    ["WHERE", "bname = p_user"]
+  ]);
+
+  const elseTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="ELSE"]');
+  const elseRow = elseTable.querySelector("tr");
+  assert.strictEqual(elseRow.querySelectorAll("td").length, 40);
+  assert.strictEqual(elseRow.querySelectorAll("td")[0].textContent.trim(), "ELSE");
+  assert.strictEqual(elseRow.querySelectorAll("td")[20].textContent.trim(), "");
+
+  dom.window.close();
+}
+
+async function assertLegacyTemplateImportAddsMissingSpecificConfigs() {
+  const dom = await renderFixture("DATA lv_a TYPE string.\nlv_a = 'A'.");
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
+  const legacyConfig = {
+    version: 1,
+    templates: {
+      DEFAULT: {
+        _options: { hideEmptyRows: true },
+        "A1:T1": { text: "Custom default" }
+      },
+      ASSIGNMENT: {
+        _options: { hideEmptyRows: true },
+        "A1:T1": { text: "Custom assignment" }
+      }
+    }
+  };
+  const legacyFile = {
+    name: "legacy-template.json",
+    async text() {
+      return JSON.stringify(legacyConfig);
+    }
+  };
+  Object.defineProperty(els.templateImportInput, "files", {
+    configurable: true,
+    value: [legacyFile]
+  });
+  els.templateImportInput.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await waitForViewerUi(window);
+  await waitForViewerUi(window);
+
+  assert.strictEqual(state.templateConfig.version, 1);
+  assert.strictEqual(state.templateConfig.templates.DEFAULT["A1:T1"].text, "Custom default");
+  assert.strictEqual(state.templateConfig.templates.ASSIGNMENT["A1:T1"].text, "Custom assignment");
+  for (const templateKey of STATEMENT_TEMPLATE_KEYS) {
+    assert(
+      Object.prototype.hasOwnProperty.call(state.templateConfig.templates, templateKey),
+      `Expected legacy import migration to add ${templateKey}.`
+    );
+  }
+
+  dom.window.close();
 }
 
 async function assertViewerFixture(fileName) {
@@ -94,6 +1007,22 @@ async function assertViewerFixture(fileName) {
     assert(editableCell, "Expected template preview to expose editable cells.");
     const previewTable = els.templatePreviewOutput.querySelector(".template-preview-table");
     assert(previewTable, "Expected template preview block to render a table.");
+    const previewEditableCells = Array.from(previewTable.querySelectorAll("td.template-preview-editable"));
+    const tabbablePreviewCells = previewEditableCells.filter((cell) => Number(cell.tabIndex) === 0);
+    assert.strictEqual(
+      tabbablePreviewCells.length,
+      1,
+      "Expected each Template preview table to expose only one Tab stop."
+    );
+    assert(
+      /[A-Z]+\d+/.test(String(tabbablePreviewCells[0].getAttribute("aria-label") || "")),
+      "Expected the editable Template cell label to include its grid coordinate."
+    );
+    assert(previewEditableCells.length > 1, "Expected enough Template cells to test arrow-key navigation.");
+    previewEditableCells[0].dispatchEvent(new window.KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    assert.strictEqual(previewEditableCells[0].tabIndex, -1, "Expected ArrowRight to move the active Template cell.");
+    assert.strictEqual(previewEditableCells[1].tabIndex, 0, "Expected ArrowRight to activate the next Template cell.");
+    assert.strictEqual(window.document.activeElement, previewEditableCells[1], "Expected ArrowRight to focus the next Template cell.");
     const squareCell = Array.from(els.templatePreviewOutput.querySelectorAll("td.template-preview-editable"))
       .find((cell) => Number(cell.rowSpan || 1) === 1 && Number(cell.colSpan || 1) === 1);
     assert(squareCell, "Expected at least one non-merged editable template cell.");
@@ -166,60 +1095,31 @@ async function assertViewerFixture(fileName) {
 
     els.templateApplyBtn.click();
     await new Promise((resolve) => window.setTimeout(resolve, 0));
-    const configModal = findVisibleTemplateConfigModal(window);
-    assert(configModal, "Expected Template Form modal to open.");
-    const jsonButton = Array.from(configModal.querySelectorAll("button"))
-      .find((btn) => String(btn.textContent || "").trim() === "JSON (Advanced)");
-    assert(jsonButton, "Expected Template Form modal to expose a JSON tab button.");
-    jsonButton.click();
-    await new Promise((resolve) => window.setTimeout(resolve, 0));
-    const jsonArea = configModal.querySelector("textarea.template-config-json");
-    assert(jsonArea, "Expected Template Form modal to expose a JSON textarea.");
-    const legacyConfig = JSON.parse(JSON.stringify(state.templateConfig));
-    const legacyCell = legacyConfig
-      && legacyConfig.templates
-      && legacyConfig.templates.DEFAULT
-      ? legacyConfig.templates.DEFAULT["A1:F1"]
-      : null;
-    assert(legacyCell, "Expected DEFAULT A1:F1 template cell for legacy config test.");
-    legacyCell.background = "mau xanh nhat";
-    legacyCell["font color"] = "den";
-    jsonArea.value = JSON.stringify(legacyConfig, null, 2);
-    jsonArea.dispatchEvent(new window.Event("input", { bubbles: true }));
-    const jsonApplyButton = Array.from(configModal.querySelectorAll("button"))
-      .find((btn) => String(btn.textContent || "").trim() === "Apply");
-    assert(jsonApplyButton, "Expected Template Form modal to expose an Apply button in JSON mode.");
-    jsonApplyButton.click();
-    await new Promise((resolve) => window.setTimeout(resolve, 0));
-    assert.strictEqual(Boolean(findVisibleTemplateConfigModal(window)), false, "Expected legacy JSON config to import successfully.");
-    assert.strictEqual(state.templateConfig.templates.DEFAULT["A1:F1"].background, "#dbeef4");
-    assert.strictEqual(state.templateConfig.templates.DEFAULT["A1:F1"]["font color"], "#000000");
-
-    els.templateApplyBtn.click();
-    await new Promise((resolve) => window.setTimeout(resolve, 0));
-    const reopenedConfigModal = findVisibleTemplateConfigModal(window);
-    assert.strictEqual(Boolean(reopenedConfigModal), true, "Expected Template Form modal to reopen for builder checks.");
-    const activeConfigModal = reopenedConfigModal || configModal;
-    assert(activeConfigModal.querySelector(".template-config-builder"), "Expected Template Form modal to expose the drag-drop builder.");
+    const configPage = findVisibleTemplateConfigPage(window);
+    assert(configPage, "Expected Template Form page to open.");
+    const activeConfigPage = configPage;
+    assert(activeConfigPage.querySelector(".template-config-builder"), "Expected Template Form page to expose the drag-drop builder.");
     assert.strictEqual(
-      Boolean(activeConfigModal.querySelector(".template-config-ranges-table")),
+      Boolean(activeConfigPage.querySelector(".template-config-ranges-table")),
       false,
       "Expected drag-drop builder to replace the old range table form as the primary UI."
     );
 
-    const builderGrid = activeConfigModal.querySelector(".template-builder-grid");
+    const builderGrid = activeConfigPage.querySelector(".template-builder-grid");
     assert(builderGrid, "Expected Template Builder to expose an editable grid.");
     assert.strictEqual(
       String(builderGrid.style.getPropertyValue("--template-builder-cell-size") || "").trim(),
       "18px",
       "Expected Template Builder cells to match Template Preview default square cell size."
     );
-    const paletteText = activeConfigModal.querySelector('[data-template-builder-tool="text"]');
-    const palettePlaceholder = activeConfigModal.querySelector('[data-template-builder-tool="placeholder"]');
-    const paletteFormat = activeConfigModal.querySelector('[data-template-builder-tool="format"]');
+    const paletteText = activeConfigPage.querySelector('[data-template-builder-tool="text"]');
+    const palettePlaceholder = activeConfigPage.querySelector('[data-template-builder-tool="placeholder"]');
+    const paletteFormatBlue = activeConfigPage.querySelector('[data-template-builder-tool="format-blue"]');
+    const paletteFormatWhite = activeConfigPage.querySelector('[data-template-builder-tool="format-white"]');
     assert(paletteText, "Expected Template Builder palette to expose Text.");
     assert(palettePlaceholder, "Expected Template Builder palette to expose Placeholder.");
-    assert(paletteFormat, "Expected Template Builder palette to expose Format.");
+    assert(paletteFormatBlue, "Expected Template Builder palette to expose format-blue.");
+    assert(paletteFormatWhite, "Expected Template Builder palette to expose format-white.");
 
     function dispatchPointer(type, target) {
       target.dispatchEvent(new window.MouseEvent(type, { bubbles: true, cancelable: true, button: 0 }));
@@ -238,42 +1138,42 @@ async function assertViewerFixture(fileName) {
       target.dispatchEvent(event);
     }
 
-    let cellH8 = activeConfigModal.querySelector('.template-builder-grid td[data-row="8"][data-col="8"]');
+    let cellH8 = activeConfigPage.querySelector('.template-builder-grid td[data-row="8"][data-col="8"]');
     assert(cellH8, "Expected builder grid cell H8.");
     dispatchPointer("pointerdown", cellH8);
     dispatchPointer("pointerup", window.document);
     await new Promise((resolve) => window.setTimeout(resolve, 0));
 
-    cellH8 = activeConfigModal.querySelector('.template-builder-grid td[data-row="8"][data-col="8"]');
+    cellH8 = activeConfigPage.querySelector('.template-builder-grid td[data-row="8"][data-col="8"]');
     assert(cellH8, "Expected builder grid cell H8 after selecting it.");
     dispatchDrop(cellH8, "text");
     await new Promise((resolve) => window.setTimeout(resolve, 0));
-    let builderTextArea = activeConfigModal.querySelector("textarea.template-builder-textarea");
+    let builderTextArea = activeConfigPage.querySelector("textarea.template-builder-textarea");
     assert(builderTextArea, "Expected builder inspector text area.");
     assert.strictEqual(String(builderTextArea.value || ""), "Text", "Expected dropping Text to set default text on selected cell.");
 
-    cellH8 = activeConfigModal.querySelector('.template-builder-grid td[data-row="8"][data-col="8"]');
+    cellH8 = activeConfigPage.querySelector('.template-builder-grid td[data-row="8"][data-col="8"]');
     dispatchDrop(cellH8, "placeholder");
     await new Promise((resolve) => window.setTimeout(resolve, 0));
-    builderTextArea = activeConfigModal.querySelector("textarea.template-builder-textarea");
+    builderTextArea = activeConfigPage.querySelector("textarea.template-builder-textarea");
     assert(/\{[^{}]+\}/.test(String(builderTextArea.value || "")), "Expected dropping Placeholder to insert a {path} token.");
 
-    let cellA1 = activeConfigModal.querySelector('.template-builder-grid td[data-row="1"][data-col="1"]');
-    let cellC2 = activeConfigModal.querySelector('.template-builder-grid td[data-row="2"][data-col="3"]');
+    let cellA1 = activeConfigPage.querySelector('.template-builder-grid td[data-row="1"][data-col="1"]');
+    let cellC2 = activeConfigPage.querySelector('.template-builder-grid td[data-row="2"][data-col="3"]');
     assert(cellA1, "Expected builder grid cell A1.");
     assert(cellC2, "Expected builder grid cell C2.");
     dispatchPointer("pointerdown", cellA1);
     cellC2.dispatchEvent(new window.MouseEvent("pointerenter", { bubbles: true, cancelable: true }));
     dispatchPointer("pointerup", window.document);
     await new Promise((resolve) => window.setTimeout(resolve, 0));
-    const rangeInput = activeConfigModal.querySelector(".template-builder-inspector input.template-config-cell-input");
+    const rangeInput = activeConfigPage.querySelector(".template-builder-inspector input.template-config-cell-input");
     assert(rangeInput, "Expected builder inspector range input.");
     assert.strictEqual(String(rangeInput.value || ""), "A1:C2", "Expected pointer drag to select range A1:C2.");
 
-    cellA1 = activeConfigModal.querySelector('.template-builder-grid td[data-row="1"][data-col="1"]');
-    dispatchDrop(cellA1, "format");
+    cellA1 = activeConfigPage.querySelector('.template-builder-grid td[data-row="1"][data-col="1"]');
+    dispatchDrop(cellA1, "format-blue");
     await new Promise((resolve) => window.setTimeout(resolve, 0));
-    const mergeToggle = Array.from(activeConfigModal.querySelectorAll("label.toggle"))
+    const mergeToggle = Array.from(activeConfigPage.querySelectorAll("label.toggle"))
       .find((label) => String(label.textContent || "").includes("Merge"))
       ?.querySelector('input[type="checkbox"]');
     assert(mergeToggle, "Expected builder inspector to expose Merge toggle.");
@@ -281,25 +1181,25 @@ async function assertViewerFixture(fileName) {
     mergeToggle.dispatchEvent(new window.Event("change", { bubbles: true }));
     await new Promise((resolve) => window.setTimeout(resolve, 0));
 
-    const backgroundInput = Array.from(activeConfigModal.querySelectorAll(".template-builder-field"))
+    const backgroundInput = Array.from(activeConfigPage.querySelectorAll(".template-builder-field"))
       .find((field) => String(field.textContent || "").includes("Background"))
       ?.querySelector("input.template-config-cell-input");
     assert(backgroundInput, "Expected builder inspector to expose Background input.");
-    const applyButton = Array.from(activeConfigModal.querySelectorAll("button"))
+    const applyButton = Array.from(activeConfigPage.querySelectorAll("button"))
       .find((btn) => String(btn.textContent || "").trim() === "Apply");
     assert(applyButton, "Expected Template Form modal to expose an Apply button.");
 
     backgroundInput.value = "not-a-color";
     backgroundInput.dispatchEvent(new window.Event("input", { bubbles: true }));
     await new Promise((resolve) => window.setTimeout(resolve, 0));
-    const configError = String(activeConfigModal.querySelector(".template-error")?.textContent || "").trim();
+    const configError = String(activeConfigPage.querySelector(".template-error")?.textContent || "").trim();
     assert(configError.includes("hex color"), "Expected invalid color input to show a validation error.");
 
     applyButton.click();
     await new Promise((resolve) => window.setTimeout(resolve, 0));
-    assert.strictEqual(Boolean(findVisibleTemplateConfigModal(window)), true, "Expected Template Form modal to stay open after invalid color apply.");
+    assert.strictEqual(Boolean(findVisibleTemplateConfigPage(window)), true, "Expected Template Form modal to stay open after invalid color apply.");
 
-    const validBackgroundInput = Array.from(activeConfigModal.querySelectorAll(".template-builder-field"))
+    const validBackgroundInput = Array.from(activeConfigPage.querySelectorAll(".template-builder-field"))
       .find((field) => String(field.textContent || "").includes("Background"))
       ?.querySelector("input.template-config-cell-input");
     assert(validBackgroundInput, "Expected Background input to still be available after invalid apply.");
@@ -308,7 +1208,7 @@ async function assertViewerFixture(fileName) {
     await new Promise((resolve) => window.setTimeout(resolve, 0));
     applyButton.click();
     await new Promise((resolve) => window.setTimeout(resolve, 0));
-    assert.strictEqual(Boolean(findVisibleTemplateConfigModal(window)), false, "Expected Template Form modal to close after valid builder apply.");
+    assert.strictEqual(Boolean(findVisibleTemplateConfigPage(window)), false, "Expected Template Form modal to close after valid builder apply.");
     assert(state.templateConfig.templates.DEFAULT["A1:C2"], "Expected builder to save selected A1:C2 range.");
     assert.strictEqual(state.templateConfig.templates.DEFAULT["A1:C2"].background, "#123abc");
     assert.strictEqual(state.templateConfig.templates.DEFAULT["A1:C2"].border, "outside-thin");
@@ -342,8 +1242,45 @@ async function assertViewerFixture(fileName) {
 }
 
 async function main() {
-  for (const fileName of listFixtureFiles(fixturesDir)) {
-    await assertViewerFixture(fileName);
+  const focus = String(process.argv[2] || "").trim();
+  if (!focus || focus === "fixtures") {
+    for (const fileName of listFixtureFiles(fixturesDir)) {
+      await assertViewerFixture(fileName);
+    }
+  }
+  if (!focus || focus === "render-error") {
+    await assertFailedRenderClearsPreviousResult();
+  }
+  if (!focus || focus === "template-import-error") {
+    await assertTemplateImportErrorIsVisible();
+  }
+  if (!focus || focus === "template-reset") {
+    await assertTemplateResetCanBeCancelled();
+  }
+  if (!focus || focus === "if-template") {
+    await assertIfInitialUsesConditionTemplate();
+  }
+  if (!focus || focus === "template-configs") {
+    await assertStatementSpecificTwentyCellTemplates();
+    await assertLegacyTemplateImportAddsMissingSpecificConfigs();
+  }
+  if (!focus || focus === "perform-root-trace") {
+    await assertExpandedPerformTraceUsesRootDeclarations();
+  }
+  if (!focus || focus === "struct-field-finaldesc") {
+    await assertStructFieldFinalDescNormalizesParentOnly();
+  }
+  if (!focus || focus === "template-multi-value-perform-call") {
+    await assertPerformAndCallMultiValueRows();
+  }
+  if (!focus || focus === "template-multi-value-perform-root") {
+    await assertExpandedPerformMultiValueRowsUseRootDescriptions();
+  }
+  if (!focus || focus === "template-multi-value-conditions") {
+    await assertConditionListsExpandRows();
+  }
+  if (!focus || focus === "template-multi-value-safe-lists") {
+    await assertSafeRawListsExpandWithoutSplittingExpressions();
   }
   console.log("viewer-contracts: ok");
 }

@@ -9,3 +9,19 @@ Thumbs.db
 
 # Local package installs
 node_modules/
+
+# Local-only tools and machine configuration
+.codegraph/
+.cursor/
+*.local.*
+.env
+.env.*
+!.env.example
+
+# Local agent runtime files
+# These files change per machine/session and can include prompt previews.
+.omx/logs/*.jsonl
+.omx/state/*.json
+.omx/metrics.json
+.omx/project-memory.json
+.omx/notepad.md

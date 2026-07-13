@@ -8,7 +8,7 @@ This document is the repo-level guide for:
 
 ## 1. Scope
 
-This parser/viewer is not a full ABAP grammar. It is a config-driven subset built from [`configs/*.json`](/e:/Documents/MyGitProject/Abap/configs) and then enriched by the viewer/export/template runtime.
+This parser/viewer is not a full ABAP grammar. It is a config-driven subset built from [`configs/*.json`](../configs) and then enriched by the viewer/export/template runtime.
 
 Official ABAP statement overview:
 - SAP Help, ABAP statements overview: <https://help.sap.com/http.svc/rc/abapdocu_752_index_htm/7.52/en-US/abenabap_statements.htm>
@@ -38,7 +38,7 @@ Current built-in configs cover these object families:
 - Internal table and data access: `SELECT`, `READ_TABLE`, `LOOP_AT_ITAB`, `MODIFY_ITAB`, `DELETE_ITAB`, `INSERT_ITAB`, `APPEND`, `SORT_ITAB`
 
 Important gap:
-- Standalone `TABLES` is used in [`examples/deep_form_demo.abap`](/e:/Documents/MyGitProject/Abap/examples/deep_form_demo.abap), but there is no `configs/tables.json`, so the current parser does not emit a `TABLES` object for that statement family.
+- Standalone `TABLES` is used in [`examples/deep_form_demo.abap`](../examples/deep_form_demo.abap), but there is no `configs/tables.json`, so the current parser does not emit a `TABLES` object for that statement family.
 
 ## 3. Current Conversion Pipeline
 
@@ -46,7 +46,7 @@ The current runtime has three layers even though they are not named explicitly.
 
 ### Layer A: Parse object
 
-The base parser object is the `AbapObject` created in [`shared/abap-parser/01-context.js`](/e:/Documents/MyGitProject/Abap/shared/abap-parser/01-context.js).
+The base parser object is the `AbapObject` created in [`shared/abap-parser/01-context.js`](../shared/abap-parser/01-context.js).
 
 Stable base fields:
 - `id`
@@ -82,7 +82,7 @@ This layer is still close to parser semantics.
 
 The viewer then adds more synthetic structure in several different places:
 - Output tree rendering builds renderable objects and traced decl chains
-- XML export normalizes entry objects through `normalizeEntryObjectForXml`
+- Template path resolution normalizes entry objects through `normalizeEntryObjectForPath`
 - Template preview clones objects through `buildTemplateContextObject`
 
 These three consumers currently apply overlapping but different normalization rules. This is the main reason the schema feels patched together.
@@ -94,7 +94,7 @@ The main ambiguity today is not `AbapObject` itself. The ambiguity comes from mi
 Examples:
 - `finalDesc` exists for decl-like objects and for value-like objects
 - template resolution has special handling so `values.expr.decl.finalDesc` may resolve to the value-level `finalDesc`, not the plain decl-level `finalDesc`
-- Output, XML, and Template each synthesize decls for conditions and argument rows in slightly different places
+- Output and Template each synthesize decls for conditions and argument rows in slightly different places
 
 Current rule for new template work:
 - Prefer `values.<name>.finalDesc` when you want the value-level final text
@@ -126,13 +126,12 @@ Instead keep three explicit schemas:
 
 2. `ResolvedAbapObject`
 - one shared conversion result derived from `ParseAbapObject`
-- used by Output, Template, and XML
+- used by Output and Template
 - keeps canonical normalized fields in predictable places
 
 3. Consumer projections
 - `toOutputNode(resolved)`
 - `toTemplateContext(resolved)`
-- `toXmlNode(resolved)`
 
 Recommended shared convert entry point:
 
@@ -175,7 +174,7 @@ Lowest-risk order:
 
 1. Keep parser output stable.
 2. Introduce one shared resolver at viewer/export layer first.
-3. Migrate Template and XML to consume the same resolved structure.
+3. Migrate Template to consume the same resolved structure.
 4. Migrate Output tree helpers last.
 5. Keep old template paths working as compatibility paths, but document only the canonical ones.
 
@@ -185,7 +184,7 @@ Do not start by rewriting `configs/*.json` or by changing the parse contract for
 
 These are the changes that currently make the most sense:
 - add `TABLES` support if DDIC work-area parsing is required
-- update [`RULES.md`](/e:/Documents/MyGitProject/Abap/RULES.md) so it no longer looks like the full runtime schema
+- update [`RULES.md`](../RULES.md) so it no longer looks like the full runtime schema
 - keep this file as the source of truth for canonical path guidance
 - before adding more viewer-side synthetic fields, route them through one shared resolver
 
@@ -203,4 +202,4 @@ When adding a new template path:
 
 When adding new condition support:
 - keep parser detail in `extras.<kind>.conditions`
-- feed Output, XML, and Template from the same resolved condition model
+- feed Output and Template from the same resolved condition model

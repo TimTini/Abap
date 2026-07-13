@@ -26,7 +26,7 @@ This file is the local source of truth for future AI/code agents working in this
   - `userDesc` override
   - fallback `codeDesc`
   - fallback technical id (`decl.name`)
-- `finalDesc` is XML-export oriented; keep legacy behavior intact.
+- `finalDesc` is template-oriented; keep legacy behavior intact.
 - Any change in condition display/edit must support both left and right operands consistently.
 
 ## 4) Viewer Behavior Rules
@@ -61,13 +61,13 @@ This file is the local source of truth for future AI/code agents working in this
 ## 7) Recent Implementation Decisions (Keep Consistent)
 
 - Split-file runtime loader invariants:
-  - Large runtime scripts are split into plain JS source parts plus generated compatibility bundles.
-  - Bundles must keep legacy entry paths and APIs (`shared/abap-parser.js`, `viewer/app/01-core.js`, `viewer/app/02-descriptions.js`, `viewer/app/03-template-preview.js`, `viewer/app/04-output-render.js`).
+  - Parser stays split across `shared/abap-parser/*.js` plus generated `shared/abap-parser.js`.
+  - Viewer runtime uses **one plain JS source part per bundle** (`core`, `descriptions`, `template`, `output`) built into legacy bundle entry paths (`viewer/app/01-core.js`, `02-descriptions.js`, `03-template-preview.js`, `04-output-render.js`).
   - Source parts are built into bundles by `node scripts/build-runtime-bundles.js`.
   - `viewer/index.html` loads bundles, not individual source parts.
   - Do not reintroduce runtime `eval`, `__AbapSourceParts`, or injected `<script>.textContent` assembly.
-  - Do not reorder split parts unless the corresponding bundle order in `scripts/build-runtime-bundles.js` is updated.
-  - Runtime metadata keys shared across split parts (e.g., perform-trace keys) must avoid top-level redeclare collisions; prefer unique key names per module context and `var` declarations only when cross-part scope requires it.
+  - Do not add empty placeholder part files; `build-runtime-bundles.js` fails on missing/empty parts.
+  - Runtime metadata keys shared across modules (e.g., perform-trace keys) must avoid top-level redeclare collisions; prefer unique key names per module context and `var` declarations only when cross-part scope requires it.
 
 - `PERFORM -> FORM` expansion in Viewer/Export:
   - Expansion is recursive.
@@ -95,7 +95,7 @@ This file is the local source of truth for future AI/code agents working in this
 - Output Values rendering policy for `*Raw` fields:
   - In Output table, prefer parsed rows over raw text for `*Raw` entries (for editable decl-desc per argument).
   - Keep raw fallback when parsed rows are empty/unavailable.
-  - Do not change XML contract for these `values.*Raw` fields unless explicitly requested.
+  - Do not change legacy output contract for these `values.*Raw` fields unless explicitly requested.
 
 - Value-level `finalDesc` for expression-like entries:
   - Preserve expression shape and operators/literals.
@@ -174,41 +174,23 @@ This file is the local source of truth for future AI/code agents working in this
   - `viewer/index.inline.html`: generated artifact from `scripts/build-inline-viewer.py` (do not hand-edit logic).
 
 - Generated runtime bundles (legacy entry points, do not hand-edit):
-  - `viewer/app/01-core.js`: built from `viewer/app/core/*.js`.
-  - `viewer/app/02-descriptions.js`: built from `viewer/app/descriptions/*.js`.
-  - `viewer/app/03-template-preview.js`: built from `viewer/app/template/*.js`.
-  - `viewer/app/04-output-render.js`: built from `viewer/app/output/*.js`.
+  - `viewer/app/01-core.js`: built from `viewer/app/core/01-runtime-state.js`.
+  - `viewer/app/02-descriptions.js`: built from `viewer/app/descriptions/01-normalize-and-desc.js`.
+  - `viewer/app/03-template-preview.js`: built from `viewer/app/template/01-path-resolver.js`.
+  - `viewer/app/04-output-render.js`: built from `viewer/app/output/01-output-render.js`.
   - `shared/abap-parser.js`: built from `shared/abap-parser/*.js`.
 
-- Core runtime parts (`viewer/app/core/*`):
-  - `01-runtime-state.js`: runtime state, DOM refs, default settings, sample ABAP/template defaults.
-  - `02-build-info.js`: read/show build metadata from `index.html` meta tags.
-  - `03-storage.js`: localStorage persistence (desc overrides, template config, theme/layout/settings).
-  - `04-template-config.js`: template config normalization/defaults and config apply helpers.
-  - `05-theme-layout.js`: layout split + theme behavior and related UI state wiring.
-  - `06-rules.js`: custom rules modal/editor lifecycle.
-  - `07-settings-modal.js`: settings modal (normalize toggle, decl types, name templates).
+- Core runtime (`viewer/app/core/01-runtime-state.js`):
+  - Runtime state, DOM refs, defaults, localStorage, build info, theme/layout, settings modal, template config helpers.
 
-- Description/normalization parts (`viewer/app/descriptions/*`):
-  - `01-normalize-and-desc.js`: decl-desc normalization rules and name-template matching.
-  - `02-overrides-and-edit.js`: edit modal flows + override keying/saving.
-  - `03-value-finaldesc.js`: value-level `finalDesc` resolution (expression-aware replacement).
-  - `04-panel-render.js`: decl panel rendering + `PERFORM` expansion + binding metadata attachment.
+- Description/normalization (`viewer/app/descriptions/01-normalize-and-desc.js`):
+  - Decl-desc normalization, edit modal flows, value-level `finalDesc`, decl panel rendering, `PERFORM` expansion + binding metadata.
 
-- Output render parts (`viewer/app/output/*`):
-  - `01-xml-export.js`: XML export assembly/serialization helpers.
-  - `02-search-index.js`: search haystack/index build for filtering.
-  - `03-selection-gutter.js`: code-line selection + gutter navigation sync.
-  - `04-render-shared.js`: shared table render helpers, decl dedupe, perform-trace chain resolution.
-  - `05-render-values.js`: values table rows/cells and value-entry-specific rendering.
-  - `06-render-extras.js`: extras rendering (including condition-related details).
-  - `07-render-tree.js`: recursive object/card tree rendering orchestration.
+- Output render (`viewer/app/output/01-output-render.js`):
+  - Output tree/cards, search index, gutter sync, shared render helpers, path-entry normalization (`normalizeEntryObjectForPath`).
 
-- Template preview parts (`viewer/app/template/*`):
-  - `01-path-resolver.js`: template path resolution, context clone, expanded-perform decl remap.
-  - `02-grid-and-style.js`: grid range parsing + style normalization/application.
-  - `03-preview-render.js`: template preview table rendering pipeline.
-  - `04-copy-import-export.js`: copy template text, import/export template JSON.
+- Template preview (`viewer/app/template/01-path-resolver.js`):
+  - Template path resolution, grid/style, preview render, copy/import/export.
 
 - Parser parts (`shared/abap-parser/*`):
   - `01-context.js`: parse context/bootstrap helpers.
@@ -233,4 +215,3 @@ This file is the local source of truth for future AI/code agents working in this
   - Edit `examples/deep_form_demo.abap` first.
   - Then run `node scripts/sync-default-sample.js`.
   - If viewer parts changed, rebuild bundles and inline viewer afterward with `node scripts/build-runtime-bundles.js` then `python scripts/build-inline-viewer.py`.
-

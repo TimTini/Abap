@@ -25,43 +25,25 @@ const GROUPS = [
   {
     bundle: "viewer/app/01-core.js",
     parts: [
-      "viewer/app/core/01-runtime-state.js",
-      "viewer/app/core/02-build-info.js",
-      "viewer/app/core/03-storage.js",
-      "viewer/app/core/04-template-config.js",
-      "viewer/app/core/05-theme-layout.js",
-      "viewer/app/core/06-rules.js",
-      "viewer/app/core/07-settings-modal.js"
+      "viewer/app/core/01-runtime-state.js"
     ]
   },
   {
     bundle: "viewer/app/02-descriptions.js",
     parts: [
-      "viewer/app/descriptions/01-normalize-and-desc.js",
-      "viewer/app/descriptions/02-overrides-and-edit.js",
-      "viewer/app/descriptions/03-value-finaldesc.js",
-      "viewer/app/descriptions/04-panel-render.js"
+      "viewer/app/descriptions/01-normalize-and-desc.js"
     ]
   },
   {
     bundle: "viewer/app/03-template-preview.js",
     parts: [
-      "viewer/app/template/01-path-resolver.js",
-      "viewer/app/template/02-grid-and-style.js",
-      "viewer/app/template/03-preview-render.js",
-      "viewer/app/template/04-copy-import-export.js"
+      "viewer/app/template/01-path-resolver.js"
     ]
   },
   {
     bundle: "viewer/app/04-output-render.js",
     parts: [
-      "viewer/app/output/01-xml-export.js",
-      "viewer/app/output/02-search-index.js",
-      "viewer/app/output/03-selection-gutter.js",
-      "viewer/app/output/04-render-shared.js",
-      "viewer/app/output/05-render-values.js",
-      "viewer/app/output/06-render-extras.js",
-      "viewer/app/output/07-render-tree.js"
+      "viewer/app/output/01-output-render.js"
     ]
   }
 ];
@@ -133,7 +115,13 @@ function buildBundle(group) {
   const chunks = [];
   for (const partRelPath of group.parts) {
     const absPartPath = path.resolve(repoRoot, partRelPath);
+    if (!fs.existsSync(absPartPath)) {
+      throw new Error(`Missing runtime source part: ${partRelPath}`);
+    }
     const source = normalizeSource(readText(absPartPath));
+    if (!source.trim()) {
+      throw new Error(`Runtime source part is empty: ${partRelPath}`);
+    }
     chunks.push(`// bundled from: ${partRelPath}\n${source}`);
   }
 
