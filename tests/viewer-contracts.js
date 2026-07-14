@@ -48,6 +48,39 @@ function findVisibleTemplateEditModal(window) {
     .find((modal) => !modal.hidden && String(modal.textContent || "").includes("Edit Template Cell"));
 }
 
+async function openTemplateCellDescriptionTab(window, cell) {
+  assert(cell, "Expected a rendered Template cell to edit.");
+  cell.dispatchEvent(new window.MouseEvent("dblclick", { bubbles: true }));
+  await waitForViewerUi(window);
+
+  const modal = findVisibleTemplateEditModal(window);
+  assert(modal, "Expected double-click to open the Template cell editor.");
+  const descriptionTab = Array.from(modal.querySelectorAll("button"))
+    .find((button) => String(button.textContent || "").trim() === "Description");
+  assert(descriptionTab, "Expected the Template cell editor to expose the Description tab.");
+  descriptionTab.click();
+  await waitForViewerUi(window);
+  return modal;
+}
+
+async function saveTemplateCellDescription(window, modal, nextDescription) {
+  const textarea = modal.querySelector("textarea.template-config-json");
+  assert(textarea && !textarea.disabled, "Expected an editable Description textarea.");
+  textarea.value = String(nextDescription || "");
+  textarea.dispatchEvent(new window.Event("input", { bubbles: true }));
+
+  const saveButton = Array.from(modal.querySelectorAll("button"))
+    .find((button) => String(button.textContent || "").trim() === "Save");
+  assert(saveButton, "Expected the Template cell editor to expose Save.");
+  saveButton.click();
+  await waitForViewerUi(window);
+}
+
+function findTemplateCellByText(table, expectedText) {
+  return Array.from(table ? table.querySelectorAll("td") : [])
+    .find((cell) => String(cell.textContent || "").trim() === expectedText);
+}
+
 function findVisibleTemplateConfigPage(window) {
   return Array.from(window.document.querySelectorAll(".template-dynamic-page, .modal"))
     .find((root) => {
@@ -462,6 +495,149 @@ async function assertSafeRawListsExpandWithoutSplittingExpressions() {
     ["TRANSPORTING", "col1"],
     ["TRANSPORTING", "col2"]
   ]);
+
+  dom.window.close();
+}
+
+async function assertTemplateRowDescriptionEditsLocalLoopDecl() {
+  const source = [
+    "PERFORM frm_main.",
+    "FORM frm_main.",
+    "  DATA lt_abc TYPE TABLE OF string. \"Table local",
+    "  DATA ls_abc TYPE string. \"Row local",
+    "  LOOP AT lt_abc INTO ls_abc.",
+    "  ENDLOOP.",
+    "ENDFORM."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  let loopTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="LOOP_AT_ITAB"]');
+  assert(loopTable, "Expected the expanded FORM to render its LOOP template.");
+  let modal = await openTemplateCellDescriptionTab(window, findTemplateCellByText(loopTable, "Table local"));
+  const modalText = String(modal.textContent || "");
+  assert(!modalText.includes("Khong tim thay decl cho o nay."), "Expected the LOOP table row to retain its declaration target.");
+  assert(modalText.includes("lt_abc"), "Expected the LOOP table row to target lt_abc.");
+  assert(!modalText.includes("ls_abc"), "Expected the LOOP table row not to target the INTO declaration.");
+
+  const tableDecl = (state.data && Array.isArray(state.data.decls) ? state.data.decls : [])
+    .find((decl) => String(decl && decl.name || "") === "lt_abc");
+  assert(tableDecl, "Expected the parser result to contain the local table declaration.");
+  const tableDeclKey = window.getDeclOverrideStorageKey(tableDecl);
+
+  await saveTemplateCellDescription(window, modal, "Updated list");
+  const storedOverride = state.descOverrides[tableDeclKey];
+  assert.strictEqual(
+    typeof storedOverride === "object" ? String(storedOverride.text || "") : String(storedOverride || ""),
+    "Updated list",
+    "Expected Save to persist the exact local table override."
+  );
+  assert(String(els.output.textContent || "").includes("Updated list"), "Expected Output to refresh after the row description edit.");
+
+  loopTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="LOOP_AT_ITAB"]');
+  assert(findTemplateCellByText(loopTable, "Updated list"), "Expected Template Preview to refresh after Save.");
+  modal = await openTemplateCellDescriptionTab(window, findTemplateCellByText(loopTable, "Updated list"));
+  await saveTemplateCellDescription(window, modal, "");
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(state.descOverrides, tableDeclKey), false, "Expected clearing the description to remove its override.");
+
+  loopTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="LOOP_AT_ITAB"]');
+  assert(findTemplateCellByText(loopTable, "Table local"), "Expected clearing the override to restore the code description.");
+  const intoModal = await openTemplateCellDescriptionTab(window, findTemplateCellByText(loopTable, "Row local"));
+  const intoModalText = String(intoModal.textContent || "");
+  assert(intoModalText.includes("ls_abc"), "Expected the INTO row to target ls_abc.");
+  assert(!intoModalText.includes("lt_abc"), "Expected the INTO row not to target the table declaration.");
+
+  dom.window.close();
+}
+
+async function assertTemplateRowDescriptionKeepsNestedPerformTrace() {
+  const source = [
+    "DATA gv_root_one TYPE string. \"Root one",
+    "DATA gv_root_two TYPE string. \"Root two",
+    "PERFORM frm_outer USING gv_root_one gv_root_two.",
+    "PERFORM frm_literal USING 'X'.",
+    "FORM frm_outer USING iv_outer_one TYPE string iv_outer_two TYPE string.",
+    "  PERFORM frm_inner USING iv_outer_one iv_outer_two.",
+    "ENDFORM.",
+    "FORM frm_inner USING iv_inner_one TYPE string iv_inner_two TYPE string.",
+    "  CLEAR iv_inner_one.",
+    "ENDFORM.",
+    "FORM frm_literal USING iv_literal TYPE string.",
+    "  CLEAR iv_literal.",
+    "ENDFORM."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els } = window.AbapViewerRuntime;
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const performTables = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="PERFORM"]'));
+  let nestedTable = performTables.find((table) => getTemplateTableRows(table).some((row) => row.includes("frm_inner")));
+  assert(nestedTable, "Expected the nested PERFORM template table.");
+  let modal = await openTemplateCellDescriptionTab(window, findTemplateCellByText(nestedTable, "Root two"));
+  const targetSelect = modal.querySelector("select");
+  assert(targetSelect, "Expected the traced PERFORM row to expose a target selector.");
+  const targetLabels = Array.from(targetSelect.options, (option) => String(option.textContent || ""));
+  assert(targetLabels[0].includes("gv_root_two"), "Expected the displayed root declaration to be selected first.");
+  assert(targetLabels.some((label) => label.includes("gv_root_two")), "Expected the displayed root declaration to be the first editable trace target.");
+  assert(targetLabels.some((label) => label.includes("iv_outer_two")), "Expected the caller-local FORM_PARAM to remain available in the target list.");
+  assert(!targetLabels.some((label) => label.includes("gv_root_one") || label.includes("iv_outer_one")), "Expected the second PERFORM row not to inherit targets from the first row.");
+
+  await saveTemplateCellDescription(window, modal, "Root two edited");
+  nestedTable = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="PERFORM"]'))
+    .find((table) => getTemplateTableRows(table).some((row) => row.includes("frm_inner")));
+  assert.deepStrictEqual(getTemplateTableRows(nestedTable), [
+    ["PERFORM", "frm_inner"],
+    ["USING", "Root one"],
+    ["USING", "Root two edited"]
+  ]);
+
+  const literalTable = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="PERFORM"]'))
+    .find((table) => getTemplateTableRows(table).some((row) => row.includes("frm_literal")));
+  assert(literalTable, "Expected the literal PERFORM template table.");
+  modal = await openTemplateCellDescriptionTab(window, findTemplateCellByText(literalTable, "'X'"));
+  assert(String(modal.textContent || "").includes("Khong tim thay decl cho o nay."), "Expected literal-only rows to remain non-editable.");
+  const literalTextarea = modal.querySelector("textarea.template-config-json");
+  assert(literalTextarea && literalTextarea.disabled, "Expected the literal Description textarea to stay disabled.");
+
+  dom.window.close();
+}
+
+async function assertTemplateRowDescriptionTargetsExactConditionDecls() {
+  const source = [
+    "DATA lt_rows TYPE TABLE OF string.",
+    "DATA ls_row TYPE string.",
+    "DATA lv_a TYPE string. \"A",
+    "DATA lv_b TYPE string. \"B",
+    "DATA lv_c TYPE string. \"C",
+    "DATA lv_d TYPE string. \"D",
+    "LOOP AT lt_rows INTO ls_row WHERE lv_a = lv_b AND lv_c = lv_d.",
+    "ENDLOOP."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els } = window.AbapViewerRuntime;
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  let loopTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="LOOP_AT_ITAB"]');
+  assert(loopTable, "Expected the conditional LOOP template table.");
+  const modal = await openTemplateCellDescriptionTab(window, findTemplateCellByText(loopTable, "C = D"));
+  const targetLabels = Array.from(modal.querySelectorAll("select option"), (option) => String(option.textContent || ""));
+  assert(targetLabels.some((label) => label.includes("lv_c")), "Expected the second condition row to target lv_c.");
+  assert(targetLabels.some((label) => label.includes("lv_d")), "Expected the second condition row to target lv_d.");
+  assert(!targetLabels.some((label) => label.includes("lv_a") || label.includes("lv_b")), "Expected condition targets to stay isolated by rendered row.");
+
+  await saveTemplateCellDescription(window, modal, "C edited");
+  loopTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="LOOP_AT_ITAB"]');
+  assert(findTemplateCellByText(loopTable, "C edited = D"), "Expected saving the selected condition target to refresh only that operand.");
 
   dom.window.close();
 }
@@ -1281,6 +1457,15 @@ async function main() {
   }
   if (!focus || focus === "template-multi-value-safe-lists") {
     await assertSafeRawListsExpandWithoutSplittingExpressions();
+  }
+  if (!focus || focus === "template-row-description-loop") {
+    await assertTemplateRowDescriptionEditsLocalLoopDecl();
+  }
+  if (!focus || focus === "template-row-description-perform") {
+    await assertTemplateRowDescriptionKeepsNestedPerformTrace();
+  }
+  if (!focus || focus === "template-row-description-condition") {
+    await assertTemplateRowDescriptionTargetsExactConditionDecls();
   }
   console.log("viewer-contracts: ok");
 }
