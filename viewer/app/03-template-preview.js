@@ -7,6 +7,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
   var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
   var TEMPLATE_ROW_DECLS_META_KEY_TEMPLATE = "__abapTemplateRowDecls";
+  var TEMPLATE_OBJECT_INDEX_META_KEY_TEMPLATE = "__abapTemplateObjectIndex";
+  var TEMPLATE_CONTEXT_ERRORS_META_KEY_TEMPLATE = "__abapTemplateContextErrors";
+  var TEMPLATE_PROVENANCE_WARNED_KEYS_TEMPLATE = new Set();
 
   function toInlineCssText(styleMap) {
     if (!styleMap || typeof styleMap !== "object") {
@@ -346,13 +349,16 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return "item";
   }
 
-  function normalizeTemplateEntryForPath(value, keyHint, pathParts, ownerContext) {
+  function normalizeTemplateEntryForPath(value, keyHint, pathParts, ownerContext, onError) {
     if (typeof normalizeEntryObjectForPath !== "function") {
       return value;
     }
     try {
       return normalizeEntryObjectForPath(value, keyHint, pathParts, ownerContext);
-    } catch {
+    } catch (err) {
+      if (typeof onError === "function") {
+        onError(err);
+      }
       return value;
     }
   }
@@ -388,6 +394,301 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       out.push(decl);
     }
     return out;
+  }
+
+  function isTemplatePathDecl(decl) {
+    return Boolean(
+      decl
+      && typeof decl === "object"
+      && String(decl.objectType || "").trim().toUpperCase() === "PATH_DECL"
+    );
+  }
+
+  function getTemplateDeclStorageKey(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+    const scope = String(decl.scopeLabel || "").trim().toUpperCase();
+    const name = String(decl.name || "").trim().toUpperCase();
+    return scope && name ? `${scope}:${name}` : "";
+  }
+
+  function attachTemplateSyntheticDeclAliases(decl, objectIndexOneBased) {
+    if (!isTemplatePathDecl(decl)) {
+      return decl;
+    }
+    const objectIndex = Math.max(1, Number(objectIndexOneBased) || 1);
+    const canonicalKey = getTemplateDeclStorageKey(decl);
+    const scopeLabel = String(decl.scopeLabel || "").trim().toUpperCase();
+    const name = String(decl.name || "").trim().toUpperCase();
+    const legacyScope = scopeLabel.replace(
+      /^PATH:OBJECT:[^/]+\//,
+      `PATH:OBJECTS/OBJECT[${objectIndex}]/`
+    );
+    const legacyScopes = [];
+    const pushLegacyScope = (value) => {
+      const scope = String(value || "").trim();
+      if (scope && scope !== scopeLabel && !legacyScopes.includes(scope)) {
+        legacyScopes.push(scope);
+      }
+    };
+    pushLegacyScope(legacyScope);
+    if (/\/CLAUSE\[/i.test(legacyScope)) {
+      pushLegacyScope(legacyScope.replace(/\/CLAUSE\[/gi, "/ITEM["));
+    }
+    const lookupKeys = [];
+    const pushKey = (value) => {
+      const key = String(value || "").trim();
+      if (key && !lookupKeys.includes(key)) {
+        lookupKeys.push(key);
+      }
+    };
+    pushKey(canonicalKey);
+    if (name) {
+      for (const scope of legacyScopes) {
+        pushKey(`${scope}:${name}`);
+      }
+    }
+    decl.overrideLookupKeys = lookupKeys;
+    decl.pathAliases = legacyScopes;
+    return decl;
+  }
+
+  function warnTemplateProvenanceOnce(reason, details) {
+    const info = details && typeof details === "object" ? details : {};
+    const errorMessage = info.error && info.error.message
+      ? String(info.error.message)
+      : String(info.error || "");
+    const key = [
+      String(reason || ""),
+      String(info.objectId === undefined || info.objectId === null ? "" : info.objectId),
+      String(info.line === undefined || info.line === null ? "" : info.line),
+      String(info.template || ""),
+      String(info.range || ""),
+      String(info.token || ""),
+      errorMessage
+    ].join("|");
+    if (TEMPLATE_PROVENANCE_WARNED_KEYS_TEMPLATE.has(key)) {
+      return;
+    }
+    TEMPLATE_PROVENANCE_WARNED_KEYS_TEMPLATE.add(key);
+    if (typeof console !== "undefined" && typeof console.warn === "function") {
+      console.warn("Template description provenance resolution failed", {
+        reason: String(reason || "RESOLUTION_ERROR"),
+        objectId: info.objectId === undefined ? null : info.objectId,
+        line: info.line === undefined ? null : info.line,
+        template: String(info.template || ""),
+        range: String(info.range || ""),
+        token: String(info.token || ""),
+        error: errorMessage
+      });
+    }
+  }
+
+  function isTemplateLiteralOrWildcard(value) {
+    const text = String(value === undefined || value === null ? "" : value).trim();
+    if (!text) {
+      return false;
+    }
+    if (/^(?:\*|@\*|#|SPACE)$/i.test(text)) {
+      return true;
+    }
+    if (/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?$/.test(text)) {
+      return true;
+    }
+    if (
+      /^'(?:''|[^'])*'$/.test(text)
+      || /^[A-Za-z_][A-Za-z0-9_]*'(?:''|[^'])*'$/.test(text)
+      || /^`(?:``|[^`])*`$/.test(text)
+      || /^\|[\s\S]*\|$/.test(text)
+    ) {
+      return true;
+    }
+    return /^(?:ABAP_TRUE|ABAP_FALSE|ABAP_UNDEFINED)$/i.test(text);
+  }
+
+  function isTemplateStaticOperandToken(value) {
+    return /^(?:INITIAL|TABLE|LINE|LINES|ADJACENT|DUPLICATES)$/i.test(
+      String(value === undefined || value === null ? "" : value).trim()
+    );
+  }
+
+  function isTemplateIdentifierOperand(value) {
+    const text = String(value === undefined || value === null ? "" : value).trim();
+    if (!text || isTemplateLiteralOrWildcard(text) || isTemplateStaticOperandToken(text)) {
+      return false;
+    }
+    return /^(?:@)?(?:<[^>]+>|[A-Za-z_][A-Za-z0-9_]*)(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)*$/.test(text)
+      || /^(?:@)?(?:<[^>]+>|[A-Za-z_][A-Za-z0-9_]*)/.test(text);
+  }
+
+  function isTemplateDataValueEntry(sourceObj, entry) {
+    if (!sourceObj || !entry || typeof entry !== "object") {
+      return false;
+    }
+    const objectType = String(sourceObj.objectType || "").trim().toUpperCase();
+    const entryName = String(entry.name || entry.label || "").trim().toLowerCase();
+    const allowedByType = {
+      APPEND: ["what", "to", "target", "source", "assigning", "refinto"],
+      ASSIGNMENT: ["target", "expr", "source", "value"],
+      CLEAR: ["target", "with"],
+      DELETE_ITAB: ["target", "itab", "from", "to", "index"],
+      INSERT_ITAB: ["what", "to", "into", "target", "source", "intotable", "into-table", "index", "assigning", "refinto"],
+      LOOP_AT_ITAB: ["itab", "into", "assigning", "refinto", "referenceinto", "reference-into", "from", "to"],
+      MODIFY_ITAB: ["itab", "itabordbtab", "target", "from", "assigning", "referenceinto", "reference-into", "index"],
+      MOVE: ["source", "to", "target"],
+      "MOVE-CORRESPONDING": ["source", "to", "target"],
+      READ_TABLE: ["itab", "into", "assigning", "refinto", "referenceinto", "reference-into", "index"],
+      SELECT: ["into", "intotable", "into-table", "appendingtable", "appending-table", "assigning", "refinto", "referenceinto", "reference-into"],
+      SORT_ITAB: ["itab"]
+    };
+    const allowed = allowedByType[objectType];
+    return Array.isArray(allowed) && allowed.includes(entryName);
+  }
+
+  function getTemplateCanonicalObjectPathBase(obj) {
+    if (typeof buildObjectPathBase === "function") {
+      return buildObjectPathBase(obj);
+    }
+    const id = obj && obj.id !== undefined && obj.id !== null ? String(obj.id).trim() : "";
+    if (id) {
+      return `OBJECT:${id}`;
+    }
+    const objectType = String(obj && obj.objectType || "OBJECT").trim() || "OBJECT";
+    const file = String(obj && obj.file || "NO_FILE").trim() || "NO_FILE";
+    const line = Number(obj && obj.lineStart) || 0;
+    return `OBJECT:${objectType}:${file}:${line}`;
+  }
+
+  function ensureTemplateCanonicalValueEntry(sourceObj, entry, objectIndexOneBased) {
+    if (!entry || typeof entry !== "object" || isDeclLikeObject(entry.decl)) {
+      return entry;
+    }
+    const valueText = String(entry.value === undefined || entry.value === null ? "" : entry.value).trim();
+    if (!isTemplateDataValueEntry(sourceObj, entry) || !isTemplateIdentifierOperand(valueText)) {
+      return entry;
+    }
+    if (typeof ensureEntryDeclWithSynthetic !== "function") {
+      return entry;
+    }
+    const source = typeof getDeclSourceContextFromObject === "function"
+      ? getDeclSourceContextFromObject(sourceObj)
+      : {
+          file: String(sourceObj && sourceObj.file || ""),
+          lineStart: Number(sourceObj && sourceObj.lineStart) || null,
+          raw: String(sourceObj && sourceObj.raw || "")
+        };
+    const entryName = String(entry.name || entry.label || "value").trim() || "value";
+    const normalized = ensureEntryDeclWithSynthetic({ ...entry, decl: null }, {
+      pathKey: [getTemplateCanonicalObjectPathBase(sourceObj), "values", entryName].join("/"),
+      file: source.file,
+      lineStart: source.lineStart,
+      raw: source.raw,
+      role: "value"
+    });
+    if (normalized && isTemplatePathDecl(normalized.decl)) {
+      attachTemplateSyntheticDeclAliases(normalized.decl, objectIndexOneBased);
+    }
+    return normalized;
+  }
+
+  function attachTemplateEntrySyntheticAliases(entry, objectIndexOneBased) {
+    if (!entry || typeof entry !== "object") {
+      return entry;
+    }
+    for (const key of ["decl", "valueDecl", "leftOperandDecl", "rightOperandDecl"]) {
+      if (isTemplatePathDecl(entry[key])) {
+        attachTemplateSyntheticDeclAliases(entry[key], objectIndexOneBased);
+      }
+    }
+    return entry;
+  }
+
+  function ensureTemplateCanonicalExtrasValueEntry(sourceObj, entry, options) {
+    if (!entry || typeof entry !== "object") {
+      return entry;
+    }
+    const opts = options && typeof options === "object" ? options : {};
+    const valueText = String(entry.value === undefined || entry.value === null ? "" : entry.value).trim();
+    if (!isTemplateIdentifierOperand(valueText)) {
+      return entry;
+    }
+    const source = typeof getDeclSourceContextFromObject === "function"
+      ? getDeclSourceContextFromObject(sourceObj)
+      : {
+          file: String(sourceObj && sourceObj.file || ""),
+          lineStart: Number(sourceObj && sourceObj.lineStart) || null,
+          raw: String(sourceObj && sourceObj.raw || "")
+        };
+    const basePath = [
+      getTemplateCanonicalObjectPathBase(sourceObj),
+      "extras",
+      String(opts.extrasScope || "extras"),
+      String(opts.sectionName || "section"),
+      `item[${Math.max(1, Number(opts.indexOneBased) || 1)}]`
+    ].join("/");
+    let normalized = { ...entry };
+    if (typeof ensureEntryDeclWithSynthetic === "function") {
+      normalized = ensureEntryDeclWithSynthetic(normalized, {
+        pathKey: basePath,
+        file: source.file,
+        lineStart: source.lineStart,
+        raw: source.raw,
+        role: `${opts.extrasScope || "extras"}:${opts.sectionName || "entry"}`
+      });
+    }
+    if (typeof ensureValueDeclWithSynthetic === "function") {
+      normalized = ensureValueDeclWithSynthetic(normalized, {
+        pathKey: basePath,
+        file: source.file,
+        lineStart: source.lineStart,
+        raw: source.raw,
+        role: `${opts.extrasScope || "extras"}:${opts.sectionName || "entry"}:value`,
+        nameHint: String(opts.sectionName || "value")
+      });
+    }
+    return attachTemplateEntrySyntheticAliases(normalized, opts.objectIndexOneBased);
+  }
+
+  function ensureTemplateCanonicalConditionClause(sourceObj, clause, options) {
+    if (!clause || typeof clause !== "object" || typeof ensureConditionClauseDeclsWithSynthetic !== "function") {
+      return clause;
+    }
+    const opts = options && typeof options === "object" ? options : {};
+    const source = typeof getDeclSourceContextFromObject === "function"
+      ? getDeclSourceContextFromObject(sourceObj)
+      : {
+          file: String(sourceObj && sourceObj.file || ""),
+          lineStart: Number(sourceObj && sourceObj.lineStart) || null,
+          raw: String(sourceObj && sourceObj.raw || "")
+        };
+    const clausePath = [
+      getTemplateCanonicalObjectPathBase(sourceObj),
+      "extras",
+      String(opts.extrasScope || "extras"),
+      String(opts.sectionName || "conditions"),
+      `clause[${Math.max(1, Number(opts.indexOneBased) || 1)}]`
+    ].join("/");
+    const normalized = ensureConditionClauseDeclsWithSynthetic(clause, {
+      pathKey: clausePath,
+      file: source.file,
+      lineStart: source.lineStart,
+      raw: source.raw
+    });
+    return attachTemplateEntrySyntheticAliases(normalized, opts.objectIndexOneBased);
+  }
+
+  function getTemplateNoDeclReason(value, isDataOperand, isSchemaValue) {
+    if (isSchemaValue || isTemplateStaticOperandToken(value)) {
+      return "NON_DECL_SCHEMA_VALUE";
+    }
+    if (isTemplateLiteralOrWildcard(value)) {
+      return "LITERAL_NO_DECL";
+    }
+    if (isDataOperand && isTemplateIdentifierOperand(value)) {
+      return "UNBOUND_IDENTIFIER";
+    }
+    return "MISSING_PROVENANCE";
   }
 
   function getExpandedPerformBindingContextForTemplate(obj) {
@@ -831,14 +1132,15 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return "";
   }
 
-  function createTemplateExpandedRow(text, declCandidates) {
+  function createTemplateExpandedRow(text, declCandidates, provenance) {
     return {
       text: String(text === undefined || text === null ? "" : text).trim(),
-      declCandidates: dedupeTemplateDecls(declCandidates)
+      declCandidates: dedupeTemplateDecls(declCandidates),
+      provenance: provenance && typeof provenance === "object" ? { ...provenance } : null
     };
   }
 
-  function createTemplateKeywordRow(keyword, finalDesc, declCandidates) {
+  function createTemplateKeywordRow(keyword, finalDesc, declCandidates, provenance) {
     const row = {
       keyword: String(keyword === undefined || keyword === null ? "" : keyword).trim(),
       finalDesc: String(finalDesc === undefined || finalDesc === null ? "" : finalDesc).trim()
@@ -846,16 +1148,40 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     Object.defineProperty(row, TEMPLATE_ROW_DECLS_META_KEY_TEMPLATE, {
       configurable: true,
       enumerable: false,
-      value: dedupeTemplateDecls(declCandidates)
+      value: {
+        declCandidates: dedupeTemplateDecls(declCandidates),
+        status: String(provenance && provenance.status || ""),
+        reasonCode: String(provenance && provenance.reasonCode || "")
+      }
     });
     return row;
   }
 
-  function getTemplateKeywordRowDecls(row) {
+  function getTemplateKeywordRowProvenance(row) {
     if (!row || typeof row !== "object") {
-      return [];
+      return { declCandidates: [], status: "unresolved", reasonCode: "MISSING_PROVENANCE" };
     }
-    return dedupeTemplateDecls(row[TEMPLATE_ROW_DECLS_META_KEY_TEMPLATE]);
+    const meta = row[TEMPLATE_ROW_DECLS_META_KEY_TEMPLATE];
+    if (Array.isArray(meta)) {
+      return {
+        declCandidates: dedupeTemplateDecls(meta),
+        status: meta.length ? "editable" : "unresolved",
+        reasonCode: meta.length ? "" : "MISSING_PROVENANCE"
+      };
+    }
+    if (!meta || typeof meta !== "object") {
+      return { declCandidates: [], status: "unresolved", reasonCode: "MISSING_PROVENANCE" };
+    }
+    const declCandidates = dedupeTemplateDecls(meta.declCandidates);
+    return {
+      declCandidates,
+      status: String(meta.status || (declCandidates.length ? "editable" : "unresolved")),
+      reasonCode: String(meta.reasonCode || (declCandidates.length ? "" : "MISSING_PROVENANCE"))
+    };
+  }
+
+  function getTemplateKeywordRowDecls(row) {
+    return getTemplateKeywordRowProvenance(row).declCandidates;
   }
 
   function collectTemplateTraceAwareDeclCandidates(decl, ownerContext) {
@@ -898,35 +1224,44 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return traceAwareEntry;
   }
 
-  function buildTemplateSemanticValueRow(entry, ownerContext) {
+  function buildTemplateSemanticValueRow(entry, ownerContext, provenanceOptions) {
     if (!entry || typeof entry !== "object") {
       return createTemplateExpandedRow("", []);
     }
-    const rawValue = String(entry.value === undefined || entry.value === null ? "" : entry.value).trim();
-    const valueEntry = buildTemplateSemanticValueEntry(entry, ownerContext);
+    const sourceEntry = provenanceOptions
+      ? ensureTemplateCanonicalExtrasValueEntry(ownerContext, entry, provenanceOptions)
+      : entry;
+    const rawValue = String(sourceEntry.value === undefined || sourceEntry.value === null ? "" : sourceEntry.value).trim();
+    const valueEntry = buildTemplateSemanticValueEntry(sourceEntry, ownerContext);
     const declCandidates = valueEntry
       ? getTemplateEditableDeclCandidatesFromResolvedValue(valueEntry)
       : [];
     if (valueEntry && valueEntry.decl) {
       const resolved = resolveTemplateValueRowFinalDesc(valueEntry);
       if (resolved) {
-        return createTemplateExpandedRow(resolved, declCandidates);
+        return createTemplateExpandedRow(resolved, declCandidates, {
+          status: "editable",
+          reasonCode: ""
+        });
       }
     }
-    return createTemplateExpandedRow(rawValue, declCandidates);
+    return createTemplateExpandedRow(rawValue, declCandidates, {
+      status: declCandidates.length ? "editable" : "not_applicable",
+      reasonCode: declCandidates.length ? "" : getTemplateNoDeclReason(rawValue, true, false)
+    });
   }
 
-  function formatTemplateAssignmentRow(entry, ownerContext) {
+  function formatTemplateAssignmentRow(entry, ownerContext, provenanceOptions) {
     if (!entry || typeof entry !== "object") {
       return createTemplateExpandedRow("", []);
     }
     const name = String(entry.name || "").trim();
-    const valueRow = buildTemplateSemanticValueRow(entry, ownerContext);
+    const valueRow = buildTemplateSemanticValueRow(entry, ownerContext, provenanceOptions);
     const valueText = valueRow.text;
     if (name && valueText) {
-      return createTemplateExpandedRow(`${name} = ${valueText}`, valueRow.declCandidates);
+      return createTemplateExpandedRow(`${name} = ${valueText}`, valueRow.declCandidates, valueRow.provenance);
     }
-    return createTemplateExpandedRow(name || valueText, valueRow.declCandidates);
+    return createTemplateExpandedRow(name || valueText, valueRow.declCandidates, valueRow.provenance);
   }
 
   function formatTemplateConditionRow(clause, ownerContext) {
@@ -957,36 +1292,56 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     );
   }
 
-  function getTemplateConditionRows(sourceObj, keywordLabel, ownerContext) {
+  function getTemplateConditionRows(sourceObj, keywordLabel, ownerContext, objectIndexOneBased) {
     const objectType = String(sourceObj && sourceObj.objectType || "").trim().toUpperCase();
     const extras = sourceObj && sourceObj.extras && typeof sourceObj.extras === "object"
       ? sourceObj.extras
       : {};
     let conditions = null;
+    let extrasScope = "extras";
+    let sectionName = "conditions";
 
     if (objectType === "PERFORM" && keywordLabel === "if" && extras.performCall) {
       conditions = extras.performCall.ifConditions;
+      extrasScope = "performCall";
+      sectionName = "ifConditions";
     } else if (objectType === "SELECT" && extras.select) {
       if (keywordLabel === "where") {
         conditions = extras.select.whereConditions;
+        extrasScope = "select.where";
+        sectionName = "whereConditions";
       } else if (keywordLabel === "having") {
         conditions = extras.select.havingConditions;
+        extrasScope = "select.having";
+        sectionName = "havingConditions";
       }
     } else if (objectType === "READ_TABLE" && ["with-key", "with-table-key"].includes(keywordLabel) && extras.readTable) {
       conditions = extras.readTable.conditions;
+      extrasScope = "readTable";
     } else if (objectType === "LOOP_AT_ITAB" && keywordLabel === "where" && extras.loopAtItab) {
       conditions = extras.loopAtItab.conditions;
+      extrasScope = "loopAtItab";
     } else if (objectType === "MODIFY_ITAB" && keywordLabel === "where" && extras.modifyItab) {
       conditions = extras.modifyItab.conditions;
+      extrasScope = "modifyItab";
     } else if (objectType === "DELETE_ITAB" && keywordLabel === "where" && extras.deleteItab) {
       conditions = extras.deleteItab.conditions;
+      extrasScope = "deleteItab";
     }
 
     const list = Array.isArray(conditions) ? conditions : [];
-    return list.length ? list.map((clause) => formatTemplateConditionRow(clause, ownerContext)) : null;
+    return list.length ? list.map((clause, index) => formatTemplateConditionRow(
+      ensureTemplateCanonicalConditionClause(sourceObj, clause, {
+        extrasScope,
+        sectionName,
+        indexOneBased: index + 1,
+        objectIndexOneBased
+      }),
+      ownerContext
+    )) : null;
   }
 
-  function getTemplateSemanticSectionRows(sourceObj, keywordLabel, ownerContext) {
+  function getTemplateSemanticSectionRows(sourceObj, keywordLabel, ownerContext, objectIndexOneBased) {
     const extras = sourceObj && sourceObj.extras && typeof sourceObj.extras === "object"
       ? sourceObj.extras
       : {};
@@ -994,14 +1349,25 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (assignmentSection && ["exporting", "importing", "changing", "tables", "receiving", "exceptions"].includes(keywordLabel)) {
       const assignments = Array.isArray(assignmentSection[keywordLabel]) ? assignmentSection[keywordLabel] : [];
       if (assignments.length) {
-        return assignments.map((entry) => formatTemplateAssignmentRow(entry, ownerContext));
+        const extrasScope = extras.callFunction ? "callFunction" : "callMethod";
+        return assignments.map((entry, index) => formatTemplateAssignmentRow(entry, ownerContext, {
+          extrasScope,
+          sectionName: keywordLabel,
+          indexOneBased: index + 1,
+          objectIndexOneBased
+        }));
       }
     }
 
     if (extras.performCall && ["using", "changing", "tables"].includes(keywordLabel)) {
       const values = Array.isArray(extras.performCall[keywordLabel]) ? extras.performCall[keywordLabel] : [];
       if (values.length) {
-        return values.map((entry) => buildTemplateSemanticValueRow(entry, ownerContext));
+        return values.map((entry, index) => buildTemplateSemanticValueRow(entry, ownerContext, {
+          extrasScope: "performCall",
+          sectionName: keywordLabel,
+          indexOneBased: index + 1,
+          objectIndexOneBased
+        }));
       }
     }
 
@@ -1245,23 +1611,26 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return null;
   }
 
-  function getTemplateExpandedKeywordRows(sourceObj, keyword, valueEntry, ownerContext) {
+  function getTemplateExpandedKeywordRows(sourceObj, keyword, valueEntry, ownerContext, objectIndexOneBased) {
     const keywordLabel = normalizeTemplatePairToken(keyword && keyword.label);
-    const semanticRows = getTemplateSemanticSectionRows(sourceObj, keywordLabel, ownerContext);
+    const semanticRows = getTemplateSemanticSectionRows(sourceObj, keywordLabel, ownerContext, objectIndexOneBased);
     if (Array.isArray(semanticRows) && semanticRows.length) {
       return semanticRows;
     }
-    const conditionRows = getTemplateConditionRows(sourceObj, keywordLabel, ownerContext);
+    const conditionRows = getTemplateConditionRows(sourceObj, keywordLabel, ownerContext, objectIndexOneBased);
     if (Array.isArray(conditionRows) && conditionRows.length) {
       return conditionRows;
     }
     const rawListRows = getTemplateSafeRawListRows(sourceObj, keywordLabel, valueEntry);
     return Array.isArray(rawListRows) && rawListRows.length
-      ? rawListRows.map((text) => createTemplateExpandedRow(text, []))
+      ? rawListRows.map((text) => createTemplateExpandedRow(text, [], {
+          status: "not_applicable",
+          reasonCode: "NON_DECL_SCHEMA_VALUE"
+        }))
       : null;
   }
 
-  function buildTemplateKeywordRows(sourceObj, ownerContext) {
+  function buildTemplateKeywordRows(sourceObj, ownerContext, objectIndexOneBased) {
     if (!sourceObj || typeof sourceObj !== "object") {
       return [];
     }
@@ -1285,69 +1654,511 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         sourceObj,
         keyword,
         valueEntry,
-        ownerContext || sourceObj
+        ownerContext || sourceObj,
+        objectIndexOneBased
       );
       if (Array.isArray(expandedRows) && expandedRows.length) {
         for (const expandedRow of expandedRows) {
           rows.push(createTemplateKeywordRow(
             keywordText,
             expandedRow && typeof expandedRow === "object" ? expandedRow.text : expandedRow,
-            expandedRow && typeof expandedRow === "object" ? expandedRow.declCandidates : []
+            expandedRow && typeof expandedRow === "object" ? expandedRow.declCandidates : [],
+            expandedRow && typeof expandedRow === "object" && expandedRow.provenance
+              ? expandedRow.provenance
+              : {
+                  status: expandedRow && Array.isArray(expandedRow.declCandidates) && expandedRow.declCandidates.length
+                    ? "editable"
+                    : "not_applicable",
+                  reasonCode: expandedRow && Array.isArray(expandedRow.declCandidates) && expandedRow.declCandidates.length
+                    ? ""
+                    : getTemplateNoDeclReason(
+                        expandedRow && typeof expandedRow === "object" ? expandedRow.text : expandedRow,
+                        false,
+                        false
+                      )
+                }
           ));
         }
         continue;
       }
-      const traceAwareValueEntry = valueEntry
-        ? remapTemplateDeclForExpandedPerform(valueEntry, ownerContext || sourceObj)
+      const canonicalValueEntry = valueEntry
+        ? ensureTemplateCanonicalValueEntry(sourceObj, valueEntry, objectIndexOneBased)
         : null;
+      const traceAwareValueEntry = canonicalValueEntry
+        ? remapTemplateDeclForExpandedPerform(canonicalValueEntry, ownerContext || sourceObj)
+        : null;
+      const declCandidates = traceAwareValueEntry
+        ? getTemplateEditableDeclCandidatesFromResolvedValue(traceAwareValueEntry)
+        : [];
+      const rawValue = String(valueEntry && valueEntry.value !== undefined ? valueEntry.value : "").trim();
+      const isDataOperand = Boolean(valueEntry && isTemplateDataValueEntry(sourceObj, valueEntry));
+      const renderedValue = isTemplateLiteralOrWildcard(rawValue)
+        ? rawValue
+        : (traceAwareValueEntry ? resolveTemplateValueRowFinalDesc(traceAwareValueEntry) : "");
       rows.push(createTemplateKeywordRow(
         keywordText,
-        traceAwareValueEntry ? resolveTemplateValueRowFinalDesc(traceAwareValueEntry) : "",
-        traceAwareValueEntry ? getTemplateEditableDeclCandidatesFromResolvedValue(traceAwareValueEntry) : []
+        renderedValue,
+        declCandidates,
+        {
+          status: declCandidates.length ? "editable" : "not_applicable",
+          reasonCode: declCandidates.length
+            ? ""
+            : getTemplateNoDeclReason(rawValue, isDataOperand, Boolean(valueEntry && !isDataOperand))
+        }
       ));
     }
 
     return rows;
   }
 
-  function getTemplateRowDeclCandidatesByLine(contextObj, tokenExpression) {
+  function orderTemplateDeclCandidates(list) {
+    const deduped = dedupeTemplateDecls(list);
+    return [
+      ...deduped.filter((decl) => !isTemplatePathDecl(decl)),
+      ...deduped.filter((decl) => isTemplatePathDecl(decl))
+    ];
+  }
+
+  function getTemplateRowProvenanceByLine(contextObj, tokenExpression) {
     const token = String(tokenExpression || "").trim();
-    const match = token.match(/^rows\.(keyword|finalDesc)$/i);
+    const match = token.match(/^rows(?:\[(\d+)\])?\.(keyword|finalDesc)$/i);
     if (!match || !contextObj || !Array.isArray(contextObj.rows)) {
       return null;
     }
 
-    const propertyName = String(match[1] || "").toLowerCase() === "keyword" ? "keyword" : "finalDesc";
-    const candidatesByLine = [];
-    for (const row of contextObj.rows) {
-      const rowDecls = getTemplateKeywordRowDecls(row);
-      const rowText = String(row && row[propertyName] !== undefined ? row[propertyName] : "");
+    const indexedRow = match[1] === undefined ? null : Number(match[1]);
+    const propertyName = String(match[2] || "").toLowerCase() === "keyword" ? "keyword" : "finalDesc";
+    const rows = indexedRow === null
+      ? contextObj.rows.map((row, index) => ({ row, index }))
+      : (contextObj.rows[indexedRow] ? [{ row: contextObj.rows[indexedRow], index: indexedRow }] : []);
+    if (!rows.length) {
+      return {
+        declCandidatesByLine: [[]],
+        statusByLine: ["unresolved"],
+        reasonCodeByLine: ["UNRESOLVED_TEMPLATE_PATH"],
+        sourcePathByLine: [token]
+      };
+    }
+
+    const declCandidatesByLine = [];
+    const statusByLine = [];
+    const reasonCodeByLine = [];
+    const sourcePathByLine = [];
+    for (const item of rows) {
+      const rowMeta = getTemplateKeywordRowProvenance(item.row);
+      const rowText = String(item.row && item.row[propertyName] !== undefined ? item.row[propertyName] : "");
       const textLines = splitTemplateTextLines(rowText);
       for (let lineIndex = 0; lineIndex < textLines.length; lineIndex += 1) {
-        candidatesByLine.push(rowDecls.slice());
+        declCandidatesByLine.push(orderTemplateDeclCandidates(rowMeta.declCandidates));
+        statusByLine.push(rowMeta.declCandidates.length ? "editable" : String(rowMeta.status || "not_applicable"));
+        reasonCodeByLine.push(rowMeta.declCandidates.length ? "" : String(rowMeta.reasonCode || "MISSING_PROVENANCE"));
+        sourcePathByLine.push(`rows[${item.index}].${propertyName}`);
       }
     }
-    return candidatesByLine;
+    return { declCandidatesByLine, statusByLine, reasonCodeByLine, sourcePathByLine };
   }
 
-  function buildTemplateCellDeclMeta(contextObj, placeholderToken) {
-    const candidatesByLine = getTemplateRowDeclCandidatesByLine(contextObj, placeholderToken);
-    if (!Array.isArray(candidatesByLine)) {
-      return null;
+  function collectTemplateConcretePathRecords(root, pathExpression) {
+    const segments = parseTemplatePathSegments(pathExpression);
+    if (!segments) {
+      return [];
     }
-    const allCandidates = [];
-    for (const lineCandidates of candidatesByLine) {
-      allCandidates.push(...lineCandidates);
+    const records = [];
+    const walk = (current, segmentIndex, concretePath, lineage) => {
+      if (segmentIndex >= segments.length) {
+        records.push({
+          value: current,
+          owner: lineage.length ? lineage[lineage.length - 1] : null,
+          lineage: lineage.slice(),
+          sourcePath: concretePath
+        });
+        return;
+      }
+
+      const segment = segments[segmentIndex];
+      if (Array.isArray(current)) {
+        if (typeof segment === "number") {
+          if (segment >= 0 && segment < current.length) {
+            walk(current[segment], segmentIndex + 1, `${concretePath}[${segment}]`, lineage.concat(current[segment]));
+          }
+          return;
+        }
+        for (let index = 0; index < current.length; index += 1) {
+          walk(current[index], segmentIndex, `${concretePath}[${index}]`, lineage.concat(current[index]));
+        }
+        return;
+      }
+
+      if (typeof segment === "number" || !current || typeof current !== "object") {
+        return;
+      }
+      const key = String(segment || "").trim();
+      const nextPath = concretePath ? `${concretePath}.${key}` : key;
+      const keyLower = key.toLowerCase();
+      if (
+        segmentIndex === segments.length - 1
+        && (keyLower === "finaldesc" || keyLower === "desc")
+        && !Object.prototype.hasOwnProperty.call(current, key)
+      ) {
+        records.push({
+          value: resolveTemplatePathValue(current, key),
+          owner: current,
+          lineage: lineage.concat(current),
+          sourcePath: nextPath
+        });
+        return;
+      }
+      if (!Object.prototype.hasOwnProperty.call(current, key)) {
+        return;
+      }
+      walk(current[key], segmentIndex + 1, nextPath, lineage.concat(current));
+    };
+    walk(root, 0, "", []);
+    return records;
+  }
+
+  function findTemplateRecordSourceObject(record) {
+    const lineage = record && Array.isArray(record.lineage) ? record.lineage : [];
+    for (let index = lineage.length - 1; index >= 0; index -= 1) {
+      const candidate = lineage[index];
+      if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+        continue;
+      }
+      if (
+        Object.prototype.hasOwnProperty.call(candidate, "value")
+        || Object.prototype.hasOwnProperty.call(candidate, "leftOperand")
+        || Object.prototype.hasOwnProperty.call(candidate, "rightOperand")
+        || Object.prototype.hasOwnProperty.call(candidate, "decl")
+        || Object.prototype.hasOwnProperty.call(candidate, "valueDecl")
+      ) {
+        return candidate;
+      }
+    }
+    return record && record.owner && typeof record.owner === "object" ? record.owner : null;
+  }
+
+  function getTemplateRecordOperandText(record, tokenExpression) {
+    const source = findTemplateRecordSourceObject(record);
+    const token = String(tokenExpression || "");
+    if (source && /leftOperand/i.test(token) && Object.prototype.hasOwnProperty.call(source, "leftOperand")) {
+      return String(source.leftOperand || "");
+    }
+    if (source && /rightOperand/i.test(token) && Object.prototype.hasOwnProperty.call(source, "rightOperand")) {
+      return String(source.rightOperand || "");
+    }
+    if (source && Object.prototype.hasOwnProperty.call(source, "value")) {
+      return String(source.value === undefined || source.value === null ? "" : source.value);
+    }
+    return String(record && record.value !== undefined && record.value !== null ? record.value : "");
+  }
+
+  function isTemplateRecordDataOperand(contextObj, tokenExpression, record) {
+    const token = String(tokenExpression || "").trim();
+    const source = findTemplateRecordSourceObject(record);
+    if (/\.[A-Za-z]*conditions(?:\[\d+\])?\./i.test(token) && /(?:left|right)Operand/i.test(token)) {
+      return true;
+    }
+    if (/^values\./i.test(token) && source) {
+      return isTemplateDataValueEntry(contextObj, source);
+    }
+    if (/^extras\.(?:performCall)\.(?:using|changing|tables)(?:\[\d+\])?/i.test(token)) {
+      return true;
+    }
+    if (/^extras\.(?:callFunction|callMethod)\.(?:exporting|importing|changing|tables|receiving)(?:\[\d+\])?/i.test(token)) {
+      return true;
+    }
+    return false;
+  }
+
+  function collectTemplateRecordDeclCandidates(contextObj, tokenExpression, record) {
+    const token = String(tokenExpression || "").trim();
+    const source = findTemplateRecordSourceObject(record);
+    const candidates = [];
+    const add = (value) => {
+      if (isDeclLikeObject(value)) {
+        candidates.push(value);
+      }
+    };
+
+    add(record && record.value);
+    add(record && record.owner);
+    if (source && /leftOperand/i.test(token)) {
+      add(source.leftOperandDecl);
+    } else if (source && /rightOperand/i.test(token)) {
+      add(source.rightOperandDecl);
+    } else if (source) {
+      add(source.valueDecl);
+      add(source.decl);
+      for (const originDecl of Array.isArray(source.originDecls) ? source.originDecls : []) {
+        add(originDecl);
+      }
+    }
+
+    const dataOperand = isTemplateRecordDataOperand(contextObj, token, record);
+    const operandText = getTemplateRecordOperandText(record, token);
+    const allowConditionSynthetic = /\.[A-Za-z]*conditions(?:\[\d+\])?\./i.test(token)
+      && /(?:left|right)Operand/i.test(token);
+    return orderTemplateDeclCandidates(candidates.filter((decl) => (
+      !isTemplatePathDecl(decl)
+      || allowConditionSynthetic
+      || (dataOperand && isTemplateIdentifierOperand(operandText))
+    )));
+  }
+
+  function resolveTemplateTokenProvenance(contextObj, tokenExpression, debugMeta) {
+    const token = String(tokenExpression || "").trim();
+    const rowMeta = getTemplateRowProvenanceByLine(contextObj, token);
+    if (rowMeta) {
+      return rowMeta;
+    }
+
+    const contextErrors = contextObj && Array.isArray(contextObj[TEMPLATE_CONTEXT_ERRORS_META_KEY_TEMPLATE])
+      ? contextObj[TEMPLATE_CONTEXT_ERRORS_META_KEY_TEMPLATE]
+      : [];
+    if (contextErrors.length) {
+      const contextError = contextErrors[0];
+      warnTemplateProvenanceOnce("RESOLUTION_ERROR", {
+        objectId: contextObj && contextObj.id,
+        line: contextObj && contextObj.lineStart,
+        template: debugMeta && debugMeta.templateKey,
+        range: debugMeta && debugMeta.rangeKey,
+        token,
+        error: contextError && contextError.error
+      });
+      return {
+        declCandidatesByLine: [[]],
+        statusByLine: ["error"],
+        reasonCodeByLine: ["RESOLUTION_ERROR"],
+        sourcePathByLine: [String(contextError && contextError.path || token)]
+      };
+    }
+
+    let resolvedValue;
+    let sourcePath = "";
+    let records = [];
+    try {
+      for (const candidate of buildTemplatePathCandidates(token)) {
+        const candidateValue = resolveTemplatePathValue(contextObj, candidate);
+        if (candidateValue === undefined) {
+          continue;
+        }
+        resolvedValue = candidateValue;
+        sourcePath = candidate;
+        records = collectTemplateConcretePathRecords(contextObj, candidate);
+        break;
+      }
+    } catch (err) {
+      warnTemplateProvenanceOnce("RESOLUTION_ERROR", {
+        objectId: contextObj && contextObj.id,
+        line: contextObj && contextObj.lineStart,
+        template: debugMeta && debugMeta.templateKey,
+        range: debugMeta && debugMeta.rangeKey,
+        token,
+        error: err
+      });
+      return {
+        declCandidatesByLine: [[]],
+        statusByLine: ["error"],
+        reasonCodeByLine: ["RESOLUTION_ERROR"],
+        sourcePathByLine: [token]
+      };
+    }
+
+    if (resolvedValue === undefined) {
+      return {
+        declCandidatesByLine: [[]],
+        statusByLine: ["unresolved"],
+        reasonCodeByLine: ["UNRESOLVED_TEMPLATE_PATH"],
+        sourcePathByLine: [token]
+      };
+    }
+
+    const resolvedLines = splitTemplateTextLines(stringifyTemplateResolvedValue(resolvedValue));
+    const recordList = records.length ? records : [{ value: resolvedValue, owner: null, lineage: [], sourcePath }];
+    const lineMeta = [];
+    for (const record of recordList) {
+      const declCandidates = collectTemplateRecordDeclCandidates(contextObj, sourcePath, record);
+      const operandText = getTemplateRecordOperandText(record, sourcePath);
+      const dataOperand = isTemplateRecordDataOperand(contextObj, sourcePath, record);
+      const schemaValue = !dataOperand && (
+        /(?:comparisonOperator|logicalConnector|\.type(?:\.|$)|\.form(?:\.|$)|\.program(?:\.|$)|\.name(?:\.|$)|\.fields(?:\.|$)|\.from(?:\.|$))/i.test(sourcePath)
+      );
+      const recordLines = splitTemplateTextLines(stringifyTemplateResolvedValue(record.value));
+      const repeatCount = Math.max(1, recordLines.length);
+      for (let lineIndex = 0; lineIndex < repeatCount; lineIndex += 1) {
+        lineMeta.push({
+          declCandidates,
+          status: declCandidates.length ? "editable" : "not_applicable",
+          reasonCode: declCandidates.length ? "" : getTemplateNoDeclReason(operandText, dataOperand, schemaValue),
+          sourcePath: String(record.sourcePath || sourcePath || token)
+        });
+      }
+    }
+    while (lineMeta.length < resolvedLines.length) {
+      lineMeta.push(lineMeta.length ? { ...lineMeta[lineMeta.length - 1] } : {
+        declCandidates: [],
+        status: "unresolved",
+        reasonCode: "MISSING_PROVENANCE",
+        sourcePath: sourcePath || token
+      });
+    }
+    if (lineMeta.length > resolvedLines.length) {
+      lineMeta.length = resolvedLines.length;
     }
     return {
-      declCandidates: dedupeTemplateDecls(allCandidates),
-      declCandidatesByLine: candidatesByLine.map((decls) => dedupeTemplateDecls(decls))
+      declCandidatesByLine: lineMeta.map((item) => item.declCandidates),
+      statusByLine: lineMeta.map((item) => item.status),
+      reasonCodeByLine: lineMeta.map((item) => item.reasonCode),
+      sourcePathByLine: lineMeta.map((item) => item.sourcePath)
+    };
+  }
+
+  function parseTemplatePlaceholderTokens(rawText) {
+    const text = String(rawText === undefined || rawText === null ? "" : rawText);
+    const tokens = [];
+    const regex = /\{([^{}]+)\}/g;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      tokens.push({
+        token: String(match[1] || "").trim(),
+        start: match.index,
+        end: regex.lastIndex,
+        full: match[0]
+      });
+    }
+    return tokens;
+  }
+
+  function combineTemplateLineProvenance(lineMeta) {
+    const list = Array.isArray(lineMeta) ? lineMeta : [];
+    const candidates = [];
+    const paths = [];
+    let status = "not_applicable";
+    let reasonCode = "STATIC_TEXT";
+    for (const item of list) {
+      candidates.push(...(Array.isArray(item && item.declCandidates) ? item.declCandidates : []));
+      const path = String(item && item.sourcePath || "").trim();
+      if (path && !paths.includes(path)) {
+        paths.push(path);
+      }
+      if (item && item.status === "editable") {
+        status = "editable";
+        reasonCode = "";
+      } else if (status !== "editable" && item && item.status) {
+        status = String(item.status);
+        reasonCode = String(item.reasonCode || reasonCode);
+      }
+    }
+    const orderedCandidates = orderTemplateDeclCandidates(candidates);
+    if (orderedCandidates.length) {
+      status = "editable";
+      reasonCode = "";
+    }
+    return {
+      declCandidates: orderedCandidates,
+      status,
+      reasonCode,
+      sourcePath: paths.join(", ")
+    };
+  }
+
+  function buildTemplateCellDeclMeta(contextObj, rawText, debugMeta) {
+    const text = String(rawText === undefined || rawText === null ? "" : rawText);
+    const placeholders = parseTemplatePlaceholderTokens(text);
+    if (!placeholders.length) {
+      return {
+        declCandidates: [],
+        declCandidatesByLine: [[]],
+        status: "not_applicable",
+        reasonCode: "STATIC_TEXT",
+        sourcePath: "",
+        statusByLine: ["not_applicable"],
+        reasonCodeByLine: ["STATIC_TEXT"],
+        sourcePathByLine: [""]
+      };
+    }
+
+    const lines = [[]];
+    let currentLine = 0;
+    let cursor = 0;
+    const advanceStaticLines = (staticText) => {
+      const count = splitTemplateTextLines(staticText).length - 1;
+      for (let index = 0; index < count; index += 1) {
+        currentLine += 1;
+        if (!lines[currentLine]) {
+          lines[currentLine] = [];
+        }
+      }
+    };
+
+    for (const placeholder of placeholders) {
+      advanceStaticLines(text.slice(cursor, placeholder.start));
+      const tokenMeta = resolveTemplateTokenProvenance(contextObj, placeholder.token, debugMeta);
+      let resolvedText = "";
+      try {
+        resolvedText = stringifyTemplateResolvedValue(resolveTemplatePlaceholderValue(contextObj, placeholder.token));
+      } catch (err) {
+        warnTemplateProvenanceOnce("RESOLUTION_ERROR", {
+          objectId: contextObj && contextObj.id,
+          line: contextObj && contextObj.lineStart,
+          template: debugMeta && debugMeta.templateKey,
+          range: debugMeta && debugMeta.rangeKey,
+          token: placeholder.token,
+          error: err
+        });
+      }
+      const resolvedLineCount = Math.max(1, splitTemplateTextLines(resolvedText).length);
+      for (let lineIndex = 0; lineIndex < resolvedLineCount; lineIndex += 1) {
+        const candidatesByLine = tokenMeta.declCandidatesByLine || [];
+        const statusByLine = tokenMeta.statusByLine || [];
+        const reasonByLine = tokenMeta.reasonCodeByLine || [];
+        const pathByLine = tokenMeta.sourcePathByLine || [];
+        const selectedIndex = Math.max(0, Math.min(Math.max(0, candidatesByLine.length - 1), lineIndex));
+        lines[currentLine].push({
+          declCandidates: candidatesByLine[selectedIndex] || [],
+          status: statusByLine[selectedIndex] || "unresolved",
+          reasonCode: reasonByLine[selectedIndex] !== undefined
+            ? String(reasonByLine[selectedIndex] || "")
+            : "MISSING_PROVENANCE",
+          sourcePath: pathByLine[selectedIndex] || placeholder.token
+        });
+        if (lineIndex < resolvedLineCount - 1) {
+          currentLine += 1;
+          if (!lines[currentLine]) {
+            lines[currentLine] = [];
+          }
+        }
+      }
+      cursor = placeholder.end;
+    }
+    advanceStaticLines(text.slice(cursor));
+
+    const combinedByLine = lines.map((line) => combineTemplateLineProvenance(line));
+    const allCandidates = [];
+    for (const item of combinedByLine) {
+      allCandidates.push(...item.declCandidates);
+    }
+    const first = combinedByLine[0] || {
+      status: "unresolved",
+      reasonCode: "MISSING_PROVENANCE",
+      sourcePath: ""
+    };
+    return {
+      declCandidates: orderTemplateDeclCandidates(allCandidates),
+      declCandidatesByLine: combinedByLine.map((item) => item.declCandidates),
+      status: first.status,
+      reasonCode: first.reasonCode,
+      sourcePath: first.sourcePath,
+      statusByLine: combinedByLine.map((item) => item.status),
+      reasonCodeByLine: combinedByLine.map((item) => item.reasonCode),
+      sourcePathByLine: combinedByLine.map((item) => item.sourcePath)
     };
   }
 
   function buildTemplateContextObject(obj, objectIndexOneBased) {
     const objectIndex = Number(objectIndexOneBased) || 1;
-    const basePathParts = ["objects", `object[${objectIndex}]`];
+    const basePathParts = [getTemplateCanonicalObjectPathBase(obj)];
+    const normalizationErrors = [];
 
     const cloneRecursive = (value, keyHint, pathParts, ownerContext) => {
       if (value === null || value === undefined) {
@@ -1358,7 +2169,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       }
 
       if (Array.isArray(value)) {
-        const itemTag = getTemplateArrayItemTagName(keyHint);
+        const itemTag = /conditions$/i.test(String(keyHint || ""))
+          ? "clause"
+          : getTemplateArrayItemTagName(keyHint);
         return value.map((item, index) => cloneRecursive(
           item,
           itemTag,
@@ -1374,7 +2187,16 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       const nextOwnerContext = (typeof isAbapStatementObject === "function" && isAbapStatementObject(value))
         ? value
         : ownerContext;
-      const normalized = normalizeTemplateEntryForPath(value, keyHint, pathParts, nextOwnerContext);
+      const normalized = normalizeTemplateEntryForPath(
+        value,
+        keyHint,
+        pathParts,
+        nextOwnerContext,
+        (error) => normalizationErrors.push({
+          path: pathParts.join("/"),
+          error
+        })
+      );
       if (!normalized || typeof normalized !== "object") {
         return normalized;
       }
@@ -1396,7 +2218,38 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     const context = cloneRecursive(obj, "object", basePathParts, obj);
     if (context && typeof context === "object" && !Array.isArray(context)) {
-      context.rows = buildTemplateKeywordRows(obj, obj);
+      const stack = [context];
+      const seen = new Set();
+      while (stack.length) {
+        const current = stack.pop();
+        if (!current || typeof current !== "object" || seen.has(current)) {
+          continue;
+        }
+        seen.add(current);
+        if (isTemplatePathDecl(current)) {
+          attachTemplateSyntheticDeclAliases(current, objectIndex);
+        }
+        if (Array.isArray(current)) {
+          for (const item of current) {
+            stack.push(item);
+          }
+          continue;
+        }
+        for (const key of Object.keys(current)) {
+          stack.push(current[key]);
+        }
+      }
+      Object.defineProperty(context, TEMPLATE_OBJECT_INDEX_META_KEY_TEMPLATE, {
+        configurable: true,
+        enumerable: false,
+        value: objectIndex
+      });
+      Object.defineProperty(context, TEMPLATE_CONTEXT_ERRORS_META_KEY_TEMPLATE, {
+        configurable: true,
+        enumerable: false,
+        value: normalizationErrors.slice()
+      });
+      context.rows = buildTemplateKeywordRows(obj, obj, objectIndex);
     }
     return context;
   }
@@ -2065,6 +2918,15 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       // Per-line provenance is immutable; share it across the 20-cell template ranges.
       cloned.declCandidatesByLine = meta.declCandidatesByLine;
     }
+    if (Array.isArray(meta.statusByLine)) {
+      cloned.statusByLine = meta.statusByLine;
+    }
+    if (Array.isArray(meta.reasonCodeByLine)) {
+      cloned.reasonCodeByLine = meta.reasonCodeByLine;
+    }
+    if (Array.isArray(meta.sourcePathByLine)) {
+      cloned.sourcePathByLine = meta.sourcePathByLine;
+    }
     return cloned;
   }
 
@@ -2077,6 +2939,17 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       ? Math.max(0, Math.min(candidatesByLine.length - 1, Number(lineIndex) || 0))
       : 0;
     cell.meta.declCandidates = dedupeTemplateDecls(candidatesByLine[selectedIndex] || []);
+    if (Array.isArray(cell.meta.statusByLine)) {
+      cell.meta.status = String(cell.meta.statusByLine[selectedIndex] || "unresolved");
+    }
+    if (Array.isArray(cell.meta.reasonCodeByLine)) {
+      cell.meta.reasonCode = cell.meta.reasonCodeByLine[selectedIndex] !== undefined
+        ? String(cell.meta.reasonCodeByLine[selectedIndex] || "")
+        : "MISSING_PROVENANCE";
+    }
+    if (Array.isArray(cell.meta.sourcePathByLine)) {
+      cell.meta.sourcePath = String(cell.meta.sourcePathByLine[selectedIndex] || "");
+    }
   }
 
   function cloneTemplateMatrixCell(cell) {
@@ -2289,7 +3162,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       const rawText = hasText ? String(cfg.text === undefined || cfg.text === null ? "" : cfg.text) : "";
       const textMeta = hasText ? resolveTemplateText(rawText, obj) : null;
       const placeholderToken = hasText ? parseSingleTemplatePlaceholderToken(rawText) : "";
-      const declMeta = placeholderToken ? buildTemplateCellDeclMeta(obj, placeholderToken) : null;
+      const declMeta = hasText ? buildTemplateCellDeclMeta(obj, rawText, {
+        templateKey: modelTemplateKey,
+        rangeKey: String(entry.rangeKey || "")
+      }) : null;
       const cellMeta = hasText
         ? {
             rangeKey: String(entry.rangeKey || ""),
@@ -3388,14 +4264,62 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         : String(cellMeta.rawText);
       const token = String(cellMeta.placeholderToken || "").trim();
 
-      const getDescOverrideEntrySafe = (declKey) => {
-        if (!declKey) {
+      const getDeclLookupKeysSafe = (decl) => {
+        const keys = [];
+        const pushKey = (value) => {
+          const key = String(value || "").trim();
+          if (key && !keys.includes(key)) {
+            keys.push(key);
+          }
+        };
+        if (typeof getDeclOverrideLookupKeys === "function") {
+          try {
+            for (const key of getDeclOverrideLookupKeys(decl)) {
+              pushKey(key);
+            }
+          } catch (err) {
+            warnTemplateProvenanceOnce("decl-lookup-keys", {
+              objectId: obj && obj.id,
+              line: obj && obj.lineStart,
+              template: templateKey,
+              range: rangeKey,
+              token,
+              error: err
+            });
+          }
+        }
+        pushKey(typeof getDeclOverrideStorageKey === "function" ? getDeclOverrideStorageKey(decl) : "");
+        for (const key of Array.isArray(decl && decl.overrideLookupKeys) ? decl.overrideLookupKeys : []) {
+          pushKey(key);
+        }
+        return keys;
+      };
+
+      const getDescOverrideEntrySafe = (decl, lookupKeys) => {
+        if (!decl || typeof decl !== "object") {
           return null;
         }
         if (typeof getDescOverrideEntry === "function") {
-          return getDescOverrideEntry(declKey);
+          try {
+            return getDescOverrideEntry(decl);
+          } catch (err) {
+            warnTemplateProvenanceOnce("desc-override-read", {
+              objectId: obj && obj.id,
+              line: obj && obj.lineStart,
+              template: templateKey,
+              range: rangeKey,
+              token,
+              error: err
+            });
+          }
         }
-        const rawOverride = state && state.descOverrides ? state.descOverrides[declKey] : null;
+        let rawOverride = null;
+        for (const key of Array.isArray(lookupKeys) ? lookupKeys : []) {
+          if (state && state.descOverrides && Object.prototype.hasOwnProperty.call(state.descOverrides, key)) {
+            rawOverride = state.descOverrides[key];
+            break;
+          }
+        }
         if (rawOverride === undefined || rawOverride === null) {
           return null;
         }
@@ -3421,7 +4345,15 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
           if (!targetDeclCandidates.length) {
             targetDeclCandidates = resolveTemplateEditableDeclCandidatesFromToken(templateContextObj, token);
           }
-        } catch {
+        } catch (err) {
+          warnTemplateProvenanceOnce("RESOLUTION_ERROR", {
+            objectId: obj && obj.id,
+            line: obj && obj.lineStart,
+            template: templateKey,
+            range: rangeKey,
+            token,
+            error: err
+          });
           targetDeclCandidates = [];
         }
       }
@@ -3434,18 +4366,31 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
           continue;
         }
         let declKey = "";
+        let lookupKeys = [];
         try {
-          declKey = typeof getDeclOverrideStorageKey === "function" ? getDeclOverrideStorageKey(decl) : "";
-        } catch {
+          lookupKeys = getDeclLookupKeysSafe(decl);
+          declKey = lookupKeys.length
+            ? lookupKeys[0]
+            : (typeof getDeclOverrideStorageKey === "function" ? getDeclOverrideStorageKey(decl) : "");
+        } catch (err) {
+          warnTemplateProvenanceOnce("decl-key", {
+            objectId: obj && obj.id,
+            line: obj && obj.lineStart,
+            template: templateKey,
+            range: rangeKey,
+            token,
+            error: err
+          });
           declKey = "";
         }
-        const descEntry = getDescOverrideEntrySafe(declKey);
+        const descEntry = getDescOverrideEntrySafe(decl, lookupKeys);
         const techName = typeof getDeclTechName === "function" ? getDeclTechName(decl) : String(decl && decl.name ? decl.name : "");
         const scopeName = String(decl && decl.scopeLabel ? decl.scopeLabel : "").trim();
         const label = scopeName ? (techName || "(unknown)") + " @ " + scopeName : (techName || "(unknown)");
         modalDeclCandidates.push({
           decl,
           declKey,
+          lookupKeys,
           label,
           currentDesc: String(descEntry && descEntry.text ? descEntry.text : ""),
           skipNormalize: Boolean(descEntry && descEntry.noNormalize),
@@ -3497,6 +4442,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         },
         descPart: {
           token,
+          status: String(cellMeta.status || "unresolved"),
+          reasonCode: String(cellMeta.reasonCode || "MISSING_PROVENANCE"),
+          sourcePath: String(cellMeta.sourcePath || token),
           declCandidates: modalDeclCandidates,
           onSaveDesc: ({ decl, text: nextDesc, skipNormalize }) => {
             if (!decl || typeof decl !== "object") {
@@ -3505,16 +4453,21 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
             if (typeof getDeclOverrideStorageKey !== "function" || typeof saveDescOverrides !== "function") {
               return { ok: false, error: "Description override helpers are unavailable." };
             }
-            const declKey = getDeclOverrideStorageKey(decl);
+            const lookupKeys = getDeclLookupKeysSafe(decl);
+            const declKey = lookupKeys.length ? lookupKeys[0] : getDeclOverrideStorageKey(decl);
             if (!declKey) {
               return { ok: false, error: "Decl key is unavailable." };
             }
             const raw = String(nextDesc === undefined || nextDesc === null ? "" : nextDesc);
             const trimmed = raw.trim();
             const stored = skipNormalize ? trimmed : stripDeclCategoryPrefix(trimmed);
-            if (!stored) {
-              delete state.descOverrides[declKey];
-            } else {
+            for (const key of lookupKeys.length ? lookupKeys : [declKey]) {
+              delete state.descOverrides[key];
+              if (state.descOverridesLegacy && typeof state.descOverridesLegacy === "object") {
+                delete state.descOverridesLegacy[key];
+              }
+            }
+            if (stored) {
               state.descOverrides[declKey] = skipNormalize ? { text: stored, noNormalize: true } : stored;
             }
             const saved = saveDescOverrides();

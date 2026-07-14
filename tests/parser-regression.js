@@ -152,6 +152,182 @@ function testChainedDataStatementKeepsCommaInsideTemplateLiteral() {
   assert.strictEqual(getValue(dataObjects[1].values, "value"), "|C|");
 }
 
+function testChainedConstantsKeepItemCommentsWithoutHeaderLeak() {
+  const code = [
+    "* Hằng số dùng chung",
+    "CONSTANTS: gc_true TYPE abap_bool VALUE abap_true,  \"Giá trị boolean đúng",
+    "  gc_status_empty TYPE string VALUE 'EMPTY'.    \"Trạng thái chưa có khách",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = findObjects(flattenObjects(result.objects), "CONSTANTS");
+
+  assert.strictEqual(objects.length, 2, "Expected two chained CONSTANTS objects.");
+  assert.strictEqual(objects[0].comment, "Giá trị boolean đúng");
+  assert.strictEqual(objects[1].comment, "Trạng thái chưa có khách");
+  assert.strictEqual(getValueEntry(objects[0].values, "name").codeDesc, "Giá trị boolean đúng");
+  assert.strictEqual(getValueEntry(objects[1].values, "name").codeDesc, "Trạng thái chưa có khách");
+}
+
+function testChainedConstantsUseSingleInternalCommentForNextItem() {
+  const code = [
+    "* Hằng số dùng chung",
+    "CONSTANTS:",
+    "* Giá trị boolean đúng",
+    "  gc_true TYPE abap_bool VALUE abap_true,",
+    "  gc_status_empty TYPE string VALUE 'EMPTY'.    \"Trạng thái chưa có khách",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = findObjects(flattenObjects(result.objects), "CONSTANTS");
+
+  assert.strictEqual(objects.length, 2, "Expected two chained CONSTANTS objects.");
+  assert.strictEqual(objects[0].comment, "Giá trị boolean đúng");
+  assert.strictEqual(objects[1].comment, "Trạng thái chưa có khách");
+  assert.strictEqual(getValueEntry(objects[0].values, "name").codeDesc, "Giá trị boolean đúng");
+  assert.strictEqual(getValueEntry(objects[1].values, "name").codeDesc, "Trạng thái chưa có khách");
+}
+
+function testGenericChainedStatementUsesPerItemComment() {
+  const code = [
+    "* Header must not describe a chained item",
+    "CLEAR:",
+    "* Clear first target",
+    "  lv_first,",
+    "  lv_second. \"Clear second target",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = findObjects(flattenObjects(result.objects), "CLEAR");
+
+  assert.strictEqual(objects.length, 2, "Expected CLEAR chain to use the generic chained splitter.");
+  assert.strictEqual(getValue(objects[0].values, "target"), "lv_first");
+  assert.strictEqual(getValue(objects[1].values, "target"), "lv_second");
+  assert.strictEqual(objects[0].comment, "Clear first target");
+  assert.strictEqual(objects[1].comment, "Clear second target");
+}
+
+function testChainedCommentsRejectBlocksGapsAndUnfinishedItems() {
+  const code = [
+    "DATA:",
+    "* block line one",
+    "* block line two",
+    "  lv_block TYPE i,",
+    "* separated comment",
+    "",
+    "  lv_gap TYPE i,",
+    "* separated by decoration",
+    "* -----------------------",
+    "  lv_decorated TYPE i,",
+    "  lv_unfinished TYPE",
+    "* comment inside unfinished item",
+    "    i.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = findObjects(flattenObjects(result.objects), "DATA");
+
+  assert.deepStrictEqual(
+    objects.map((obj) => obj.comment),
+    ["", "", "", ""],
+    "Comment blocks, gaps, decorative gaps, and comments inside an unfinished item must not describe chained items."
+  );
+}
+
+function testChainedStructCommentsUseSegmentMetadata() {
+  const code = [
+    "* DATA header must not become the root description",
+    "DATA:",
+    "* Data root description",
+    "  BEGIN OF ls_data,",
+    "  field_inline TYPE string, \"Inline data field",
+    "* Internal data field",
+    "  field_internal TYPE i,",
+    "  END OF ls_data.",
+    "* TYPES header must not become the root description",
+    "TYPES:",
+    "* Type root description",
+    "  BEGIN OF ty_data,",
+    "  field_inline TYPE string, \"Inline type field",
+    "* Internal type field",
+    "  field_internal TYPE i,",
+    "  END OF ty_data.",
+    "DATA ls_typed TYPE ty_data.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+  const dataObjects = findObjects(objects, "DATA");
+  const typeObjects = findObjects(objects, "TYPES");
+  const declByName = new Map(result.decls.map((decl) => [String(decl.name || "").toUpperCase(), decl]));
+
+  assert.strictEqual(dataObjects[0].comment, "Data root description");
+  assert.strictEqual(dataObjects[1].comment, "Inline data field");
+  assert.strictEqual(dataObjects[2].comment, "Internal data field");
+  assert.strictEqual(typeObjects[0].comment, "Type root description");
+  assert.strictEqual(typeObjects[1].comment, "Inline type field");
+  assert.strictEqual(typeObjects[2].comment, "Internal type field");
+  assert.strictEqual(declByName.get("LS_DATA").comment, "Data root description");
+  assert.strictEqual(declByName.get("LS_DATA-FIELD_INLINE").comment, "Inline data field");
+  assert.strictEqual(declByName.get("LS_DATA-FIELD_INTERNAL").comment, "Internal data field");
+  assert.strictEqual(declByName.get("TY_DATA").comment, "Type root description");
+  assert.strictEqual(declByName.get("LS_TYPED-FIELD_INLINE").comment, "Inline type field");
+  assert.strictEqual(declByName.get("LS_TYPED-FIELD_INTERNAL").comment, "Internal type field");
+}
+
+function testNonChainedStructKeepsSingleLeadingComment() {
+  const code = [
+    "* Non-chain data root description",
+    "DATA BEGIN OF ls_data,",
+    "  field_one TYPE string,",
+    "  END OF ls_data.",
+    "* Non-chain type root description",
+    "TYPES BEGIN OF ty_data,",
+    "  field_one TYPE string,",
+    "  END OF ty_data.",
+    "DATA ls_typed TYPE ty_data.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const declByName = new Map(result.decls.map((decl) => [String(decl.name || "").toUpperCase(), decl]));
+  const dataRoot = declByName.get("LS_DATA");
+  const dataField = declByName.get("LS_DATA-FIELD_ONE");
+  const typeRoot = declByName.get("TY_DATA");
+  const typedField = declByName.get("LS_TYPED-FIELD_ONE");
+
+  assert(dataRoot && dataField && typeRoot && typedField, "Expected non-chain DATA/TYPES struct declarations.");
+  assert.strictEqual(dataRoot.comment, "Non-chain data root description");
+  assert.strictEqual(dataField.structComment, "Non-chain data root description");
+  assert.strictEqual(typeRoot.comment, "Non-chain type root description");
+  assert.strictEqual(typedField.structTypeComment, "Non-chain type root description");
+}
+
+function testNonChainedStructKeepsLeadingCommentBlock() {
+  const code = [
+    "* Non-chain data root",
+    "* second documentation line",
+    "DATA BEGIN OF ls_data_block,",
+    "  field_one TYPE string,",
+    "  END OF ls_data_block.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const declByName = new Map(result.decls.map((decl) => [String(decl.name || "").toUpperCase(), decl]));
+  const dataRoot = declByName.get("LS_DATA_BLOCK");
+  const dataField = declByName.get("LS_DATA_BLOCK-FIELD_ONE");
+
+  assert(dataRoot && dataField, "Expected the non-chain struct declaration and field.");
+  assert.strictEqual(dataRoot.comment, "Non-chain data root second documentation line");
+  assert.strictEqual(dataField.structComment, "Non-chain data root second documentation line");
+}
+
 function testBacktickLiteralKeepsStatementAndInlineComment() {
   const result = parse('DATA lv_text TYPE string VALUE `A.B "C`. DATA lv_other TYPE string.\n');
   const objects = flattenObjects(result.objects);
@@ -1090,6 +1266,13 @@ function run() {
   testChainedDataStatementSingleLine();
   testChainedDataStatementAcrossLines();
   testChainedDataStatementKeepsCommaInsideTemplateLiteral();
+  testChainedConstantsKeepItemCommentsWithoutHeaderLeak();
+  testChainedConstantsUseSingleInternalCommentForNextItem();
+  testGenericChainedStatementUsesPerItemComment();
+  testChainedCommentsRejectBlocksGapsAndUnfinishedItems();
+  testChainedStructCommentsUseSegmentMetadata();
+  testNonChainedStructKeepsSingleLeadingComment();
+  testNonChainedStructKeepsLeadingCommentBlock();
   testBacktickLiteralKeepsStatementAndInlineComment();
   testInlineCommentInsideSingleQuote();
   testInlineCommentInsideTemplate();

@@ -53,6 +53,22 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     );
   }
 
+  function attachOutputSyntheticDeclAliases(value, ownerContext) {
+    if (!value || typeof value !== "object") {
+      return value;
+    }
+    const objectIndex = Number(ownerContext && ownerContext.__abapTemplateObjectIndex) || 0;
+    if (objectIndex <= 0 || typeof attachTemplateSyntheticDeclAliases !== "function") {
+      return value;
+    }
+    for (const key of ["decl", "valueDecl", "leftOperandDecl", "rightOperandDecl"]) {
+      if (value[key] && typeof value[key] === "object") {
+        attachTemplateSyntheticDeclAliases(value[key], objectIndex);
+      }
+    }
+    return value;
+  }
+
   function normalizeEntryObjectForPath(value, keyHint, pathParts, ownerContext) {
     if (!isPlainObjectRecord(value)) {
       return value;
@@ -113,7 +129,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       }
     }
 
-    return next;
+    return attachOutputSyntheticDeclAliases(next, ownerContext);
   }
 
   function walkObjects(roots, visit) {
@@ -1347,13 +1363,14 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
     const source = getDeclSourceContextFromObject(obj);
     const entryName = String(entry.name || "value").trim() || "value";
-    return ensureEntryDeclWithSynthetic(entry, {
+    const normalized = ensureEntryDeclWithSynthetic(entry, {
       pathKey: buildPathKeyFromParts([buildObjectPathBase(obj), "values", entryName]),
       file: source.file,
       lineStart: source.lineStart,
       raw: source.raw,
       role: "value"
     });
+    return attachOutputSyntheticDeclAliases(normalized, obj);
   }
 
   function buildRenderableValueEntries(obj) {
@@ -1451,7 +1468,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       role: `${extrasScope || "extras"}:${sectionName || "entry"}:value`,
       nameHint: sectionName || "value"
     });
-    return next;
+    return attachOutputSyntheticDeclAliases(next, obj);
   }
 
   function renderAssignmentTable(title, list, context) {
@@ -1640,6 +1657,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
           lineStart: source.lineStart,
           raw: source.raw
         });
+        attachOutputSyntheticDeclAliases(normalizedClause, obj);
         leftRef = normalizedClause && normalizedClause.leftOperandRef ? String(normalizedClause.leftOperandRef) : leftRef;
         rightRef = normalizedClause && normalizedClause.rightOperandRef ? String(normalizedClause.rightOperandRef) : rightRef;
         if (!effectiveLeftDecl) {

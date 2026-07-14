@@ -255,13 +255,26 @@
         continue;
       }
 
+      const isChainedStructStatement = isChainedStatementStart(statement.raw || "", startKeyword);
+      const structLineEntries = isChainedStructStatement
+        ? splitChainedStatementWithMeta(statement, startKeyword).map((segment) => ({
+            line: segment && segment.lineStart ? segment.lineStart : statement.lineStart,
+            code: segment && segment.raw
+              ? String(segment.raw).replace(new RegExp(`^\\s*${escapeRegExp(startKeyword)}\\s+`, "i"), "")
+              : "",
+            comment: segment && segment.comment ? segment.comment : ""
+          }))
+        : lineEntries;
+
       const scopeId = getStatementScopeId(statement.lineStart, procedureBlocks, classBlocks);
       const scopeInfo = scopeInfoById.get(scopeId) || buildFallbackScopeInfo(scopeId);
 
       const defs = parseStructDefsFromLineEntries({
         kind: startKeyword,
-        lineEntries,
-        leadingComments: Array.isArray(statement.leadingComments) ? statement.leadingComments : [],
+        lineEntries: structLineEntries,
+        leadingComments: isChainedStructStatement
+          ? []
+          : (Array.isArray(statement.leadingComments) ? statement.leadingComments : []),
         fileName: fileName || "",
         scopeId,
         scopeInfo
@@ -288,7 +301,9 @@
     const defs = [];
     let current = null;
     const stack = [];
-    const leadingText = Array.isArray(leadingComments) ? leadingComments.filter(Boolean).join(" ").trim() : "";
+    const leadingText = Array.isArray(leadingComments)
+      ? leadingComments.filter(Boolean).join(" ").trim()
+      : "";
 
     function currentNestedPrefix() {
       if (stack.length <= 1) {

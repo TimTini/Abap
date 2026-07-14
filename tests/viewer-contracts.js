@@ -601,8 +601,10 @@ async function assertTemplateRowDescriptionKeepsNestedPerformTrace() {
   const literalTable = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="PERFORM"]'))
     .find((table) => getTemplateTableRows(table).some((row) => row.includes("frm_literal")));
   assert(literalTable, "Expected the literal PERFORM template table.");
-  modal = await openTemplateCellDescriptionTab(window, findTemplateCellByText(literalTable, "'X'"));
-  assert(String(modal.textContent || "").includes("Khong tim thay decl cho o nay."), "Expected literal-only rows to remain non-editable.");
+  const literalCell = findTemplateCellByText(literalTable, "'X'");
+  assert.strictEqual(literalCell && literalCell.__templateCellMeta && literalCell.__templateCellMeta.reasonCode, "LITERAL_NO_DECL");
+  modal = await openTemplateCellDescriptionTab(window, literalCell);
+  assert(!String(modal.textContent || "").includes("Khong tim thay decl cho o nay."), "Expected the generic missing-declaration message to be replaced.");
   const literalTextarea = modal.querySelector("textarea.template-config-json");
   assert(literalTextarea && literalTextarea.disabled, "Expected the literal Description textarea to stay disabled.");
 
@@ -640,6 +642,539 @@ async function assertTemplateRowDescriptionTargetsExactConditionDecls() {
   assert(findTemplateCellByText(loopTable, "C edited = D"), "Expected saving the selected condition target to refresh only that operand.");
 
   dom.window.close();
+}
+
+async function assertTemplateAppendUnboundOperandsUseCanonicalTargets() {
+  const dom = await renderFixture("APPEND a TO b.");
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
+  const legacySourceKey = "PATH:OBJECTS/OBJECT[1]/VALUES/WHAT/DECL:A";
+  state.descOverrides[legacySourceKey] = "Legacy A";
+  runtime.api.renderOutput();
+  runtime.api.renderTemplatePreview();
+  assert(String(els.output.textContent || "").includes("Legacy A"), "Expected Output to read the legacy PATH_DECL alias before migration.");
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  let appendTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="APPEND"]');
+  assert(appendTable, "Expected the APPEND template table.");
+  let sourceModal = await openTemplateCellDescriptionTab(window, findTemplateCellByText(appendTable, "Legacy A"));
+  assert(!String(sourceModal.textContent || "").includes("Khong tim thay decl cho o nay."), "Expected unbound APPEND source a to stay editable.");
+  assert(String(sourceModal.textContent || "").includes("a"), "Expected APPEND source cell to target a.");
+  assert(!String(sourceModal.textContent || "").includes("b @"), "Expected APPEND source cell not to target b.");
+
+  const sourceKey = "PATH:OBJECT:1/VALUES/WHAT/DECL:A";
+  const targetKey = "PATH:OBJECT:1/VALUES/TO/DECL:B";
+  await saveTemplateCellDescription(window, sourceModal, "Source A");
+  assert.strictEqual(String(state.descOverrides[sourceKey] || ""), "Source A", "Expected APPEND source to save under the canonical Output PATH_DECL key.");
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(state.descOverrides, legacySourceKey), false, "Expected canonical Save to remove the legacy Template alias.");
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(state.descOverrides, targetKey), false, "Expected editing a not to modify b.");
+  assert(String(els.output.textContent || "").includes("Source A"), "Expected Output to refresh the canonical source override.");
+
+  appendTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="APPEND"]');
+  assert(findTemplateCellByText(appendTable, "Source A"), "Expected Template to refresh the APPEND source override.");
+  sourceModal = await openTemplateCellDescriptionTab(window, findTemplateCellByText(appendTable, "Source A"));
+  await saveTemplateCellDescription(window, sourceModal, "");
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(state.descOverrides, sourceKey), false, "Expected clearing a to remove its canonical override.");
+
+  state.descOverrides[legacySourceKey] = "Legacy clear";
+  runtime.api.renderTemplatePreview();
+  appendTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="APPEND"]');
+  sourceModal = await openTemplateCellDescriptionTab(window, findTemplateCellByText(appendTable, "Legacy clear"));
+  await saveTemplateCellDescription(window, sourceModal, "");
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(state.descOverrides, legacySourceKey), false, "Expected Clear to remove the legacy Template alias without resurfacing it.");
+
+  appendTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="APPEND"]');
+  const targetModal = await openTemplateCellDescriptionTab(window, findTemplateCellByText(appendTable, "b"));
+  assert(String(targetModal.textContent || "").includes("b"), "Expected APPEND target cell to target b.");
+  await saveTemplateCellDescription(window, targetModal, "Target B");
+  assert.strictEqual(String(state.descOverrides[targetKey] || ""), "Target B", "Expected APPEND target to save under its own canonical Output PATH_DECL key.");
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(state.descOverrides, sourceKey), false, "Expected editing b not to recreate a.");
+
+  dom.window.close();
+}
+
+async function assertLegacyPathAliasUsesTemplateIndexAfterPerformExpansion() {
+  const source = [
+    "PERFORM f.",
+    "APPEND a TO b.",
+    "FORM f.",
+    "  CLEAR x.",
+    "ENDFORM."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
+  const legacySourceKey = "PATH:OBJECTS/OBJECT[3]/VALUES/WHAT/DECL:A";
+
+  const templateItems = typeof window.getRenderableObjectListForTemplate === "function"
+    ? window.getRenderableObjectListForTemplate()
+    : [];
+  const appendIndex = templateItems.findIndex((item) => item && item.obj && item.obj.objectType === "APPEND");
+  assert.strictEqual(appendIndex, 2, "Expected expanded FORM content to shift APPEND to Template object 3.");
+
+  state.descOverrides[legacySourceKey] = "Legacy shifted A";
+  runtime.api.renderOutput();
+  runtime.api.renderTemplatePreview();
+
+  assert(
+    String(els.output.textContent || "").includes("Legacy shifted A"),
+    "Expected Output to resolve the legacy Template index alias after PERFORM expansion."
+  );
+  const appendTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="APPEND"]');
+  assert(findTemplateCellByText(appendTable, "Legacy shifted A"), "Expected Template to resolve the same shifted legacy alias.");
+
+  dom.window.close();
+}
+
+async function assertTemplateAppendDeclaredOperandsPreferRealDeclarations() {
+  const source = [
+    "DATA a TYPE i. \"Real A",
+    "DATA b TYPE STANDARD TABLE OF i. \"Real B",
+    "APPEND a TO b."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const appendTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="APPEND"]');
+  assert(appendTable, "Expected the declared APPEND template table.");
+  const sourceCell = findTemplateCellByText(appendTable, "Real A");
+  assert(sourceCell, "Expected the declared APPEND source description.");
+  const candidates = sourceCell.__templateCellMeta && sourceCell.__templateCellMeta.declCandidates;
+  assert(Array.isArray(candidates) && candidates.length > 0, "Expected declared APPEND source provenance.");
+  assert.strictEqual(String(candidates[0].name || ""), "a");
+  assert.notStrictEqual(String(candidates[0].objectType || "").toUpperCase(), "PATH_DECL", "Expected the real declaration before any Viewer fallback.");
+
+  const realDecl = (Array.isArray(state.data && state.data.decls) ? state.data.decls : [])
+    .find((decl) => String(decl && decl.name || "") === "a");
+  assert(realDecl, "Expected the parser declaration for a.");
+  const realKey = window.getDeclOverrideStorageKey(realDecl);
+  const modal = await openTemplateCellDescriptionTab(window, sourceCell);
+  await saveTemplateCellDescription(window, modal, "Real A edited");
+  assert.strictEqual(String(state.descOverrides[realKey] || ""), "Real A edited", "Expected a declared APPEND source to retain its real declaration key.");
+
+  dom.window.close();
+}
+
+async function assertTemplateAppendLiteralKeepsOnlyTargetEditable() {
+  const dom = await renderFixture("APPEND 'X' TO b.");
+  const { window } = dom;
+  const { els } = window.AbapViewerRuntime;
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const appendTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="APPEND"]');
+  assert(appendTable, "Expected the literal APPEND template table.");
+  const literalCell = findTemplateCellByText(appendTable, "'X'");
+  assert(literalCell, "Expected the literal APPEND source cell.");
+  assert.strictEqual(literalCell.__templateCellMeta && literalCell.__templateCellMeta.reasonCode, "LITERAL_NO_DECL");
+  const literalModal = await openTemplateCellDescriptionTab(window, literalCell);
+  const literalTextarea = literalModal.querySelector("textarea.template-config-json");
+  assert(literalTextarea && literalTextarea.disabled, "Expected the literal APPEND source to stay locked.");
+
+  const targetCell = findTemplateCellByText(appendTable, "b");
+  assert(targetCell, "Expected the APPEND target cell.");
+  assert.strictEqual(targetCell.__templateCellMeta && targetCell.__templateCellMeta.status, "editable");
+  assert.strictEqual(targetCell.__templateCellMeta && targetCell.__templateCellMeta.reasonCode, "");
+  assert.strictEqual(targetCell.__templateCellMeta && targetCell.__templateCellMeta.sourcePath, "rows[1].finalDesc");
+  const targetModal = await openTemplateCellDescriptionTab(window, targetCell);
+  const targetTextarea = targetModal.querySelector("textarea.template-config-json");
+  assert(targetTextarea && !targetTextarea.disabled, "Expected b to remain editable when APPEND source is a literal.");
+
+  dom.window.close();
+
+  const typedDom = await renderFixture("APPEND X'01' TO b.");
+  const typedWindow = typedDom.window;
+  const typedEls = typedWindow.AbapViewerRuntime.els;
+  typedEls.rightTabTemplateBtn.click();
+  await waitForViewerUi(typedWindow);
+  const typedAppendTable = typedEls.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="APPEND"]');
+  const typedLiteralCell = findTemplateCellByText(typedAppendTable, "X'01'");
+  assert(typedLiteralCell, "Expected the typed ABAP literal APPEND source cell.");
+  assert.strictEqual(typedLiteralCell.__templateCellMeta && typedLiteralCell.__templateCellMeta.reasonCode, "LITERAL_NO_DECL");
+  assert.deepStrictEqual(Array.from(typedLiteralCell.__templateCellMeta.declCandidates || []), [], "Expected a typed ABAP literal not to create PATH_DECL.");
+  const typedTargetCell = findTemplateCellByText(typedAppendTable, "b");
+  assert(Array.isArray(typedTargetCell && typedTargetCell.__templateCellMeta && typedTargetCell.__templateCellMeta.declCandidates)
+    && typedTargetCell.__templateCellMeta.declCandidates.length > 0, "Expected the APPEND target to remain editable beside a typed literal.");
+  typedDom.window.close();
+
+  const staticDom = await renderFixture("APPEND INITIAL LINE TO b.");
+  const staticWindow = staticDom.window;
+  const staticEls = staticWindow.AbapViewerRuntime.els;
+  staticEls.rightTabTemplateBtn.click();
+  await waitForViewerUi(staticWindow);
+  const staticAppendTable = staticEls.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="APPEND"]');
+  const initialCell = findTemplateCellByText(staticAppendTable, "INITIAL");
+  assert(initialCell, "Expected the APPEND INITIAL LINE marker.");
+  assert.strictEqual(initialCell.__templateCellMeta && initialCell.__templateCellMeta.reasonCode, "NON_DECL_SCHEMA_VALUE");
+  assert.deepStrictEqual(Array.from(initialCell.__templateCellMeta.declCandidates || []), [], "Expected INITIAL not to create a data declaration target.");
+  staticDom.window.close();
+}
+
+async function assertTemplateIfArrayProvenanceIsPerRenderedLine() {
+  const source = [
+    "DATA a TYPE i. \"A",
+    "DATA b TYPE i. \"B",
+    "DATA c TYPE i. \"C",
+    "DATA d TYPE i. \"D",
+    "IF a = b OR c = d.",
+    "ENDIF."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els } = window.AbapViewerRuntime;
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const ifTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="IF"]');
+  assert(ifTable, "Expected the IF template table.");
+  const secondLeftCell = findTemplateCellByText(ifTable, "C");
+  assert(secondLeftCell, "Expected the second IF left operand row.");
+  const modal = await openTemplateCellDescriptionTab(window, secondLeftCell);
+  const modalText = String(modal.textContent || "");
+  assert(modalText.includes("c"), "Expected the second IF line to target c.");
+  assert(!modalText.includes("a @"), "Expected the second IF line not to inherit a.");
+  assert.strictEqual(secondLeftCell.__templateCellMeta && secondLeftCell.__templateCellMeta.sourcePath, "extras.ifCondition.conditions[1].leftOperandDecl.finalDesc");
+
+  await saveTemplateCellDescription(window, modal, "C edited");
+  const refreshedIfTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="IF"]');
+  assert(findTemplateCellByText(refreshedIfTable, "A"), "Expected the first IF left operand to stay unchanged.");
+  assert(findTemplateCellByText(refreshedIfTable, "C edited"), "Expected only the second IF left operand to refresh.");
+
+  dom.window.close();
+}
+
+async function assertTemplateIndexedAndCompositePlaceholdersKeepProvenance() {
+  const dom = await renderFixture("APPEND a TO b.");
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
+
+  state.templateConfig.templates.APPEND = {
+    _options: {
+      hideEmptyRows: true,
+      hideRowsWithoutValues: false,
+      expandMultilineRows: true,
+      squareCells: true,
+      squareCellSize: 18
+    },
+    A1: { text: "{rows[0].finalDesc}" },
+    U1: { text: "From {values.what.value} to {values.to.value}" },
+    AO1: { text: "Static" },
+    BI1: { text: "{values.missing.value}" }
+  };
+  runtime.api.renderTemplatePreview();
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const appendTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="APPEND"]');
+  assert(appendTable, "Expected the custom APPEND template table.");
+  const indexedCell = findTemplateCellByText(appendTable, "a");
+  assert(indexedCell, "Expected indexed rows[0] output.");
+  assert.strictEqual(indexedCell.__templateCellMeta && indexedCell.__templateCellMeta.sourcePath, "rows[0].finalDesc");
+  const indexedModal = await openTemplateCellDescriptionTab(window, indexedCell);
+  assert(String(indexedModal.textContent || "").includes("a"), "Expected indexed rows[0] to retain a provenance.");
+
+  const compositeCell = findTemplateCellByText(appendTable, "From a to b");
+  assert(compositeCell, "Expected the composite placeholder output.");
+  const compositeModal = await openTemplateCellDescriptionTab(window, compositeCell);
+  const targetSelect = compositeModal.querySelector("select");
+  assert(targetSelect, "Expected composite placeholders to expose both targets.");
+  const labels = Array.from(targetSelect.options, (option) => String(option.textContent || ""));
+  assert(labels[0].includes("a"), "Expected the first placeholder target a to stay first.");
+  assert(labels[1].includes("b"), "Expected the second placeholder target b to stay second.");
+  assert.strictEqual(compositeCell.__templateCellMeta && compositeCell.__templateCellMeta.sourcePath, "values.what.value, values.to.value");
+
+  const staticCell = appendTable.querySelector('td[data-template-range-key="AO1"]');
+  assert(staticCell, "Expected the static custom template cell.");
+  assert.strictEqual(staticCell.__templateCellMeta && staticCell.__templateCellMeta.reasonCode, "STATIC_TEXT");
+  const staticModal = await openTemplateCellDescriptionTab(window, staticCell);
+  assert(String(staticModal.textContent || "").includes("static text"), "Expected a clear static-text Description reason.");
+  assert(staticModal.querySelector("textarea.template-config-json").disabled, "Expected static text to stay non-editable.");
+  const missingPathCell = appendTable.querySelector('td[data-template-range-key="BI1"]');
+  assert(missingPathCell, "Expected the unresolved custom template cell.");
+  assert.strictEqual(missingPathCell.__templateCellMeta && missingPathCell.__templateCellMeta.reasonCode, "UNRESOLVED_TEMPLATE_PATH");
+  assert.strictEqual(missingPathCell.__templateCellMeta && missingPathCell.__templateCellMeta.sourcePath, "values.missing.value");
+  const missingPathModal = await openTemplateCellDescriptionTab(window, missingPathCell);
+  assert(String(missingPathModal.textContent || "").includes("Template path"), "Expected a clear unresolved-path Description reason.");
+  assert(missingPathModal.querySelector("textarea.template-config-json").disabled, "Expected an unresolved path to stay non-editable.");
+
+  dom.window.close();
+}
+
+async function assertTemplateSemanticFallbacksMatchOutputPaths() {
+  const source = [
+    "PERFORM f USING x.",
+    "CALL FUNCTION 'F' EXPORTING p = y.",
+    "IF z = 1.",
+    "ENDIF."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els } = window.AbapViewerRuntime;
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const performTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="PERFORM"]');
+  assert(performTable, "Expected the unbound PERFORM template table.");
+  const routineCell = findTemplateCellByText(performTable, "f");
+  assert.strictEqual(routineCell && routineCell.__templateCellMeta && routineCell.__templateCellMeta.reasonCode, "NON_DECL_SCHEMA_VALUE");
+  const performValueCell = findTemplateCellByText(performTable, "x");
+  const performDecl = performValueCell && performValueCell.__templateCellMeta && performValueCell.__templateCellMeta.declCandidates[0];
+  assert(performDecl, "Expected an unbound PERFORM parameter target.");
+  assert.strictEqual(performValueCell.__templateCellMeta.reasonCode, "");
+  assert.strictEqual(
+    window.getDeclOverrideStorageKey(performDecl),
+    "PATH:OBJECT:1/EXTRAS/PERFORMCALL/USING/ITEM[1]/VALUEDECL:X"
+  );
+
+  const callTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="CALL_FUNCTION"]');
+  assert(callTable, "Expected the unbound CALL FUNCTION template table.");
+  const functionCell = findTemplateCellByText(callTable, "'F'");
+  assert.strictEqual(functionCell && functionCell.__templateCellMeta && functionCell.__templateCellMeta.reasonCode, "NON_DECL_SCHEMA_VALUE");
+  const callValueCell = findTemplateCellByText(callTable, "p = y");
+  const callDecl = callValueCell && callValueCell.__templateCellMeta && callValueCell.__templateCellMeta.declCandidates[0];
+  assert(callDecl, "Expected an unbound CALL parameter target.");
+  assert.strictEqual(
+    window.getDeclOverrideStorageKey(callDecl),
+    "PATH:OBJECT:2/EXTRAS/CALLFUNCTION/EXPORTING/ITEM[1]/VALUEDECL:Y"
+  );
+
+  const ifTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="IF"]');
+  assert(ifTable, "Expected the unbound IF template table.");
+  const conditionLeft = findTemplateCellByText(ifTable, "z");
+  const conditionRight = findTemplateCellByText(ifTable, "1");
+  assert(Array.isArray(conditionLeft && conditionLeft.__templateCellMeta && conditionLeft.__templateCellMeta.declCandidates)
+    && conditionLeft.__templateCellMeta.declCandidates.length > 0, "Expected the existing condition synthetic target for z.");
+  assert(Array.isArray(conditionRight && conditionRight.__templateCellMeta && conditionRight.__templateCellMeta.declCandidates)
+    && conditionRight.__templateCellMeta.declCandidates.length > 0, "Expected the existing condition synthetic target for literal 1 to remain unchanged.");
+  const conditionLeftDecl = conditionLeft.__templateCellMeta.declCandidates[0];
+  const conditionLeftKey = "CONDITION:Z";
+  assert.strictEqual(window.getDeclOverrideStorageKey(conditionLeftDecl), conditionLeftKey, "Expected Template and Output to keep the existing condition-operand synthetic key.");
+  const conditionModal = await openTemplateCellDescriptionTab(window, conditionLeft);
+  await saveTemplateCellDescription(window, conditionModal, "Z edited");
+  assert.strictEqual(String(window.AbapViewerRuntime.state.descOverrides[conditionLeftKey] || ""), "Z edited");
+  assert(String(els.output.textContent || "").includes("Z edited"), "Expected Output to refresh the condition override saved from Template.");
+  const refreshedIfTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="IF"]');
+  assert(findTemplateCellByText(refreshedIfTable, "Z edited"), "Expected Template to refresh the same condition operand.");
+
+  dom.window.close();
+}
+
+async function assertTemplateDirectSchemaPathsStayLocked() {
+  const dom = await renderFixture("SELECT col FROM dbtab INTO TABLE out WHERE q = 1.");
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
+
+  state.templateConfig.templates.SELECT = {
+    _options: {
+      hideEmptyRows: true,
+      hideRowsWithoutValues: false,
+      expandMultilineRows: true,
+      squareCells: true,
+      squareCellSize: 18
+    },
+    A1: { text: "{extras.select.whereConditions.leftOperandDecl.finalDesc}" },
+    U1: { text: "{values.fields.value}" },
+    AO1: { text: "{values.from.value}" },
+    BI1: { text: "{values.intoTable.value}" }
+  };
+  runtime.api.renderTemplatePreview();
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const selectTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="SELECT"]');
+  assert(selectTable, "Expected the custom SELECT template table.");
+  const conditionCell = findTemplateCellByText(selectTable, "q");
+  assert(Array.isArray(conditionCell && conditionCell.__templateCellMeta && conditionCell.__templateCellMeta.declCandidates)
+    && conditionCell.__templateCellMeta.declCandidates.length > 0, "Expected direct condition paths to keep operand provenance.");
+
+  const fieldsCell = findTemplateCellByText(selectTable, "col");
+  assert.strictEqual(fieldsCell && fieldsCell.__templateCellMeta && fieldsCell.__templateCellMeta.reasonCode, "NON_DECL_SCHEMA_VALUE");
+  assert.deepStrictEqual(Array.from(fieldsCell.__templateCellMeta.declCandidates || []), [], "Expected raw SELECT fields not to create PATH_DECL targets.");
+  const fieldsModal = await openTemplateCellDescriptionTab(window, fieldsCell);
+  assert(String(fieldsModal.textContent || "").includes("không phải data operand"), "Expected a clear schema-value Description reason.");
+  assert(fieldsModal.querySelector("textarea.template-config-json").disabled, "Expected raw SELECT fields to stay non-editable.");
+
+  const dbCell = findTemplateCellByText(selectTable, "dbtab");
+  assert.strictEqual(dbCell && dbCell.__templateCellMeta && dbCell.__templateCellMeta.reasonCode, "NON_DECL_SCHEMA_VALUE");
+  assert.deepStrictEqual(Array.from(dbCell.__templateCellMeta.declCandidates || []), [], "Expected DB names not to create PATH_DECL targets.");
+
+  const intoCell = findTemplateCellByText(selectTable, "out");
+  const intoDecl = intoCell && intoCell.__templateCellMeta && intoCell.__templateCellMeta.declCandidates[0];
+  assert(intoDecl, "Expected SELECT destination out to remain editable.");
+  assert.strictEqual(window.getDeclOverrideStorageKey(intoDecl), "PATH:OBJECT:1/VALUES/INTOTABLE/DECL:OUT");
+
+  dom.window.close();
+}
+
+async function assertTemplateFallbackAllowlistCoversExistingItabOperands() {
+  const cases = [
+    {
+      source: "MODIFY t FROM x INDEX i.",
+      objectType: "MODIFY_ITAB",
+      targets: [
+        ["t", "PATH:OBJECT:1/VALUES/ITABORDBTAB/DECL:T"],
+        ["x", "PATH:OBJECT:1/VALUES/FROM/DECL:X"],
+        ["i", "PATH:OBJECT:1/VALUES/INDEX/DECL:I"]
+      ]
+    },
+    {
+      source: "DELETE t INDEX i.",
+      objectType: "DELETE_ITAB",
+      targets: [
+        ["t", "PATH:OBJECT:1/VALUES/TARGET/DECL:T"],
+        ["i", "PATH:OBJECT:1/VALUES/INDEX/DECL:I"]
+      ]
+    },
+    {
+      source: "INSERT a INTO TABLE t.",
+      objectType: "INSERT_ITAB",
+      targets: [
+        ["a", "PATH:OBJECT:1/VALUES/WHAT/DECL:A"],
+        ["t", "PATH:OBJECT:1/VALUES/INTOTABLE/DECL:T"]
+      ]
+    },
+    {
+      source: "INSERT a INTO t INDEX i.",
+      objectType: "INSERT_ITAB",
+      targets: [
+        ["a", "PATH:OBJECT:1/VALUES/WHAT/DECL:A"],
+        ["t", "PATH:OBJECT:1/VALUES/INTO/DECL:T"],
+        ["i", "PATH:OBJECT:1/VALUES/INDEX/DECL:I"]
+      ]
+    },
+    {
+      source: "APPEND a TO t REFERENCE INTO r.",
+      objectType: "APPEND",
+      targets: [
+        ["a", "PATH:OBJECT:1/VALUES/WHAT/DECL:A"],
+        ["t", "PATH:OBJECT:1/VALUES/TO/DECL:T"],
+        ["r", "PATH:OBJECT:1/VALUES/REFINTO/DECL:R"]
+      ]
+    },
+    {
+      source: "CLEAR a WITH b.",
+      objectType: "CLEAR",
+      targets: [
+        ["a", "PATH:OBJECT:1/VALUES/TARGET/DECL:A"],
+        ["b", "PATH:OBJECT:1/VALUES/WITH/DECL:B"]
+      ]
+    },
+    {
+      source: "READ TABLE t REFERENCE INTO r.",
+      objectType: "READ_TABLE",
+      targets: [
+        ["t", "PATH:OBJECT:1/VALUES/ITAB/DECL:T"],
+        ["r", "PATH:OBJECT:1/VALUES/REFINTO/DECL:R"]
+      ]
+    },
+    {
+      source: "LOOP AT t REFERENCE INTO r.\nENDLOOP.",
+      objectType: "LOOP_AT_ITAB",
+      targets: [
+        ["t", "PATH:OBJECT:1/VALUES/ITAB/DECL:T"],
+        ["r", "PATH:OBJECT:1/VALUES/REFINTO/DECL:R"]
+      ]
+    },
+    {
+      source: "SELECT col FROM db APPENDING TABLE t.",
+      objectType: "SELECT",
+      targets: [
+        ["t", "PATH:OBJECT:1/VALUES/APPENDINGTABLE/DECL:T"]
+      ]
+    },
+    {
+      source: "INSERT a INTO TABLE t REFERENCE INTO r.",
+      objectType: "INSERT_ITAB",
+      targets: [
+        ["r", "PATH:OBJECT:1/VALUES/REFINTO/DECL:R"]
+      ]
+    }
+  ];
+
+  for (const testCase of cases) {
+    const dom = await renderFixture(testCase.source);
+    const { window } = dom;
+    const { els } = window.AbapViewerRuntime;
+    els.rightTabTemplateBtn.click();
+    await waitForViewerUi(window);
+
+    const table = els.templatePreviewOutput.querySelector(`.template-preview-table[data-object-type="${testCase.objectType}"]`);
+    assert(table, `Expected the ${testCase.objectType} template table.`);
+    for (const [cellText, expectedKey] of testCase.targets) {
+      const cell = findTemplateCellByText(table, cellText);
+      const decl = cell && cell.__templateCellMeta && cell.__templateCellMeta.declCandidates[0];
+      assert(decl, `Expected ${testCase.objectType} operand ${cellText} to be editable.`);
+      assert.strictEqual(window.getDeclOverrideStorageKey(decl), expectedKey);
+    }
+    dom.window.close();
+  }
+}
+
+async function assertTemplateResolverWarnsOnceWithCellMetadata() {
+  const dom = await renderFixture("APPEND a TO b.");
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
+  state.templateConfig.templates.APPEND = {
+    _options: {
+      hideEmptyRows: false,
+      hideRowsWithoutValues: false,
+      expandMultilineRows: true
+    },
+    A1: { text: "{values.what.value}" }
+  };
+
+  const originalNormalize = window.normalizeEntryObjectForPath;
+  const originalWarn = window.console.warn;
+  const provenanceWarnings = [];
+  window.normalizeEntryObjectForPath = () => {
+    throw new Error("forced provenance failure");
+  };
+  window.console.warn = (message, details) => {
+    if (String(message || "").includes("Template description provenance resolution failed")) {
+      provenanceWarnings.push(details);
+    }
+  };
+
+  try {
+    runtime.api.renderTemplatePreview();
+    runtime.api.renderTemplatePreview();
+    els.rightTabTemplateBtn.click();
+    await waitForViewerUi(window);
+
+    assert.strictEqual(provenanceWarnings.length, 1, "Expected the same resolver failure to warn only once.");
+    const warning = provenanceWarnings[0] || {};
+    assert.strictEqual(warning.objectId, 1);
+    assert.strictEqual(warning.line, 1);
+    assert.strictEqual(warning.template, "APPEND");
+    assert.strictEqual(warning.range, "A1");
+    assert.strictEqual(warning.token, "values.what.value");
+    assert(!JSON.stringify(warning).includes("APPEND a TO b."), "Expected the resolver warning not to dump source code.");
+
+    const cell = els.templatePreviewOutput.querySelector('td[data-template-range-key="A1"]');
+    assert(cell, "Expected the resolver-error template cell.");
+    assert.strictEqual(cell.__templateCellMeta && cell.__templateCellMeta.reasonCode, "RESOLUTION_ERROR");
+    const modal = await openTemplateCellDescriptionTab(window, cell);
+    assert(String(modal.textContent || "").includes("Resolver phát sinh lỗi"), "Expected a clear resolver-error Description reason.");
+    assert(modal.querySelector("textarea.template-config-json").disabled, "Expected a resolver-error cell to stay non-editable.");
+  } finally {
+    window.normalizeEntryObjectForPath = originalNormalize;
+    window.console.warn = originalWarn;
+    dom.window.close();
+  }
 }
 
 async function assertExpandedPerformTraceUsesRootDeclarations() {
@@ -1466,6 +2001,18 @@ async function main() {
   }
   if (!focus || focus === "template-row-description-condition") {
     await assertTemplateRowDescriptionTargetsExactConditionDecls();
+  }
+  if (!focus || focus === "template-provenance") {
+    await assertTemplateAppendDeclaredOperandsPreferRealDeclarations();
+    await assertTemplateAppendUnboundOperandsUseCanonicalTargets();
+    await assertLegacyPathAliasUsesTemplateIndexAfterPerformExpansion();
+    await assertTemplateAppendLiteralKeepsOnlyTargetEditable();
+    await assertTemplateIfArrayProvenanceIsPerRenderedLine();
+    await assertTemplateIndexedAndCompositePlaceholdersKeepProvenance();
+    await assertTemplateSemanticFallbacksMatchOutputPaths();
+    await assertTemplateDirectSchemaPathsStayLocked();
+    await assertTemplateFallbackAllowlistCoversExistingItabOperands();
+    await assertTemplateResolverWarnsOnceWithCellMetadata();
   }
   console.log("viewer-contracts: ok");
 }

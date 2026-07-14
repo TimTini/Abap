@@ -169,6 +169,13 @@
       }
     }
 
+    const raw = Array.isArray(statementBuffer.rawParts)
+      ? statementBuffer.rawParts.join(" ").replace(/\s+/g, " ").trim()
+      : "";
+    if (/^[A-Za-z][A-Za-z0-9-]*\s*:/i.test(raw)) {
+      return "";
+    }
+
     const leading = Array.isArray(statementBuffer.leadingCommentLines) ? statementBuffer.leadingCommentLines : [];
     if (leading.length !== 1) {
       return "";
@@ -320,6 +327,13 @@
         if (commentText) {
           if (current) {
             current.comments.push(commentText);
+            current.lineEntries.push({
+              line: lineNumber,
+              code: "",
+              comment: "",
+              commentOnlyText: commentText,
+              isCommentOnly: true
+            });
           } else {
             pendingComments.push({ line: lineNumber, text: commentText });
           }
@@ -1161,13 +1175,26 @@
         continue;
       }
 
+      const isChainedStructStatement = isChainedStatementStart(statement.raw || "", startKeyword);
+      const structLineEntries = isChainedStructStatement
+        ? splitChainedStatementWithMeta(statement, startKeyword).map((segment) => ({
+            line: segment && segment.lineStart ? segment.lineStart : statement.lineStart,
+            code: segment && segment.raw
+              ? String(segment.raw).replace(new RegExp(`^\\s*${escapeRegExp(startKeyword)}\\s+`, "i"), "")
+              : "",
+            comment: segment && segment.comment ? segment.comment : ""
+          }))
+        : lineEntries;
+
       const scopeId = getStatementScopeId(statement.lineStart, procedureBlocks, classBlocks);
       const scopeInfo = scopeInfoById.get(scopeId) || buildFallbackScopeInfo(scopeId);
 
       const defs = parseStructDefsFromLineEntries({
         kind: startKeyword,
-        lineEntries,
-        leadingComments: Array.isArray(statement.leadingComments) ? statement.leadingComments : [],
+        lineEntries: structLineEntries,
+        leadingComments: isChainedStructStatement
+          ? []
+          : (Array.isArray(statement.leadingComments) ? statement.leadingComments : []),
         fileName: fileName || "",
         scopeId,
         scopeInfo
@@ -1194,7 +1221,9 @@
     const defs = [];
     let current = null;
     const stack = [];
-    const leadingText = Array.isArray(leadingComments) ? leadingComments.filter(Boolean).join(" ").trim() : "";
+    const leadingText = Array.isArray(leadingComments)
+      ? leadingComments.filter(Boolean).join(" ").trim()
+      : "";
 
     function currentNestedPrefix() {
       if (stack.length <= 1) {
@@ -3076,8 +3105,8 @@
       return parts.map((partRaw) => ({
         raw: partRaw,
         lineStart: baseLineStart,
-        comment: statement && typeof statement.comment === "string" ? statement.comment : "",
-        commentLines: statement && Array.isArray(statement.commentLines) ? statement.commentLines.slice() : []
+        comment: "",
+        commentLines: []
       }));
     }
 
@@ -3086,6 +3115,8 @@
 
     let current = "";
     let currentStartLine = null;
+    let currentLeadingComment = "";
+    let pendingCommentEntries = [];
     let inSingleQuote = false;
     let inPipe = false;
 
@@ -3094,10 +3125,12 @@
       if (!text) {
         current = "";
         currentStartLine = null;
+        currentLeadingComment = "";
         return;
       }
 
-      const commentText = String(comment || "").trim();
+      const inlineComment = String(comment || "").trim();
+      const commentText = inlineComment || currentLeadingComment;
       segments.push({
         raw: `${startKeyword} ${text}.`,
         lineStart: currentStartLine || endLine || baseLineStart,
@@ -3106,9 +3139,48 @@
       });
       current = "";
       currentStartLine = null;
+      currentLeadingComment = "";
+    };
+
+    const rememberCommentOnlyEntry = (entry) => {
+      const text = entry && entry.commentOnlyText ? String(entry.commentOnlyText || "").trim() : "";
+      const line = entry && entry.line ? Number(entry.line || 0) || null : null;
+      if (!text || !line || current.trim()) {
+        pendingCommentEntries = [];
+        return;
+      }
+
+      const previous = pendingCommentEntries.length
+        ? pendingCommentEntries[pendingCommentEntries.length - 1]
+        : null;
+      if (!previous || previous.line !== line - 1) {
+        pendingCommentEntries = [];
+      }
+      pendingCommentEntries.push({ line, text });
+    };
+
+    const takeLeadingCommentForLine = (lineNumber) => {
+      if (current.trim() || !pendingCommentEntries.length) {
+        pendingCommentEntries = [];
+        return "";
+      }
+
+      const candidate = pendingCommentEntries.length === 1
+        ? pendingCommentEntries[0]
+        : null;
+      pendingCommentEntries = [];
+      if (!candidate || !lineNumber || candidate.line !== lineNumber - 1) {
+        return "";
+      }
+      return candidate.text;
     };
 
     for (const entry of lineEntries) {
+      if (entry && entry.isCommentOnly) {
+        rememberCommentOnlyEntry(entry);
+        continue;
+      }
+
       const lineNumber = entry && entry.line ? Number(entry.line || 0) || null : null;
       const lineComment = entry && entry.comment ? String(entry.comment || "").trim() : "";
       let code = entry && entry.code ? String(entry.code || "") : "";
@@ -3119,6 +3191,12 @@
       code = code.replace(prefixPattern, "").trim();
       if (!code) {
         continue;
+      }
+
+      if (!current.trim()) {
+        currentLeadingComment = takeLeadingCommentForLine(lineNumber);
+      } else {
+        pendingCommentEntries = [];
       }
 
       if (current.trim()) {

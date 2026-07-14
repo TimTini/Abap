@@ -167,6 +167,13 @@
       }
     }
 
+    const raw = Array.isArray(statementBuffer.rawParts)
+      ? statementBuffer.rawParts.join(" ").replace(/\s+/g, " ").trim()
+      : "";
+    if (/^[A-Za-z][A-Za-z0-9-]*\s*:/i.test(raw)) {
+      return "";
+    }
+
     const leading = Array.isArray(statementBuffer.leadingCommentLines) ? statementBuffer.leadingCommentLines : [];
     if (leading.length !== 1) {
       return "";
@@ -318,6 +325,13 @@
         if (commentText) {
           if (current) {
             current.comments.push(commentText);
+            current.lineEntries.push({
+              line: lineNumber,
+              code: "",
+              comment: "",
+              commentOnlyText: commentText,
+              isCommentOnly: true
+            });
           } else {
             pendingComments.push({ line: lineNumber, text: commentText });
           }

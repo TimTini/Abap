@@ -643,6 +643,87 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return `${type}:NAME:${name}`;
   }
 
+  function isPathDeclForOverrideKey(decl) {
+    if (!decl || typeof decl !== "object") {
+      return false;
+    }
+    return (
+      normalizeKeyToken(decl.objectType) === "PATH_DECL"
+      || normalizeKeyToken(decl.scopeType) === "PATH"
+    );
+  }
+
+  function buildPathDeclOverrideKey(pathKey, declName) {
+    const name = normalizeKeyToken(declName);
+    if (!name) {
+      return "";
+    }
+    const rawPath = String(pathKey || "").trim().replace(/^PATH:/i, "");
+    if (!rawPath) {
+      return "";
+    }
+    return `PATH:${normalizeSyntheticPathKey(rawPath)}:${name}`;
+  }
+
+  function getPathDeclOverrideLookupKeys(decl) {
+    if (!isPathDeclForOverrideKey(decl)) {
+      return [];
+    }
+
+    const canonicalKeys = [];
+    const aliasKeys = [];
+    const pushUnique = (list, value) => {
+      const key = String(value || "").trim();
+      if (!key || canonicalKeys.includes(key) || aliasKeys.includes(key)) {
+        return;
+      }
+      list.push(key);
+    };
+    const pushClassified = (value) => {
+      const key = String(value || "").trim();
+      if (!key) {
+        return;
+      }
+      if (/^PATH:OBJECTS\/OBJECT\[/i.test(key)) {
+        pushUnique(aliasKeys, key);
+      } else {
+        pushUnique(canonicalKeys, key);
+      }
+    };
+
+    pushClassified(decl.canonicalOverrideKey);
+    if (decl.canonicalPathKey) {
+      pushClassified(buildPathDeclOverrideKey(decl.canonicalPathKey, decl.name));
+    }
+
+    pushClassified(getDeclKey(decl));
+
+    const explicitLookupKeys = Array.isArray(decl.overrideLookupKeys)
+      ? decl.overrideLookupKeys
+      : [];
+    for (const key of explicitLookupKeys) {
+      pushClassified(key);
+    }
+
+    const pathAliases = [];
+    const canonicalScope = String(decl.scopeLabel || "").trim();
+    const numericObjectPath = canonicalScope.match(/^PATH:OBJECT:(\d+)\/(.+)$/i);
+    if (numericObjectPath) {
+      pathAliases.push(`PATH:OBJECTS/OBJECT[${numericObjectPath[1]}]/${numericObjectPath[2]}`);
+    }
+    if (decl.legacyPathKey) {
+      pathAliases.push(decl.legacyPathKey);
+    }
+    if (Array.isArray(decl.pathAliases)) {
+      pathAliases.push(...decl.pathAliases);
+    }
+    for (const pathAlias of pathAliases) {
+      pushClassified(buildPathDeclOverrideKey(pathAlias, decl.name));
+    }
+
+    return canonicalKeys.concat(aliasKeys);
+  }
+
   function getDeclOverrideLookupKeys(decl) {
     const keys = [];
     const pushKey = (value) => {
@@ -653,7 +734,13 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       keys.push(key);
     };
 
-    pushKey(getDeclKey(decl));
+    if (isPathDeclForOverrideKey(decl)) {
+      for (const key of getPathDeclOverrideLookupKeys(decl)) {
+        pushKey(key);
+      }
+    } else {
+      pushKey(getDeclKey(decl));
+    }
     pushKey(getLegacyDeclKey(decl));
     pushKey(getDeclFallbackKey(decl));
     return keys;
@@ -1433,7 +1520,18 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return normalized || "ROOT";
   }
 
-  function buildSyntheticDeclForPath({ pathKey, fieldId, file, lineStart, raw, role }) {
+  function buildSyntheticDeclForPath({
+    pathKey,
+    fieldId,
+    file,
+    lineStart,
+    raw,
+    role,
+    canonicalPathKey,
+    legacyPathKey,
+    pathAliases,
+    overrideLookupKeys
+  }) {
     const name = String(fieldId || "").trim();
     if (!name) {
       return null;
@@ -1443,8 +1541,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       ? null
       : (Number(lineStart) || null);
 
-    const normalizedPath = normalizeSyntheticPathKey(pathKey);
-    return {
+    const normalizedPath = normalizeSyntheticPathKey(canonicalPathKey || pathKey);
+    const decl = {
       id: null,
       objectType: "PATH_DECL",
       name,
@@ -1457,6 +1555,37 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       scopeType: "PATH",
       scopeName: String(role || "")
     };
+
+    const aliasPaths = [];
+    const pushAliasPath = (value) => {
+      const alias = String(value || "").trim();
+      if (!alias || aliasPaths.includes(alias)) {
+        return;
+      }
+      aliasPaths.push(alias);
+    };
+    if (canonicalPathKey && String(pathKey || "").trim() !== String(canonicalPathKey || "").trim()) {
+      pushAliasPath(pathKey);
+    }
+    pushAliasPath(legacyPathKey);
+    if (Array.isArray(pathAliases)) {
+      for (const alias of pathAliases) {
+        pushAliasPath(alias);
+      }
+    }
+
+    if (canonicalPathKey) {
+      decl.canonicalPathKey = String(canonicalPathKey);
+    }
+    if (aliasPaths.length) {
+      decl.pathAliases = aliasPaths;
+    }
+    if (Array.isArray(overrideLookupKeys) && overrideLookupKeys.length) {
+      decl.overrideLookupKeys = overrideLookupKeys
+        .map((value) => String(value || "").trim())
+        .filter(Boolean);
+    }
+    return decl;
   }
 
   function getDeclSourceContextFromObject(obj) {
@@ -1506,7 +1635,17 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       file: options && options.file ? options.file : "",
       lineStart: options ? options.lineStart : null,
       raw: options && options.raw ? options.raw : "",
-      role: options && options.role ? options.role : "value"
+      role: options && options.role ? options.role : "value",
+      canonicalPathKey: options && options.canonicalPathKey
+        ? buildPathKeyFromParts([options.canonicalPathKey, "decl"])
+        : "",
+      legacyPathKey: options && options.legacyPathKey
+        ? buildPathKeyFromParts([options.legacyPathKey, "decl"])
+        : "",
+      pathAliases: options && Array.isArray(options.pathAliases)
+        ? options.pathAliases.map((alias) => buildPathKeyFromParts([alias, "decl"]))
+        : [],
+      overrideLookupKeys: options && Array.isArray(options.overrideLookupKeys) ? options.overrideLookupKeys : []
     });
     if (!syntheticDecl) {
       return entry;
@@ -1540,7 +1679,17 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       file: options && options.file ? options.file : "",
       lineStart: options ? options.lineStart : null,
       raw: options && options.raw ? options.raw : "",
-      role: options && options.role ? options.role : "value"
+      role: options && options.role ? options.role : "value",
+      canonicalPathKey: options && options.canonicalPathKey
+        ? buildPathKeyFromParts([options.canonicalPathKey, "valueDecl"])
+        : "",
+      legacyPathKey: options && options.legacyPathKey
+        ? buildPathKeyFromParts([options.legacyPathKey, "valueDecl"])
+        : "",
+      pathAliases: options && Array.isArray(options.pathAliases)
+        ? options.pathAliases.map((alias) => buildPathKeyFromParts([alias, "valueDecl"]))
+        : [],
+      overrideLookupKeys: options && Array.isArray(options.overrideLookupKeys) ? options.overrideLookupKeys : []
     });
     if (!syntheticDecl) {
       return entry;
@@ -1562,6 +1711,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const lineStart = options ? options.lineStart : null;
     const raw = options && options.raw ? options.raw : "";
     const basePath = options && options.pathKey ? options.pathKey : "";
+    const canonicalBasePath = options && options.canonicalPathKey ? options.canonicalPathKey : "";
+    const legacyBasePath = options && options.legacyPathKey ? options.legacyPathKey : "";
+    const basePathAliases = options && Array.isArray(options.pathAliases) ? options.pathAliases : [];
+    const buildOperandPathAliases = (fieldName) => basePathAliases.map((alias) => (
+      buildPathKeyFromParts([alias, fieldName])
+    ));
 
     if (!isDeclLikeObject(clause.leftOperandDecl)) {
       const leftFieldId = resolveFallbackFieldId({
@@ -1575,7 +1730,14 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         file,
         lineStart,
         raw,
-        role: "leftOperand"
+        role: "leftOperand",
+        canonicalPathKey: canonicalBasePath
+          ? buildPathKeyFromParts([canonicalBasePath, "leftOperandDecl"])
+          : "",
+        legacyPathKey: legacyBasePath
+          ? buildPathKeyFromParts([legacyBasePath, "leftOperandDecl"])
+          : "",
+        pathAliases: buildOperandPathAliases("leftOperandDecl")
       });
       if (leftDecl) {
         if (next === clause) {
@@ -1600,7 +1762,14 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         file,
         lineStart,
         raw,
-        role: "rightOperand"
+        role: "rightOperand",
+        canonicalPathKey: canonicalBasePath
+          ? buildPathKeyFromParts([canonicalBasePath, "rightOperandDecl"])
+          : "",
+        legacyPathKey: legacyBasePath
+          ? buildPathKeyFromParts([legacyBasePath, "rightOperandDecl"])
+          : "",
+        pathAliases: buildOperandPathAliases("rightOperandDecl")
       });
       if (rightDecl) {
         if (next === clause) {
@@ -2034,6 +2203,16 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         output.push(clonedRoot);
       }
     }
+
+    let templateObjectIndex = 0;
+    walkObjects(output, (obj) => {
+      templateObjectIndex += 1;
+      Object.defineProperty(obj, "__abapTemplateObjectIndex", {
+        configurable: true,
+        enumerable: false,
+        value: templateObjectIndex
+      });
+    });
 
     return output;
   }

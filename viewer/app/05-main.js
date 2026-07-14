@@ -2534,12 +2534,16 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
   function openTemplateCellUnifiedEditModal(options) {
     const opts = options && typeof options === "object" ? options : {};
+    const metadata = opts.metadata && typeof opts.metadata === "object" ? opts.metadata : {};
     const textPart = opts.textPart && typeof opts.textPart === "object" ? opts.textPart : {};
     const descPart = opts.descPart && typeof opts.descPart === "object" ? opts.descPart : {};
+    const provenance = descPart.provenance && typeof descPart.provenance === "object"
+      ? descPart.provenance
+      : {};
 
     const templateKey = String(textPart.templateKey || "").trim();
     const rangeKey = String(textPart.rangeKey || "").trim();
-    const objectType = String(textPart.objectType || "").trim();
+    const objectType = String(textPart.objectType || metadata.objectType || "").trim();
     const currentText = String(textPart.currentText === undefined || textPart.currentText === null ? "" : textPart.currentText);
     const onSaveText = typeof textPart.onSaveText === "function" ? textPart.onSaveText : null;
 
@@ -2549,6 +2553,37 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const skipNormalize = Boolean(descPart.skipNormalize);
     const onSaveDesc = typeof descPart.onSaveDesc === "function" ? descPart.onSaveDesc : null;
     const normalizeEnabled = Boolean(state && state.settings && state.settings.normalizeDeclDesc);
+    const descResolutionStatus = String(
+      descPart.status || provenance.status || metadata.status || ""
+    ).trim();
+    const descReasonCode = String(
+      descPart.reasonCode || provenance.reasonCode || metadata.reasonCode || ""
+    ).trim().toUpperCase().replace(/[\s-]+/g, "_");
+    const descSourcePath = String(
+      descPart.sourcePath || provenance.sourcePath || metadata.sourcePath || ""
+    ).trim();
+
+    const getUnavailableDescriptionMessage = () => {
+      const reasonCode = descReasonCode || (
+        descResolutionStatus.toUpperCase() === "ERROR" ? "RESOLUTION_ERROR" : "MISSING_PROVENANCE"
+      );
+      const messages = {
+        STATIC_TEXT: "Description không áp dụng cho static text.",
+        LITERAL_NO_DECL: "Literal, số hoặc wildcard không có declaration.",
+        NON_DECL_SCHEMA_VALUE: "Schema, type hoặc routine name không phải data operand.",
+        UNRESOLVED_TEMPLATE_PATH: "Template path không resolve được.",
+        UNBOUND_IDENTIFIER: "Data operand chưa được bind với declaration.",
+        MISSING_PROVENANCE: "Cell có giá trị nhưng thiếu provenance.",
+        RESOLUTION_ERROR: "Resolver phát sinh lỗi khi xác định declaration."
+      };
+      if (Object.prototype.hasOwnProperty.call(messages, reasonCode)) {
+        return messages[reasonCode];
+      }
+      if (rawDeclCandidates.length && !onSaveDesc) {
+        return "Không thể lưu Description vì chức năng lưu declaration không khả dụng.";
+      }
+      return messages.MISSING_PROVENANCE;
+    };
 
     const normalizeDescValueForModal = (decl, value, noNormalize) => {
       const raw = String(value === undefined || value === null ? "" : value);
@@ -2701,8 +2736,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         return null;
       }
       let declKey = String(candidate.declKey || "").trim();
-      if (!declKey && typeof getDeclOverrideStorageKey === "function") {
-        declKey = String(getDeclOverrideStorageKey(decl) || "").trim();
+      if (typeof getDeclOverrideStorageKey === "function") {
+        const storageKey = String(getDeclOverrideStorageKey(decl) || "").trim();
+        declKey = storageKey || declKey;
       }
       const techName = typeof getDeclTechName === "function"
         ? getDeclTechName(decl)
@@ -2824,7 +2860,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       objectType ? `Object: ${objectType}` : "",
       templateKey ? `Template: ${templateKey}` : "",
       rangeKey ? `Range: ${rangeKey}` : "",
-      token ? `Token: ${token}` : ""
+      token ? `Token: ${token}` : "",
+      descResolutionStatus ? `Status: ${descResolutionStatus}` : "",
+      descSourcePath ? `Source path: ${descSourcePath}` : ""
     ].filter(Boolean).join(" • ");
     modal.body.appendChild(hint);
 
@@ -3061,7 +3099,13 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       }
 
       if (!hasDecl) {
-        descInfo.textContent = "Khong tim thay decl cho o nay.";
+        descInfo.textContent = getUnavailableDescriptionMessage();
+        if (descReasonCode) {
+          descInfo.dataset.reasonCode = descReasonCode;
+        }
+        if (descSourcePath) {
+          descInfo.title = `Source path: ${descSourcePath}`;
+        }
         const descArea = document.createElement("textarea");
         descArea.className = "template-config-json";
         descArea.spellcheck = false;
