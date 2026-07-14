@@ -539,50 +539,79 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return null;
   }
 
-  function jumpInputToCodeRange(lineStart, lineEnd, segmentIndex) {
-    const start = Math.max(1, Number(lineStart) || 1);
-    const end = Math.max(start, Number(lineEnd) || start);
-    const targetSegmentIndex = Number.isFinite(Number(segmentIndex))
-      ? Math.max(0, Math.floor(Number(segmentIndex)))
-      : null;
-
-    if (targetSegmentIndex !== null && typeof goToInputLine === "function") {
-      goToInputLine({ line: start, segmentIndex: targetSegmentIndex });
-      return;
-    }
-
-    if (typeof selectCodeLines === "function") {
-      selectCodeLines(start, end);
-    } else if (els.inputText) {
-      const text = String(els.inputText.value || "");
-      const lines = text.split(/\r\n|\r|\n/);
-      const toOffset = (lineNo) => {
-        const line = Math.max(1, Math.min(lines.length || 1, Number(lineNo) || 1));
-        let offset = 0;
-        for (let i = 0; i < line - 1; i += 1) {
-          offset += lines[i].length + 1;
-        }
-        return offset;
-      };
-      const startOffset = toOffset(start);
-      const endOffset = toOffset(end + 1);
-      els.inputText.focus();
-      els.inputText.setSelectionRange(startOffset, Math.max(startOffset, endOffset));
-    }
-
+  function focusInputWithoutPageScroll() {
     if (!els.inputText) {
       return;
     }
-    const lineHeight = typeof getInputGutterLineHeightPx === "function"
-      ? Math.max(12, Number(getInputGutterLineHeightPx()) || 18)
-      : 18;
-    const viewportHeight = Math.max(0, Number(els.inputText.clientHeight) || 0);
-    const offsetTop = Math.max(0, Math.round(viewportHeight * 0.28));
-    const targetTop = Math.max(0, Math.round(((start - 1) * lineHeight) - offsetTop));
-    els.inputText.scrollTop = targetTop;
-    if (typeof syncInputGutterScroll === "function") {
-      syncInputGutterScroll();
+    try {
+      els.inputText.focus({ preventScroll: true });
+    } catch {
+      els.inputText.focus();
     }
+  }
+
+  function navigateInputRange(options) {
+    if (!els.inputText) {
+      return { line: 1, total: 1 };
+    }
+    const opts = options && typeof options === "object" ? options : {};
+    const totalLines = getCurrentInputLineCount();
+    const start = Math.max(1, Math.min(totalLines, Math.floor(Number(opts.lineStart) || 1)));
+    const end = Math.max(start, Math.min(totalLines, Math.floor(Number(opts.lineEnd) || start)));
+    const hasSegmentIndex = opts.segmentIndex !== null
+      && opts.segmentIndex !== undefined
+      && String(opts.segmentIndex).trim() !== "";
+    const segmentIndex = hasSegmentIndex && Number.isFinite(Number(opts.segmentIndex))
+      ? Math.max(0, Math.floor(Number(opts.segmentIndex)))
+      : null;
+    const anchorRatio = Math.max(0, Math.min(0.9, Number(opts.anchorRatio) || 0));
+    const text = String(els.inputText.value || "");
+    const offsets = typeof computeLineOffsets === "function" ? computeLineOffsets(text) : [0];
+    state.inputLineOffsets = offsets;
+
+    let selectionStart = Number(offsets[start - 1]) || 0;
+    let selectionEnd = Number(offsets[end]) || text.length;
+    if (segmentIndex !== null) {
+      const lineEndOffset = Number(offsets[start]) || text.length;
+      const lineText = text.slice(selectionStart, lineEndOffset);
+      const segmentRange = getSegmentRangeForLine(lineText, segmentIndex);
+      if (segmentRange) {
+        selectionStart += segmentRange.start;
+        selectionEnd = (Number(offsets[start - 1]) || 0) + segmentRange.end;
+      } else {
+        selectionEnd = Math.max(selectionStart, lineEndOffset > selectionStart ? lineEndOffset - 1 : selectionStart);
+      }
+    }
+
+    focusInputWithoutPageScroll();
+    els.inputText.setSelectionRange(selectionStart, Math.max(selectionStart, selectionEnd));
+
+    const applyScroll = () => {
+      const metrics = typeof measureInputLineMetrics === "function"
+        ? measureInputLineMetrics()
+        : { effectivePitch: 18 };
+      const pitch = Math.max(12, Number(metrics && metrics.effectivePitch) || 18);
+      const viewportHeight = Math.max(0, Number(els.inputText.clientHeight) || 0);
+      const maxTop = Math.max(0, (Number(els.inputText.scrollHeight) || 0) - viewportHeight);
+      const targetTop = ((start - 1) * pitch) - (viewportHeight * anchorRatio);
+      els.inputText.scrollTop = Math.max(0, Math.min(maxTop, targetTop));
+      if (typeof syncInputGutterScroll === "function") {
+        syncInputGutterScroll();
+      }
+    };
+
+    applyScroll();
+    requestAnimationFrame(applyScroll);
+    return { line: start, total: totalLines };
+  }
+
+  function jumpInputToCodeRange(lineStart, lineEnd, segmentIndex) {
+    return navigateInputRange({
+      lineStart,
+      lineEnd,
+      segmentIndex,
+      anchorRatio: 0.28
+    });
   }
 
   function interceptOutputCodeButtonClick(ev) {
@@ -3618,56 +3647,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       ? Math.max(0, Math.floor(Number(inputLine.segmentIndex)))
       : null;
 
-    if (typeof selectCodeLines === "function" && targetSegmentIndex === null) {
-      selectCodeLines(targetLine, targetLine);
-      return { line: targetLine, total: totalLines };
-    }
-
-    const text = els.inputText.value || "";
-    const offsets = Array.isArray(state.inputLineOffsets) && state.inputLineOffsets.length
-      ? state.inputLineOffsets
-      : computeLineOffsets(text);
-    const startOffset = Number(offsets[Math.max(0, targetLine - 1)]) || 0;
-    const nextOffsetIndex = Math.min(offsets.length - 1, targetLine);
-    const nextOffset = Number(offsets[nextOffsetIndex]);
-    const endOffset = Number.isFinite(nextOffset) && nextOffset > startOffset
-      ? Math.max(startOffset, nextOffset - 1)
-      : startOffset;
-
-    els.inputText.focus();
-    if (targetSegmentIndex !== null) {
-      const lineStartOffset = Number(offsets[Math.max(0, targetLine - 1)]) || 0;
-      const lineEndOffset = Number(offsets[Math.min(offsets.length - 1, targetLine)]) || text.length;
-      const lineText = text.slice(lineStartOffset, lineEndOffset);
-      const segmentRange = getSegmentRangeForLine(lineText, targetSegmentIndex);
-      if (segmentRange) {
-        els.inputText.selectionStart = lineStartOffset + segmentRange.start;
-        els.inputText.selectionEnd = lineStartOffset + segmentRange.end;
-      } else {
-        els.inputText.selectionStart = startOffset;
-        els.inputText.selectionEnd = endOffset;
-      }
-    } else {
-      els.inputText.selectionStart = startOffset;
-      els.inputText.selectionEnd = endOffset;
-    }
-
-    let lineHeight = 18;
-    try {
-      lineHeight = Number.parseFloat(window.getComputedStyle(els.inputText).lineHeight || "18") || 18;
-    } catch {
-      lineHeight = 18;
-    }
-    const targetScrollTop = Math.max(
-      0,
-      Math.round(((targetLine - 1) * lineHeight) - ((Number(els.inputText.clientHeight) || 0) * 0.35))
-    );
-    els.inputText.scrollTop = targetScrollTop;
-    if (typeof syncInputGutterScroll === "function") {
-      syncInputGutterScroll();
-    }
-
-    return { line: targetLine, total: totalLines };
+    return navigateInputRange({
+      lineStart: targetLine,
+      lineEnd: targetLine,
+      segmentIndex: targetSegmentIndex,
+      anchorRatio: 0.35
+    });
   }
 
   function submitInputGotoLine() {
@@ -4376,6 +4361,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (els.inputText) {
       els.inputText.addEventListener("input", rebuildInputGutter);
       els.inputText.addEventListener("scroll", syncInputGutterScroll);
+    }
+    if (typeof window !== "undefined" && typeof syncInputGutterScroll === "function") {
+      window.addEventListener("resize", syncInputGutterScroll, { passive: true });
+      if (window.visualViewport && typeof window.visualViewport.addEventListener === "function") {
+        window.visualViewport.addEventListener("resize", syncInputGutterScroll, { passive: true });
+      }
     }
     if (els.output && typeof handleOutputVirtualScroll === "function") {
       els.output.addEventListener("scroll", handleOutputVirtualScroll, { passive: true });

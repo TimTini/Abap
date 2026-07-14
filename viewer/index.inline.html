@@ -9,9 +9,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.07.14-r53">
-  <meta name="abap-viewer-updated-at" content="2026-07-14 22:24:43">
-  <meta name="abap-viewer-updated-note" content="Chained comments and template cells retain exact editable declaration targets.">
+  <meta name="abap-viewer-version" content="v2026.07.14-r54">
+  <meta name="abap-viewer-updated-at" content="2026-07-14 23:19:45">
+  <meta name="abap-viewer-updated-note" content="Fractional gutters and virtual anchors stay aligned across zoom and Description edits.">
   <title>ABAP Parser Viewer</title>
   <style>
     :root {
@@ -337,6 +337,7 @@
     }
 
     #inputGutter {
+      --input-line-pitch: 18px;
       width: 68px;
       flex: none;
       border-right: 1px solid var(--border);
@@ -356,7 +357,7 @@
     }
 
     .gutter-line {
-      height: 18px;
+      height: var(--input-line-pitch, 18px);
       display: flex;
       align-items: center;
       gap: 6px;
@@ -12044,10 +12045,14 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     const mode = state.activeEdit.mode === "structField" ? "structField" : "single";
     const skipNormalize = Boolean(els.editSkipNormalize && els.editSkipNormalize.checked);
+    state.pendingOutputViewportAnchor = state.rightTab === "output" && typeof captureOutputViewportAnchor === "function"
+      ? captureOutputViewportAnchor()
+      : null;
 
     if (mode === "single") {
       const key = state.activeEdit.key;
       if (!key) {
+        state.pendingOutputViewportAnchor = null;
         return;
       }
 
@@ -12065,6 +12070,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       const structKey = state.activeEdit.structKey;
       const itemKey = state.activeEdit.itemKey;
       if (!structKey || !itemKey) {
+        state.pendingOutputViewportAnchor = null;
         return;
       }
 
@@ -17272,12 +17278,21 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         pendingRaf: 0,
         isAdjustingScroll: false,
         avgItemHeight: 140,
+        itemHeights: new Float64Array(0),
+        prefixOffsets: new Float64Array(1),
+        sourceRenderObjects: null,
         lineTargetMap: new Map(),
         isInitialized: false
       };
     }
     if (!(state.templateVirtual.lineTargetMap instanceof Map)) {
       state.templateVirtual.lineTargetMap = new Map();
+    }
+    if (!(state.templateVirtual.itemHeights instanceof Float64Array)) {
+      state.templateVirtual.itemHeights = new Float64Array(0);
+    }
+    if (!(state.templateVirtual.prefixOffsets instanceof Float64Array)) {
+      state.templateVirtual.prefixOffsets = new Float64Array(1);
     }
     return state.templateVirtual;
   }
@@ -17308,7 +17323,16 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     } catch {
       // ignore
     }
-    return Math.max(0, rect.height + marginTop + marginBottom);
+    const container = els.templatePreviewOutput;
+    const containerRect = container && typeof container.getBoundingClientRect === "function"
+      ? container.getBoundingClientRect()
+      : null;
+    const layoutHeight = Math.max(0, Number(container && container.offsetHeight) || Number(container && container.clientHeight) || 0);
+    const measuredScale = layoutHeight > 0 ? (Number(containerRect && containerRect.height) || 0) / layoutHeight : 1;
+    const scrollScale = Number.isFinite(measuredScale) && measuredScale >= 0.5 && measuredScale <= 2
+      ? measuredScale
+      : 1;
+    return Math.max(0, (rect.height / scrollScale) + marginTop + marginBottom);
   }
 
   function updateTemplateAverageHeight(virtual, heights) {
@@ -17453,7 +17477,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       block.appendChild(el("div", { className: "template-error", text: model.errors.join("\n") }));
     }
 
-    const openCellUnifiedEditor = (cellMeta) => {
+    const openCellUnifiedEditor = (cellMeta, cellElement) => {
       if (!cellMeta || typeof cellMeta !== "object") {
         return;
       }
@@ -17670,6 +17694,11 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
             const raw = String(nextDesc === undefined || nextDesc === null ? "" : nextDesc);
             const trimmed = raw.trim();
             const stored = skipNormalize ? trimmed : stripDeclCategoryPrefix(trimmed);
+            state.pendingTemplateViewportAnchor = captureTemplateViewportAnchor({
+              templateIndex: absIndex,
+              gridRow: Number(cellElement && cellElement.getAttribute("data-template-grid-row")),
+              gridCol: Number(cellElement && cellElement.getAttribute("data-template-grid-col"))
+            });
             for (const key of lookupKeys.length ? lookupKeys : [declKey]) {
               delete state.descOverrides[key];
               if (state.descOverridesLegacy && typeof state.descOverridesLegacy === "object") {
@@ -17681,6 +17710,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
             }
             const saved = saveDescOverrides();
             if (saved === false) {
+              state.pendingTemplateViewportAnchor = null;
               return { ok: false, error: "Failed to persist description override." };
             }
             if (typeof renderOutput === "function") {
@@ -17699,11 +17729,11 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     };
 
     const table = renderTemplateTable(model, isInteractive ? {
-      onCellDblClick: (cellMeta) => {
+      onCellDblClick: (cellMeta, cellElement) => {
         if (!cellMeta || typeof cellMeta !== "object") {
           return;
         }
-        openCellUnifiedEditor(cellMeta);
+        openCellUnifiedEditor(cellMeta, cellElement);
       }
     } : null);
     if (table) {
@@ -17753,6 +17783,87 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return Math.max(24, Number(virtual && virtual.avgItemHeight) || 140);
   }
 
+  function ensureTemplateHeightCache(virtual, itemCount) {
+    const total = Math.max(0, Number(itemCount) || 0);
+    if (!(virtual.itemHeights instanceof Float64Array) || virtual.itemHeights.length !== total) {
+      virtual.itemHeights = new Float64Array(total);
+    }
+    if (!(virtual.prefixOffsets instanceof Float64Array) || virtual.prefixOffsets.length !== (total + 1)) {
+      virtual.prefixOffsets = new Float64Array(total + 1);
+    }
+  }
+
+  function rebuildTemplatePrefixOffsets(virtual) {
+    const total = Math.max(0, Number(virtual && virtual.itemCount) || 0);
+    ensureTemplateHeightCache(virtual, total);
+    const estimate = getTemplateEstimatedItemHeight(virtual);
+    virtual.prefixOffsets[0] = 0;
+    for (let index = 0; index < total; index += 1) {
+      const measured = Number(virtual.itemHeights[index]) || 0;
+      virtual.prefixOffsets[index + 1] = virtual.prefixOffsets[index] + (measured > 0 ? measured : estimate);
+    }
+  }
+
+  function getTemplateOffsetAtIndex(virtual, index) {
+    const total = Math.max(0, Number(virtual && virtual.itemCount) || 0);
+    const safeIndex = Math.max(0, Math.min(total, Number(index) || 0));
+    if (!(virtual.prefixOffsets instanceof Float64Array) || virtual.prefixOffsets.length !== (total + 1)) {
+      rebuildTemplatePrefixOffsets(virtual);
+    }
+    return Number(virtual.prefixOffsets[safeIndex]) || 0;
+  }
+
+  function findTemplateIndexAtOffset(virtual, scrollTop) {
+    const total = Math.max(0, Number(virtual && virtual.itemCount) || 0);
+    if (!total) {
+      return 0;
+    }
+    if (!(virtual.prefixOffsets instanceof Float64Array) || virtual.prefixOffsets.length !== (total + 1)) {
+      rebuildTemplatePrefixOffsets(virtual);
+    }
+    const target = Math.max(0, Number(scrollTop) || 0);
+    let low = 0;
+    let high = total;
+    while (low < high) {
+      const mid = Math.floor((low + high) / 2);
+      if (virtual.prefixOffsets[mid + 1] <= target) {
+        low = mid + 1;
+      } else {
+        high = mid;
+      }
+    }
+    return Math.max(0, Math.min(total - 1, low));
+  }
+
+  function measureRenderedTemplateItems(virtual, start, end) {
+    if (!els.templatePreviewOutput) {
+      return;
+    }
+    const heights = [];
+    for (const node of Array.from(els.templatePreviewOutput.querySelectorAll(".template-block[data-template-index]"))) {
+      const index = Number(node.getAttribute("data-template-index"));
+      if (!Number.isFinite(index) || index < start || index >= end || index >= virtual.itemHeights.length) {
+        continue;
+      }
+      const height = measureTemplateOuterHeight(node);
+      if (height > 0) {
+        virtual.itemHeights[index] = height;
+        heights.push(height);
+      }
+    }
+    updateTemplateAverageHeight(virtual, heights);
+    rebuildTemplatePrefixOffsets(virtual);
+    const topSpacer = els.templatePreviewOutput.querySelector(".template-virtual-spacer-top");
+    const bottomSpacer = els.templatePreviewOutput.querySelector(".template-virtual-spacer-bottom");
+    if (topSpacer) {
+      topSpacer.style.height = `${getTemplateOffsetAtIndex(virtual, start)}px`;
+    }
+    if (bottomSpacer) {
+      const totalHeight = getTemplateOffsetAtIndex(virtual, virtual.itemCount);
+      bottomSpacer.style.height = `${Math.max(0, totalHeight - getTemplateOffsetAtIndex(virtual, end))}px`;
+    }
+  }
+
   function computeTemplateVirtualRangeFromScroll(scrollTop) {
     const virtual = getTemplateVirtualState();
     const total = Number(virtual.itemCount) || 0;
@@ -17767,7 +17878,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     const top = Math.max(0, Number(scrollTop) || 0);
-    const firstVisible = Math.max(0, Math.floor(top / estimatedHeight));
+    const firstVisible = findTemplateIndexAtOffset(virtual, top);
     let start = Math.max(0, firstVisible - metrics.overscanCount);
     let end = Math.min(total, start + metrics.targetCount);
     if ((end - start) < metrics.targetCount) {
@@ -17788,7 +17899,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const total = items.length;
     const start = Math.max(0, Math.min(total, Number(virtual.start) || 0));
     const end = Math.max(start, Math.min(total, Number(virtual.end) || 0));
-    const estimatedHeight = getTemplateEstimatedItemHeight(virtual);
+    rebuildTemplatePrefixOffsets(virtual);
     const config = virtual.config && typeof virtual.config === "object"
       ? virtual.config
       : getDefaultTemplateConfig();
@@ -17796,29 +17907,27 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const frag = document.createDocumentFragment();
     const topSpacer = document.createElement("div");
     topSpacer.className = "virtual-spacer template-virtual-spacer-top";
-    topSpacer.style.height = String(Math.max(0, Math.round(start * estimatedHeight))) + "px";
+    topSpacer.style.height = `${getTemplateOffsetAtIndex(virtual, start)}px`;
     topSpacer.setAttribute("aria-hidden", "true");
     frag.appendChild(topSpacer);
 
-    const heights = [];
     for (let index = start; index < end; index += 1) {
       const block = buildTemplateBlockElement(items[index], index, config, true);
       if (!block) {
         continue;
       }
       frag.appendChild(block);
-      heights.push(measureTemplateOuterHeight(block));
     }
 
     const bottomSpacer = document.createElement("div");
     bottomSpacer.className = "virtual-spacer template-virtual-spacer-bottom";
-    bottomSpacer.style.height = String(Math.max(0, Math.round((total - end) * estimatedHeight))) + "px";
+    bottomSpacer.style.height = `${Math.max(0, getTemplateOffsetAtIndex(virtual, total) - getTemplateOffsetAtIndex(virtual, end))}px`;
     bottomSpacer.setAttribute("aria-hidden", "true");
     frag.appendChild(bottomSpacer);
 
     els.templatePreviewOutput.classList.remove("muted");
     els.templatePreviewOutput.replaceChildren(frag);
-    updateTemplateAverageHeight(virtual, heights);
+    measureRenderedTemplateItems(virtual, start, end);
 
     if (opts.preserveScroll) {
       const maxTop = Math.max(0, Number(els.templatePreviewOutput.scrollHeight || 0) - Number(els.templatePreviewOutput.clientHeight || 0));
@@ -17839,8 +17948,15 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       virtual.pendingRaf = 0;
     }
 
+    if (virtual.sourceRenderObjects !== state.renderObjects) {
+      virtual.itemHeights = new Float64Array(0);
+      virtual.prefixOffsets = new Float64Array(1);
+    }
+    virtual.sourceRenderObjects = state.renderObjects;
     virtual.items = list;
     virtual.itemCount = list.length;
+    ensureTemplateHeightCache(virtual, virtual.itemCount);
+    rebuildTemplatePrefixOffsets(virtual);
     virtual.lineTargetMap = buildTemplateLineTargetMap(list);
     virtual.start = 0;
     virtual.end = 0;
@@ -17905,7 +18021,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     virtual.start = start;
     virtual.end = end;
-    const targetTop = Math.max(0, Math.round(start * getTemplateEstimatedItemHeight(virtual)));
+    const targetTop = Math.max(0, getTemplateOffsetAtIndex(virtual, start));
     renderTemplateVirtualRangeReplace({ preserveScroll: false, scrollTop: targetTop });
     return true;
   }
@@ -17917,6 +18033,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const virtual = getTemplateVirtualState();
     const total = Number(virtual.itemCount) || 0;
     if (!virtual.isInitialized || !total) {
+      return;
+    }
+    if (virtual.isAdjustingScroll) {
       return;
     }
 
@@ -17937,7 +18056,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
   function scheduleTemplateVirtualScroll() {
     const virtual = getTemplateVirtualState();
-    if (virtual.pendingRaf) {
+    if (virtual.pendingRaf || virtual.isAdjustingScroll) {
       return;
     }
     virtual.pendingRaf = requestAnimationFrame(() => {
@@ -17963,14 +18082,141 @@ function resetTemplateVirtualState() {
     virtual.lastScrollTop = 0;
     virtual.scrollDir = "down";
     virtual.isAdjustingScroll = false;
+    virtual.itemHeights = new Float64Array(0);
+    virtual.prefixOffsets = new Float64Array(1);
+    virtual.sourceRenderObjects = null;
     virtual.lineTargetMap = new Map();
     virtual.isInitialized = false;
+  }
+
+  function getTemplateAnchorNode(anchor) {
+    if (!els.templatePreviewOutput || !anchor || typeof anchor !== "object") {
+      return null;
+    }
+    const index = Number(anchor.templateIndex);
+    if (!Number.isFinite(index) || index < 0) {
+      return null;
+    }
+    if (anchor.kind === "cell") {
+      const row = Number(anchor.gridRow);
+      const col = Number(anchor.gridCol);
+      return els.templatePreviewOutput.querySelector(
+        `.template-block[data-template-index="${index}"] td.template-preview-editable[data-template-grid-row="${row}"][data-template-grid-col="${col}"]`
+      );
+    }
+    return els.templatePreviewOutput.querySelector(`.template-block[data-template-index="${index}"]`);
+  }
+
+  function captureTemplateViewportAnchor(preferred) {
+    if (!els.templatePreviewOutput) {
+      return null;
+    }
+    const container = els.templatePreviewOutput;
+    const containerRect = container.getBoundingClientRect();
+    const base = {
+      scrollTop: Number(container.scrollTop) || 0,
+      viewportOffset: 0
+    };
+    const preferredIndex = Number(preferred && preferred.templateIndex);
+    const preferredRow = Number(preferred && preferred.gridRow);
+    const preferredCol = Number(preferred && preferred.gridCol);
+    if (Number.isFinite(preferredIndex) && Number.isFinite(preferredRow) && Number.isFinite(preferredCol)) {
+      const anchor = {
+        ...base,
+        kind: "cell",
+        templateIndex: preferredIndex,
+        gridRow: preferredRow,
+        gridCol: preferredCol
+      };
+      const cell = getTemplateAnchorNode(anchor);
+      if (cell) {
+        anchor.viewportOffset = cell.getBoundingClientRect().top - containerRect.top;
+        return anchor;
+      }
+    }
+
+    const selectedBlock = state.selectedTemplateIndex !== ""
+      ? container.querySelector(`.template-block[data-template-index="${String(state.selectedTemplateIndex)}"]`)
+      : null;
+    const renderedBlocks = Array.from(container.querySelectorAll(".template-block[data-template-index]"));
+    const isVisible = (block) => {
+      if (!block) {
+        return false;
+      }
+      const rect = block.getBoundingClientRect();
+      return rect.bottom > containerRect.top && rect.top < containerRect.bottom;
+    };
+    const firstVisible = renderedBlocks.find((block) => {
+      return isVisible(block);
+    }) || null;
+    const block = isVisible(selectedBlock) ? selectedBlock : firstVisible;
+    if (!block) {
+      return { ...base, kind: "scroll" };
+    }
+    return {
+      ...base,
+      kind: "item",
+      templateIndex: Number(block.getAttribute("data-template-index")),
+      viewportOffset: block.getBoundingClientRect().top - containerRect.top
+    };
+  }
+
+  function restoreTemplateViewportAnchor(anchor) {
+    if (!els.templatePreviewOutput || !anchor || typeof anchor !== "object") {
+      return;
+    }
+    const container = els.templatePreviewOutput;
+    if (anchor.kind === "scroll") {
+      container.scrollTop = Math.max(0, Number(anchor.scrollTop) || 0);
+      return;
+    }
+    const index = Number(anchor.templateIndex);
+    if (!Number.isFinite(index) || index < 0 || !ensureTemplateWindowContainsIndex(index)) {
+      container.scrollTop = Math.max(0, Number(anchor.scrollTop) || 0);
+      return;
+    }
+
+    const virtual = getTemplateVirtualState();
+    if (virtual.pendingRaf) {
+      cancelAnimationFrame(virtual.pendingRaf);
+      virtual.pendingRaf = 0;
+    }
+    virtual.isAdjustingScroll = true;
+    const apply = () => {
+      const node = getTemplateAnchorNode(anchor);
+      if (!node) {
+        return;
+      }
+      const containerRect = container.getBoundingClientRect();
+      const currentOffset = node.getBoundingClientRect().top - containerRect.top;
+      const maxTop = Math.max(0, Number(container.scrollHeight || 0) - Number(container.clientHeight || 0));
+      const layoutHeight = Math.max(0, Number(container.offsetHeight) || Number(container.clientHeight) || 0);
+      const measuredScale = layoutHeight > 0 ? (Number(containerRect.height) || 0) / layoutHeight : 1;
+      const scrollScale = Number.isFinite(measuredScale) && measuredScale >= 0.5 && measuredScale <= 2
+        ? measuredScale
+        : 1;
+      const nextTop = (Number(container.scrollTop) || 0)
+        + ((currentOffset - (Number(anchor.viewportOffset) || 0)) / scrollScale);
+      container.scrollTop = Math.max(0, Math.min(maxTop, nextTop));
+    };
+    apply();
+    requestAnimationFrame(() => {
+      apply();
+      virtual.lastScrollTop = Number(container.scrollTop) || 0;
+      virtual.isAdjustingScroll = false;
+    });
   }
 
   function renderTemplatePreview() {
     if (!els.templatePreviewOutput) {
       return;
     }
+
+    const preferredAnchor = state.pendingTemplateViewportAnchor;
+    const viewportAnchor = preferredAnchor && preferredAnchor.kind
+      ? preferredAnchor
+      : captureTemplateViewportAnchor(preferredAnchor);
+    state.pendingTemplateViewportAnchor = null;
 
     if (!state.data || !Array.isArray(state.renderObjects)) {
       resetTemplateVirtualState();
@@ -18008,6 +18254,7 @@ function resetTemplateVirtualState() {
 
     const scrollTop = Number(els.templatePreviewOutput.scrollTop || 0) || 0;
     initTemplateVirtualWindow(items, config, { preserveScroll: true, scrollTop });
+    restoreTemplateViewportAnchor(viewportAnchor);
     state.templatePreviewCache = { count: items.length };
 
     if (state.selectedTemplateIndex !== "" && typeof setSelectedTemplateBlock === "function") {
@@ -18244,12 +18491,30 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
   }
 
   function selectCodeLines(lineStart, lineEnd) {
+    if (typeof navigateInputRange === "function") {
+      return navigateInputRange({
+        lineStart,
+        lineEnd,
+        segmentIndex: null,
+        anchorRatio: 0.28
+      });
+    }
     const text = els.inputText.value || "";
     state.inputLineOffsets = computeLineOffsets(text);
     const range = getSelectionRangeForLines(text, lineStart, lineEnd);
     els.inputText.focus();
     els.inputText.setSelectionRange(range.start, range.end);
     syncInputGutterScroll();
+  }
+
+  function getContainerScrollScale(container) {
+    if (!container || typeof container.getBoundingClientRect !== "function") {
+      return 1;
+    }
+    const rect = container.getBoundingClientRect();
+    const layoutHeight = Math.max(0, Number(container.offsetHeight) || Number(container.clientHeight) || 0);
+    const scale = layoutHeight > 0 ? (Number(rect && rect.height) || 0) / layoutHeight : 1;
+    return Number.isFinite(scale) && scale >= 0.5 && scale <= 2 ? scale : 1;
   }
 
   function scrollElementInContainer(container, element, options) {
@@ -18270,21 +18535,22 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     const currentTop = Number(container.scrollTop || 0) || 0;
+    const scrollScale = getContainerScrollScale(container);
     let nextTop = currentTop;
 
     if (mode === "start") {
-      nextTop = currentTop + (elementRect.top - containerRect.top) - padTop;
+      nextTop = currentTop + ((elementRect.top - containerRect.top - padTop) / scrollScale);
     } else if (mode === "center") {
       nextTop = currentTop
-        + (elementRect.top + (elementRect.height / 2))
-        - (containerRect.top + (containerRect.height / 2));
+        + ((elementRect.top + (elementRect.height / 2)
+          - (containerRect.top + (containerRect.height / 2))) / scrollScale);
     } else {
       const topLimit = containerRect.top + padTop;
       const bottomLimit = containerRect.bottom - padBottom;
       if (elementRect.top < topLimit) {
-        nextTop = currentTop + (elementRect.top - topLimit);
+        nextTop = currentTop + ((elementRect.top - topLimit) / scrollScale);
       } else if (elementRect.bottom > bottomLimit) {
-        nextTop = currentTop + (elementRect.bottom - bottomLimit);
+        nextTop = currentTop + ((elementRect.bottom - bottomLimit) / scrollScale);
       } else {
         return;
       }
@@ -20284,6 +20550,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         pendingRaf: 0,
         isAdjustingScroll: false,
         avgItemHeight: 200,
+        itemHeights: new Float64Array(0),
+        prefixOffsets: new Float64Array(1),
+        sourceRenderObjects: null,
         idToRootIndex: new Map(),
         lineTargetMap: new Map(),
         isInitialized: false
@@ -20294,6 +20563,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
     if (!(state.outputVirtual.lineTargetMap instanceof Map)) {
       state.outputVirtual.lineTargetMap = new Map();
+    }
+    if (!(state.outputVirtual.itemHeights instanceof Float64Array)) {
+      state.outputVirtual.itemHeights = new Float64Array(0);
+    }
+    if (!(state.outputVirtual.prefixOffsets instanceof Float64Array)) {
+      state.outputVirtual.prefixOffsets = new Float64Array(1);
     }
     return state.outputVirtual;
   }
@@ -20364,7 +20639,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     } catch {
       // ignore
     }
-    return Math.max(0, rect.height + marginTop + marginBottom);
+    const scrollScale = getContainerScrollScale(els.output);
+    return Math.max(0, (rect.height / scrollScale) + marginTop + marginBottom);
   }
 
   function updateAverageItemHeight(virtualState, heights, minimum) {
@@ -20459,6 +20735,87 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return Math.max(24, Number(virtual && virtual.avgItemHeight) || 200);
   }
 
+  function ensureOutputHeightCache(virtual, itemCount) {
+    const total = Math.max(0, Number(itemCount) || 0);
+    if (!(virtual.itemHeights instanceof Float64Array) || virtual.itemHeights.length !== total) {
+      virtual.itemHeights = new Float64Array(total);
+    }
+    if (!(virtual.prefixOffsets instanceof Float64Array) || virtual.prefixOffsets.length !== (total + 1)) {
+      virtual.prefixOffsets = new Float64Array(total + 1);
+    }
+  }
+
+  function rebuildOutputPrefixOffsets(virtual) {
+    const total = Math.max(0, Number(virtual && virtual.itemCount) || 0);
+    ensureOutputHeightCache(virtual, total);
+    const estimate = getOutputEstimatedItemHeight(virtual);
+    virtual.prefixOffsets[0] = 0;
+    for (let index = 0; index < total; index += 1) {
+      const measured = Number(virtual.itemHeights[index]) || 0;
+      virtual.prefixOffsets[index + 1] = virtual.prefixOffsets[index] + (measured > 0 ? measured : estimate);
+    }
+  }
+
+  function getOutputOffsetAtIndex(virtual, index) {
+    const total = Math.max(0, Number(virtual && virtual.itemCount) || 0);
+    const safeIndex = Math.max(0, Math.min(total, Number(index) || 0));
+    if (!(virtual.prefixOffsets instanceof Float64Array) || virtual.prefixOffsets.length !== (total + 1)) {
+      rebuildOutputPrefixOffsets(virtual);
+    }
+    return Number(virtual.prefixOffsets[safeIndex]) || 0;
+  }
+
+  function findOutputIndexAtOffset(virtual, scrollTop) {
+    const total = Math.max(0, Number(virtual && virtual.itemCount) || 0);
+    if (!total) {
+      return 0;
+    }
+    if (!(virtual.prefixOffsets instanceof Float64Array) || virtual.prefixOffsets.length !== (total + 1)) {
+      rebuildOutputPrefixOffsets(virtual);
+    }
+    const target = Math.max(0, Number(scrollTop) || 0);
+    let low = 0;
+    let high = total;
+    while (low < high) {
+      const mid = Math.floor((low + high) / 2);
+      if (virtual.prefixOffsets[mid + 1] <= target) {
+        low = mid + 1;
+      } else {
+        high = mid;
+      }
+    }
+    return Math.max(0, Math.min(total - 1, low));
+  }
+
+  function measureRenderedOutputItems(virtual, start, end) {
+    if (!els.output) {
+      return;
+    }
+    const heights = [];
+    for (const node of Array.from(els.output.querySelectorAll("[data-virtual-item-index]"))) {
+      const index = Number(node.getAttribute("data-virtual-item-index"));
+      if (!Number.isFinite(index) || index < start || index >= end || index >= virtual.itemHeights.length) {
+        continue;
+      }
+      const height = measureOuterHeight(node);
+      if (height > 0) {
+        virtual.itemHeights[index] = height;
+        heights.push(height);
+      }
+    }
+    updateAverageItemHeight(virtual, heights, 80);
+    rebuildOutputPrefixOffsets(virtual);
+    const topSpacer = els.output.querySelector(".output-virtual-spacer-top");
+    const bottomSpacer = els.output.querySelector(".output-virtual-spacer-bottom");
+    if (topSpacer) {
+      topSpacer.style.height = `${getOutputOffsetAtIndex(virtual, start)}px`;
+    }
+    if (bottomSpacer) {
+      const totalHeight = getOutputOffsetAtIndex(virtual, virtual.itemCount);
+      bottomSpacer.style.height = `${Math.max(0, totalHeight - getOutputOffsetAtIndex(virtual, end))}px`;
+    }
+  }
+
   function computeOutputVirtualRangeFromScroll(scrollTop) {
     const virtual = getOutputVirtualState();
     const total = Number(virtual.itemCount) || 0;
@@ -20473,7 +20830,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     const top = Math.max(0, Number(scrollTop) || 0);
-    const firstVisible = Math.max(0, Math.floor(top / estimatedHeight));
+    const firstVisible = findOutputIndexAtOffset(virtual, top);
     let start = Math.max(0, firstVisible - metrics.overscanCount);
     let end = Math.min(total, start + metrics.targetCount);
     if ((end - start) < metrics.targetCount) {
@@ -20493,34 +20850,32 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const total = items.length;
     const start = Math.max(0, Math.min(total, Number(virtual.start) || 0));
     const end = Math.max(start, Math.min(total, Number(virtual.end) || 0));
-    const estimatedHeight = getOutputEstimatedItemHeight(virtual);
+    rebuildOutputPrefixOffsets(virtual);
 
     const frag = document.createDocumentFragment();
     const topSpacer = document.createElement("div");
     topSpacer.className = "virtual-spacer output-virtual-spacer-top";
-    topSpacer.style.height = String(Math.max(0, Math.round(start * estimatedHeight))) + "px";
+    topSpacer.style.height = `${getOutputOffsetAtIndex(virtual, start)}px`;
     topSpacer.setAttribute("aria-hidden", "true");
     frag.appendChild(topSpacer);
 
-    const heights = [];
     for (let index = start; index < end; index += 1) {
       const elNode = buildOutputRootElement(items[index], index);
       if (!elNode) {
         continue;
       }
       frag.appendChild(elNode);
-      heights.push(measureOuterHeight(elNode));
     }
 
     const bottomSpacer = document.createElement("div");
     bottomSpacer.className = "virtual-spacer output-virtual-spacer-bottom";
-    bottomSpacer.style.height = String(Math.max(0, Math.round((total - end) * estimatedHeight))) + "px";
+    bottomSpacer.style.height = `${Math.max(0, getOutputOffsetAtIndex(virtual, total) - getOutputOffsetAtIndex(virtual, end))}px`;
     bottomSpacer.setAttribute("aria-hidden", "true");
     frag.appendChild(bottomSpacer);
 
     els.output.classList.remove("muted");
     els.output.replaceChildren(frag);
-    updateAverageItemHeight(virtual, heights, 80);
+    measureRenderedOutputItems(virtual, start, end);
 
     if (opts.preserveScroll) {
       const maxTop = Math.max(0, Number(els.output.scrollHeight || 0) - Number(els.output.clientHeight || 0));
@@ -20543,8 +20898,15 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     const virtualData = buildOutputVirtualData(roots);
+    if (virtual.sourceRenderObjects !== state.renderObjects) {
+      virtual.itemHeights = new Float64Array(0);
+      virtual.prefixOffsets = new Float64Array(1);
+    }
+    virtual.sourceRenderObjects = state.renderObjects;
     virtual.roots = virtualData.items;
     virtual.itemCount = virtualData.items.length;
+    ensureOutputHeightCache(virtual, virtual.itemCount);
+    rebuildOutputPrefixOffsets(virtual);
     virtual.idToRootIndex = virtualData.idToRootIndex;
     virtual.lineTargetMap = virtualData.lineTargetMap;
     virtual.start = 0;
@@ -20608,7 +20970,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     virtual.start = start;
     virtual.end = end;
-    const targetTop = Math.max(0, Math.round(start * getOutputEstimatedItemHeight(virtual)));
+    const targetTop = Math.max(0, getOutputOffsetAtIndex(virtual, start));
     renderOutputVirtualInitialRange({ preserveScroll: false, scrollTop: targetTop });
     return true;
   }
@@ -20620,6 +20982,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const virtual = getOutputVirtualState();
     const total = Number(virtual.itemCount) || 0;
     if (!virtual.isInitialized || !total) {
+      return;
+    }
+    if (virtual.isAdjustingScroll) {
       return;
     }
 
@@ -20640,7 +21005,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
   function scheduleOutputVirtualScroll() {
     const virtual = getOutputVirtualState();
-    if (virtual.pendingRaf) {
+    if (virtual.pendingRaf || virtual.isAdjustingScroll) {
       return;
     }
     virtual.pendingRaf = requestAnimationFrame(() => {
@@ -20666,9 +21031,50 @@ function resetOutputVirtualState() {
     virtual.lastScrollTop = 0;
     virtual.scrollDir = "down";
     virtual.isAdjustingScroll = false;
+    virtual.itemHeights = new Float64Array(0);
+    virtual.prefixOffsets = new Float64Array(1);
+    virtual.sourceRenderObjects = null;
     virtual.idToRootIndex = new Map();
     virtual.lineTargetMap = new Map();
     virtual.isInitialized = false;
+  }
+
+  function alignVirtualTargetAfterRender(container, virtual, selector, initialNode) {
+    if (!container || !virtual) {
+      return;
+    }
+    if (virtual.pendingRaf) {
+      cancelAnimationFrame(virtual.pendingRaf);
+      virtual.pendingRaf = 0;
+    }
+    virtual.isAdjustingScroll = true;
+
+    const align = () => {
+      const node = selector ? container.querySelector(selector) : initialNode;
+      if (!node) {
+        return true;
+      }
+      const offsetError = node.getBoundingClientRect().top - container.getBoundingClientRect().top - 10;
+      if (Math.abs(offsetError) <= 1) {
+        return true;
+      }
+      scrollElementInContainer(container, node, { mode: "start", padTop: 10, padBottom: 10 });
+      return false;
+    };
+
+    align();
+    const settle = (remainingFrames) => {
+      const isSettled = align();
+      if (!isSettled && remainingFrames > 0) {
+        requestAnimationFrame(() => settle(remainingFrames - 1));
+        return;
+      }
+      requestAnimationFrame(() => {
+        virtual.lastScrollTop = Number(container.scrollTop || 0) || 0;
+        virtual.isAdjustingScroll = false;
+      });
+    };
+    requestAnimationFrame(() => settle(4));
   }
 
   function setSelectedCard(id, options) {
@@ -20703,7 +21109,17 @@ function resetOutputVirtualState() {
     if (next) {
       next.classList.add("selected");
       if (shouldScroll) {
-        scrollElementInContainer(els.output, next, { mode: scrollMode, padTop: 10, padBottom: 10 });
+        const virtual = getOutputVirtualState();
+        if (scrollMode === "start" && virtual.isInitialized) {
+          alignVirtualTargetAfterRender(
+            els.output,
+            virtual,
+            `[data-id="${escapeSelectorValue(normalized)}"]`,
+            next
+          );
+        } else {
+          scrollElementInContainer(els.output, next, { mode: scrollMode, padTop: 10, padBottom: 10 });
+        }
       }
     }
   }
@@ -20748,23 +21164,75 @@ function resetOutputVirtualState() {
     if (next) {
       next.classList.add("selected");
       if (shouldScroll) {
-        scrollElementInContainer(els.templatePreviewOutput, next, { mode: scrollMode, padTop: 10, padBottom: 10 });
+        const virtual = getTemplateVirtualStateForOutput();
+        if (scrollMode === "start" && virtual.isInitialized) {
+          alignVirtualTargetAfterRender(
+            els.templatePreviewOutput,
+            virtual,
+            `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`,
+            next
+          );
+        } else {
+          scrollElementInContainer(els.templatePreviewOutput, next, { mode: scrollMode, padTop: 10, padBottom: 10 });
+        }
       }
     }
   }
 
   function getInputGutterLineHeightPx() {
+    return measureInputLineMetrics().effectivePitch;
+  }
+
+  function measureInputLineMetrics() {
+    const fallback = {
+      lineCount: Math.max(1, Number(state.inputLineCount) || 1),
+      nominalPitch: 18,
+      effectivePitch: 18,
+      paddingTop: 0,
+      paddingBottom: 0
+    };
     if (!els.inputText) {
-      return 18;
+      return fallback;
     }
-    let lineHeight = 0;
+
+    const lineCount = Math.max(1, Number(state.inputLineCount) || countInputLines(els.inputText.value || ""));
+    let nominalPitch = 18;
+    let paddingTop = 0;
+    let paddingBottom = 0;
     try {
       const style = window.getComputedStyle(els.inputText);
-      lineHeight = Number.parseFloat(style && style.lineHeight ? style.lineHeight : "0") || 0;
+      nominalPitch = Number.parseFloat(style && style.lineHeight ? style.lineHeight : "18") || 18;
+      paddingTop = Number.parseFloat(style && style.paddingTop ? style.paddingTop : "0") || 0;
+      paddingBottom = Number.parseFloat(style && style.paddingBottom ? style.paddingBottom : "0") || 0;
     } catch {
       // ignore
     }
-    return Math.max(12, lineHeight || 18);
+    nominalPitch = Math.max(12, nominalPitch);
+
+    let effectivePitch = nominalPitch;
+    const scrollHeight = Math.max(0, Number(els.inputText.scrollHeight) || 0);
+    const clientHeight = Math.max(0, Number(els.inputText.clientHeight) || 0);
+    const contentHeight = scrollHeight - paddingTop - paddingBottom;
+    const measuredPitch = lineCount > 0 ? (contentHeight / lineCount) : 0;
+    const minPitch = nominalPitch * 0.9;
+    const maxPitch = nominalPitch * 1.1;
+    if (
+      lineCount > 1
+      && scrollHeight > (clientHeight + 1)
+      && Number.isFinite(measuredPitch)
+      && measuredPitch >= minPitch
+      && measuredPitch <= maxPitch
+    ) {
+      effectivePitch = measuredPitch;
+    }
+
+    return {
+      lineCount,
+      nominalPitch,
+      effectivePitch,
+      paddingTop,
+      paddingBottom
+    };
   }
 
   function scheduleInputGutterVirtualRender() {
@@ -20783,11 +21251,18 @@ function resetOutputVirtualState() {
       return;
     }
     const opts = options && typeof options === "object" ? options : {};
-    const force = opts.force === true;
+    let force = opts.force === true;
     const virtual = getInputGutterVirtualState();
     const lineCount = Math.max(1, Number(state.inputLineCount) || 1);
     const scrollTop = Number(els.inputText.scrollTop || 0) || 0;
-    const lineHeight = Math.max(12, Number(virtual.lineHeightPx) || getInputGutterLineHeightPx() || 18);
+    const lineMetrics = measureInputLineMetrics();
+    const lineHeight = Math.max(12, Number(lineMetrics.effectivePitch) || 18);
+    if (Math.abs((Number(virtual.lineHeightPx) || 0) - lineHeight) > 0.0001) {
+      force = true;
+    }
+    if (els.inputGutter && els.inputGutter.style) {
+      els.inputGutter.style.setProperty("--input-line-pitch", `${lineHeight}px`);
+    }
     const visibleLines = Math.max(1, Math.ceil((Number(els.inputText.clientHeight) || 0) / lineHeight));
     const overscanLines = Math.max(6, Math.ceil(visibleLines * 0.75));
     const firstVisibleLine = Math.max(1, Math.floor(scrollTop / lineHeight) + 1);
@@ -20805,8 +21280,8 @@ function resetOutputVirtualState() {
     virtual.endLine = endLine;
     virtual.lineHeightPx = lineHeight;
     virtual.overscanLines = overscanLines;
-    virtual.topPadPx = Math.max(0, Math.round((startLine - 1) * lineHeight));
-    virtual.bottomPadPx = Math.max(0, Math.round((lineCount - endLine) * lineHeight));
+    virtual.topPadPx = Math.max(0, (startLine - 1) * lineHeight);
+    virtual.bottomPadPx = Math.max(0, (lineCount - endLine) * lineHeight);
     virtual.lastScrollTop = scrollTop;
     virtual.isInitialized = true;
 
@@ -20827,6 +21302,7 @@ function resetOutputVirtualState() {
     for (let line = startLine; line <= endLine; line += 1) {
       const row = document.createElement("div");
       row.className = "gutter-line";
+      row.style.height = `${lineHeight}px`;
 
       const btn = document.createElement("button");
       btn.type = "button";
@@ -20871,7 +21347,7 @@ function resetOutputVirtualState() {
     state.inputLineCount = Math.max(1, countInputLines(els.inputText.value || ""));
 
     const virtual = getInputGutterVirtualState();
-    virtual.lineHeightPx = getInputGutterLineHeightPx();
+    virtual.lineHeightPx = measureInputLineMetrics().effectivePitch;
     renderInputGutterWindow({ force: true });
   }
 
@@ -20927,8 +21403,84 @@ function resetOutputVirtualState() {
     return targets;
   }
 
+  function captureOutputViewportAnchor() {
+    if (!els.output) {
+      return null;
+    }
+    const container = els.output;
+    const containerRect = container.getBoundingClientRect();
+    const renderedItems = Array.from(container.querySelectorAll("[data-virtual-item-index]"));
+    const isVisible = (node) => {
+      if (!node) {
+        return false;
+      }
+      const rect = node.getBoundingClientRect();
+      return rect.bottom > containerRect.top && rect.top < containerRect.bottom;
+    };
+    const selected = state.selectedId
+      ? container.querySelector(`[data-id="${escapeSelectorValue(state.selectedId)}"]`)
+      : null;
+    const node = isVisible(selected) ? selected : (renderedItems.find(isVisible) || null);
+    if (!node) {
+      return { kind: "scroll", scrollTop: Number(container.scrollTop) || 0 };
+    }
+    return {
+      kind: "item",
+      id: String(node.getAttribute("data-id") || ""),
+      rootIndex: Number(node.getAttribute("data-virtual-item-index")),
+      viewportOffset: node.getBoundingClientRect().top - containerRect.top,
+      scrollTop: Number(container.scrollTop) || 0
+    };
+  }
+
+  function restoreOutputViewportAnchor(anchor) {
+    if (!els.output || !anchor || typeof anchor !== "object") {
+      return;
+    }
+    const container = els.output;
+    if (anchor.kind === "scroll") {
+      container.scrollTop = Math.max(0, Number(anchor.scrollTop) || 0);
+      return;
+    }
+    const virtual = getOutputVirtualState();
+    const mappedIndex = anchor.id && virtual.idToRootIndex.has(anchor.id)
+      ? Number(virtual.idToRootIndex.get(anchor.id))
+      : Number(anchor.rootIndex);
+    if (!Number.isFinite(mappedIndex) || mappedIndex < 0 || !ensureOutputWindowContainsRootIndex(mappedIndex)) {
+      container.scrollTop = Math.max(0, Number(anchor.scrollTop) || 0);
+      return;
+    }
+
+    if (virtual.pendingRaf) {
+      cancelAnimationFrame(virtual.pendingRaf);
+      virtual.pendingRaf = 0;
+    }
+    virtual.isAdjustingScroll = true;
+    const apply = () => {
+      const node = anchor.id
+        ? container.querySelector(`[data-id="${escapeSelectorValue(anchor.id)}"]`)
+        : container.querySelector(`[data-virtual-item-index="${mappedIndex}"]`);
+      if (!node) {
+        return;
+      }
+      const currentOffset = node.getBoundingClientRect().top - container.getBoundingClientRect().top;
+      const maxTop = Math.max(0, Number(container.scrollHeight || 0) - Number(container.clientHeight || 0));
+      const nextTop = (Number(container.scrollTop) || 0)
+        + ((currentOffset - (Number(anchor.viewportOffset) || 0)) / getContainerScrollScale(container));
+      container.scrollTop = Math.max(0, Math.min(maxTop, nextTop));
+    };
+    apply();
+    requestAnimationFrame(() => {
+      apply();
+      virtual.lastScrollTop = Number(container.scrollTop) || 0;
+      virtual.isAdjustingScroll = false;
+    });
+  }
+
   function renderOutput() {
     const previousScrollTop = els.output ? (Number(els.output.scrollTop || 0) || 0) : 0;
+    const viewportAnchor = state.pendingOutputViewportAnchor || captureOutputViewportAnchor();
+    state.pendingOutputViewportAnchor = null;
 
     if (!state.data || !Array.isArray(state.renderObjects)) {
       resetOutputVirtualState();
@@ -20949,6 +21501,7 @@ function resetOutputVirtualState() {
     }
 
     initOutputVirtualWindow(filteredRoots, { preserveScroll: true, scrollTop: previousScrollTop });
+    restoreOutputViewportAnchor(viewportAnchor);
     if (state.selectedId) {
       setSelectedCard(state.selectedId, { scroll: false, ensure: false });
     }
@@ -21508,50 +22061,79 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return null;
   }
 
-  function jumpInputToCodeRange(lineStart, lineEnd, segmentIndex) {
-    const start = Math.max(1, Number(lineStart) || 1);
-    const end = Math.max(start, Number(lineEnd) || start);
-    const targetSegmentIndex = Number.isFinite(Number(segmentIndex))
-      ? Math.max(0, Math.floor(Number(segmentIndex)))
-      : null;
-
-    if (targetSegmentIndex !== null && typeof goToInputLine === "function") {
-      goToInputLine({ line: start, segmentIndex: targetSegmentIndex });
-      return;
-    }
-
-    if (typeof selectCodeLines === "function") {
-      selectCodeLines(start, end);
-    } else if (els.inputText) {
-      const text = String(els.inputText.value || "");
-      const lines = text.split(/\r\n|\r|\n/);
-      const toOffset = (lineNo) => {
-        const line = Math.max(1, Math.min(lines.length || 1, Number(lineNo) || 1));
-        let offset = 0;
-        for (let i = 0; i < line - 1; i += 1) {
-          offset += lines[i].length + 1;
-        }
-        return offset;
-      };
-      const startOffset = toOffset(start);
-      const endOffset = toOffset(end + 1);
-      els.inputText.focus();
-      els.inputText.setSelectionRange(startOffset, Math.max(startOffset, endOffset));
-    }
-
+  function focusInputWithoutPageScroll() {
     if (!els.inputText) {
       return;
     }
-    const lineHeight = typeof getInputGutterLineHeightPx === "function"
-      ? Math.max(12, Number(getInputGutterLineHeightPx()) || 18)
-      : 18;
-    const viewportHeight = Math.max(0, Number(els.inputText.clientHeight) || 0);
-    const offsetTop = Math.max(0, Math.round(viewportHeight * 0.28));
-    const targetTop = Math.max(0, Math.round(((start - 1) * lineHeight) - offsetTop));
-    els.inputText.scrollTop = targetTop;
-    if (typeof syncInputGutterScroll === "function") {
-      syncInputGutterScroll();
+    try {
+      els.inputText.focus({ preventScroll: true });
+    } catch {
+      els.inputText.focus();
     }
+  }
+
+  function navigateInputRange(options) {
+    if (!els.inputText) {
+      return { line: 1, total: 1 };
+    }
+    const opts = options && typeof options === "object" ? options : {};
+    const totalLines = getCurrentInputLineCount();
+    const start = Math.max(1, Math.min(totalLines, Math.floor(Number(opts.lineStart) || 1)));
+    const end = Math.max(start, Math.min(totalLines, Math.floor(Number(opts.lineEnd) || start)));
+    const hasSegmentIndex = opts.segmentIndex !== null
+      && opts.segmentIndex !== undefined
+      && String(opts.segmentIndex).trim() !== "";
+    const segmentIndex = hasSegmentIndex && Number.isFinite(Number(opts.segmentIndex))
+      ? Math.max(0, Math.floor(Number(opts.segmentIndex)))
+      : null;
+    const anchorRatio = Math.max(0, Math.min(0.9, Number(opts.anchorRatio) || 0));
+    const text = String(els.inputText.value || "");
+    const offsets = typeof computeLineOffsets === "function" ? computeLineOffsets(text) : [0];
+    state.inputLineOffsets = offsets;
+
+    let selectionStart = Number(offsets[start - 1]) || 0;
+    let selectionEnd = Number(offsets[end]) || text.length;
+    if (segmentIndex !== null) {
+      const lineEndOffset = Number(offsets[start]) || text.length;
+      const lineText = text.slice(selectionStart, lineEndOffset);
+      const segmentRange = getSegmentRangeForLine(lineText, segmentIndex);
+      if (segmentRange) {
+        selectionStart += segmentRange.start;
+        selectionEnd = (Number(offsets[start - 1]) || 0) + segmentRange.end;
+      } else {
+        selectionEnd = Math.max(selectionStart, lineEndOffset > selectionStart ? lineEndOffset - 1 : selectionStart);
+      }
+    }
+
+    focusInputWithoutPageScroll();
+    els.inputText.setSelectionRange(selectionStart, Math.max(selectionStart, selectionEnd));
+
+    const applyScroll = () => {
+      const metrics = typeof measureInputLineMetrics === "function"
+        ? measureInputLineMetrics()
+        : { effectivePitch: 18 };
+      const pitch = Math.max(12, Number(metrics && metrics.effectivePitch) || 18);
+      const viewportHeight = Math.max(0, Number(els.inputText.clientHeight) || 0);
+      const maxTop = Math.max(0, (Number(els.inputText.scrollHeight) || 0) - viewportHeight);
+      const targetTop = ((start - 1) * pitch) - (viewportHeight * anchorRatio);
+      els.inputText.scrollTop = Math.max(0, Math.min(maxTop, targetTop));
+      if (typeof syncInputGutterScroll === "function") {
+        syncInputGutterScroll();
+      }
+    };
+
+    applyScroll();
+    requestAnimationFrame(applyScroll);
+    return { line: start, total: totalLines };
+  }
+
+  function jumpInputToCodeRange(lineStart, lineEnd, segmentIndex) {
+    return navigateInputRange({
+      lineStart,
+      lineEnd,
+      segmentIndex,
+      anchorRatio: 0.28
+    });
   }
 
   function interceptOutputCodeButtonClick(ev) {
@@ -24587,56 +25169,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       ? Math.max(0, Math.floor(Number(inputLine.segmentIndex)))
       : null;
 
-    if (typeof selectCodeLines === "function" && targetSegmentIndex === null) {
-      selectCodeLines(targetLine, targetLine);
-      return { line: targetLine, total: totalLines };
-    }
-
-    const text = els.inputText.value || "";
-    const offsets = Array.isArray(state.inputLineOffsets) && state.inputLineOffsets.length
-      ? state.inputLineOffsets
-      : computeLineOffsets(text);
-    const startOffset = Number(offsets[Math.max(0, targetLine - 1)]) || 0;
-    const nextOffsetIndex = Math.min(offsets.length - 1, targetLine);
-    const nextOffset = Number(offsets[nextOffsetIndex]);
-    const endOffset = Number.isFinite(nextOffset) && nextOffset > startOffset
-      ? Math.max(startOffset, nextOffset - 1)
-      : startOffset;
-
-    els.inputText.focus();
-    if (targetSegmentIndex !== null) {
-      const lineStartOffset = Number(offsets[Math.max(0, targetLine - 1)]) || 0;
-      const lineEndOffset = Number(offsets[Math.min(offsets.length - 1, targetLine)]) || text.length;
-      const lineText = text.slice(lineStartOffset, lineEndOffset);
-      const segmentRange = getSegmentRangeForLine(lineText, targetSegmentIndex);
-      if (segmentRange) {
-        els.inputText.selectionStart = lineStartOffset + segmentRange.start;
-        els.inputText.selectionEnd = lineStartOffset + segmentRange.end;
-      } else {
-        els.inputText.selectionStart = startOffset;
-        els.inputText.selectionEnd = endOffset;
-      }
-    } else {
-      els.inputText.selectionStart = startOffset;
-      els.inputText.selectionEnd = endOffset;
-    }
-
-    let lineHeight = 18;
-    try {
-      lineHeight = Number.parseFloat(window.getComputedStyle(els.inputText).lineHeight || "18") || 18;
-    } catch {
-      lineHeight = 18;
-    }
-    const targetScrollTop = Math.max(
-      0,
-      Math.round(((targetLine - 1) * lineHeight) - ((Number(els.inputText.clientHeight) || 0) * 0.35))
-    );
-    els.inputText.scrollTop = targetScrollTop;
-    if (typeof syncInputGutterScroll === "function") {
-      syncInputGutterScroll();
-    }
-
-    return { line: targetLine, total: totalLines };
+    return navigateInputRange({
+      lineStart: targetLine,
+      lineEnd: targetLine,
+      segmentIndex: targetSegmentIndex,
+      anchorRatio: 0.35
+    });
   }
 
   function submitInputGotoLine() {
@@ -25345,6 +25883,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (els.inputText) {
       els.inputText.addEventListener("input", rebuildInputGutter);
       els.inputText.addEventListener("scroll", syncInputGutterScroll);
+    }
+    if (typeof window !== "undefined" && typeof syncInputGutterScroll === "function") {
+      window.addEventListener("resize", syncInputGutterScroll, { passive: true });
+      if (window.visualViewport && typeof window.visualViewport.addEventListener === "function") {
+        window.visualViewport.addEventListener("resize", syncInputGutterScroll, { passive: true });
+      }
     }
     if (els.output && typeof handleOutputVirtualScroll === "function") {
       els.output.addEventListener("scroll", handleOutputVirtualScroll, { passive: true });

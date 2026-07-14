@@ -100,6 +100,122 @@ async function waitForViewerUi(window) {
   await new Promise((resolve) => window.setTimeout(resolve, 0));
 }
 
+async function settleViewerUi(window, ticks = 6) {
+  for (let index = 0; index < ticks; index += 1) {
+    await waitForViewerUi(window);
+  }
+}
+
+function createLayoutRect(top, height, width = 640) {
+  return {
+    x: 0,
+    y: top,
+    top,
+    right: width,
+    bottom: top + height,
+    left: 0,
+    width,
+    height,
+    toJSON() {
+      return {};
+    }
+  };
+}
+
+function installVirtualLayoutMock(window, container, kind, itemCount, getItemHeight, options) {
+  const prototype = window.HTMLElement.prototype;
+  const originalGetBoundingClientRect = prototype.getBoundingClientRect;
+  const isTemplate = kind === "template";
+  const rootSelector = isTemplate
+    ? ".template-block[data-template-index]"
+    : "[data-virtual-item-index]";
+  const topSpacerSelector = isTemplate
+    ? ".template-virtual-spacer-top"
+    : ".output-virtual-spacer-top";
+  const containerTop = 100;
+  const clientHeight = 800;
+  const opts = options && typeof options === "object" ? options : {};
+  const visualScale = Math.max(0.5, Math.min(2, Number(opts.visualScale) || 1));
+  const outerHeightAt = (index) => Math.max(1, Number(getItemHeight(index)) || 1) + (isTemplate ? 10 : 0);
+
+  Object.defineProperty(container, "clientHeight", {
+    configurable: true,
+    get() {
+      return clientHeight;
+    }
+  });
+  Object.defineProperty(container, "offsetHeight", {
+    configurable: true,
+    get() {
+      return clientHeight;
+    }
+  });
+  Object.defineProperty(container, "scrollHeight", {
+    configurable: true,
+    get() {
+      let total = 0;
+      for (let index = 0; index < itemCount; index += 1) {
+        total += outerHeightAt(index);
+      }
+      return total;
+    }
+  });
+  container.scrollTo = ({ top }) => {
+    const requestedTop = Number(top) || 0;
+    const convergenceFactor = Math.max(0.05, Math.min(1, Number(opts.scrollConvergenceFactor) || 1));
+    container.scrollTop = (Number(container.scrollTop) || 0)
+      + ((requestedTop - (Number(container.scrollTop) || 0)) * convergenceFactor);
+    if (opts.scrollEventViaRaf) {
+      window.requestAnimationFrame(() => container.dispatchEvent(new window.Event("scroll")));
+    } else {
+      window.setTimeout(() => container.dispatchEvent(new window.Event("scroll")), 0);
+    }
+  };
+
+  prototype.getBoundingClientRect = function getMockedBoundingClientRect() {
+    if (this === container) {
+      return createLayoutRect(containerTop, clientHeight * visualScale);
+    }
+    if (!this.isConnected || !container.contains(this)) {
+      return originalGetBoundingClientRect.call(this);
+    }
+
+    const root = typeof this.closest === "function" ? this.closest(rootSelector) : null;
+    if (!root || !container.contains(root)) {
+      return originalGetBoundingClientRect.call(this);
+    }
+
+    const renderedRoots = Array.from(container.querySelectorAll(rootSelector));
+    const rootPosition = renderedRoots.indexOf(root);
+    const itemIndex = Number(root.getAttribute(isTemplate ? "data-template-index" : "data-virtual-item-index"));
+    const topSpacer = container.querySelector(topSpacerSelector);
+    let top = containerTop + (
+      (Number.parseFloat(topSpacer && topSpacer.style.height ? topSpacer.style.height : "0") || 0)
+      - (Number(container.scrollTop) || 0)
+    ) * visualScale;
+    for (let position = 0; position < rootPosition; position += 1) {
+      const previousIndex = Number(renderedRoots[position].getAttribute(
+        isTemplate ? "data-template-index" : "data-virtual-item-index"
+      ));
+      top += outerHeightAt(previousIndex) * visualScale;
+    }
+
+    let innerOffset = 0;
+    let height = Math.max(1, Number(getItemHeight(itemIndex)) || 1);
+    if (this !== root) {
+      height = 18;
+      if (this.matches && this.matches("td.template-preview-editable")) {
+        innerOffset = 42;
+      }
+    }
+    return createLayoutRect(top + (innerOffset * visualScale), height * visualScale);
+  };
+
+  return () => {
+    prototype.getBoundingClientRect = originalGetBoundingClientRect;
+  };
+}
+
 async function assertFailedRenderClearsPreviousResult() {
   const dom = await renderFixture([
     "REPORT z_render_error.",
@@ -728,6 +844,312 @@ async function assertLegacyPathAliasUsesTemplateIndexAfterPerformExpansion() {
   assert(findTemplateCellByText(appendTable, "Legacy shifted A"), "Expected Template to resolve the same shifted legacy alias.");
 
   dom.window.close();
+}
+
+async function assertInputPitchAndCodeNavigationUseNativeTextareaMetrics() {
+  const dom = await renderFixture("CLEAR seed.");
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+  const lineCount = 8001;
+  const targetLine = 7000;
+  let nativeScrollHeight = 144101;
+  const paddingY = 20;
+  const expectedPitch = (nativeScrollHeight - paddingY) / lineCount;
+  const lines = Array.from({ length: lineCount }, (_, index) => (
+    `CLEAR gv_${String(index + 1).padStart(5, "0")}. \"日本語の説明 ${index + 1}`
+  ));
+
+  Object.defineProperty(els.inputText, "clientHeight", {
+    configurable: true,
+    get() {
+      return 540;
+    }
+  });
+  Object.defineProperty(els.inputText, "scrollHeight", {
+    configurable: true,
+    get() {
+      return nativeScrollHeight;
+    }
+  });
+  els.inputText.value = lines.join("\n");
+  els.inputText.dispatchEvent(new window.Event("input", { bubbles: true }));
+  await settleViewerUi(window);
+
+  assert(
+    Math.abs(Number(state.inputGutterVirtual.lineHeightPx) - expectedPitch) <= 0.001,
+    "Expected the gutter to use the native textarea pitch instead of nominal 18px."
+  );
+
+  els.inputText.scrollTop = (targetLine - 1) * expectedPitch;
+  els.inputText.dispatchEvent(new window.Event("scroll"));
+  await settleViewerUi(window);
+  const targetButton = els.inputGutterContent.querySelector(`button[data-line="${targetLine}"]`);
+  const targetRow = targetButton && targetButton.closest(".gutter-line");
+  assert(targetRow, "Expected the target gutter row to be virtualized.");
+  assert(
+    Math.abs(Number.parseFloat(targetRow.style.height || "0") - expectedPitch) <= 0.001,
+    "Expected each gutter row to use the same fractional pitch as the textarea."
+  );
+
+  assert.strictEqual(typeof window.jumpInputToCodeRange, "function", "Expected shared source navigation to remain available.");
+  window.jumpInputToCodeRange(targetLine, targetLine, null);
+  await settleViewerUi(window);
+  const expectedTop = ((targetLine - 1) * expectedPitch) - (540 * 0.28);
+  assert(
+    Math.abs(Number(els.inputText.scrollTop) - expectedTop) <= 1,
+    "Expected Template/Output Code navigation to use the measured textarea pitch."
+  );
+  assert.strictEqual(
+    String(els.inputText.value || "").slice(els.inputText.selectionStart, els.inputText.selectionEnd).trim(),
+    lines[targetLine - 1],
+    "Expected Japanese source selection to remain exact."
+  );
+
+  nativeScrollHeight = 145701;
+  const resizedPitch = (nativeScrollHeight - paddingY) / lineCount;
+  window.dispatchEvent(new window.Event("resize"));
+  await settleViewerUi(window);
+  assert(
+    Math.abs(Number(state.inputGutterVirtual.lineHeightPx) - resizedPitch) <= 0.001,
+    "Expected resize/zoom metric changes to update gutter pitch without editing the source."
+  );
+
+  dom.window.close();
+}
+
+async function assertVirtualGutterJumpSettlesInOneClick() {
+  const itemCount = 700;
+  const targetLine = 600;
+  const source = Array.from({ length: itemCount }, (_, index) => `CLEAR gv_${index + 1}.`).join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els } = window.AbapViewerRuntime;
+
+  const runJumpAssertion = async ({ kind, container, tabButton, getItemHeight, selectedSelector }) => {
+    tabButton.click();
+    await settleViewerUi(window);
+    const restoreLayout = installVirtualLayoutMock(
+      window,
+      container,
+      kind,
+      itemCount,
+      getItemHeight,
+      {
+        scrollEventViaRaf: true,
+        scrollConvergenceFactor: 1,
+        visualScale: kind === "output" ? 0.8 : 1.25
+      }
+    );
+    try {
+      els.inputText.scrollTop = (targetLine - 1) * 18;
+      els.inputText.dispatchEvent(new window.Event("scroll"));
+      await settleViewerUi(window);
+      const gutterButton = els.inputGutterContent.querySelector(`button[data-line="${targetLine}"]`);
+      assert(gutterButton && !gutterButton.hidden, `Expected ${kind} gutter target for line ${targetLine}.`);
+
+      gutterButton.click();
+      await settleViewerUi(window, 10);
+      const selected = container.querySelector(selectedSelector);
+      assert(selected, `Expected ${kind} target to stay selected after virtual settling.`);
+      const firstOffset = selected.getBoundingClientRect().top - container.getBoundingClientRect().top;
+      assert(
+        Math.abs(firstOffset - 10) <= 1,
+        `Expected one ${kind} gutter click to settle at 10px, got ${firstOffset}.`
+      );
+
+      const firstScrollTop = Number(container.scrollTop) || 0;
+      gutterButton.click();
+      await settleViewerUi(window, 10);
+      const secondOffset = selected.getBoundingClientRect().top - container.getBoundingClientRect().top;
+      assert(Math.abs(secondOffset - 10) <= 1, `Expected repeated ${kind} click to remain aligned.`);
+      assert(
+        Math.abs((Number(container.scrollTop) || 0) - firstScrollTop) <= 1,
+        `Expected repeated ${kind} click to be idempotent.`
+      );
+    } finally {
+      restoreLayout();
+    }
+  };
+
+  await runJumpAssertion({
+    kind: "output",
+    container: els.output,
+    tabButton: els.rightTabOutputBtn,
+    getItemHeight: (index) => 90 + ((index % 4) * 70),
+    selectedSelector: ".card.selected"
+  });
+  await runJumpAssertion({
+    kind: "template",
+    container: els.templatePreviewOutput,
+    tabButton: els.rightTabTemplateBtn,
+    getItemHeight: (index) => 70 + ((index % 3) * 65),
+    selectedSelector: ".template-block.selected"
+  });
+
+  dom.window.close();
+}
+
+async function assertDescriptionSaveAndClearPreserveTemplateCellAnchor() {
+  const clearCount = 700;
+  const targetLine = 600;
+  const source = [
+    'DATA gv_shared TYPE string. "Shared value',
+    ...Array.from({ length: clearCount }, () => "CLEAR gv_shared.")
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+
+  els.rightTabTemplateBtn.click();
+  await settleViewerUi(window);
+  const restoreLayout = installVirtualLayoutMock(
+    window,
+    els.templatePreviewOutput,
+    "template",
+    clearCount + 1,
+    (index) => 72 + ((index % 3) * 18) + (Object.keys(state.descOverrides || {}).length ? 54 : 0),
+    { visualScale: 1.25 }
+  );
+
+  try {
+    els.inputText.scrollTop = (targetLine - 1) * 18;
+    els.inputText.dispatchEvent(new window.Event("scroll"));
+    await settleViewerUi(window);
+    const gutterButton = els.inputGutterContent.querySelector(`button[data-line="${targetLine}"]`);
+    assert(gutterButton && !gutterButton.hidden, "Expected a deep Template gutter target for the anchor test.");
+    gutterButton.click();
+    await settleViewerUi(window, 10);
+
+    const getSelectedCell = () => {
+      const block = els.templatePreviewOutput.querySelector(".template-block.selected");
+      return block && findTemplateCellByText(block, Object.keys(state.descOverrides || {}).length ? "Shared override" : "Shared value");
+    };
+    let cell = getSelectedCell();
+    assert(cell, "Expected the selected deep Template block to expose the shared Description cell.");
+
+    const containerTop = els.templatePreviewOutput.getBoundingClientRect().top;
+    const beforeSaveOffset = cell.getBoundingClientRect().top - containerTop;
+    els.inputText.setSelectionRange(3, 11);
+    els.inputText.scrollTop = 123;
+    const sourceSelection = [els.inputText.selectionStart, els.inputText.selectionEnd];
+    const sourceScrollTop = Number(els.inputText.scrollTop) || 0;
+
+    let modal = await openTemplateCellDescriptionTab(window, cell);
+    await saveTemplateCellDescription(window, modal, "Shared override");
+    await settleViewerUi(window, 10);
+
+    cell = getSelectedCell();
+    assert(cell, "Expected the edited Template cell to be restored after Save.");
+    const afterSaveOffset = cell.getBoundingClientRect().top - containerTop;
+    assert(
+      Math.abs(afterSaveOffset - beforeSaveOffset) <= 1,
+      `Expected Description Save to preserve the edited cell anchor, moved ${afterSaveOffset - beforeSaveOffset}px.`
+    );
+    assert.deepStrictEqual(
+      [els.inputText.selectionStart, els.inputText.selectionEnd],
+      sourceSelection,
+      "Expected Description Save not to change the source selection."
+    );
+    assert.strictEqual(Number(els.inputText.scrollTop) || 0, sourceScrollTop, "Expected Description Save not to scroll source code.");
+    assert(String(els.output.textContent || "").includes("Shared override"), "Expected Output to update after Description Save.");
+    assert(String(els.templatePreviewOutput.textContent || "").includes("Shared override"), "Expected Template to update after Description Save.");
+
+    const beforeClearOffset = cell.getBoundingClientRect().top - containerTop;
+    modal = await openTemplateCellDescriptionTab(window, cell);
+    await saveTemplateCellDescription(window, modal, "");
+    await settleViewerUi(window, 10);
+
+    cell = getSelectedCell();
+    assert(cell, "Expected the cleared Template cell to be restored.");
+    const afterClearOffset = cell.getBoundingClientRect().top - containerTop;
+    assert(
+      Math.abs(afterClearOffset - beforeClearOffset) <= 1,
+      `Expected Description Clear to preserve the edited cell anchor, moved ${afterClearOffset - beforeClearOffset}px.`
+    );
+    assert.deepStrictEqual(
+      [els.inputText.selectionStart, els.inputText.selectionEnd],
+      sourceSelection,
+      "Expected Description Clear not to change the source selection."
+    );
+    assert.strictEqual(Number(els.inputText.scrollTop) || 0, sourceScrollTop, "Expected Description Clear not to scroll source code.");
+    assert(String(els.output.textContent || "").includes("Shared value"), "Expected Output to restore code Description after Clear.");
+    assert(String(els.templatePreviewOutput.textContent || "").includes("Shared value"), "Expected Template to restore code Description after Clear.");
+  } finally {
+    restoreLayout();
+    dom.window.close();
+  }
+}
+
+async function assertDescriptionEditPreservesOutputSelectedItemAnchor() {
+  const clearCount = 700;
+  const targetLine = 600;
+  const source = [
+    'DATA gv_shared TYPE string. "Shared value',
+    ...Array.from({ length: clearCount }, () => "CLEAR gv_shared.")
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+  els.rightTabOutputBtn.click();
+  await settleViewerUi(window);
+  const restoreLayout = installVirtualLayoutMock(
+    window,
+    els.output,
+    "output",
+    clearCount + 1,
+    (index) => 160 + ((index % 4) * 25) + (Object.keys(state.descOverrides || {}).length ? 48 : 0),
+    { visualScale: 0.8 }
+  );
+
+  try {
+    els.inputText.scrollTop = (targetLine - 1) * 18;
+    els.inputText.dispatchEvent(new window.Event("scroll"));
+    await settleViewerUi(window);
+    const gutterButton = els.inputGutterContent.querySelector(`button[data-line="${targetLine}"]`);
+    assert(gutterButton && !gutterButton.hidden, "Expected a deep Output gutter target for the anchor test.");
+    gutterButton.click();
+    await settleViewerUi(window, 10);
+
+    let selected = els.output.querySelector(".card.selected");
+    assert(selected, "Expected a selected Output item before Description edit.");
+    const containerTop = els.output.getBoundingClientRect().top;
+    const beforeSaveOffset = selected.getBoundingClientRect().top - containerTop;
+    assert(Math.abs(beforeSaveOffset - 10) <= 1, `Expected Output gutter jump to align before edit, got ${beforeSaveOffset}.`);
+    let editButton = selected.querySelector('button[aria-label="Edit decl description"]');
+    assert(editButton, "Expected the selected Output item to expose Description edit.");
+    editButton.click();
+    assert(!els.editModal.hidden, "Expected Output Description edit modal.");
+    els.editDesc.value = "Shared output override";
+    els.editSaveBtn.click();
+    await settleViewerUi(window, 10);
+
+    selected = els.output.querySelector(".card.selected");
+    assert(selected, "Expected the selected Output item to survive Description Save.");
+    const afterSaveOffset = selected.getBoundingClientRect().top - containerTop;
+    assert(
+      Math.abs(afterSaveOffset - beforeSaveOffset) <= 1,
+      `Expected Description Save to preserve the selected Output item, moved ${afterSaveOffset - beforeSaveOffset}px.`
+    );
+    assert(String(els.output.textContent || "").includes("Shared output override"), "Expected Output Description Save to rerender text.");
+
+    const beforeClearOffset = selected.getBoundingClientRect().top - containerTop;
+    editButton = selected.querySelector('button[aria-label="Edit decl description"]');
+    editButton.click();
+    els.editClearBtn.click();
+    await settleViewerUi(window, 10);
+
+    selected = els.output.querySelector(".card.selected");
+    assert(selected, "Expected the selected Output item to survive Description Clear.");
+    const afterClearOffset = selected.getBoundingClientRect().top - containerTop;
+    assert(
+      Math.abs(afterClearOffset - beforeClearOffset) <= 1,
+      `Expected Description Clear to preserve the selected Output item, moved ${afterClearOffset - beforeClearOffset}px.`
+    );
+    assert(String(els.output.textContent || "").includes("Shared value"), "Expected Output to restore code Description after Clear.");
+  } finally {
+    restoreLayout();
+    dom.window.close();
+  }
 }
 
 async function assertTemplateAppendDeclaredOperandsPreferRealDeclarations() {
@@ -2013,6 +2435,12 @@ async function main() {
     await assertTemplateDirectSchemaPathsStayLocked();
     await assertTemplateFallbackAllowlistCoversExistingItabOperands();
     await assertTemplateResolverWarnsOnceWithCellMetadata();
+  }
+  if (!focus || focus === "scroll-navigation") {
+    await assertInputPitchAndCodeNavigationUseNativeTextareaMetrics();
+    await assertVirtualGutterJumpSettlesInOneClick();
+    await assertDescriptionSaveAndClearPreserveTemplateCellAnchor();
+    await assertDescriptionEditPreservesOutputSelectedItemAnchor();
   }
   console.log("viewer-contracts: ok");
 }

@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.07.14-r53">
-  <meta name="abap-viewer-updated-at" content="2026-07-14 22:24:43">
-  <meta name="abap-viewer-updated-note" content="Chained comments and template cells retain exact editable declaration targets.">
+  <meta name="abap-viewer-version" content="v2026.07.14-r54">
+  <meta name="abap-viewer-updated-at" content="2026-07-14 23:19:45">
+  <meta name="abap-viewer-updated-note" content="Fractional gutters and virtual anchors stay aligned across zoom and Description edits.">
   <title>ABAP Parser Viewer</title>
   <style>
     :root {
@@ -331,6 +331,7 @@
     }
 
     #inputGutter {
+      --input-line-pitch: 18px;
       width: 68px;
       flex: none;
       border-right: 1px solid var(--border);
@@ -350,7 +351,7 @@
     }
 
     .gutter-line {
-      height: 18px;
+      height: var(--input-line-pitch, 18px);
       display: flex;
       align-items: center;
       gap: 6px;

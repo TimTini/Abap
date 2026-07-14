@@ -1236,10 +1236,14 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     const mode = state.activeEdit.mode === "structField" ? "structField" : "single";
     const skipNormalize = Boolean(els.editSkipNormalize && els.editSkipNormalize.checked);
+    state.pendingOutputViewportAnchor = state.rightTab === "output" && typeof captureOutputViewportAnchor === "function"
+      ? captureOutputViewportAnchor()
+      : null;
 
     if (mode === "single") {
       const key = state.activeEdit.key;
       if (!key) {
+        state.pendingOutputViewportAnchor = null;
         return;
       }
 
@@ -1257,6 +1261,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       const structKey = state.activeEdit.structKey;
       const itemKey = state.activeEdit.itemKey;
       if (!structKey || !itemKey) {
+        state.pendingOutputViewportAnchor = null;
         return;
       }
 
