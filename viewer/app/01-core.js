@@ -108,6 +108,13 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
       pendingRaf: 0,
       isAdjustingScroll: false,
       avgItemHeight: 200,
+      unknownItemHeight: 200,
+      estimateCalibrated: false,
+      adjustmentRaf: 0,
+      adjustmentGeneration: 0,
+      needsScrollSync: false,
+      isRenderTransaction: false,
+      geometryEpoch: 0,
       idToRootIndex: new Map(),
       lineTargetMap: new Map(),
       isInitialized: false
@@ -122,6 +129,13 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
       pendingRaf: 0,
       isAdjustingScroll: false,
       avgItemHeight: 140,
+      unknownItemHeight: 140,
+      estimateCalibrated: false,
+      adjustmentRaf: 0,
+      adjustmentGeneration: 0,
+      needsScrollSync: false,
+      isRenderTransaction: false,
+      geometryEpoch: 0,
       lineTargetMap: new Map(),
       isInitialized: false
     },
@@ -2168,9 +2182,19 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
 
   function applyLayoutSplit(nextPercent, { save } = {}) {
     const normalized = normalizeLayoutSplit(nextPercent);
+    const previous = Number(state.layoutLeftPane);
     state.layoutLeftPane = normalized;
     document.documentElement.style.setProperty("--layout-left-pane", `${normalized}%`);
     updateSplitterAria(normalized);
+
+    if (
+      Number.isFinite(previous)
+      && Math.abs(previous - normalized) >= 0.01
+      && typeof window !== "undefined"
+      && typeof window.dispatchEvent === "function"
+    ) {
+      window.dispatchEvent(new Event("abap-viewer-layout-resize"));
+    }
 
     if (save === false) {
       return;

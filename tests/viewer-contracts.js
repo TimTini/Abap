@@ -132,11 +132,15 @@ function installVirtualLayoutMock(window, container, kind, itemCount, getItemHei
   const topSpacerSelector = isTemplate
     ? ".template-virtual-spacer-top"
     : ".output-virtual-spacer-top";
+  const bottomSpacerSelector = isTemplate
+    ? ".template-virtual-spacer-bottom"
+    : ".output-virtual-spacer-bottom";
   const containerTop = 100;
   const clientHeight = 800;
   const opts = options && typeof options === "object" ? options : {};
   const visualScale = Math.max(0.5, Math.min(2, Number(opts.visualScale) || 1));
-  const outerHeightAt = (index) => Math.max(1, Number(getItemHeight(index)) || 1) + (isTemplate ? 10 : 0);
+  const outerMargin = isTemplate ? 10 : 12;
+  const outerHeightAt = (index) => Math.max(1, Number(getItemHeight(index)) || 1) + outerMargin;
 
   Object.defineProperty(container, "clientHeight", {
     configurable: true,
@@ -153,6 +157,17 @@ function installVirtualLayoutMock(window, container, kind, itemCount, getItemHei
   Object.defineProperty(container, "scrollHeight", {
     configurable: true,
     get() {
+      if (opts.scrollHeightMode === "virtual-dom") {
+        const topSpacer = container.querySelector(topSpacerSelector);
+        const bottomSpacer = container.querySelector(bottomSpacerSelector);
+        const topHeight = Number.parseFloat(topSpacer && topSpacer.style.height ? topSpacer.style.height : "0") || 0;
+        const bottomHeight = Number.parseFloat(bottomSpacer && bottomSpacer.style.height ? bottomSpacer.style.height : "0") || 0;
+        const renderedHeight = Array.from(container.querySelectorAll(rootSelector)).reduce((sum, node) => {
+          const index = Number(node.getAttribute(isTemplate ? "data-template-index" : "data-virtual-item-index"));
+          return sum + outerHeightAt(index);
+        }, 0);
+        return topHeight + renderedHeight + bottomHeight;
+      }
       let total = 0;
       for (let index = 0; index < itemCount; index += 1) {
         total += outerHeightAt(index);
@@ -984,6 +999,275 @@ async function assertVirtualGutterJumpSettlesInOneClick() {
     tabButton: els.rightTabTemplateBtn,
     getItemHeight: (index) => 70 + ((index % 3) * 65),
     selectedSelector: ".template-block.selected"
+  });
+
+  dom.window.close();
+}
+
+async function assertManualScrollCancelsPendingVirtualAlignment() {
+  const itemCount = 700;
+  const targetLine = 600;
+  const source = Array.from({ length: itemCount }, (_, index) => `CLEAR gv_${index + 1}.`).join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els } = window.AbapViewerRuntime;
+
+  const runTakeoverAssertion = async ({ kind, container, tabButton, getItemHeight }) => {
+    tabButton.click();
+    await settleViewerUi(window);
+    const restoreLayout = installVirtualLayoutMock(
+      window,
+      container,
+      kind,
+      itemCount,
+      getItemHeight,
+      { scrollEventViaRaf: true, visualScale: kind === "output" ? 0.8 : 1.25 }
+    );
+    try {
+      els.inputText.scrollTop = (targetLine - 1) * 18;
+      els.inputText.dispatchEvent(new window.Event("scroll"));
+      await settleViewerUi(window);
+      const gutterButton = els.inputGutterContent.querySelector(`button[data-line="${targetLine}"]`);
+      assert(gutterButton && !gutterButton.hidden, `Expected ${kind} gutter target for manual takeover.`);
+
+      const userIntentCases = [
+        {
+          name: "wheel",
+          delta: 420,
+          createEvent: () => new window.WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 420 })
+        },
+        {
+          name: "pointerdown",
+          delta: -240,
+          createEvent: () => new window.Event("pointerdown", { bubbles: true, cancelable: true })
+        },
+        {
+          name: "touchstart",
+          delta: 300,
+          createEvent: () => new window.Event("touchstart", { bubbles: true, cancelable: true })
+        },
+        {
+          name: "PageDown",
+          delta: -180,
+          createEvent: () => new window.KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "PageDown" })
+        }
+      ];
+
+      for (const userIntent of userIntentCases) {
+        gutterButton.click();
+        const alignedTop = Number(container.scrollTop) || 0;
+        const userTop = Math.max(0, alignedTop + userIntent.delta);
+        container.dispatchEvent(userIntent.createEvent());
+        container.scrollTop = userTop;
+        container.dispatchEvent(new window.Event("scroll"));
+        await settleViewerUi(window, 12);
+
+        assert(
+          Math.abs((Number(container.scrollTop) || 0) - userTop) <= 1,
+          `Expected ${kind} ${userIntent.name} input to cancel stale gutter alignment; `
+            + `requested ${userTop}, got ${container.scrollTop}.`
+        );
+      }
+    } finally {
+      restoreLayout();
+    }
+  };
+
+  await runTakeoverAssertion({
+    kind: "output",
+    container: els.output,
+    tabButton: els.rightTabOutputBtn,
+    getItemHeight: (index) => 120 + ((index % 4) * 24)
+  });
+  await runTakeoverAssertion({
+    kind: "template",
+    container: els.templatePreviewOutput,
+    tabButton: els.rightTabTemplateBtn,
+    getItemHeight: (index) => 90 + ((index % 3) * 22)
+  });
+
+  dom.window.close();
+}
+
+async function assertHeterogeneousVirtualRangesKeepViewportCovered() {
+  const itemCount = 700;
+  const targetLine = 600;
+  const source = Array.from({ length: itemCount }, (_, index) => `CLEAR gv_${index + 1}.`).join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+
+  const runCoverageAssertion = async ({ kind, container, tabButton, rootSelector, virtualState }) => {
+    tabButton.click();
+    await settleViewerUi(window);
+    const getItemHeight = (index) => {
+      if (index >= 330 && index <= 380) {
+        return 1200 + ((index % 3) * 80);
+      }
+      if (index >= 585 && index <= 615) {
+        return kind === "template" ? 130 : 140;
+      }
+      return 55 + ((index % 5) * 8);
+    };
+    const restoreLayout = installVirtualLayoutMock(
+      window,
+      container,
+      kind,
+      itemCount,
+      getItemHeight,
+      { scrollHeightMode: "virtual-dom", visualScale: kind === "output" ? 0.8 : 1.25 }
+    );
+    try {
+      els.inputText.scrollTop = (targetLine - 1) * 18;
+      els.inputText.dispatchEvent(new window.Event("scroll"));
+      await settleViewerUi(window);
+      const gutterButton = els.inputGutterContent.querySelector(`button[data-line="${targetLine}"]`);
+      assert(gutterButton && !gutterButton.hidden, `Expected ${kind} gutter target before range coverage test.`);
+      gutterButton.click();
+      await settleViewerUi(window, 10);
+
+      const estimateBeforeRangeChange = Number(virtualState.avgItemHeight) || (kind === "template" ? 140 : 200);
+      const requestedTop = 350 * estimateBeforeRangeChange;
+      container.dispatchEvent(new window.WheelEvent("wheel", {
+        bubbles: true,
+        cancelable: true,
+        deltaY: requestedTop - (Number(container.scrollTop) || 0)
+      }));
+      container.scrollTop = requestedTop;
+      container.dispatchEvent(new window.Event("scroll"));
+      await settleViewerUi(window, 8);
+
+      const containerRect = container.getBoundingClientRect();
+      const renderedRoots = Array.from(container.querySelectorAll(rootSelector));
+      const coveringRoots = renderedRoots.filter((node) => {
+        const rect = node.getBoundingClientRect();
+        return rect.bottom > containerRect.top && rect.top < containerRect.bottom;
+      });
+      assert(
+        coveringRoots.length > 0,
+        `Expected ${kind} virtual range to cover the viewport after heterogeneous measurement; `
+          + `scrollTop=${container.scrollTop}, start=${virtualState.start}, end=${virtualState.end}.`
+      );
+
+      const firstVisibleIndex = Number(coveringRoots[0].getAttribute(
+        kind === "template" ? "data-template-index" : "data-virtual-item-index"
+      ));
+      container.dispatchEvent(new window.Event("scroll"));
+      await settleViewerUi(window, 6);
+      const nextVisible = Array.from(container.querySelectorAll(rootSelector)).find((node) => {
+        const rect = node.getBoundingClientRect();
+        return rect.bottom > containerRect.top && rect.top < containerRect.bottom;
+      });
+      assert(nextVisible, `Expected repeated ${kind} scroll processing not to leave a blank viewport.`);
+      assert.strictEqual(
+        Number(nextVisible.getAttribute(kind === "template" ? "data-template-index" : "data-virtual-item-index")),
+        firstVisibleIndex,
+        `Expected repeated ${kind} scroll processing at the same offset not to oscillate ranges; `
+          + `scrollTop=${container.scrollTop}, start=${virtualState.start}, end=${virtualState.end}, `
+          + `first=${firstVisibleIndex}, next=${nextVisible.getAttribute(kind === "template" ? "data-template-index" : "data-virtual-item-index")}.`
+      );
+    } finally {
+      restoreLayout();
+    }
+  };
+
+  await runCoverageAssertion({
+    kind: "output",
+    container: els.output,
+    tabButton: els.rightTabOutputBtn,
+    rootSelector: "[data-virtual-item-index]",
+    virtualState: state.outputVirtual
+  });
+  await runCoverageAssertion({
+    kind: "template",
+    container: els.templatePreviewOutput,
+    tabButton: els.rightTabTemplateBtn,
+    rootSelector: ".template-block[data-template-index]",
+    virtualState: state.templateVirtual
+  });
+
+  dom.window.close();
+}
+
+async function assertSplitterRefreshesActiveVirtualGeometry() {
+  const source = Array.from({ length: 700 }, (_, index) => `CLEAR gv_${index + 1}.`).join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+
+  const runAssertion = async ({ kind, tabButton, virtualState }) => {
+    tabButton.click();
+    await settleViewerUi(window);
+    const epochBefore = Number(virtualState.geometryEpoch) || 0;
+    window.applyLayoutSplit((Number(state.layoutLeftPane) || 48) + 2, { save: false });
+    await settleViewerUi(window, 6);
+    assert(
+      (Number(virtualState.geometryEpoch) || 0) > epochBefore,
+      `Expected splitter width change to invalidate active ${kind} virtual geometry.`
+    );
+  };
+
+  await runAssertion({
+    kind: "output",
+    tabButton: els.rightTabOutputBtn,
+    virtualState: state.outputVirtual
+  });
+  await runAssertion({
+    kind: "template",
+    tabButton: els.rightTabTemplateBtn,
+    virtualState: state.templateVirtual
+  });
+
+  dom.window.close();
+}
+
+async function assertBlankViewportFallbackUsesLogicalAnchor() {
+  const itemCount = 700;
+  const source = Array.from({ length: itemCount }, (_, index) => `CLEAR gv_${index + 1}.`).join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els } = window.AbapViewerRuntime;
+
+  const runAssertion = async ({ kind, container, tabButton, rootSelector, captureAnchor }) => {
+    tabButton.click();
+    await settleViewerUi(window);
+    const restoreLayout = installVirtualLayoutMock(
+      window,
+      container,
+      kind,
+      itemCount,
+      (index) => 80 + ((index % 4) * 20)
+    );
+    try {
+      container.scrollTop = 24000;
+      const containerRect = container.getBoundingClientRect();
+      const hasVisibleRoot = Array.from(container.querySelectorAll(rootSelector)).some((node) => {
+        const rect = node.getBoundingClientRect();
+        return rect.bottom > containerRect.top && rect.top < containerRect.bottom;
+      });
+      assert.strictEqual(hasVisibleRoot, false, `Expected ${kind} fallback precondition to start from a blank viewport.`);
+
+      const anchor = captureAnchor();
+      assert(anchor && anchor.kind === "logical", `Expected blank ${kind} viewport to capture a logical item anchor.`);
+      assert(Number.isFinite(Number(anchor.itemIndex)), `Expected blank ${kind} logical anchor to retain an item index.`);
+    } finally {
+      restoreLayout();
+    }
+  };
+
+  await runAssertion({
+    kind: "output",
+    container: els.output,
+    tabButton: els.rightTabOutputBtn,
+    rootSelector: "[data-virtual-item-index]",
+    captureAnchor: () => window.captureOutputViewportAnchor()
+  });
+  await runAssertion({
+    kind: "template",
+    container: els.templatePreviewOutput,
+    tabButton: els.rightTabTemplateBtn,
+    rootSelector: ".template-block[data-template-index]",
+    captureAnchor: () => window.captureTemplateViewportAnchor()
   });
 
   dom.window.close();
@@ -2439,8 +2723,22 @@ async function main() {
   if (!focus || focus === "scroll-navigation") {
     await assertInputPitchAndCodeNavigationUseNativeTextareaMetrics();
     await assertVirtualGutterJumpSettlesInOneClick();
+    await assertManualScrollCancelsPendingVirtualAlignment();
+    await assertHeterogeneousVirtualRangesKeepViewportCovered();
+    await assertSplitterRefreshesActiveVirtualGeometry();
+    await assertBlankViewportFallbackUsesLogicalAnchor();
     await assertDescriptionSaveAndClearPreserveTemplateCellAnchor();
     await assertDescriptionEditPreservesOutputSelectedItemAnchor();
+  }
+  if (focus === "scroll-manual-takeover") {
+    await assertManualScrollCancelsPendingVirtualAlignment();
+  }
+  if (focus === "scroll-range-coverage") {
+    await assertHeterogeneousVirtualRangesKeepViewportCovered();
+  }
+  if (focus === "scroll-geometry") {
+    await assertSplitterRefreshesActiveVirtualGeometry();
+    await assertBlankViewportFallbackUsesLogicalAnchor();
   }
   console.log("viewer-contracts: ok");
 }

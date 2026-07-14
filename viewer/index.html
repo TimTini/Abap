@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.07.14-r54">
-  <meta name="abap-viewer-updated-at" content="2026-07-14 23:19:45">
-  <meta name="abap-viewer-updated-note" content="Fractional gutters and virtual anchors stay aligned across zoom and Description edits.">
+  <meta name="abap-viewer-version" content="v2026.07.14-r55">
+  <meta name="abap-viewer-updated-at" content="2026-07-15 00:29:14">
+  <meta name="abap-viewer-updated-note" content="Manual scrolling cancels stale alignment and virtual ranges stay populated after remeasurement.">
   <title>ABAP Parser Viewer</title>
   <style>
     :root {
@@ -409,6 +409,7 @@
       flex: 1;
       min-height: 0;
       overflow: auto;
+      overflow-anchor: none;
       padding-right: 6px;
     }
 
@@ -536,6 +537,7 @@
       min-height: 220px;
       min-width: 0;
       overflow: auto;
+      overflow-anchor: none;
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 10px;

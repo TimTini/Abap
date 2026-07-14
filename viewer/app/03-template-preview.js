@@ -4063,6 +4063,13 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         pendingRaf: 0,
         isAdjustingScroll: false,
         avgItemHeight: 140,
+        unknownItemHeight: 140,
+        estimateCalibrated: false,
+        adjustmentRaf: 0,
+        adjustmentGeneration: 0,
+        needsScrollSync: false,
+        isRenderTransaction: false,
+        geometryEpoch: 0,
         itemHeights: new Float64Array(0),
         prefixOffsets: new Float64Array(1),
         sourceRenderObjects: null,
@@ -4078,6 +4085,27 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
     if (!(state.templateVirtual.prefixOffsets instanceof Float64Array)) {
       state.templateVirtual.prefixOffsets = new Float64Array(1);
+    }
+    if (!Number.isFinite(Number(state.templateVirtual.unknownItemHeight)) || Number(state.templateVirtual.unknownItemHeight) <= 0) {
+      state.templateVirtual.unknownItemHeight = 140;
+    }
+    if (typeof state.templateVirtual.estimateCalibrated !== "boolean") {
+      state.templateVirtual.estimateCalibrated = false;
+    }
+    if (!Number.isFinite(Number(state.templateVirtual.adjustmentRaf))) {
+      state.templateVirtual.adjustmentRaf = 0;
+    }
+    if (!Number.isFinite(Number(state.templateVirtual.adjustmentGeneration))) {
+      state.templateVirtual.adjustmentGeneration = 0;
+    }
+    if (typeof state.templateVirtual.needsScrollSync !== "boolean") {
+      state.templateVirtual.needsScrollSync = false;
+    }
+    if (typeof state.templateVirtual.isRenderTransaction !== "boolean") {
+      state.templateVirtual.isRenderTransaction = false;
+    }
+    if (!Number.isFinite(Number(state.templateVirtual.geometryEpoch))) {
+      state.templateVirtual.geometryEpoch = 0;
     }
     return state.templateVirtual;
   }
@@ -4129,6 +4157,29 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const prev = Math.max(60, Number(virtual.avgItemHeight) || 140);
     const next = Math.max(60, ((prev * 0.8) + (sampleAvg * 0.2)));
     virtual.avgItemHeight = Math.round(next);
+  }
+
+  function calibrateTemplateUnknownItemHeight(virtual, heights) {
+    if (!virtual || virtual.estimateCalibrated) {
+      return;
+    }
+    const samples = Array.isArray(heights)
+      ? heights
+        .map((value) => Number(value))
+        .filter((value) => Number.isFinite(value) && value >= 24)
+        .sort((left, right) => left - right)
+      : [];
+    if (!samples.length) {
+      return;
+    }
+    const middle = Math.floor(samples.length / 2);
+    const median = samples.length % 2
+      ? samples[middle]
+      : ((samples[middle - 1] + samples[middle]) / 2);
+    virtual.unknownItemHeight = Math.max(24, median);
+    virtual.avgItemHeight = virtual.unknownItemHeight;
+    virtual.estimateCalibrated = true;
+    virtual.geometryEpoch = (Number(virtual.geometryEpoch) || 0) + 1;
   }
 
   function buildTemplateLineTargetMap(items) {
@@ -4568,6 +4619,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return Math.max(24, Number(virtual && virtual.avgItemHeight) || 140);
   }
 
+  function getTemplateUnknownItemHeight(virtual) {
+    return Math.max(24, Number(virtual && virtual.unknownItemHeight) || 140);
+  }
+
   function ensureTemplateHeightCache(virtual, itemCount) {
     const total = Math.max(0, Number(itemCount) || 0);
     if (!(virtual.itemHeights instanceof Float64Array) || virtual.itemHeights.length !== total) {
@@ -4581,7 +4636,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
   function rebuildTemplatePrefixOffsets(virtual) {
     const total = Math.max(0, Number(virtual && virtual.itemCount) || 0);
     ensureTemplateHeightCache(virtual, total);
-    const estimate = getTemplateEstimatedItemHeight(virtual);
+    const estimate = getTemplateUnknownItemHeight(virtual);
     virtual.prefixOffsets[0] = 0;
     for (let index = 0; index < total; index += 1) {
       const measured = Number(virtual.itemHeights[index]) || 0;
@@ -4636,6 +4691,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         heights.push(height);
       }
     }
+    calibrateTemplateUnknownItemHeight(virtual, heights);
     updateTemplateAverageHeight(virtual, heights);
     rebuildTemplatePrefixOffsets(virtual);
     const topSpacer = els.templatePreviewOutput.querySelector(".template-virtual-spacer-top");
@@ -4673,6 +4729,96 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return { start, end };
   }
 
+  function cancelTemplateVirtualAdjustment(virtual) {
+    if (!virtual || typeof virtual !== "object") {
+      return;
+    }
+    if (virtual.adjustmentRaf) {
+      cancelAnimationFrame(virtual.adjustmentRaf);
+      virtual.adjustmentRaf = 0;
+    }
+    virtual.adjustmentGeneration = (Number(virtual.adjustmentGeneration) || 0) + 1;
+    virtual.isAdjustingScroll = false;
+  }
+
+  function beginTemplateVirtualAdjustment(virtual) {
+    cancelTemplateVirtualAdjustment(virtual);
+    virtual.isAdjustingScroll = true;
+    return Number(virtual.adjustmentGeneration) || 0;
+  }
+
+  function finishTemplateVirtualAdjustment(virtual, generation) {
+    if (!virtual || Number(virtual.adjustmentGeneration) !== Number(generation)) {
+      return false;
+    }
+    virtual.adjustmentRaf = 0;
+    virtual.isAdjustingScroll = false;
+    if (virtual.needsScrollSync) {
+      scheduleTemplateVirtualScroll();
+    }
+    return true;
+  }
+
+  function captureTemplateLogicalScrollAnchor(virtual, scrollTop) {
+    const total = Math.max(0, Number(virtual && virtual.itemCount) || 0);
+    if (!total) {
+      return null;
+    }
+    rebuildTemplatePrefixOffsets(virtual);
+    const maxOffset = Math.max(0, getTemplateOffsetAtIndex(virtual, total));
+    const top = Math.max(0, Math.min(maxOffset, Number(scrollTop) || 0));
+    const index = findTemplateIndexAtOffset(virtual, top);
+    return {
+      index,
+      intra: Math.max(0, top - getTemplateOffsetAtIndex(virtual, index))
+    };
+  }
+
+  function ensureTemplateRangeContainsLogicalAnchor(virtual, anchor) {
+    if (!virtual || !anchor) {
+      return;
+    }
+    const total = Math.max(0, Number(virtual.itemCount) || 0);
+    const index = Math.max(0, Math.min(total - 1, Number(anchor.index) || 0));
+    if (!total || (index >= virtual.start && index < virtual.end)) {
+      return;
+    }
+    const metrics = getTemplateVirtualConfig(els.templatePreviewOutput, virtual.avgItemHeight);
+    const requestedCount = Math.max(1, Number(virtual.end) - Number(virtual.start), metrics.targetCount);
+    let start = Math.max(0, index - Math.floor(requestedCount / 2));
+    let end = Math.min(total, start + requestedCount);
+    if ((end - start) < requestedCount) {
+      start = Math.max(0, end - requestedCount);
+    }
+    virtual.start = start;
+    virtual.end = end;
+  }
+
+  function restoreTemplateLogicalScrollAnchor(virtual, anchor, fallbackTop) {
+    if (!els.templatePreviewOutput) {
+      return;
+    }
+    const rawIndex = anchor && Object.prototype.hasOwnProperty.call(anchor, "itemIndex")
+      ? anchor.itemIndex
+      : (anchor && anchor.index);
+    const rawIntra = anchor && Object.prototype.hasOwnProperty.call(anchor, "intraItemOffset")
+      ? anchor.intraItemOffset
+      : (anchor && anchor.intra);
+    let nextTop = Math.max(0, Number(fallbackTop) || 0);
+    if (Number.isFinite(Number(rawIndex))) {
+      const index = Math.max(0, Math.min(virtual.itemCount - 1, Number(rawIndex) || 0));
+      const anchorStart = getTemplateOffsetAtIndex(virtual, index);
+      const anchorEnd = getTemplateOffsetAtIndex(virtual, index + 1);
+      const maxIntra = Math.max(0, anchorEnd - anchorStart - 1);
+      nextTop = anchorStart + Math.min(maxIntra, Math.max(0, Number(rawIntra) || 0));
+    }
+    const maxTop = Math.max(
+      0,
+      Number(els.templatePreviewOutput.scrollHeight || 0) - Number(els.templatePreviewOutput.clientHeight || 0)
+    );
+    els.templatePreviewOutput.scrollTop = Math.max(0, Math.min(maxTop, nextTop));
+  }
+
   function renderTemplateVirtualRangeReplace(options) {
     if (!els.templatePreviewOutput) {
       return;
@@ -4682,45 +4828,54 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const virtual = getTemplateVirtualState();
     const items = Array.isArray(virtual.items) ? virtual.items : [];
     const total = items.length;
+    rebuildTemplatePrefixOffsets(virtual);
+    const requestedTop = Number.isFinite(Number(opts.scrollTop))
+      ? Number(opts.scrollTop)
+      : (Number(els.templatePreviewOutput.scrollTop) || 0);
+    const logicalAnchor = opts.preserveScroll && opts.preserveLogicalAnchor !== false
+      ? captureTemplateLogicalScrollAnchor(virtual, requestedTop)
+      : null;
+    ensureTemplateRangeContainsLogicalAnchor(virtual, logicalAnchor);
     const start = Math.max(0, Math.min(total, Number(virtual.start) || 0));
     const end = Math.max(start, Math.min(total, Number(virtual.end) || 0));
-    rebuildTemplatePrefixOffsets(virtual);
     const config = virtual.config && typeof virtual.config === "object"
       ? virtual.config
       : getDefaultTemplateConfig();
+    virtual.isRenderTransaction = true;
+    try {
+      const frag = document.createDocumentFragment();
+      const topSpacer = document.createElement("div");
+      topSpacer.className = "virtual-spacer template-virtual-spacer-top";
+      topSpacer.style.height = `${getTemplateOffsetAtIndex(virtual, start)}px`;
+      topSpacer.setAttribute("aria-hidden", "true");
+      frag.appendChild(topSpacer);
 
-    const frag = document.createDocumentFragment();
-    const topSpacer = document.createElement("div");
-    topSpacer.className = "virtual-spacer template-virtual-spacer-top";
-    topSpacer.style.height = `${getTemplateOffsetAtIndex(virtual, start)}px`;
-    topSpacer.setAttribute("aria-hidden", "true");
-    frag.appendChild(topSpacer);
-
-    for (let index = start; index < end; index += 1) {
-      const block = buildTemplateBlockElement(items[index], index, config, true);
-      if (!block) {
-        continue;
+      for (let index = start; index < end; index += 1) {
+        const block = buildTemplateBlockElement(items[index], index, config, true);
+        if (!block) {
+          continue;
+        }
+        frag.appendChild(block);
       }
-      frag.appendChild(block);
+
+      const bottomSpacer = document.createElement("div");
+      bottomSpacer.className = "virtual-spacer template-virtual-spacer-bottom";
+      bottomSpacer.style.height = `${Math.max(0, getTemplateOffsetAtIndex(virtual, total) - getTemplateOffsetAtIndex(virtual, end))}px`;
+      bottomSpacer.setAttribute("aria-hidden", "true");
+      frag.appendChild(bottomSpacer);
+
+      els.templatePreviewOutput.classList.remove("muted");
+      els.templatePreviewOutput.replaceChildren(frag);
+      measureRenderedTemplateItems(virtual, start, end);
+
+      restoreTemplateLogicalScrollAnchor(virtual, logicalAnchor, requestedTop);
+      virtual.lastScrollTop = Number(els.templatePreviewOutput.scrollTop || 0) || 0;
+    } finally {
+      virtual.isRenderTransaction = false;
     }
-
-    const bottomSpacer = document.createElement("div");
-    bottomSpacer.className = "virtual-spacer template-virtual-spacer-bottom";
-    bottomSpacer.style.height = `${Math.max(0, getTemplateOffsetAtIndex(virtual, total) - getTemplateOffsetAtIndex(virtual, end))}px`;
-    bottomSpacer.setAttribute("aria-hidden", "true");
-    frag.appendChild(bottomSpacer);
-
-    els.templatePreviewOutput.classList.remove("muted");
-    els.templatePreviewOutput.replaceChildren(frag);
-    measureRenderedTemplateItems(virtual, start, end);
-
-    if (opts.preserveScroll) {
-      const maxTop = Math.max(0, Number(els.templatePreviewOutput.scrollHeight || 0) - Number(els.templatePreviewOutput.clientHeight || 0));
-      els.templatePreviewOutput.scrollTop = Math.max(0, Math.min(maxTop, Number(opts.scrollTop) || 0));
-    } else {
-      els.templatePreviewOutput.scrollTop = Math.max(0, Number(opts.scrollTop) || 0);
+    if (virtual.needsScrollSync) {
+      scheduleTemplateVirtualScroll();
     }
-    virtual.lastScrollTop = Number(els.templatePreviewOutput.scrollTop || 0) || 0;
   }
 
   function initTemplateVirtualWindow(items, config, options) {
@@ -4732,11 +4887,15 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       cancelAnimationFrame(virtual.pendingRaf);
       virtual.pendingRaf = 0;
     }
-
-    if (virtual.sourceRenderObjects !== state.renderObjects) {
-      virtual.itemHeights = new Float64Array(0);
-      virtual.prefixOffsets = new Float64Array(1);
-    }
+    cancelTemplateVirtualAdjustment(virtual);
+    virtual.needsScrollSync = false;
+    virtual.isRenderTransaction = false;
+    virtual.geometryEpoch = (Number(virtual.geometryEpoch) || 0) + 1;
+    virtual.avgItemHeight = 140;
+    virtual.unknownItemHeight = 140;
+    virtual.estimateCalibrated = false;
+    virtual.itemHeights = new Float64Array(0);
+    virtual.prefixOffsets = new Float64Array(1);
     virtual.sourceRenderObjects = state.renderObjects;
     virtual.items = list;
     virtual.itemCount = list.length;
@@ -4763,7 +4922,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const selectedIndex = state.selectedTemplateIndex !== ""
       ? Number(state.selectedTemplateIndex)
       : Number.NaN;
-    if (Number.isFinite(selectedIndex) && selectedIndex >= 0 && selectedIndex < total) {
+    const hasSelectedIndex = Number.isFinite(selectedIndex) && selectedIndex >= 0 && selectedIndex < total;
+    if (hasSelectedIndex) {
       start = Math.max(0, selectedIndex - Math.floor(metrics.targetCount / 2));
       end = Math.min(total, start + metrics.targetCount);
       if ((end - start) < metrics.targetCount) {
@@ -4779,6 +4939,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     virtual.end = end;
     renderTemplateVirtualRangeReplace({
       preserveScroll: true,
+      preserveLogicalAnchor: !hasSelectedIndex,
       scrollTop: opts.preserveScroll === true ? (Number(opts.scrollTop) || 0) : 0
     });
   }
@@ -4820,7 +4981,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (!virtual.isInitialized || !total) {
       return;
     }
-    if (virtual.isAdjustingScroll) {
+    if (virtual.isAdjustingScroll || virtual.isRenderTransaction) {
+      virtual.needsScrollSync = true;
       return;
     }
 
@@ -4841,12 +5003,21 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
   function scheduleTemplateVirtualScroll() {
     const virtual = getTemplateVirtualState();
-    if (virtual.pendingRaf || virtual.isAdjustingScroll) {
+    virtual.needsScrollSync = true;
+    if (virtual.pendingRaf || virtual.isAdjustingScroll || virtual.isRenderTransaction) {
       return;
     }
     virtual.pendingRaf = requestAnimationFrame(() => {
       virtual.pendingRaf = 0;
+      if (virtual.isAdjustingScroll || virtual.isRenderTransaction) {
+        virtual.needsScrollSync = true;
+        return;
+      }
+      virtual.needsScrollSync = false;
       processTemplateVirtualScrollFrame();
+      if (virtual.needsScrollSync) {
+        scheduleTemplateVirtualScroll();
+      }
     });
   }
 
@@ -4854,12 +5025,20 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     scheduleTemplateVirtualScroll();
   }
 
-function resetTemplateVirtualState() {
+  function handleTemplateVirtualUserIntent() {
+    const virtual = getTemplateVirtualState();
+    cancelTemplateVirtualAdjustment(virtual);
+    virtual.needsScrollSync = true;
+    scheduleTemplateVirtualScroll();
+  }
+
+  function resetTemplateVirtualState() {
     const virtual = getTemplateVirtualState();
     if (virtual.pendingRaf) {
       cancelAnimationFrame(virtual.pendingRaf);
       virtual.pendingRaf = 0;
     }
+    cancelTemplateVirtualAdjustment(virtual);
     virtual.items = [];
     virtual.itemCount = 0;
     virtual.start = 0;
@@ -4867,6 +5046,12 @@ function resetTemplateVirtualState() {
     virtual.lastScrollTop = 0;
     virtual.scrollDir = "down";
     virtual.isAdjustingScroll = false;
+    virtual.avgItemHeight = 140;
+    virtual.unknownItemHeight = 140;
+    virtual.estimateCalibrated = false;
+    virtual.needsScrollSync = false;
+    virtual.isRenderTransaction = false;
+    virtual.geometryEpoch = (Number(virtual.geometryEpoch) || 0) + 1;
     virtual.itemHeights = new Float64Array(0);
     virtual.prefixOffsets = new Float64Array(1);
     virtual.sourceRenderObjects = null;
@@ -4936,6 +5121,15 @@ function resetTemplateVirtualState() {
     }) || null;
     const block = isVisible(selectedBlock) ? selectedBlock : firstVisible;
     if (!block) {
+      const logical = captureTemplateLogicalScrollAnchor(getTemplateVirtualState(), base.scrollTop);
+      if (logical) {
+        return {
+          ...base,
+          kind: "logical",
+          itemIndex: logical.index,
+          intraItemOffset: logical.intra
+        };
+      }
       return { ...base, kind: "scroll" };
     }
     return {
@@ -4951,13 +5145,33 @@ function resetTemplateVirtualState() {
       return;
     }
     const container = els.templatePreviewOutput;
+    if (anchor.kind === "logical") {
+      const virtual = getTemplateVirtualState();
+      const itemIndex = Number(anchor.itemIndex);
+      cancelTemplateVirtualAdjustment(virtual);
+      if (
+        Number.isFinite(itemIndex)
+        && itemIndex >= 0
+        && ensureTemplateWindowContainsIndex(itemIndex)
+      ) {
+        restoreTemplateLogicalScrollAnchor(virtual, anchor, anchor.scrollTop);
+        virtual.lastScrollTop = Number(container.scrollTop) || 0;
+        return;
+      }
+    }
     if (anchor.kind === "scroll") {
+      const virtual = getTemplateVirtualState();
+      cancelTemplateVirtualAdjustment(virtual);
       container.scrollTop = Math.max(0, Number(anchor.scrollTop) || 0);
+      virtual.lastScrollTop = Number(container.scrollTop) || 0;
       return;
     }
     const index = Number(anchor.templateIndex);
     if (!Number.isFinite(index) || index < 0 || !ensureTemplateWindowContainsIndex(index)) {
+      const virtual = getTemplateVirtualState();
+      cancelTemplateVirtualAdjustment(virtual);
       container.scrollTop = Math.max(0, Number(anchor.scrollTop) || 0);
+      virtual.lastScrollTop = Number(container.scrollTop) || 0;
       return;
     }
 
@@ -4966,11 +5180,14 @@ function resetTemplateVirtualState() {
       cancelAnimationFrame(virtual.pendingRaf);
       virtual.pendingRaf = 0;
     }
-    virtual.isAdjustingScroll = true;
+    const generation = beginTemplateVirtualAdjustment(virtual);
     const apply = () => {
+      if (Number(virtual.adjustmentGeneration) !== generation || !virtual.isAdjustingScroll) {
+        return false;
+      }
       const node = getTemplateAnchorNode(anchor);
       if (!node) {
-        return;
+        return false;
       }
       const containerRect = container.getBoundingClientRect();
       const currentOffset = node.getBoundingClientRect().top - containerRect.top;
@@ -4983,12 +5200,21 @@ function resetTemplateVirtualState() {
       const nextTop = (Number(container.scrollTop) || 0)
         + ((currentOffset - (Number(anchor.viewportOffset) || 0)) / scrollScale);
       container.scrollTop = Math.max(0, Math.min(maxTop, nextTop));
+      return true;
     };
-    apply();
-    requestAnimationFrame(() => {
+    if (!apply()) {
+      container.scrollTop = Math.max(0, Number(anchor.scrollTop) || 0);
+      virtual.lastScrollTop = Number(container.scrollTop) || 0;
+      finishTemplateVirtualAdjustment(virtual, generation);
+      return;
+    }
+    virtual.adjustmentRaf = requestAnimationFrame(() => {
+      if (Number(virtual.adjustmentGeneration) !== generation || !virtual.isAdjustingScroll) {
+        return;
+      }
       apply();
       virtual.lastScrollTop = Number(container.scrollTop) || 0;
-      virtual.isAdjustingScroll = false;
+      finishTemplateVirtualAdjustment(virtual, generation);
     });
   }
 

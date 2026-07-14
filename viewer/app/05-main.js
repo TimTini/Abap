@@ -4318,6 +4318,87 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     });
   }
 
+  let virtualGeometryRefreshFrameMain = 0;
+
+  function isVirtualScrollKeyMain(ev) {
+    if (!ev) {
+      return false;
+    }
+    return [
+      "ArrowUp",
+      "ArrowDown",
+      "PageUp",
+      "PageDown",
+      "Home",
+      "End",
+      " ",
+      "Space",
+      "Spacebar"
+    ].includes(String(ev.key || ""));
+  }
+
+  function isEditableVirtualScrollTargetMain(target) {
+    if (!(target instanceof Element)) {
+      return false;
+    }
+    if (target.closest("input, textarea, select")) {
+      return true;
+    }
+    if (target.isContentEditable) {
+      return true;
+    }
+    const editableAncestor = target.closest("[contenteditable]");
+    return Boolean(
+      editableAncestor
+      && String(editableAncestor.getAttribute("contenteditable") || "").toLowerCase() !== "false"
+    );
+  }
+
+  function addVirtualUserIntentListenersMain(container, handler) {
+    if (!container || typeof handler !== "function") {
+      return;
+    }
+    const passiveCapture = { passive: true, capture: true };
+    for (const eventName of ["wheel", "pointerdown", "touchstart"]) {
+      container.addEventListener(eventName, handler, passiveCapture);
+    }
+    container.addEventListener("keydown", (ev) => {
+      if (!isVirtualScrollKeyMain(ev) || isEditableVirtualScrollTargetMain(ev.target)) {
+        return;
+      }
+      handler(ev);
+    }, { capture: true });
+  }
+
+  function scheduleVirtualGeometryRefreshMain() {
+    if (virtualGeometryRefreshFrameMain || typeof requestAnimationFrame !== "function") {
+      return;
+    }
+    virtualGeometryRefreshFrameMain = requestAnimationFrame(() => {
+      virtualGeometryRefreshFrameMain = 0;
+      if (!state.data || !Array.isArray(state.renderObjects) || !state.renderObjects.length) {
+        return;
+      }
+      if (
+        state.rightTab === "output"
+        && els.output
+        && !els.output.hidden
+        && typeof renderOutput === "function"
+      ) {
+        renderOutput();
+        return;
+      }
+      if (
+        state.rightTab === "template"
+        && els.templatePreviewPanel
+        && !els.templatePreviewPanel.hidden
+        && typeof renderTemplatePreview === "function"
+      ) {
+        renderTemplatePreview();
+      }
+    });
+  }
+
   function init() {
     renderBuildInfo();
     state.descOverrides = loadDescOverrides();
@@ -4362,20 +4443,33 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       els.inputText.addEventListener("input", rebuildInputGutter);
       els.inputText.addEventListener("scroll", syncInputGutterScroll);
     }
-    if (typeof window !== "undefined" && typeof syncInputGutterScroll === "function") {
-      window.addEventListener("resize", syncInputGutterScroll, { passive: true });
+    if (typeof window !== "undefined") {
+      if (typeof syncInputGutterScroll === "function") {
+        window.addEventListener("resize", syncInputGutterScroll, { passive: true });
+      }
+      window.addEventListener("resize", scheduleVirtualGeometryRefreshMain, { passive: true });
+      window.addEventListener("abap-viewer-layout-resize", scheduleVirtualGeometryRefreshMain);
       if (window.visualViewport && typeof window.visualViewport.addEventListener === "function") {
-        window.visualViewport.addEventListener("resize", syncInputGutterScroll, { passive: true });
+        if (typeof syncInputGutterScroll === "function") {
+          window.visualViewport.addEventListener("resize", syncInputGutterScroll, { passive: true });
+        }
+        window.visualViewport.addEventListener("resize", scheduleVirtualGeometryRefreshMain, { passive: true });
       }
     }
     if (els.output && typeof handleOutputVirtualScroll === "function") {
       els.output.addEventListener("scroll", handleOutputVirtualScroll, { passive: true });
+    }
+    if (els.output && typeof handleOutputVirtualUserIntent === "function") {
+      addVirtualUserIntentListenersMain(els.output, handleOutputVirtualUserIntent);
     }
     if (els.output) {
       els.output.addEventListener("click", interceptOutputCodeButtonClick, true);
     }
     if (els.templatePreviewOutput && typeof handleTemplateVirtualScroll === "function") {
       els.templatePreviewOutput.addEventListener("scroll", handleTemplateVirtualScroll, { passive: true });
+    }
+    if (els.templatePreviewOutput && typeof handleTemplateVirtualUserIntent === "function") {
+      addVirtualUserIntentListenersMain(els.templatePreviewOutput, handleTemplateVirtualUserIntent);
     }
     if (els.templatePreviewOutput) {
       els.templatePreviewOutput.addEventListener("click", interceptTemplateCodeButtonClick, true);

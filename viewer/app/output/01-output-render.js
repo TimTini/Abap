@@ -2230,6 +2230,13 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         pendingRaf: 0,
         isAdjustingScroll: false,
         avgItemHeight: 200,
+        unknownItemHeight: 200,
+        estimateCalibrated: false,
+        adjustmentRaf: 0,
+        adjustmentGeneration: 0,
+        needsScrollSync: false,
+        isRenderTransaction: false,
+        geometryEpoch: 0,
         itemHeights: new Float64Array(0),
         prefixOffsets: new Float64Array(1),
         sourceRenderObjects: null,
@@ -2250,6 +2257,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (!(state.outputVirtual.prefixOffsets instanceof Float64Array)) {
       state.outputVirtual.prefixOffsets = new Float64Array(1);
     }
+    ensureOutputModuleVirtualControlState(state.outputVirtual, 200);
     return state.outputVirtual;
   }
 
@@ -2265,6 +2273,13 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         pendingRaf: 0,
         isAdjustingScroll: false,
         avgItemHeight: 140,
+        unknownItemHeight: 140,
+        estimateCalibrated: false,
+        adjustmentRaf: 0,
+        adjustmentGeneration: 0,
+        needsScrollSync: false,
+        isRenderTransaction: false,
+        geometryEpoch: 0,
         lineTargetMap: new Map(),
         isInitialized: false
       };
@@ -2272,7 +2287,33 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (!(state.templateVirtual.lineTargetMap instanceof Map)) {
       state.templateVirtual.lineTargetMap = new Map();
     }
+    ensureOutputModuleVirtualControlState(state.templateVirtual, 140);
     return state.templateVirtual;
+  }
+
+  function ensureOutputModuleVirtualControlState(virtual, defaultEstimate) {
+    const fallback = Math.max(1, Number(defaultEstimate) || 1);
+    if (!Number.isFinite(Number(virtual.unknownItemHeight)) || Number(virtual.unknownItemHeight) <= 0) {
+      virtual.unknownItemHeight = fallback;
+    }
+    if (typeof virtual.estimateCalibrated !== "boolean") {
+      virtual.estimateCalibrated = false;
+    }
+    if (!Number.isFinite(Number(virtual.adjustmentRaf))) {
+      virtual.adjustmentRaf = 0;
+    }
+    if (!Number.isFinite(Number(virtual.adjustmentGeneration))) {
+      virtual.adjustmentGeneration = 0;
+    }
+    if (typeof virtual.needsScrollSync !== "boolean") {
+      virtual.needsScrollSync = false;
+    }
+    if (typeof virtual.isRenderTransaction !== "boolean") {
+      virtual.isRenderTransaction = false;
+    }
+    if (!Number.isFinite(Number(virtual.geometryEpoch))) {
+      virtual.geometryEpoch = 0;
+    }
   }
 
   function getInputGutterVirtualState() {
@@ -2411,8 +2452,27 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return node;
   }
 
-  function getOutputEstimatedItemHeight(virtual) {
-    return Math.max(24, Number(virtual && virtual.avgItemHeight) || 200);
+  function getOutputUnknownItemHeight(virtual) {
+    return Math.max(24, Number(virtual && virtual.unknownItemHeight) || 200);
+  }
+
+  function calibrateOutputUnknownItemHeight(virtual, heights) {
+    if (!virtual || virtual.estimateCalibrated) {
+      return;
+    }
+    const samples = Array.isArray(heights)
+      ? heights.map((height) => Number(height) || 0).filter((height) => height > 0).sort((a, b) => a - b)
+      : [];
+    if (!samples.length) {
+      return;
+    }
+    const middle = Math.floor(samples.length / 2);
+    const median = samples.length % 2
+      ? samples[middle]
+      : ((samples[middle - 1] + samples[middle]) / 2);
+    virtual.unknownItemHeight = Math.max(24, median);
+    virtual.estimateCalibrated = true;
+    virtual.geometryEpoch = (Number(virtual.geometryEpoch) || 0) + 1;
   }
 
   function ensureOutputHeightCache(virtual, itemCount) {
@@ -2428,7 +2488,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
   function rebuildOutputPrefixOffsets(virtual) {
     const total = Math.max(0, Number(virtual && virtual.itemCount) || 0);
     ensureOutputHeightCache(virtual, total);
-    const estimate = getOutputEstimatedItemHeight(virtual);
+    const estimate = getOutputUnknownItemHeight(virtual);
     virtual.prefixOffsets[0] = 0;
     for (let index = 0; index < total; index += 1) {
       const measured = Number(virtual.itemHeights[index]) || 0;
@@ -2483,6 +2543,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         heights.push(height);
       }
     }
+    calibrateOutputUnknownItemHeight(virtual, heights);
     updateAverageItemHeight(virtual, heights, 80);
     rebuildOutputPrefixOffsets(virtual);
     const topSpacer = els.output.querySelector(".output-virtual-spacer-top");
@@ -2503,7 +2564,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       return { start: 0, end: 0 };
     }
 
-    const estimatedHeight = getOutputEstimatedItemHeight(virtual);
+    const estimatedHeight = Math.max(24, Number(virtual.avgItemHeight) || 200);
     const metrics = getVirtualWindowConfig(els.output, estimatedHeight);
     if (total <= metrics.targetCount) {
       return { start: 0, end: total };
@@ -2520,6 +2581,70 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return { start, end };
   }
 
+  function captureOutputLogicalScrollAnchor(virtual, scrollTop) {
+    const total = Math.max(0, Number(virtual && virtual.itemCount) || 0);
+    if (!total) {
+      return null;
+    }
+    const top = Math.max(0, Number(scrollTop) || 0);
+    const index = findOutputIndexAtOffset(virtual, top);
+    return {
+      index,
+      intraItemOffset: Math.max(0, top - getOutputOffsetAtIndex(virtual, index))
+    };
+  }
+
+  function getOutputVirtualMaxScrollTop(virtual) {
+    if (!els.output) {
+      return 0;
+    }
+    const prefixMax = Math.max(
+      0,
+      getOutputOffsetAtIndex(virtual, virtual.itemCount) - (Number(els.output.clientHeight) || 0)
+    );
+    const domMax = Math.max(0, (Number(els.output.scrollHeight) || 0) - (Number(els.output.clientHeight) || 0));
+    if (prefixMax > 0 && domMax > 0) {
+      return Math.min(prefixMax, domMax);
+    }
+    return Math.max(prefixMax, domMax);
+  }
+
+  function restoreOutputLogicalScrollAnchor(virtual, anchor, fallbackTop) {
+    if (!els.output) {
+      return;
+    }
+    let nextTop = Math.max(0, Number(fallbackTop) || 0);
+    if (anchor && Number.isFinite(Number(anchor.index))) {
+      const index = Math.max(0, Math.min(virtual.itemCount - 1, Number(anchor.index) || 0));
+      const itemStart = getOutputOffsetAtIndex(virtual, index);
+      const itemHeight = Math.max(1, getOutputOffsetAtIndex(virtual, index + 1) - itemStart);
+      const intraItemOffset = Math.max(
+        0,
+        Math.min(itemHeight - 1, Number(anchor.intraItemOffset) || 0)
+      );
+      nextTop = itemStart + intraItemOffset;
+    }
+    els.output.scrollTop = Math.max(0, Math.min(getOutputVirtualMaxScrollTop(virtual), nextTop));
+  }
+
+  function ensureOutputRangeContainsAnchor(virtual, anchor) {
+    if (!anchor || !Number.isFinite(Number(anchor.index))) {
+      return;
+    }
+    const index = Math.max(0, Math.min(virtual.itemCount - 1, Number(anchor.index) || 0));
+    if (index >= virtual.start && index < virtual.end) {
+      return;
+    }
+    const metrics = getVirtualWindowConfig(els.output, virtual.avgItemHeight);
+    let start = Math.max(0, index - metrics.overscanCount);
+    let end = Math.min(virtual.itemCount, start + metrics.targetCount);
+    if ((end - start) < metrics.targetCount) {
+      start = Math.max(0, end - metrics.targetCount);
+    }
+    virtual.start = start;
+    virtual.end = end;
+  }
+
   function renderOutputVirtualInitialRange(options) {
     if (!els.output) {
       return;
@@ -2528,9 +2653,14 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const virtual = getOutputVirtualState();
     const items = Array.isArray(virtual.roots) ? virtual.roots : [];
     const total = items.length;
+    rebuildOutputPrefixOffsets(virtual);
+    const requestedTop = Number(opts.scrollTop) || 0;
+    const logicalAnchor = opts.preserveScroll && opts.preserveLogicalAnchor !== false
+      ? captureOutputLogicalScrollAnchor(virtual, requestedTop)
+      : null;
+    ensureOutputRangeContainsAnchor(virtual, logicalAnchor);
     const start = Math.max(0, Math.min(total, Number(virtual.start) || 0));
     const end = Math.max(start, Math.min(total, Number(virtual.end) || 0));
-    rebuildOutputPrefixOffsets(virtual);
 
     const frag = document.createDocumentFragment();
     const topSpacer = document.createElement("div");
@@ -2553,18 +2683,23 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     bottomSpacer.setAttribute("aria-hidden", "true");
     frag.appendChild(bottomSpacer);
 
-    els.output.classList.remove("muted");
-    els.output.replaceChildren(frag);
-    measureRenderedOutputItems(virtual, start, end);
-
-    if (opts.preserveScroll) {
-      const maxTop = Math.max(0, Number(els.output.scrollHeight || 0) - Number(els.output.clientHeight || 0));
-      els.output.scrollTop = Math.max(0, Math.min(maxTop, Number(opts.scrollTop) || 0));
-    } else {
-      els.output.scrollTop = Math.max(0, Number(opts.scrollTop) || 0);
+    virtual.isRenderTransaction = true;
+    try {
+      els.output.classList.remove("muted");
+      els.output.replaceChildren(frag);
+      measureRenderedOutputItems(virtual, start, end);
+      restoreOutputLogicalScrollAnchor(
+        virtual,
+        opts.preserveScroll ? logicalAnchor : null,
+        requestedTop
+      );
+      virtual.lastScrollTop = Number(els.output.scrollTop || 0) || 0;
+    } finally {
+      virtual.isRenderTransaction = false;
+      if (virtual.needsScrollSync) {
+        queueVirtualScrollSync(els.output, virtual);
+      }
     }
-
-    virtual.lastScrollTop = Number(els.output.scrollTop || 0) || 0;
   }
 
   function initOutputVirtualWindow(filteredRoots, options) {
@@ -2576,12 +2711,17 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       cancelAnimationFrame(virtual.pendingRaf);
       virtual.pendingRaf = 0;
     }
+    cancelVirtualScrollAdjustment(virtual);
+    virtual.geometryEpoch = (Number(virtual.geometryEpoch) || 0) + 1;
+    virtual.needsScrollSync = false;
+    virtual.isRenderTransaction = false;
+    virtual.avgItemHeight = 200;
+    virtual.unknownItemHeight = 200;
+    virtual.estimateCalibrated = false;
+    virtual.itemHeights = new Float64Array(0);
+    virtual.prefixOffsets = new Float64Array(1);
 
     const virtualData = buildOutputVirtualData(roots);
-    if (virtual.sourceRenderObjects !== state.renderObjects) {
-      virtual.itemHeights = new Float64Array(0);
-      virtual.prefixOffsets = new Float64Array(1);
-    }
     virtual.sourceRenderObjects = state.renderObjects;
     virtual.roots = virtualData.items;
     virtual.itemCount = virtualData.items.length;
@@ -2592,7 +2732,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     virtual.start = 0;
     virtual.end = 0;
     virtual.scrollDir = "down";
-    virtual.isAdjustingScroll = false;
     virtual.isInitialized = virtual.itemCount > 0;
 
     if (!virtual.itemCount) {
@@ -2607,7 +2746,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const selectedRootIndex = state.selectedId && virtual.idToRootIndex.has(state.selectedId)
       ? Number(virtual.idToRootIndex.get(state.selectedId))
       : -1;
-    if (selectedRootIndex >= 0) {
+    const hasSelectedRootIndex = selectedRootIndex >= 0;
+    if (hasSelectedRootIndex) {
       start = Math.max(0, selectedRootIndex - Math.floor(metrics.targetCount / 2));
       end = Math.min(total, start + metrics.targetCount);
       if ((end - start) < metrics.targetCount) {
@@ -2623,6 +2763,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     virtual.end = end;
     renderOutputVirtualInitialRange({
       preserveScroll: true,
+      preserveLogicalAnchor: !hasSelectedRootIndex,
       scrollTop: opts.preserveScroll === true ? (Number(opts.scrollTop) || 0) : 0
     });
   }
@@ -2664,10 +2805,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (!virtual.isInitialized || !total) {
       return;
     }
-    if (virtual.isAdjustingScroll) {
+    if (virtual.isAdjustingScroll || virtual.isRenderTransaction) {
+      virtual.needsScrollSync = true;
       return;
     }
 
+    virtual.needsScrollSync = false;
     const currentTop = Number(els.output.scrollTop || 0) || 0;
     const prevTop = Number(virtual.lastScrollTop || 0) || 0;
     virtual.scrollDir = currentTop >= prevTop ? "down" : "up";
@@ -2685,17 +2828,90 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
   function scheduleOutputVirtualScroll() {
     const virtual = getOutputVirtualState();
-    if (virtual.pendingRaf || virtual.isAdjustingScroll) {
+    if (virtual.isAdjustingScroll || virtual.isRenderTransaction) {
+      virtual.needsScrollSync = true;
+      return;
+    }
+    if (virtual.pendingRaf) {
       return;
     }
     virtual.pendingRaf = requestAnimationFrame(() => {
       virtual.pendingRaf = 0;
+      if (virtual.isAdjustingScroll || virtual.isRenderTransaction) {
+        virtual.needsScrollSync = true;
+        return;
+      }
       processOutputVirtualScrollFrame();
     });
   }
 
   function handleOutputVirtualScroll() {
+    const virtual = getOutputVirtualState();
+    virtual.needsScrollSync = true;
     scheduleOutputVirtualScroll();
+  }
+
+  function handleOutputVirtualUserIntent() {
+    const virtual = getOutputVirtualState();
+    cancelVirtualScrollAdjustment(virtual);
+    virtual.needsScrollSync = true;
+    scheduleOutputVirtualScroll();
+  }
+
+  function cancelVirtualScrollAdjustment(virtual) {
+    if (!virtual || typeof virtual !== "object") {
+      return;
+    }
+    ensureOutputModuleVirtualControlState(virtual, virtual === state.templateVirtual ? 140 : 200);
+    virtual.adjustmentGeneration = (Number(virtual.adjustmentGeneration) || 0) + 1;
+    if (virtual.adjustmentRaf) {
+      cancelAnimationFrame(virtual.adjustmentRaf);
+      virtual.adjustmentRaf = 0;
+    }
+    virtual.isAdjustingScroll = false;
+  }
+
+  function beginVirtualScrollAdjustment(virtual) {
+    if (!virtual || typeof virtual !== "object") {
+      return 0;
+    }
+    cancelVirtualScrollAdjustment(virtual);
+    if (virtual.pendingRaf) {
+      cancelAnimationFrame(virtual.pendingRaf);
+      virtual.pendingRaf = 0;
+    }
+    virtual.needsScrollSync = false;
+    virtual.isAdjustingScroll = true;
+    return Number(virtual.adjustmentGeneration) || 0;
+  }
+
+  function queueVirtualScrollSync(container, virtual) {
+    if (!virtual || typeof virtual !== "object") {
+      return;
+    }
+    virtual.needsScrollSync = true;
+    if (virtual.isAdjustingScroll || virtual.isRenderTransaction) {
+      return;
+    }
+    if (container === els.output) {
+      scheduleOutputVirtualScroll();
+      return;
+    }
+    if (container === els.templatePreviewOutput && typeof scheduleTemplateVirtualScroll === "function") {
+      scheduleTemplateVirtualScroll();
+    }
+  }
+
+  function finishVirtualScrollAdjustment(container, virtual, generation) {
+    if (!virtual || Number(virtual.adjustmentGeneration) !== Number(generation)) {
+      return;
+    }
+    virtual.adjustmentRaf = 0;
+    virtual.lastScrollTop = Number(container && container.scrollTop) || 0;
+    virtual.isAdjustingScroll = false;
+    if (virtual.needsScrollSync) {
+      queueVirtualScrollSync(container, virtual);
+    }
   }
 
 function resetOutputVirtualState() {
@@ -2704,13 +2920,19 @@ function resetOutputVirtualState() {
       cancelAnimationFrame(virtual.pendingRaf);
       virtual.pendingRaf = 0;
     }
+    cancelVirtualScrollAdjustment(virtual);
     virtual.roots = [];
     virtual.itemCount = 0;
     virtual.start = 0;
     virtual.end = 0;
     virtual.lastScrollTop = 0;
     virtual.scrollDir = "down";
-    virtual.isAdjustingScroll = false;
+    virtual.avgItemHeight = 200;
+    virtual.unknownItemHeight = 200;
+    virtual.estimateCalibrated = false;
+    virtual.needsScrollSync = false;
+    virtual.isRenderTransaction = false;
+    virtual.geometryEpoch = (Number(virtual.geometryEpoch) || 0) + 1;
     virtual.itemHeights = new Float64Array(0);
     virtual.prefixOffsets = new Float64Array(1);
     virtual.sourceRenderObjects = null;
@@ -2723,13 +2945,12 @@ function resetOutputVirtualState() {
     if (!container || !virtual) {
       return;
     }
-    if (virtual.pendingRaf) {
-      cancelAnimationFrame(virtual.pendingRaf);
-      virtual.pendingRaf = 0;
-    }
-    virtual.isAdjustingScroll = true;
+    const generation = beginVirtualScrollAdjustment(virtual);
 
     const align = () => {
+      if (Number(virtual.adjustmentGeneration) !== generation || !virtual.isAdjustingScroll) {
+        return true;
+      }
       const node = selector ? container.querySelector(selector) : initialNode;
       if (!node) {
         return true;
@@ -2742,19 +2963,26 @@ function resetOutputVirtualState() {
       return false;
     };
 
+    const scheduleAdjustmentFrame = (callback) => {
+      virtual.adjustmentRaf = requestAnimationFrame(() => {
+        virtual.adjustmentRaf = 0;
+        if (Number(virtual.adjustmentGeneration) !== generation || !virtual.isAdjustingScroll) {
+          return;
+        }
+        callback();
+      });
+    };
+
     align();
     const settle = (remainingFrames) => {
       const isSettled = align();
       if (!isSettled && remainingFrames > 0) {
-        requestAnimationFrame(() => settle(remainingFrames - 1));
+        scheduleAdjustmentFrame(() => settle(remainingFrames - 1));
         return;
       }
-      requestAnimationFrame(() => {
-        virtual.lastScrollTop = Number(container.scrollTop || 0) || 0;
-        virtual.isAdjustingScroll = false;
-      });
+      scheduleAdjustmentFrame(() => finishVirtualScrollAdjustment(container, virtual, generation));
     };
-    requestAnimationFrame(() => settle(4));
+    scheduleAdjustmentFrame(() => settle(4));
   }
 
   function setSelectedCard(id, options) {
@@ -3102,7 +3330,17 @@ function resetOutputVirtualState() {
       : null;
     const node = isVisible(selected) ? selected : (renderedItems.find(isVisible) || null);
     if (!node) {
-      return { kind: "scroll", scrollTop: Number(container.scrollTop) || 0 };
+      const scrollTop = Number(container.scrollTop) || 0;
+      const logical = captureOutputLogicalScrollAnchor(getOutputVirtualState(), scrollTop);
+      if (logical) {
+        return {
+          kind: "logical",
+          itemIndex: logical.index,
+          intraItemOffset: logical.intraItemOffset,
+          scrollTop
+        };
+      }
+      return { kind: "scroll", scrollTop };
     }
     return {
       kind: "item",
@@ -3118,8 +3356,27 @@ function resetOutputVirtualState() {
       return;
     }
     const container = els.output;
+    if (anchor.kind === "logical") {
+      const virtual = getOutputVirtualState();
+      const itemIndex = Number(anchor.itemIndex);
+      cancelVirtualScrollAdjustment(virtual);
+      if (
+        Number.isFinite(itemIndex)
+        && itemIndex >= 0
+        && ensureOutputWindowContainsRootIndex(itemIndex)
+      ) {
+        restoreOutputLogicalScrollAnchor(virtual, {
+          index: itemIndex,
+          intraItemOffset: Number(anchor.intraItemOffset) || 0
+        }, anchor.scrollTop);
+        virtual.lastScrollTop = Number(container.scrollTop) || 0;
+        return;
+      }
+    }
     if (anchor.kind === "scroll") {
+      cancelVirtualScrollAdjustment(getOutputVirtualState());
       container.scrollTop = Math.max(0, Number(anchor.scrollTop) || 0);
+      getOutputVirtualState().lastScrollTop = Number(container.scrollTop) || 0;
       return;
     }
     const virtual = getOutputVirtualState();
@@ -3131,12 +3388,11 @@ function resetOutputVirtualState() {
       return;
     }
 
-    if (virtual.pendingRaf) {
-      cancelAnimationFrame(virtual.pendingRaf);
-      virtual.pendingRaf = 0;
-    }
-    virtual.isAdjustingScroll = true;
+    const generation = beginVirtualScrollAdjustment(virtual);
     const apply = () => {
+      if (Number(virtual.adjustmentGeneration) !== generation || !virtual.isAdjustingScroll) {
+        return;
+      }
       const node = anchor.id
         ? container.querySelector(`[data-id="${escapeSelectorValue(anchor.id)}"]`)
         : container.querySelector(`[data-virtual-item-index="${mappedIndex}"]`);
@@ -3150,10 +3406,13 @@ function resetOutputVirtualState() {
       container.scrollTop = Math.max(0, Math.min(maxTop, nextTop));
     };
     apply();
-    requestAnimationFrame(() => {
+    virtual.adjustmentRaf = requestAnimationFrame(() => {
+      virtual.adjustmentRaf = 0;
+      if (Number(virtual.adjustmentGeneration) !== generation || !virtual.isAdjustingScroll) {
+        return;
+      }
       apply();
-      virtual.lastScrollTop = Number(container.scrollTop) || 0;
-      virtual.isAdjustingScroll = false;
+      finishVirtualScrollAdjustment(container, virtual, generation);
     });
   }
 
