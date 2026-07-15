@@ -3971,51 +3971,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return applyTemplateConfigObject(defaultConfig, { save: true });
   }
 
-  function exportTemplateConfig() {
-    const config = state.templateConfig || getDefaultTemplateConfig();
-    const content = safeJson(config, true);
-    const fileName = "abap-template-config.json";
-
-    try {
-      const blob = new Blob([content], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setError("");
-    } catch (err) {
-      setError(`Export failed: ${err && err.message ? err.message : err}`);
-    }
-  }
-
-  async function importTemplateConfigFromFile(file) {
-    if (!file) {
-      return;
-    }
-
-    let text = "";
-    try {
-      text = await file.text();
-    } catch (err) {
-      setTemplateConfigError(`Import failed: ${err && err.message ? err.message : err}`);
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(text);
-      const applied = applyTemplateConfigObject(parsed, { save: true });
-      if (applied) {
-        setError("");
-      }
-    } catch (err) {
-      setTemplateConfigError(`Import JSON parse error: ${err && err.message ? err.message : err}`);
-    }
-  }
-
   async function copyAllTemplateBlocks() {
     if (!els.templatePreviewOutput) {
       return;

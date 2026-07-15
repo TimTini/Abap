@@ -4,8 +4,19 @@ window.AbapViewerModules = window.AbapViewerModules || {};
 window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
   const TEMPLATE_GUI_FILTER_STORAGE_KEY_V1 = "abap-parser-viewer.templateGuiHiddenObjectTypes.v1";
+  const TEMPLATE_FORM_EDITOR_PCT_STORAGE_KEY_V1 = "abap-parser-viewer.templateFormEditorPct.v1";
+  const VIEWER_CONFIG_KIND_V1 = "abap-viewer-config";
+  const VIEWER_CONFIG_VERSION_V1 = 1;
+  const VIEWER_CONFIG_SECTION_DEFS_V1 = Object.freeze([
+    { key: "templates", label: "Templates", fileToken: "templates" },
+    { key: "descriptionSettings", label: "Description settings", fileToken: "description-settings" },
+    { key: "descriptionOverrides", label: "Description overrides", fileToken: "description-overrides" },
+    { key: "appearance", label: "Appearance", fileToken: "appearance" },
+    { key: "templateUi", label: "Template UI", fileToken: "template-ui" }
+  ]);
   let activeTemplateDynamicModal = null;
   let templateFilterModalControls = null;
+  let activeTemplateFormSplitController = null;
 
   function isTemplateDynamicModalOpen() {
     return Boolean(activeTemplateDynamicModal && activeTemplateDynamicModal.root && activeTemplateDynamicModal.root.isConnected);
@@ -409,6 +420,592 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     modal.setCleanup(() => {
       templateFilterModalControls = null;
     });
+  }
+
+  function isViewerConfigPlainObject(value) {
+    return Boolean(value && typeof value === "object" && !Array.isArray(value));
+  }
+
+  function cloneViewerConfigValue(value) {
+    const cloned = cloneJsonValue(value);
+    if (cloned === null && value !== null) {
+      throw new Error("Viewer config contains a value that cannot be cloned.");
+    }
+    return cloned;
+  }
+
+  function normalizeTemplateFormEditorPct(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric < 22 || numeric > 78) {
+      return 58;
+    }
+    return Math.round(numeric);
+  }
+
+  function loadTemplateFormEditorPct() {
+    const current = Number(state.templateFormEditorPct);
+    if (Number.isFinite(current) && current >= 22 && current <= 78) {
+      return Math.round(current);
+    }
+
+    let saved = null;
+    try {
+      saved = localStorage.getItem(TEMPLATE_FORM_EDITOR_PCT_STORAGE_KEY_V1);
+    } catch {
+      saved = null;
+    }
+    const normalized = normalizeTemplateFormEditorPct(saved);
+    state.templateFormEditorPct = normalized;
+    return normalized;
+  }
+
+  function applyTemplateFormEditorPct(value, options) {
+    const opts = options && typeof options === "object" ? options : {};
+    const normalized = normalizeTemplateFormEditorPct(value);
+    state.templateFormEditorPct = normalized;
+
+    if (activeTemplateFormSplitController && typeof activeTemplateFormSplitController.apply === "function") {
+      activeTemplateFormSplitController.apply(normalized);
+    }
+
+    if (opts.save === false) {
+      return normalized;
+    }
+    localStorage.setItem(TEMPLATE_FORM_EDITOR_PCT_STORAGE_KEY_V1, String(normalized));
+    return normalized;
+  }
+
+  function getSelectedViewerConfigSectionDefs(sectionKeys) {
+    const requested = new Set(Array.isArray(sectionKeys) ? sectionKeys.map((key) => String(key || "")) : []);
+    return VIEWER_CONFIG_SECTION_DEFS_V1.filter((section) => requested.has(section.key));
+  }
+
+  function canonicalizeDescriptionOverridesForViewerConfig(value, options) {
+    const opts = options && typeof options === "object" ? options : {};
+    if (!isViewerConfigPlainObject(value)) {
+      throw new Error("Description overrides must be an object.");
+    }
+
+    const canonical = {};
+    for (const [key, rawEntry] of Object.entries(value)) {
+      if (!String(key || "").trim()) {
+        throw new Error("Description override keys must not be empty.");
+      }
+      if (typeof rawEntry === "string") {
+        canonical[key] = rawEntry;
+        continue;
+      }
+      if (!isViewerConfigPlainObject(rawEntry)) {
+        throw new Error(`Description override ${key} must be a string or canonical object.`);
+      }
+      if (opts.strict && typeof rawEntry.text !== "string") {
+        throw new Error(`Description override ${key}.text must be a string.`);
+      }
+      if (
+        opts.strict
+        && Object.prototype.hasOwnProperty.call(rawEntry, "noNormalize")
+        && typeof rawEntry.noNormalize !== "boolean"
+      ) {
+        throw new Error(`Description override ${key}.noNormalize must be a boolean.`);
+      }
+      const entry = normalizeDescOverrideEntry(rawEntry);
+      canonical[key] = entry.noNormalize
+        ? { text: entry.text, noNormalize: true }
+        : entry.text;
+    }
+    return canonical;
+  }
+
+  function getViewerConfigSectionValue(sectionKey) {
+    if (sectionKey === "templates") {
+      return cloneViewerConfigValue(state.templateConfig || getDefaultTemplateConfig());
+    }
+    if (sectionKey === "descriptionSettings") {
+      return cloneViewerConfigValue(normalizeSettings(state.settings || {}));
+    }
+    if (sectionKey === "descriptionOverrides") {
+      return canonicalizeDescriptionOverridesForViewerConfig(state.descOverrides || {});
+    }
+    if (sectionKey === "appearance") {
+      return {
+        theme: normalizeTheme(state.theme),
+        layoutLeftPane: normalizeLayoutSplit(state.layoutLeftPane)
+      };
+    }
+    if (sectionKey === "templateUi") {
+      ensureTemplateGuiFilterState();
+      return {
+        hiddenObjectTypes: Array.from(state.templateGuiHiddenTypes.values())
+          .map(normalizeTemplateObjectTypeToken)
+          .filter(Boolean)
+          .sort((left, right) => left.localeCompare(right)),
+        formEditorPct: loadTemplateFormEditorPct()
+      };
+    }
+    throw new Error(`Unknown Viewer config section: ${sectionKey}`);
+  }
+
+  function buildViewerConfigBundle(sectionKeys, exportedAt) {
+    const selectedSections = getSelectedViewerConfigSectionDefs(sectionKeys);
+    const sections = {};
+    for (const section of selectedSections) {
+      sections[section.key] = getViewerConfigSectionValue(section.key);
+    }
+    return {
+      kind: VIEWER_CONFIG_KIND_V1,
+      version: VIEWER_CONFIG_VERSION_V1,
+      exportedAt: exportedAt || new Date().toISOString(),
+      sections
+    };
+  }
+
+  function getViewerConfigExportFileName(sectionKeys) {
+    const selectedSections = getSelectedViewerConfigSectionDefs(sectionKeys);
+    if (selectedSections.length === VIEWER_CONFIG_SECTION_DEFS_V1.length) {
+      return "abap-viewer-config.json";
+    }
+    const suffix = selectedSections.map((section) => section.fileToken).join("-");
+    return suffix ? `abap-viewer-config-${suffix}.json` : "abap-viewer-config.json";
+  }
+
+  function downloadViewerConfigBundle(bundle, fileName) {
+    const content = safeJson(bundle, true);
+    const blob = new Blob([content], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  }
+
+  function openViewerConfigExportModal() {
+    const modal = openTemplateDynamicModal("Export Viewer Config", { contentClass: "template-runtime-modal-content" });
+    const error = document.createElement("div");
+    error.className = "template-error";
+    modal.body.appendChild(error);
+
+    const selectAllLabel = document.createElement("label");
+    selectAllLabel.className = "toggle";
+    const selectAllInput = document.createElement("input");
+    selectAllInput.type = "checkbox";
+    selectAllInput.checked = true;
+    selectAllInput.setAttribute("data-config-select-all", "true");
+    selectAllLabel.appendChild(selectAllInput);
+    selectAllLabel.appendChild(document.createTextNode("Select all"));
+    modal.body.appendChild(selectAllLabel);
+
+    const sectionInputs = [];
+    const sectionList = document.createElement("div");
+    sectionList.className = "controls";
+    for (const section of VIEWER_CONFIG_SECTION_DEFS_V1) {
+      const label = document.createElement("label");
+      label.className = "toggle";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.checked = true;
+      input.value = section.key;
+      input.setAttribute("data-config-section", section.key);
+      label.appendChild(input);
+      label.appendChild(document.createTextNode(section.label));
+      sectionList.appendChild(label);
+      sectionInputs.push(input);
+    }
+    modal.body.appendChild(sectionList);
+
+    const syncSelectAll = () => {
+      selectAllInput.checked = sectionInputs.every((input) => input.checked);
+      selectAllInput.indeterminate = !selectAllInput.checked && sectionInputs.some((input) => input.checked);
+    };
+    selectAllInput.addEventListener("change", () => {
+      for (const input of sectionInputs) {
+        input.checked = selectAllInput.checked;
+      }
+      syncSelectAll();
+    });
+    for (const input of sectionInputs) {
+      input.addEventListener("change", syncSelectAll);
+    }
+
+    const exportButton = document.createElement("button");
+    exportButton.type = "button";
+    exportButton.className = "secondary";
+    exportButton.textContent = "Export selected";
+    exportButton.addEventListener("click", () => {
+      const selectedKeys = sectionInputs.filter((input) => input.checked).map((input) => input.value);
+      if (!selectedKeys.length) {
+        error.textContent = "Select at least one config section.";
+        return;
+      }
+      try {
+        const bundle = buildViewerConfigBundle(selectedKeys);
+        downloadViewerConfigBundle(bundle, getViewerConfigExportFileName(selectedKeys));
+        setError("");
+        closeTemplateDynamicModal();
+      } catch (err) {
+        error.textContent = `Export failed: ${err && err.message ? err.message : err}`;
+      }
+    });
+    modal.actions.prepend(exportButton);
+  }
+
+  function prepareViewerConfigDescriptionSettings(value) {
+    if (!isViewerConfigPlainObject(value)) {
+      throw new Error("Description settings must be an object.");
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(value, "normalizeDeclDesc")
+      && typeof value.normalizeDeclDesc !== "boolean"
+    ) {
+      throw new Error("Description settings normalizeDeclDesc must be a boolean.");
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(value, "declFilterTypes")
+      && !Array.isArray(value.declFilterTypes)
+    ) {
+      throw new Error("Description settings declFilterTypes must be an array.");
+    }
+    if (
+      Array.isArray(value.declFilterTypes)
+      && value.declFilterTypes.some((type) => !DECL_TYPE_OPTIONS.includes(String(type || "").trim().toUpperCase()))
+    ) {
+      throw new Error("Description settings declFilterTypes contains an unsupported type.");
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(value, "structDescTemplate")
+      && (typeof value.structDescTemplate !== "string" || !value.structDescTemplate.trim())
+    ) {
+      throw new Error("Description settings structDescTemplate must be a non-empty string.");
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(value, "nameTemplatesByCode")
+      && !isViewerConfigPlainObject(value.nameTemplatesByCode)
+    ) {
+      throw new Error("Description settings nameTemplatesByCode must be an object.");
+    }
+    if (isViewerConfigPlainObject(value.nameTemplatesByCode)) {
+      for (const [code, template] of Object.entries(value.nameTemplatesByCode)) {
+        if (!NAME_CODE_OPTIONS.some((option) => option.code === code) || typeof template !== "string" || !template.trim()) {
+          throw new Error(`Description settings nameTemplatesByCode.${code} is invalid.`);
+        }
+      }
+    }
+    return normalizeSettings(value);
+  }
+
+  function prepareViewerConfigAppearance(value) {
+    if (!isViewerConfigPlainObject(value)) {
+      throw new Error("Appearance must be an object.");
+    }
+    if (value.theme !== "light" && value.theme !== "dark") {
+      throw new Error("Appearance theme must be light or dark.");
+    }
+    const layoutLeftPane = Number(value.layoutLeftPane);
+    if (!Number.isFinite(layoutLeftPane) || layoutLeftPane < LAYOUT_SPLIT_MIN || layoutLeftPane > LAYOUT_SPLIT_MAX) {
+      throw new Error(`Appearance layoutLeftPane must be between ${LAYOUT_SPLIT_MIN} and ${LAYOUT_SPLIT_MAX}.`);
+    }
+    return { theme: normalizeTheme(value.theme), layoutLeftPane: normalizeLayoutSplit(layoutLeftPane) };
+  }
+
+  function prepareViewerConfigTemplateUi(value) {
+    if (!isViewerConfigPlainObject(value)) {
+      throw new Error("Template UI must be an object.");
+    }
+    if (!Array.isArray(value.hiddenObjectTypes)) {
+      throw new Error("Template UI hiddenObjectTypes must be an array.");
+    }
+    if (value.hiddenObjectTypes.some((item) => typeof item !== "string" || !item.trim())) {
+      throw new Error("Template UI hiddenObjectTypes must contain non-empty strings.");
+    }
+    const formEditorPct = Number(value.formEditorPct);
+    if (!Number.isFinite(formEditorPct) || formEditorPct < 22 || formEditorPct > 78) {
+      throw new Error("Template UI formEditorPct must be between 22 and 78.");
+    }
+    return {
+      hiddenObjectTypes: Array.from(new Set(value.hiddenObjectTypes.map(normalizeTemplateObjectTypeToken)))
+        .filter(Boolean)
+        .sort((left, right) => left.localeCompare(right)),
+      formEditorPct: normalizeTemplateFormEditorPct(formEditorPct)
+    };
+  }
+
+  function prepareViewerConfigTemplates(value) {
+    if (!isViewerConfigPlainObject(value)) {
+      throw new Error("Templates must be a config object.");
+    }
+    const next = cloneViewerConfigValue(value);
+    normalizeTemplateConfigLegacyFieldsInPlace(next);
+    const check = validateTemplateConfig(next);
+    if (!check.valid) {
+      throw new Error(check.errors.join("\n"));
+    }
+    mergeMissingDefaultTemplatesInPlace(next);
+    return next;
+  }
+
+  function validateAndPrepareViewerConfigBundle(value) {
+    const errors = [];
+    if (!isViewerConfigPlainObject(value)) {
+      return { valid: false, errors: ["Viewer config must be a JSON object."], knownSections: [], unknownSections: [], prepared: {} };
+    }
+    if (value.kind !== VIEWER_CONFIG_KIND_V1) {
+      errors.push(`Viewer config kind must be ${VIEWER_CONFIG_KIND_V1}.`);
+    }
+    if (Number(value.version) !== VIEWER_CONFIG_VERSION_V1) {
+      errors.push(`Viewer config version must be ${VIEWER_CONFIG_VERSION_V1}.`);
+    }
+    if (!isViewerConfigPlainObject(value.sections)) {
+      errors.push("Viewer config sections must be an object.");
+      return { valid: false, errors, knownSections: [], unknownSections: [], prepared: {} };
+    }
+
+    const knownKeys = new Set(VIEWER_CONFIG_SECTION_DEFS_V1.map((section) => section.key));
+    const unknownSections = Object.keys(value.sections).filter((key) => !knownKeys.has(key));
+    const knownSections = VIEWER_CONFIG_SECTION_DEFS_V1.filter((section) => (
+      Object.prototype.hasOwnProperty.call(value.sections, section.key)
+    ));
+    if (!knownSections.length) {
+      errors.push("Viewer config has no known config section.");
+    }
+
+    const prepared = {};
+    for (const section of knownSections) {
+      try {
+        const raw = value.sections[section.key];
+        if (section.key === "templates") {
+          prepared.templates = prepareViewerConfigTemplates(raw);
+        } else if (section.key === "descriptionSettings") {
+          prepared.descriptionSettings = prepareViewerConfigDescriptionSettings(raw);
+        } else if (section.key === "descriptionOverrides") {
+          prepared.descriptionOverrides = canonicalizeDescriptionOverridesForViewerConfig(raw, { strict: true });
+        } else if (section.key === "appearance") {
+          prepared.appearance = prepareViewerConfigAppearance(raw);
+        } else if (section.key === "templateUi") {
+          prepared.templateUi = prepareViewerConfigTemplateUi(raw);
+        }
+      } catch (err) {
+        errors.push(`${section.label}: ${err && err.message ? err.message : err}`);
+      }
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+      knownSections,
+      unknownSections,
+      prepared
+    };
+  }
+
+  function getViewerConfigStorageSnapshot() {
+    const keys = [
+      TEMPLATE_CONFIG_STORAGE_KEY_V1,
+      SETTINGS_STORAGE_KEY_V1,
+      DESC_STORAGE_KEY_V2,
+      THEME_STORAGE_KEY_V1,
+      LAYOUT_SPLIT_STORAGE_KEY_V1,
+      TEMPLATE_GUI_FILTER_STORAGE_KEY_V1,
+      TEMPLATE_FORM_EDITOR_PCT_STORAGE_KEY_V1
+    ];
+    const snapshot = {};
+    for (const key of keys) {
+      snapshot[key] = localStorage.getItem(key);
+    }
+    return snapshot;
+  }
+
+  function restoreViewerConfigStorageSnapshot(snapshot) {
+    for (const [key, raw] of Object.entries(snapshot || {})) {
+      if (raw === null || raw === undefined) {
+        localStorage.removeItem(key);
+      } else {
+        localStorage.setItem(key, raw);
+      }
+    }
+  }
+
+  function getViewerConfigStateSnapshot() {
+    ensureTemplateGuiFilterState();
+    return {
+      templateConfig: cloneViewerConfigValue(state.templateConfig || getDefaultTemplateConfig()),
+      settings: cloneViewerConfigValue(state.settings || loadSettings()),
+      descOverrides: cloneViewerConfigValue(state.descOverrides || {}),
+      theme: state.theme,
+      layoutLeftPane: state.layoutLeftPane,
+      hiddenObjectTypes: Array.from(state.templateGuiHiddenTypes.values()),
+      formEditorPct: loadTemplateFormEditorPct()
+    };
+  }
+
+  function rerenderViewerAfterConfigImport() {
+    if (typeof renderSettingsModalUi === "function") {
+      renderSettingsModalUi();
+    }
+    if (typeof renderDeclDescPanelUi === "function") {
+      renderDeclDescPanelUi();
+    }
+    if (typeof renderOutput === "function") {
+      renderOutput();
+    }
+    if (typeof renderTemplateGuiFilterControls === "function") {
+      renderTemplateGuiFilterControls();
+    }
+    if (typeof renderTemplatePreview === "function") {
+      renderTemplatePreview();
+    }
+  }
+
+  function restoreViewerConfigStateSnapshot(snapshot) {
+    state.templateConfig = cloneViewerConfigValue(snapshot.templateConfig);
+    state.settings = cloneViewerConfigValue(snapshot.settings);
+    state.descOverrides = cloneViewerConfigValue(snapshot.descOverrides);
+    state.templateGuiHiddenTypes = new Set(snapshot.hiddenObjectTypes || []);
+    applyTheme(snapshot.theme, { save: false });
+    applyLayoutSplit(snapshot.layoutLeftPane, { save: false });
+    applyTemplateFormEditorPct(snapshot.formEditorPct, { save: false });
+    syncTemplateEditorFromState();
+    rerenderViewerAfterConfigImport();
+  }
+
+  function writePreparedViewerConfigSections(prepared, knownSections) {
+    const selectedKeys = new Set(knownSections.map((section) => section.key));
+    if (selectedKeys.has("templates")) {
+      localStorage.setItem(TEMPLATE_CONFIG_STORAGE_KEY_V1, JSON.stringify(prepared.templates));
+    }
+    if (selectedKeys.has("descriptionSettings")) {
+      localStorage.setItem(SETTINGS_STORAGE_KEY_V1, JSON.stringify(prepared.descriptionSettings));
+    }
+    if (selectedKeys.has("descriptionOverrides")) {
+      localStorage.setItem(DESC_STORAGE_KEY_V2, JSON.stringify(prepared.descriptionOverrides));
+    }
+    if (selectedKeys.has("appearance")) {
+      localStorage.setItem(THEME_STORAGE_KEY_V1, prepared.appearance.theme);
+      localStorage.setItem(LAYOUT_SPLIT_STORAGE_KEY_V1, String(prepared.appearance.layoutLeftPane));
+    }
+    if (selectedKeys.has("templateUi")) {
+      localStorage.setItem(
+        TEMPLATE_GUI_FILTER_STORAGE_KEY_V1,
+        JSON.stringify(prepared.templateUi.hiddenObjectTypes)
+      );
+      localStorage.setItem(
+        TEMPLATE_FORM_EDITOR_PCT_STORAGE_KEY_V1,
+        String(prepared.templateUi.formEditorPct)
+      );
+    }
+  }
+
+  function applyPreparedViewerConfigSections(prepared, knownSections) {
+    const selectedKeys = new Set(knownSections.map((section) => section.key));
+    if (selectedKeys.has("templates")) {
+      const applied = applyTemplateConfigObject(prepared.templates, { save: false });
+      if (!applied) {
+        throw new Error("Templates could not be applied.");
+      }
+    }
+    if (selectedKeys.has("descriptionSettings")) {
+      state.settings = cloneViewerConfigValue(prepared.descriptionSettings);
+    }
+    if (selectedKeys.has("descriptionOverrides")) {
+      state.descOverrides = cloneViewerConfigValue(prepared.descriptionOverrides);
+    }
+    if (selectedKeys.has("appearance")) {
+      applyTheme(prepared.appearance.theme, { save: false });
+      applyLayoutSplit(prepared.appearance.layoutLeftPane, { save: false });
+    }
+    if (selectedKeys.has("templateUi")) {
+      state.templateGuiHiddenTypes = new Set(prepared.templateUi.hiddenObjectTypes);
+      applyTemplateFormEditorPct(prepared.templateUi.formEditorPct, { save: false });
+    }
+    syncTemplateEditorFromState();
+    rerenderViewerAfterConfigImport();
+  }
+
+  function importViewerConfigObject(value) {
+    const validation = validateAndPrepareViewerConfigBundle(value);
+    if (!validation.valid) {
+      setTemplateConfigError(`Import failed: ${validation.errors.join("\n")}`);
+      return false;
+    }
+
+    const confirmationLines = validation.knownSections.map((section) => `- ${section.label}`);
+    const confirmed = typeof window.confirm !== "function"
+      || window.confirm(`Import these Viewer config sections?\n${confirmationLines.join("\n")}`);
+    if (!confirmed) {
+      setTemplateConfigError("Import cancelled.");
+      return false;
+    }
+
+    let storageSnapshot = null;
+    let stateSnapshot = null;
+    try {
+      storageSnapshot = getViewerConfigStorageSnapshot();
+      stateSnapshot = getViewerConfigStateSnapshot();
+      writePreparedViewerConfigSections(validation.prepared, validation.knownSections);
+      applyPreparedViewerConfigSections(validation.prepared, validation.knownSections);
+    } catch (err) {
+      let rollbackError = "";
+      try {
+        if (storageSnapshot) {
+          restoreViewerConfigStorageSnapshot(storageSnapshot);
+        }
+        if (stateSnapshot) {
+          restoreViewerConfigStateSnapshot(stateSnapshot);
+        }
+      } catch (restoreErr) {
+        rollbackError = ` Rollback also failed: ${restoreErr && restoreErr.message ? restoreErr.message : restoreErr}`;
+      }
+      setTemplateConfigError(
+        `Import failed and was rolled back: ${err && err.message ? err.message : err}.${rollbackError}`
+      );
+      return false;
+    }
+
+    if (validation.unknownSections.length) {
+      setTemplateConfigError(`Import warning: ignored unknown sections: ${validation.unknownSections.join(", ")}.`);
+    } else {
+      setTemplateConfigError("");
+    }
+    setError("");
+    return true;
+  }
+
+  function isLegacyTemplateConfig(value) {
+    return Boolean(
+      isViewerConfigPlainObject(value)
+      && !Object.prototype.hasOwnProperty.call(value, "kind")
+      && Object.prototype.hasOwnProperty.call(value, "version")
+      && Object.prototype.hasOwnProperty.call(value, "templates")
+    );
+  }
+
+  async function importViewerConfigFromFile(file) {
+    if (!file) {
+      return;
+    }
+
+    let text = "";
+    try {
+      text = await file.text();
+    } catch (err) {
+      setTemplateConfigError(`Import failed: ${err && err.message ? err.message : err}`);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(text);
+      if (isLegacyTemplateConfig(parsed)) {
+        const applied = applyTemplateConfigObject(parsed, { save: true });
+        if (applied) {
+          setError("");
+        }
+        return;
+      }
+      importViewerConfigObject(parsed);
+    } catch (err) {
+      setTemplateConfigError(`Import JSON parse error: ${err && err.message ? err.message : err}`);
+    }
   }
 
   function getRenderableObjectListForTemplate(options) {
@@ -883,19 +1480,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     workspace.appendChild(workspaceSplit);
     workspace.appendChild(previewPane);
 
-    const TEMPLATE_FORM_SPLIT_KEY = "abap-parser-viewer.templateFormEditorPct.v1";
-    let editorPct = 58;
-    try {
-      const saved = localStorage.getItem(TEMPLATE_FORM_SPLIT_KEY);
-      if (saved != null) {
-        const n = Number(saved);
-        if (Number.isFinite(n) && n >= 22 && n <= 78) {
-          editorPct = Math.round(n);
-        }
-      }
-    } catch {
-      // ignore
-    }
+    let editorPct = loadTemplateFormEditorPct();
     const templateFormMaxWidthMq = window.matchMedia("(max-width: 1180px)");
     const applyTemplateWorkspaceSplit = () => {
       const stacked = templateFormMaxWidthMq.matches;
@@ -906,6 +1491,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       previewPane.style.minWidth = stacked ? "0" : "220px";
       editorPane.style.minHeight = stacked ? "120px" : "0";
       previewPane.style.minHeight = stacked ? "160px" : "0";
+    };
+    activeTemplateFormSplitController = {
+      apply(nextPercent) {
+        editorPct = normalizeTemplateFormEditorPct(nextPercent);
+        applyTemplateWorkspaceSplit();
+      }
     };
     applyTemplateWorkspaceSplit();
     const onTemplateFormSplitChanged = () => {
@@ -928,7 +1519,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       templateSplitDrag = null;
       workspace.classList.remove("is-resizing");
       try {
-        localStorage.setItem(TEMPLATE_FORM_SPLIT_KEY, String(editorPct));
+        applyTemplateFormEditorPct(editorPct);
       } catch {
         // ignore
       }
@@ -964,6 +1555,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         ? (ev.clientY - rect.top) / h
         : (ev.clientX - rect.left) / w;
       editorPct = Math.round(Math.min(78, Math.max(22, ratio * 100)));
+      state.templateFormEditorPct = editorPct;
       applyTemplateWorkspaceSplit();
     });
     workspaceSplit.addEventListener("pointerup", endTemplateSplitDrag);
@@ -976,6 +1568,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         editorPct = ev.key === "ArrowLeft"
           ? Math.max(22, editorPct - step)
           : Math.min(78, editorPct + step);
+        state.templateFormEditorPct = editorPct;
         applyTemplateWorkspaceSplit();
         return;
       }
@@ -984,6 +1577,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         editorPct = ev.key === "ArrowUp"
           ? Math.max(22, editorPct - step)
           : Math.min(78, editorPct + step);
+        state.templateFormEditorPct = editorPct;
         applyTemplateWorkspaceSplit();
       }
     });
@@ -2460,6 +3054,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     modal.root.addEventListener("keydown", (ev) => { if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") { ev.preventDefault(); applyFromModal(); } });
     renderActive();
     modal.setCleanup(() => {
+      activeTemplateFormSplitController = null;
       clearPreviewTimer();
       hideTemplateTokenSuggest();
       clearTemplateTokenSuggestionCache();
@@ -4543,7 +5138,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     if (els.templateExportBtn) {
-      els.templateExportBtn.addEventListener("click", exportTemplateConfig);
+      els.templateExportBtn.addEventListener("click", openViewerConfigExportModal);
     }
 
     if (els.templateImportBtn && els.templateImportInput) {
@@ -4558,7 +5153,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         if (!file) {
           return;
         }
-        await importTemplateConfigFromFile(file);
+        await importViewerConfigFromFile(file);
         els.templateImportInput.value = "";
       });
     }
@@ -4696,6 +5291,9 @@ window.AbapViewerModules.factories["05-main"] = function registerMain(runtime) {
   targetRuntime.api.jumpInputToCodeRange = jumpInputToCodeRange;
   targetRuntime.api.findDeclSegmentIndex = findDeclSegmentIndex;
   targetRuntime.api.getSegmentRangesForLineText = getSegmentRangesForLineText;
+  targetRuntime.api.buildViewerConfigBundle = buildViewerConfigBundle;
+  targetRuntime.api.getViewerConfigExportFileName = getViewerConfigExportFileName;
+  targetRuntime.api.importViewerConfigObject = importViewerConfigObject;
 
   window.AbapViewerModules.start = function startAbapViewer() {
     if (document.readyState === "loading") {
