@@ -55,6 +55,7 @@ const VIEWER_CONFIG_STORAGE_KEYS = {
   templates: "abap-parser-viewer.templateConfig.v1",
   descriptionSettings: "abap-parser-viewer.settings.v1",
   descriptionOverrides: "abap-parser-viewer.declDescOverrides.v2",
+  legacyDescriptionOverrides: "abap-parser-viewer.descOverrides.v1",
   theme: "abap-parser-viewer.theme.v1",
   layout: "abap-parser-viewer.layoutSplit.v1",
   hiddenObjectTypes: "abap-parser-viewer.templateGuiHiddenObjectTypes.v1",
@@ -447,10 +448,15 @@ async function assertGroupedConfigRoundTripsStateStorageAndDom() {
     nameTemplatesByCode: cloneTestJson(state.settings.nameTemplatesByCode)
   };
   state.descOverrides = { changed: "changed" };
+  state.descOverridesLegacy = { "roundtrip-key": "Stale legacy override" };
   state.templateGuiHiddenTypes = new window.Set();
   window.localStorage.setItem(VIEWER_CONFIG_STORAGE_KEYS.templates, JSON.stringify(state.templateConfig));
   window.localStorage.setItem(VIEWER_CONFIG_STORAGE_KEYS.descriptionSettings, JSON.stringify(state.settings));
   window.localStorage.setItem(VIEWER_CONFIG_STORAGE_KEYS.descriptionOverrides, JSON.stringify(state.descOverrides));
+  window.localStorage.setItem(
+    VIEWER_CONFIG_STORAGE_KEYS.legacyDescriptionOverrides,
+    JSON.stringify(state.descOverridesLegacy)
+  );
   window.localStorage.setItem(VIEWER_CONFIG_STORAGE_KEYS.hiddenObjectTypes, "[]");
   window.localStorage.setItem(VIEWER_CONFIG_STORAGE_KEYS.formEditorPct, "35");
   window.applyTheme("dark");
@@ -483,6 +489,7 @@ async function assertGroupedConfigRoundTripsStateStorageAndDom() {
   assert.deepStrictEqual(Array.from(state.settings.declFilterTypes), ["DATA"]);
   assert.strictEqual(state.settings.nameTemplatesByCode.DS, "ROUNDTRIP[{{desc}}]");
   assert.deepStrictEqual(cloneTestJson(state.descOverrides), cloneTestJson(exported.sections.descriptionOverrides));
+  assert.deepStrictEqual(cloneTestJson(state.descOverridesLegacy), {});
   assert.strictEqual(state.theme, "light");
   assert.strictEqual(state.layoutLeftPane, 61);
   assert.deepStrictEqual(Array.from(state.templateGuiHiddenTypes.values()), ["DATA"]);
@@ -494,6 +501,7 @@ async function assertGroupedConfigRoundTripsStateStorageAndDom() {
     JSON.parse(window.localStorage.getItem(VIEWER_CONFIG_STORAGE_KEYS.descriptionOverrides)),
     cloneTestJson(exported.sections.descriptionOverrides)
   );
+  assert.strictEqual(window.localStorage.getItem(VIEWER_CONFIG_STORAGE_KEYS.legacyDescriptionOverrides), null);
   assert.deepStrictEqual(
     JSON.parse(window.localStorage.getItem(VIEWER_CONFIG_STORAGE_KEYS.hiddenObjectTypes)),
     ["DATA"]
@@ -645,6 +653,49 @@ async function assertGroupedConfigImportValidatesAndRollsBack() {
   assert(
     String(els.templateConfigError.textContent || "").includes("rolled back"),
     "Expected failed imports to report their rollback."
+  );
+
+  const originalOverrides = { "rollback-v2": "Original v2" };
+  const originalLegacyOverrides = { "rollback-v1": "Original legacy" };
+  state.descOverrides = cloneTestJson(originalOverrides);
+  state.descOverridesLegacy = cloneTestJson(originalLegacyOverrides);
+  window.localStorage.setItem(
+    VIEWER_CONFIG_STORAGE_KEYS.descriptionOverrides,
+    JSON.stringify(originalOverrides)
+  );
+  window.localStorage.setItem(
+    VIEWER_CONFIG_STORAGE_KEYS.legacyDescriptionOverrides,
+    JSON.stringify(originalLegacyOverrides)
+  );
+  const originalRenderOutput = window.renderOutput;
+  let renderFailureInjected = false;
+  window.renderOutput = function failFirstImportedOverrideRender() {
+    if (!renderFailureInjected) {
+      renderFailureInjected = true;
+      throw new Error("injected render failure");
+    }
+    return originalRenderOutput.apply(this, arguments);
+  };
+  try {
+    assert.strictEqual(api.importViewerConfigObject({
+      kind: "abap-viewer-config",
+      version: 1,
+      exportedAt: "2026-07-15T06:07:09.000Z",
+      sections: { descriptionOverrides: { replacement: "Replacement" } }
+    }), false);
+  } finally {
+    window.renderOutput = originalRenderOutput;
+  }
+  assert.strictEqual(renderFailureInjected, true);
+  assert.deepStrictEqual(cloneTestJson(state.descOverrides), originalOverrides);
+  assert.deepStrictEqual(cloneTestJson(state.descOverridesLegacy), originalLegacyOverrides);
+  assert.deepStrictEqual(
+    JSON.parse(window.localStorage.getItem(VIEWER_CONFIG_STORAGE_KEYS.descriptionOverrides)),
+    originalOverrides
+  );
+  assert.deepStrictEqual(
+    JSON.parse(window.localStorage.getItem(VIEWER_CONFIG_STORAGE_KEYS.legacyDescriptionOverrides)),
+    originalLegacyOverrides
   );
 
   dom.window.close();

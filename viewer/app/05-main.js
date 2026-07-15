@@ -804,6 +804,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       TEMPLATE_CONFIG_STORAGE_KEY_V1,
       SETTINGS_STORAGE_KEY_V1,
       DESC_STORAGE_KEY_V2,
+      DESC_STORAGE_KEY_LEGACY_V1,
       THEME_STORAGE_KEY_V1,
       LAYOUT_SPLIT_STORAGE_KEY_V1,
       TEMPLATE_GUI_FILTER_STORAGE_KEY_V1,
@@ -832,6 +833,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       templateConfig: cloneViewerConfigValue(state.templateConfig || getDefaultTemplateConfig()),
       settings: cloneViewerConfigValue(state.settings || loadSettings()),
       descOverrides: cloneViewerConfigValue(state.descOverrides || {}),
+      descOverridesLegacy: cloneViewerConfigValue(state.descOverridesLegacy || {}),
       theme: state.theme,
       layoutLeftPane: state.layoutLeftPane,
       hiddenObjectTypes: Array.from(state.templateGuiHiddenTypes.values()),
@@ -861,6 +863,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     state.templateConfig = cloneViewerConfigValue(snapshot.templateConfig);
     state.settings = cloneViewerConfigValue(snapshot.settings);
     state.descOverrides = cloneViewerConfigValue(snapshot.descOverrides);
+    state.descOverridesLegacy = cloneViewerConfigValue(snapshot.descOverridesLegacy);
     state.templateGuiHiddenTypes = new Set(snapshot.hiddenObjectTypes || []);
     applyTheme(snapshot.theme, { save: false });
     applyLayoutSplit(snapshot.layoutLeftPane, { save: false });
@@ -879,6 +882,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
     if (selectedKeys.has("descriptionOverrides")) {
       localStorage.setItem(DESC_STORAGE_KEY_V2, JSON.stringify(prepared.descriptionOverrides));
+      localStorage.removeItem(DESC_STORAGE_KEY_LEGACY_V1);
     }
     if (selectedKeys.has("appearance")) {
       localStorage.setItem(THEME_STORAGE_KEY_V1, prepared.appearance.theme);
@@ -909,6 +913,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
     if (selectedKeys.has("descriptionOverrides")) {
       state.descOverrides = cloneViewerConfigValue(prepared.descriptionOverrides);
+      state.descOverridesLegacy = {};
     }
     if (selectedKeys.has("appearance")) {
       applyTheme(prepared.appearance.theme, { save: false });
