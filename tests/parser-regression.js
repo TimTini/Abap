@@ -1304,11 +1304,12 @@ function testMessageStatementModel() {
     "MESSAGE lv_message TYPE lv_type WITH lv_first 'fixed' lv_second DISPLAY LIKE lv_like INTO lv_target RAISING static_error.",
     "MESSAGE e001(zclass) WITH lv_first.",
     "MESSAGE ID lv_id TYPE lv_type NUMBER lv_number WITH lv_first lv_second.",
+    "MESSAGE e001.",
     ""
   ].join("\n");
 
   const messages = findObjects(flattenObjects(parse(code).objects), "MESSAGE");
-  assert.strictEqual(messages.length, 4, "Expected all practical MESSAGE forms to parse.");
+  assert.strictEqual(messages.length, 5, "Expected all practical MESSAGE forms to parse.");
 
   const direct = messages[0];
   assert.strictEqual(getValue(direct.values, "message"), "'Saved'");
@@ -1365,6 +1366,59 @@ function testMessageStatementModel() {
   assert.strictEqual(explicitInfo.numberRef, "lv_number");
   assert.strictEqual(explicitInfo.numberDecl.name, "lv_number");
   assert.deepStrictEqual(explicitInfo.with.map((entry) => entry.value), ["lv_first", "lv_second"]);
+
+  const reference = messages[4];
+  const referenceInfo = reference.extras.message;
+  assert.strictEqual(referenceInfo.mode, "reference");
+  assert.strictEqual(getValue(reference.values, "message"), "e001");
+  assert.strictEqual(getValue(reference.values, "messageType"), "E");
+  assert.strictEqual(getValue(reference.values, "number"), "001");
+  for (const key of ["messageRef", "messageDecl", "messageTypeRef", "messageTypeDecl", "numberRef", "numberDecl"]) {
+    assert.strictEqual(referenceInfo[key], undefined, `Static MESSAGE reference ${key} must stay unset.`);
+  }
+}
+
+function testWriteNumericPositionsAndBacktickChains() {
+  const code = [
+    "DATA lv_output TYPE string.",
+    "DATA lv_destination TYPE string.",
+    "DATA lv_pos TYPE string.",
+    "WRITE 5(10) lv_output.",
+    "WRITE: 20 lv_output,",
+    "       30(4) lv_destination.",
+    "WRITE: `A,B`, |C,D|, 'E,F'.",
+    "WRITE lv_pos lv_output.",
+    ""
+  ].join("\n");
+  const writes = findObjects(flattenObjects(parse(code).objects), "WRITE");
+  assert.strictEqual(writes.length, 7, "Backtick/template/quoted commas must stay inside three chained WRITE items.");
+
+  assert.strictEqual(getValue(writes[0].values, "position"), "5(10)");
+  assert.strictEqual(writes[0].extras.write.position.column, "5");
+  assert.strictEqual(writes[0].extras.write.position.length, "10");
+  assert.strictEqual(writes[0].extras.write.output, "lv_output");
+  assert.strictEqual(writes[0].extras.write.outputDecl.name, "lv_output");
+
+  assert.strictEqual(writes[1].raw, "WRITE 20 lv_output.");
+  assert.strictEqual(writes[1].extras.write.position.column, "20");
+  assert.strictEqual(writes[1].extras.write.position.length, "");
+  assert.strictEqual(writes[1].extras.write.output, "lv_output");
+  assert.strictEqual(writes[2].extras.write.position.column, "30");
+  assert.strictEqual(writes[2].extras.write.position.length, "4");
+  assert.strictEqual(writes[2].extras.write.output, "lv_destination");
+
+  assert.deepStrictEqual(
+    writes.slice(3, 6).map((obj) => obj.extras.write.output),
+    ["`A,B`", "|C,D|", "'E,F'"],
+    "All three literal families must preserve embedded commas during chained splitting."
+  );
+  for (const literalWrite of writes.slice(3, 6)) {
+    assert.strictEqual(literalWrite.extras.write.outputRef, undefined);
+    assert.strictEqual(literalWrite.extras.write.outputDecl, undefined);
+  }
+
+  assert.strictEqual(writes[6].extras.write.output, "lv_pos", "An arbitrary leading identifier must remain the output operand.");
+  assert.deepStrictEqual(writes[6].extras.write.position, { column: "", length: "" });
 }
 
 function testWriteStatementModel() {
@@ -1514,6 +1568,7 @@ function run() {
   testConditionOperandsAlwaysHaveDecl();
   testMessageStatementModel();
   testWriteStatementModel();
+  testWriteNumericPositionsAndBacktickChains();
   testSupportedStatementSmokeMatrix();
   console.log("parser-regression: ok");
 }

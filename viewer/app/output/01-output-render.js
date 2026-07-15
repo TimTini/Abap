@@ -1433,7 +1433,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       if (entryName === "raising" || entryName === "withraw") {
         return false;
       }
-      if (message && String(message.mode || "") === "shorthand" && ["message", "id", "messagetype", "number"].includes(entryName)) {
+      if (message && ["shorthand", "reference"].includes(String(message.mode || "")) && ["message", "id", "messagetype", "number"].includes(entryName)) {
         return false;
       }
       return ["message", "id", "messagetype", "number", "displaylike", "into"].includes(entryName)

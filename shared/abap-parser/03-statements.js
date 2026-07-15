@@ -205,12 +205,19 @@
 
     const first = tokens[index] ? String(tokens[index].raw || "").trim() : "";
     const shorthand = first.match(/^([A-Za-z])(\d{3})\(([^()]+)\)$/);
+    const reference = first.match(/^([A-Za-z])(\d{3})$/);
     if (shorthand) {
       model.mode = "shorthand";
       model.message = first;
       model.messageType = shorthand[1].toUpperCase();
       model.number = shorthand[2];
       model.id = String(shorthand[3] || "").trim();
+      index += 1;
+    } else if (reference) {
+      model.mode = "reference";
+      model.message = first;
+      model.messageType = reference[1].toUpperCase();
+      model.number = reference[2];
       index += 1;
     } else if (first && !getMessageClauseAt(tokens, index)) {
       model.message = first;
@@ -354,6 +361,19 @@
         }
       }
     } else if (sawAt && firstPositionToken) {
+      const parsed = parseWritePositionToken(firstPositionToken);
+      if (parsed) {
+        model.position.column = parsed.column;
+        model.position.length = parsed.length;
+        positionRaw = firstPositionToken;
+        index += 1;
+      }
+    } else if (
+      /^(?:\d+(?:\(\d+\))?|\(\d+\))$/.test(firstPositionToken)
+      && tokens[index + 1]
+      && tokens[index + 1].upper !== "TO"
+      && !getWriteFormatSpecAt(tokens, index + 1)
+    ) {
       const parsed = parseWritePositionToken(firstPositionToken);
       if (parsed) {
         model.position.column = parsed.column;

@@ -550,7 +550,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       objectType === "MESSAGE"
       && sourceObj.extras
       && sourceObj.extras.message
-      && String(sourceObj.extras.message.mode || "") === "shorthand"
+      && ["shorthand", "reference"].includes(String(sourceObj.extras.message.mode || ""))
       && ["message", "id", "messagetype", "number"].includes(entryName)
     ) {
       return false;

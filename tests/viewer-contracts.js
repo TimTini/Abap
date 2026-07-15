@@ -3462,6 +3462,7 @@ async function assertMessageAndWriteViewerContracts() {
     "DATA lv_currency TYPE string. \"Currency",
     "MESSAGE lv_message TYPE lv_type WITH lv_first 'fixed' DISPLAY LIKE lv_like INTO lv_target RAISING static_error.",
     "MESSAGE 'literal message' TYPE 'I'.",
+    "MESSAGE e001.",
     "WRITE AT /lv_column(lv_length) lv_output TO lv_destination NO-GAP CURRENCY lv_currency USING EDIT MASK '==XX'.",
     "WRITE 'literal output'.",
     ""
@@ -3473,15 +3474,21 @@ async function assertMessageAndWriteViewerContracts() {
   assert(state.templateConfig.templates.MESSAGE, "Expected an explicit MESSAGE default template.");
   assert(state.templateConfig.templates.WRITE, "Expected an explicit WRITE default template.");
   const renderObjects = Array.isArray(state.renderObjects) ? state.renderObjects : [];
-  assert.strictEqual(renderObjects.filter((obj) => obj && obj.objectType === "MESSAGE").length, 2);
+  assert.strictEqual(renderObjects.filter((obj) => obj && obj.objectType === "MESSAGE").length, 3);
   assert.strictEqual(renderObjects.filter((obj) => obj && obj.objectType === "WRITE").length, 2);
 
+  Object.defineProperty(els.templatePreviewOutput, "clientHeight", {
+    configurable: true,
+    get() {
+      return 100000;
+    }
+  });
   els.rightTabTemplateBtn.click();
   await settleViewerUi(window);
 
   const messageTables = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="MESSAGE"]'));
   const writeTables = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="WRITE"]'));
-  assert.strictEqual(messageTables.length, 2, "Expected both MESSAGE template blocks.");
+  assert.strictEqual(messageTables.length, 3, "Expected dynamic, literal, and static-reference MESSAGE blocks.");
   assert.strictEqual(writeTables.length, 2, "Expected both WRITE template blocks.");
 
   const messageRows = getTemplateTableRows(messageTables[0]);
@@ -3528,6 +3535,13 @@ async function assertMessageAndWriteViewerContracts() {
   assert.strictEqual(literalWriteCell && literalWriteCell.__templateCellMeta && literalWriteCell.__templateCellMeta.reasonCode, "LITERAL_NO_DECL");
   modal = await openTemplateCellDescriptionTab(window, literalWriteCell);
   assert(modal.querySelector("textarea.template-config-json").disabled, "Literal WRITE output must stay locked.");
+
+  const staticReferenceCell = findTemplateCellByText(messageTables[2], "e001");
+  assert(staticReferenceCell, "Expected the short MESSAGE reference cell.");
+  assert.strictEqual(staticReferenceCell.__templateCellMeta && staticReferenceCell.__templateCellMeta.reasonCode, "NON_DECL_SCHEMA_VALUE");
+  assert.deepStrictEqual(Array.from(staticReferenceCell.__templateCellMeta && staticReferenceCell.__templateCellMeta.declCandidates || []), []);
+  modal = await openTemplateCellDescriptionTab(window, staticReferenceCell);
+  assert(modal.querySelector("textarea.template-config-json").disabled, "Short static MESSAGE reference must not create PATH_DECL.");
 
   const literalWithCell = findTemplateCellByText(messageTables[0], "'fixed'");
   assert.strictEqual(literalWithCell && literalWithCell.__templateCellMeta && literalWithCell.__templateCellMeta.reasonCode, "LITERAL_NO_DECL");

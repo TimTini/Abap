@@ -15,7 +15,7 @@
     if (!text) {
       return "";
     }
-    if (text.startsWith("'") || text.startsWith("|")) {
+    if (text.startsWith("'") || text.startsWith("`") || text.startsWith("|")) {
       return "";
     }
     if (/^[+-]?\d/.test(text)) {

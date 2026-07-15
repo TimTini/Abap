@@ -83,7 +83,7 @@
       const entryName = String(entry.name || "").trim().toLowerCase();
       if (objectType === "MESSAGE") {
         const mode = String(context.obj.extras && context.obj.extras.message && context.obj.extras.message.mode || "");
-        if (entryName === "raising" || entryName === "withraw" || (mode === "shorthand" && ["message", "id", "messagetype", "number"].includes(entryName))) {
+        if (entryName === "raising" || entryName === "withraw" || (["shorthand", "reference"].includes(mode) && ["message", "id", "messagetype", "number"].includes(entryName))) {
           return;
         }
       }
@@ -194,7 +194,7 @@
     if (!message || typeof message !== "object") {
       return;
     }
-    if (String(message.mode || "") !== "shorthand") {
+    if (!["shorthand", "reference"].includes(String(message.mode || ""))) {
       for (const key of ["message", "id", "messageType", "number"]) {
         annotateScalarDataOperand(message, key, context);
       }

@@ -213,6 +213,7 @@
     let currentLeadingComment = "";
     let pendingCommentEntries = [];
     let inSingleQuote = false;
+    let inBacktick = false;
     let inPipe = false;
 
     const pushSegment = ({ comment, endLine }) => {
@@ -302,7 +303,7 @@
         const char = code[index];
         const next = index + 1 < code.length ? code[index + 1] : "";
 
-        if (char === "'" && !inPipe) {
+        if (char === "'" && !inBacktick && !inPipe) {
           if (inSingleQuote && next === "'") {
             if (!currentStartLine && current.trim().length === 0) {
               currentStartLine = lineNumber || baseLineStart;
@@ -319,7 +320,24 @@
           continue;
         }
 
-        if (char === "|" && !inSingleQuote) {
+        if (char === "`" && !inSingleQuote && !inPipe) {
+          if (inBacktick && next === "`") {
+            if (!currentStartLine && current.trim().length === 0) {
+              currentStartLine = lineNumber || baseLineStart;
+            }
+            current += "``";
+            index += 1;
+            continue;
+          }
+          inBacktick = !inBacktick;
+          if (!currentStartLine && current.trim().length === 0) {
+            currentStartLine = lineNumber || baseLineStart;
+          }
+          current += char;
+          continue;
+        }
+
+        if (char === "|" && !inSingleQuote && !inBacktick) {
           if (inPipe && next === "|") {
             if (!currentStartLine && current.trim().length === 0) {
               currentStartLine = lineNumber || baseLineStart;
@@ -336,14 +354,14 @@
           continue;
         }
 
-        if (char === "," && !inSingleQuote && !inPipe) {
+        if (char === "," && !inSingleQuote && !inBacktick && !inPipe) {
           const rest = code.slice(index + 1).trim();
           const commentForSegment = rest ? "" : lineComment;
           pushSegment({ comment: commentForSegment, endLine: lineNumber });
           continue;
         }
 
-        if (char === "." && !inSingleQuote && !inPipe) {
+        if (char === "." && !inSingleQuote && !inBacktick && !inPipe) {
           const rest = code.slice(index + 1).trim();
           if (!rest) {
             pushSegment({ comment: lineComment, endLine: lineNumber });
@@ -398,13 +416,14 @@
     const parts = [];
     let current = "";
     let inSingleQuote = false;
+    let inBacktick = false;
     let inPipe = false;
 
     for (let index = 0; index < text.length; index += 1) {
       const char = text[index];
       const next = index + 1 < text.length ? text[index + 1] : "";
 
-      if (char === "'" && !inPipe) {
+      if (char === "'" && !inBacktick && !inPipe) {
         if (inSingleQuote && next === "'") {
           current += "''";
           index += 1;
@@ -415,7 +434,18 @@
         continue;
       }
 
-      if (char === "|" && !inSingleQuote) {
+      if (char === "`" && !inSingleQuote && !inPipe) {
+        if (inBacktick && next === "`") {
+          current += "``";
+          index += 1;
+          continue;
+        }
+        inBacktick = !inBacktick;
+        current += char;
+        continue;
+      }
+
+      if (char === "|" && !inSingleQuote && !inBacktick) {
         if (inPipe && next === "|") {
           current += "||";
           index += 1;
@@ -426,7 +456,7 @@
         continue;
       }
 
-      if (char === "," && !inSingleQuote && !inPipe) {
+      if (char === "," && !inSingleQuote && !inBacktick && !inPipe) {
         parts.push(current.trim());
         current = "";
         continue;
