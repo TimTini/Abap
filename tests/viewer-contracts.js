@@ -363,8 +363,8 @@ async function assertIfInitialUsesConditionTemplate() {
     .filter(Boolean);
   assert.deepStrictEqual(
     nonEmptyCells,
-    ["Điều kiện trái", "Toán tử", "Điều kiện phải", "Kết nối", "so_date[]", "IS", "INITIAL"],
-    "Expected IF so_date[] IS INITIAL to render once as left operand, operator, and right operand."
+    ["Điều kiện trái", "Toán tử", "Điều kiện phải", "Kết nối", "so_date", "IS", "INITIAL"],
+    "Expected the rendered description to omit the empty table-body suffix."
   );
 
   dom.window.close();
@@ -2170,6 +2170,69 @@ async function assertStructFieldFinalDescNormalizesParentOnly() {
   dom.window.close();
 }
 
+async function assertConstantInitializersAndEmptyTableBodiesShapeFinalDesc() {
+  const source = [
+    "CONSTANTS gc_max TYPE i VALUE 20. \"Maximum rows",
+    "CONSTANTS gc_initial TYPE string VALUE IS INITIAL. \"Initial marker",
+    "DATA lt_source TYPE TABLE OF string. \"Source table",
+    "DATA lt_target TYPE TABLE OF string. \"Target table",
+    "DATA lv_line TYPE string. \"Line",
+    "DATA lv_total TYPE i. \"Total",
+    "lv_total = gc_max + 1.",
+    "lt_target[] = lt_source[].",
+    "lv_line = lt_source[ 1 ].",
+    "lv_line = '[]'."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { state } = runtime;
+  const { getFinalDeclDesc, resolveValueLevelFinalDesc } = runtime.api;
+  const decls = Array.isArray(state.data && state.data.decls) ? state.data.decls : [];
+  const findDecl = (name) => decls.find((decl) => String(decl && decl.name || "") === name);
+  const constantDecl = findDecl("gc_max");
+  const initialDecl = findDecl("gc_initial");
+
+  state.settings.normalizeDeclDesc = false;
+  assert(constantDecl && initialDecl, "Expected constant declarations.");
+  assert.strictEqual(getFinalDeclDesc(constantDecl), "20");
+  assert.strictEqual(getFinalDeclDesc(initialDecl), "IS INITIAL");
+
+  const objects = Array.isArray(state.renderObjects) ? state.renderObjects : [];
+  const findByRaw = (raw) => objects.find((obj) => String(obj && obj.raw || "").trim() === raw);
+  const constantAssignment = findByRaw("lv_total = gc_max + 1.");
+  assert(constantAssignment && constantAssignment.values && constantAssignment.values.expr);
+  assert.strictEqual(resolveValueLevelFinalDesc(constantAssignment.values.expr), "20 + 1");
+
+  state.descOverrides[window.getDeclOverrideStorageKey(constantDecl)] = "Manual maximum";
+  assert.strictEqual(
+    resolveValueLevelFinalDesc(constantAssignment.values.expr),
+    "Manual maximum + 1",
+    "Expected an explicit Description override to stay above the constant initializer."
+  );
+
+  const tableBodyAssignment = findByRaw("lt_target[] = lt_source[].");
+  assert(tableBodyAssignment && tableBodyAssignment.values);
+  assert.strictEqual(tableBodyAssignment.values.target.value, "lt_target[]");
+  assert.strictEqual(tableBodyAssignment.values.expr.value, "lt_source[]");
+  assert.strictEqual(resolveValueLevelFinalDesc(tableBodyAssignment.values.target), "Target table");
+  assert.strictEqual(resolveValueLevelFinalDesc(tableBodyAssignment.values.expr), "Source table");
+
+  const tableExpressionAssignment = findByRaw("lv_line = lt_source[ 1 ].");
+  assert(tableExpressionAssignment && tableExpressionAssignment.values && tableExpressionAssignment.values.expr);
+  assert.strictEqual(
+    resolveValueLevelFinalDesc(tableExpressionAssignment.values.expr),
+    "Source table[ 1 ]",
+    "Expected a non-empty table expression to keep its brackets."
+  );
+
+  const literalAssignment = findByRaw("lv_line = '[]'.");
+  assert(literalAssignment && literalAssignment.values && literalAssignment.values.expr);
+  assert.strictEqual(resolveValueLevelFinalDesc(literalAssignment.values.expr), "'[]'");
+
+  dom.window.close();
+}
+
 async function assertStatementSpecificTwentyCellTemplates() {
   const source = [
     "TYPES ty_text TYPE string.",
@@ -2686,6 +2749,9 @@ async function main() {
   }
   if (!focus || focus === "struct-field-finaldesc") {
     await assertStructFieldFinalDescNormalizesParentOnly();
+  }
+  if (!focus || focus === "constant-finaldesc") {
+    await assertConstantInitializersAndEmptyTableBodiesShapeFinalDesc();
   }
   if (!focus || focus === "template-multi-value-perform-call") {
     await assertPerformAndCallMultiValueRows();

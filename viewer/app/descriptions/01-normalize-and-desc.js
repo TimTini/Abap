@@ -957,6 +957,41 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return String(getDeclTechName(decl) || "").trim();
   }
 
+  function rebuildConstantInitializerIndex(data) {
+    const index = new Map();
+    const roots = data && Array.isArray(data.objects) ? data.objects : [];
+
+    walkObjects(roots, (obj) => {
+      if (!obj || String(obj.objectType || "").toUpperCase() !== "CONSTANTS") {
+        return;
+      }
+
+      const entries = getValueEntries(obj);
+      const nameEntry = entries.find((entry) => String(entry && entry.name || "") === "name");
+      const valueEntry = entries.find((entry) => String(entry && entry.name || "") === "value");
+      const initializer = String(valueEntry && valueEntry.value || "").trim();
+      const decl = nameEntry && nameEntry.decl;
+      const key = decl && getDeclOverrideStorageKey(decl);
+      if (key && initializer) {
+        index.set(key, initializer);
+      }
+    });
+
+    state.constantInitializers = index;
+    return index;
+  }
+
+  function getConstantInitializer(decl) {
+    if (!decl || String(decl.objectType || "").toUpperCase() !== "CONSTANTS") {
+      return "";
+    }
+    const index = state.constantInitializers instanceof Map
+      ? state.constantInitializers
+      : new Map();
+    const key = getDeclOverrideStorageKey(decl);
+    return key && index.has(key) ? String(index.get(key) || "").trim() : "";
+  }
+
   function getFinalDeclAtomicDesc(decl) {
     if (!decl || typeof decl !== "object") {
       return "";
@@ -966,6 +1001,11 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const overrideText = overrideEntry.text ? String(overrideEntry.text) : "";
     if (overrideText) {
       return overrideText;
+    }
+
+    const constantInitializer = getConstantInitializer(decl);
+    if (constantInitializer) {
+      return constantInitializer;
     }
 
     const codeDesc = getDeclCodeDesc(decl);
@@ -980,6 +1020,11 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const atomicDesc = getFinalDeclAtomicDesc(decl);
     if (!atomicDesc) {
       return "";
+    }
+
+    const overrideEntry = getDeclOverrideEntry(decl);
+    if (!overrideEntry.text && getConstantInitializer(decl)) {
+      return atomicDesc;
     }
 
     return normalizeDeclDescByTemplate(decl, atomicDesc);
@@ -2273,7 +2318,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
   }
 
   const VALUE_LEVEL_IDENTIFIER_REGEX =
-    /<[^>]+>(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)*|SY-[A-Za-z_][A-Za-z0-9_]*|[A-Za-z_][A-Za-z0-9_]*(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)*/g;
+    /(?:<[^>]+>(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)*|SY-[A-Za-z_][A-Za-z0-9_]*|[A-Za-z_][A-Za-z0-9_]*(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)*)(?:\[\])?/g;
 
   function normalizeValueIdentifierKey(text) {
     return String(text || "").trim().toUpperCase();
@@ -2316,7 +2361,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const length = text.length;
 
     const replaceSegment = (segment) => segment.replace(VALUE_LEVEL_IDENTIFIER_REGEX, (token) => {
-      const key = normalizeValueIdentifierKey(token);
+      const identifier = token.endsWith("[]") ? token.slice(0, -2) : token;
+      const key = normalizeValueIdentifierKey(identifier);
       if (key && Object.prototype.hasOwnProperty.call(replacementMap, key)) {
         return replacementMap[key];
       }

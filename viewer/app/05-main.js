@@ -4285,7 +4285,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       }
     }
 
-    augmentSyntheticStructFieldDecls(state.data);
+        augmentSyntheticStructFieldDecls(state.data);
+        rebuildConstantInitializerIndex(state.data);
 
     state.collapsedIds.clear();
     state.selectedId = "";

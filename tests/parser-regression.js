@@ -190,6 +190,25 @@ function testChainedConstantsUseSingleInternalCommentForNextItem() {
   assert.strictEqual(getValueEntry(objects[1].values, "name").codeDesc, "Trạng thái chưa có khách");
 }
 
+function testConstantsCaptureCompleteInitializer() {
+  const code = [
+    "CONSTANTS: gc_initial TYPE string VALUE IS INITIAL,",
+    "  gc_text TYPE string VALUE 'READY'.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = findObjects(flattenObjects(result.objects), "CONSTANTS");
+
+  assert.strictEqual(objects.length, 2, "Expected both chained constants.");
+  assert.strictEqual(
+    getValue(objects[0].values, "value"),
+    "IS INITIAL",
+    "Expected the full multi-token constant initializer."
+  );
+  assert.strictEqual(getValue(objects[1].values, "value"), "'READY'");
+}
+
 function testGenericChainedStatementUsesPerItemComment() {
   const code = [
     "* Header must not describe a chained item",
@@ -1268,6 +1287,7 @@ function run() {
   testChainedDataStatementKeepsCommaInsideTemplateLiteral();
   testChainedConstantsKeepItemCommentsWithoutHeaderLeak();
   testChainedConstantsUseSingleInternalCommentForNextItem();
+  testConstantsCaptureCompleteInitializer();
   testGenericChainedStatementUsesPerItemComment();
   testChainedCommentsRejectBlocksGapsAndUnfinishedItems();
   testChainedStructCommentsUseSegmentMetadata();

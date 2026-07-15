@@ -64,7 +64,12 @@
         "after": "VALUE",
         "name": "value",
         "label": "value",
-        "descKey": "value"
+        "descKey": "value",
+        "capture": "rest",
+        "stopTokens": [
+          "LENGTH",
+          "DECIMALS"
+        ]
       },
       {
         "after": "LENGTH",

@@ -94,6 +94,7 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     selectedDeclKey: "",
     descOverrides: {},
     descOverridesLegacy: {},
+    constantInitializers: new Map(),
     activeEdit: null,
     inputLineOffsets: [],
     settings: null,
