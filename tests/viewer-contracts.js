@@ -2739,6 +2739,29 @@ async function assertPerformSourcesUseSourceOrderAndLazyLargeSelectors() {
   assert.strictEqual(mixedRegistry.getSelectedCandidate("FRM_INNER")?.lineStart, 4);
   mixedDom.window.close();
 
+  const definitionsFirstSource = [
+    "DATA gv_one TYPE string.",
+    "DATA gv_two TYPE string.",
+    "FORM frm_outer USING iv_outer TYPE string.",
+    "  PERFORM frm_inner USING iv_outer.",
+    "  PERFORM frm_inner USING 'X'.",
+    "ENDFORM.",
+    "FORM frm_inner USING iv_inner TYPE string.",
+    "  CLEAR iv_inner.",
+    "ENDFORM.",
+    "PERFORM frm_outer USING gv_one.",
+    "PERFORM frm_outer USING gv_two."
+  ].join("\n");
+  const definitionsFirstDom = await renderFixture(definitionsFirstSource);
+  const definitionsFirstRegistry = definitionsFirstDom.window.AbapViewerRuntime.state.performSourceRegistry;
+  assert.strictEqual(definitionsFirstRegistry.getSelectedCandidate("FRM_OUTER")?.lineStart, 10);
+  assert.strictEqual(
+    definitionsFirstRegistry.getSelectedCandidate("FRM_INNER")?.lineStart,
+    4,
+    "Expected parent selection to initialize before choosing a nested FORM source when definitions appear first."
+  );
+  definitionsFirstDom.window.close();
+
   const callCount = 120;
   const largeLines = ["DATA gv_shared TYPE string."];
   for (let index = 1; index <= callCount; index += 1) {

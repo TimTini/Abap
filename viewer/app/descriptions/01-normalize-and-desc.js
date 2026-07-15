@@ -2385,10 +2385,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     for (const candidates of candidatesByFormUpper.values()) {
       candidates.sort(compareCandidatesBySource);
     }
-    formOrder.sort((leftName, rightName) => compareCandidatesBySource(
-      (candidatesByFormUpper.get(leftName) || [])[0],
-      (candidatesByFormUpper.get(rightName) || [])[0]
-    ));
     registry.ensureSelections();
     return registry;
   }
