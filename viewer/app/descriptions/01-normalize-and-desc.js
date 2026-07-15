@@ -2377,6 +2377,18 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       }
       visitNode(root, `ROOT${index}`, [], null, []);
     }
+    const compareCandidatesBySource = (left, right) => {
+      const leftLine = Number(left && left.lineStart) > 0 ? Number(left.lineStart) : Number.MAX_SAFE_INTEGER;
+      const rightLine = Number(right && right.lineStart) > 0 ? Number(right.lineStart) : Number.MAX_SAFE_INTEGER;
+      return (leftLine - rightLine) || ((Number(left && left.sourceOrder) || 0) - (Number(right && right.sourceOrder) || 0));
+    };
+    for (const candidates of candidatesByFormUpper.values()) {
+      candidates.sort(compareCandidatesBySource);
+    }
+    formOrder.sort((leftName, rightName) => compareCandidatesBySource(
+      (candidatesByFormUpper.get(leftName) || [])[0],
+      (candidatesByFormUpper.get(rightName) || [])[0]
+    ));
     registry.ensureSelections();
     return registry;
   }
@@ -2463,16 +2475,38 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         "aria-label": `Nguồn mô tả FORM ${model.formName}`
       }
     });
-    for (let index = 0; index < model.candidates.length; index += 1) {
-      const candidate = model.candidates[index];
+    const appendSourceOption = (candidate, index) => {
       const lineLabel = candidate.lineStart > 0 ? String(candidate.lineStart) : "?";
       const option = el("option", {
         text: `Nguồn ${index + 1}/${model.candidates.length} · line ${lineLabel} · ${candidate.actualSummary}`,
         attrs: { value: candidate.key }
       });
       select.appendChild(option);
+    };
+    let optionsPopulated = false;
+    const populateSourceOptions = () => {
+      if (optionsPopulated) {
+        return;
+      }
+      optionsPopulated = true;
+      select.replaceChildren();
+      for (let index = 0; index < model.candidates.length; index += 1) {
+        appendSourceOption(model.candidates[index], index);
+      }
+      select.value = model.selectedKey;
+      delete select.dataset.optionsDeferred;
+    };
+    const eagerOptionLimit = 50;
+    if (model.candidates.length <= eagerOptionLimit) {
+      populateSourceOptions();
+    } else {
+      const selectedIndex = Math.max(0, model.candidates.findIndex((candidate) => candidate.key === model.selectedKey));
+      appendSourceOption(model.candidates[selectedIndex], selectedIndex);
+      select.value = model.selectedKey;
+      select.dataset.optionsDeferred = "true";
+      select.addEventListener("focus", populateSourceOptions);
+      select.addEventListener("pointerdown", populateSourceOptions);
     }
-    select.value = model.selectedKey;
     select.disabled = model.candidates.length < 2;
     select.addEventListener("change", (ev) => {
       ev.stopPropagation();

@@ -2714,6 +2714,60 @@ async function assertGlobalPerformSourceSelection() {
   dom.window.close();
 }
 
+async function assertPerformSourcesUseSourceOrderAndLazyLargeSelectors() {
+  const mixedSource = [
+    "DATA gv_outer TYPE string.",
+    "DATA gv_direct TYPE string.",
+    "PERFORM frm_outer USING gv_outer.",
+    "PERFORM frm_inner USING gv_direct.",
+    "FORM frm_outer USING iv_outer TYPE string.",
+    "  PERFORM frm_inner USING iv_outer.",
+    "ENDFORM.",
+    "FORM frm_inner USING iv_inner TYPE string.",
+    "  CLEAR iv_inner.",
+    "ENDFORM."
+  ].join("\n");
+  const mixedDom = await renderFixture(mixedSource);
+  const mixedRuntime = mixedDom.window.AbapViewerRuntime;
+  const mixedRegistry = mixedRuntime.state.performSourceRegistry;
+  const mixedCandidates = mixedRegistry.candidatesByFormUpper.get("FRM_INNER") || [];
+  assert.deepStrictEqual(
+    Array.from(mixedCandidates, (candidate) => candidate.lineStart),
+    [4, 6],
+    "Expected default candidates to follow physical source-line order, not DFS expansion order."
+  );
+  assert.strictEqual(mixedRegistry.getSelectedCandidate("FRM_INNER")?.lineStart, 4);
+  mixedDom.window.close();
+
+  const callCount = 120;
+  const largeLines = ["DATA gv_shared TYPE string."];
+  for (let index = 1; index <= callCount; index += 1) {
+    largeLines.push("PERFORM frm_many USING gv_shared.");
+  }
+  largeLines.push(
+    "FORM frm_many USING iv_value TYPE string.",
+    "  CLEAR iv_value.",
+    "ENDFORM."
+  );
+  const largeDom = await renderFixture(largeLines.join("\n"));
+  const { window } = largeDom;
+  const { els, state } = window.AbapViewerRuntime;
+  const largeCandidates = state.performSourceRegistry.candidatesByFormUpper.get("FRM_MANY") || [];
+  assert.strictEqual(largeCandidates.length, callCount);
+  const visibleSelect = els.templatePreviewOutput.querySelector(
+    '.perform-source-select[data-perform-form="FRM_MANY"]'
+  );
+  assert(visibleSelect, "Expected a visible source selector for the large FORM registry.");
+  assert.strictEqual(
+    visibleSelect.options.length,
+    1,
+    "Expected a large source selector to defer option creation instead of duplicating every source per visible call."
+  );
+  visibleSelect.dispatchEvent(new window.Event("focus"));
+  assert.strictEqual(visibleSelect.options.length, callCount, "Expected focusing the selector to populate all sources on demand.");
+  largeDom.window.close();
+}
+
 async function assertStructFieldFinalDescNormalizesParentOnly() {
   const source = [
     "TYPES: BEGIN OF ty_order,",
@@ -3503,6 +3557,7 @@ async function main() {
   }
   if (!focus || focus === "perform-source-selection") {
     await assertGlobalPerformSourceSelection();
+    await assertPerformSourcesUseSourceOrderAndLazyLargeSelectors();
   }
   if (!focus || focus === "struct-field-finaldesc") {
     await assertStructFieldFinalDescNormalizesParentOnly();
