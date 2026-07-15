@@ -79,6 +79,7 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
   const state = {
     data: null,
     renderObjects: [],
+    performSourceRegistry: null,
     inputMode: "abap",
     inputLineCount: 0,
     inputGutterButtonsByLine: new Map(),
@@ -1619,6 +1620,7 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
       "FIELD-SYMBOLS": createKeywordDescriptionTemplate(),
       IF: createConditionRowTemplate(),
       LOOP_AT_ITAB: createKeywordDescriptionTemplate(),
+      MESSAGE: createKeywordDescriptionTemplate(),
       MODIFY_ITAB: createKeywordDescriptionTemplate(),
       "MOVE-CORRESPONDING": createKeywordDescriptionTemplate(),
       PARAMETERS: createKeywordDescriptionTemplate(),
@@ -1628,7 +1630,8 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
       "SELECT-OPTIONS": createKeywordDescriptionTemplate(),
       SORT_ITAB: createKeywordDescriptionTemplate(),
       TYPES: createKeywordDescriptionTemplate(),
-      WHEN: createKeywordDescriptionTemplate()
+      WHEN: createKeywordDescriptionTemplate(),
+      WRITE: createKeywordDescriptionTemplate()
     }
   };
 

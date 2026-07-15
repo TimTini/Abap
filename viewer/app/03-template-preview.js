@@ -535,15 +535,29 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       DELETE_ITAB: ["target", "itab", "from", "to", "index"],
       INSERT_ITAB: ["what", "to", "into", "target", "source", "intotable", "into-table", "index", "assigning", "refinto"],
       LOOP_AT_ITAB: ["itab", "into", "assigning", "refinto", "referenceinto", "reference-into", "from", "to"],
+      MESSAGE: ["message", "id", "messagetype", "number", "displaylike", "into"],
       MODIFY_ITAB: ["itab", "itabordbtab", "target", "from", "assigning", "referenceinto", "reference-into", "index"],
       MOVE: ["source", "to", "target"],
       "MOVE-CORRESPONDING": ["source", "to", "target"],
       READ_TABLE: ["itab", "into", "assigning", "refinto", "referenceinto", "reference-into", "index"],
       SELECT: ["into", "intotable", "into-table", "appendingtable", "appending-table", "assigning", "refinto", "referenceinto", "reference-into"],
-      SORT_ITAB: ["itab"]
+      SORT_ITAB: ["itab"],
+      WRITE: ["output", "destination"]
     };
     const allowed = allowedByType[objectType];
-    return Array.isArray(allowed) && allowed.includes(entryName);
+    if (!Array.isArray(allowed) || !allowed.includes(entryName)) {
+      return false;
+    }
+    if (
+      objectType === "MESSAGE"
+      && sourceObj.extras
+      && sourceObj.extras.message
+      && ["shorthand", "reference"].includes(String(sourceObj.extras.message.mode || ""))
+      && ["message", "id", "messagetype", "number"].includes(entryName)
+    ) {
+      return false;
+    }
+    return true;
   }
 
   function getTemplateCanonicalObjectPathBase(obj) {
@@ -972,6 +986,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     "modif-id": ["modifId", "modif-id"],
     "group-name": ["group"],
     "assign": ["expr"],
+    "at": ["position"],
     "if": ["ifCondition", "if"],
     "to": ["to", "target"],
     "lines-of": ["source", "source-itab"],
@@ -1010,11 +1025,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     WHEN: "branch",
     CALL_METHOD: "name",
     CALL_TRANSACTION: "name",
-    MESSAGE: "messageType",
+    MESSAGE: "message",
     MOVE: "source",
     "MOVE-CORRESPONDING": "source",
     CLEAR: "target",
-    METHOD: "name"
+    METHOD: "name",
+    WRITE: "output"
   };
 
   function keywordPositionInRaw(keyword, raw) {
@@ -1341,10 +1357,81 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     )) : null;
   }
 
+  function buildTemplateWritePositionRow(sourceObj, write, ownerContext, objectIndexOneBased) {
+    if (!write || typeof write !== "object") {
+      return null;
+    }
+    const position = write.position && typeof write.position === "object" ? write.position : {};
+    const buildPart = (name) => {
+      const value = String(position[name] || "").trim();
+      if (!value) {
+        return createTemplateExpandedRow("", []);
+      }
+      const capName = `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+      return buildTemplateSemanticValueRow({
+        value,
+        valueRef: position[`${name}Ref`],
+        valueDecl: position[`${name}Decl`]
+      }, ownerContext, {
+        extrasScope: "write",
+        sectionName: `position.${name}`,
+        indexOneBased: 1,
+        objectIndexOneBased
+      });
+    };
+    const column = buildPart("column");
+    const length = buildPart("length");
+    const prefix = write.newLine ? "/" : "";
+    const positionText = `${prefix}${column.text}${length.text ? `(${length.text})` : ""}`;
+    const declCandidates = dedupeTemplateDecls([...column.declCandidates, ...length.declCandidates]);
+    return createTemplateExpandedRow(positionText || prefix, declCandidates, {
+      status: declCandidates.length ? "editable" : "not_applicable",
+      reasonCode: declCandidates.length ? "" : getTemplateNoDeclReason(positionText || prefix, true, false)
+    });
+  }
+
   function getTemplateSemanticSectionRows(sourceObj, keywordLabel, ownerContext, objectIndexOneBased) {
     const extras = sourceObj && sourceObj.extras && typeof sourceObj.extras === "object"
       ? sourceObj.extras
       : {};
+
+    if (extras.message && keywordLabel === "with") {
+      const withValues = Array.isArray(extras.message.with) ? extras.message.with : [];
+      if (withValues.length) {
+        return withValues.map((entry, index) => buildTemplateSemanticValueRow(entry, ownerContext, {
+          extrasScope: "message",
+          sectionName: "with",
+          indexOneBased: index + 1,
+          objectIndexOneBased
+        }));
+      }
+    }
+
+    if (extras.write) {
+      if (keywordLabel === "at") {
+        const positionRow = buildTemplateWritePositionRow(sourceObj, extras.write, ownerContext, objectIndexOneBased);
+        return positionRow ? [positionRow] : null;
+      }
+      const format = Array.isArray(extras.write.format) ? extras.write.format : [];
+      const formatEntry = format.find((entry) => (
+        normalizeTemplatePairToken(entry && entry.keyword).replace(/\s+/g, "-") === keywordLabel
+      ));
+      if (formatEntry) {
+        if (!String(formatEntry.value || "").trim()) {
+          return [createTemplateExpandedRow("", [], {
+            status: "not_applicable",
+            reasonCode: "NON_DECL_SCHEMA_VALUE"
+          })];
+        }
+        return [buildTemplateSemanticValueRow(formatEntry, ownerContext, {
+          extrasScope: "write",
+          sectionName: "format",
+          indexOneBased: format.indexOf(formatEntry) + 1,
+          objectIndexOneBased
+        })];
+      }
+    }
+
     const assignmentSection = extras.callFunction || extras.callMethod;
     if (assignmentSection && ["exporting", "importing", "changing", "tables", "receiving", "exceptions"].includes(keywordLabel)) {
       const assignments = Array.isArray(assignmentSection[keywordLabel]) ? assignmentSection[keywordLabel] : [];
@@ -3973,51 +4060,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return applyTemplateConfigObject(defaultConfig, { save: true });
   }
 
-  function exportTemplateConfig() {
-    const config = state.templateConfig || getDefaultTemplateConfig();
-    const content = safeJson(config, true);
-    const fileName = "abap-template-config.json";
-
-    try {
-      const blob = new Blob([content], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setError("");
-    } catch (err) {
-      setError(`Export failed: ${err && err.message ? err.message : err}`);
-    }
-  }
-
-  async function importTemplateConfigFromFile(file) {
-    if (!file) {
-      return;
-    }
-
-    let text = "";
-    try {
-      text = await file.text();
-    } catch (err) {
-      setTemplateConfigError(`Import failed: ${err && err.message ? err.message : err}`);
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(text);
-      const applied = applyTemplateConfigObject(parsed, { save: true });
-      if (applied) {
-        setError("");
-      }
-    } catch (err) {
-      setTemplateConfigError(`Import JSON parse error: ${err && err.message ? err.message : err}`);
-    }
-  }
-
   async function copyAllTemplateBlocks() {
     if (!els.templatePreviewOutput) {
       return;
@@ -4237,6 +4279,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     if (isInteractive) {
       const actions = el("div", { className: "template-block-actions" });
+      const performSourceControl = typeof createPerformSourceControl === "function"
+        ? createPerformSourceControl(obj)
+        : null;
+      if (performSourceControl) {
+        actions.appendChild(performSourceControl);
+      }
       const codeBtn = el("button", {
         className: "secondary",
         text: "Code",

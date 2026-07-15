@@ -1151,6 +1151,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       collectConditionDeclsFromClauses(extras.select.havingConditions, addDeclWithTrace);
     } else if ((entryName === "withkey" || entryName === "withtablekey") && extras.readTable) {
       collectConditionDeclsFromClauses(extras.readTable.conditions, addDeclWithTrace);
+    } else if (entryName === "position" && extras.write && extras.write.position) {
+      addDeclWithTrace(extras.write.position.columnDecl);
+      addDeclWithTrace(extras.write.position.lengthDecl);
     }
 
     return dedupeDecls(decls);
@@ -1173,10 +1176,11 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     decl,
     valueDecl,
     originDecls,
-    valueRef
+    valueRef,
+    rowName
   }) {
     const row = {
-      name: makeSectionIndexName(sectionName, indexOneBased),
+      name: rowName || makeSectionIndexName(sectionName, indexOneBased),
       value: valueText ? String(valueText) : "",
       label: baseEntry && baseEntry.label ? String(baseEntry.label) : sectionName,
       userDesc: baseEntry && baseEntry.userDesc ? String(baseEntry.userDesc) : "",
@@ -1211,6 +1215,24 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       originDecls: item && Array.isArray(item.originDecls) ? item.originDecls : [],
       valueRef: item && item.valueRef ? String(item.valueRef) : ""
     }));
+  }
+
+  function buildParsedRowsFromWriteFormats(list, baseEntry) {
+    const items = Array.isArray(list) ? list : [];
+    return items.map((item, index) => {
+      const keyword = String(item && item.keyword || "").trim();
+      return makeParsedValueRow({
+        sectionName: "format",
+        indexOneBased: index + 1,
+        rowName: `format[${index + 1}].${keyword}`,
+        valueText: item && item.value ? String(item.value) : "",
+        baseEntry,
+        decl: item && item.valueDecl ? item.valueDecl : null,
+        valueDecl: item && item.valueDecl ? item.valueDecl : null,
+        originDecls: item && Array.isArray(item.originDecls) ? item.originDecls : [],
+        valueRef: item && item.valueRef ? String(item.valueRef) : ""
+      });
+    });
   }
 
   function buildParsedRowsFromAssignments(sectionName, list, baseEntry) {
@@ -1299,6 +1321,14 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       }
     }
 
+    if (extras.message && rawName === "withraw") {
+      return buildParsedRowsFromPerformList("with", extras.message.with, baseEntry);
+    }
+
+    if (extras.write && rawName === "formatraw") {
+      return buildParsedRowsFromWriteFormats(extras.write.format, baseEntry);
+    }
+
     if (extras.callFunction) {
       const sectionMap = {
         exportingraw: "exporting",
@@ -1378,8 +1408,48 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return out;
   }
 
+  function isOutputIdentifierDataOperand(value) {
+    const text = String(value === undefined || value === null ? "" : value).trim();
+    if (!text || /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?$/.test(text)) {
+      return false;
+    }
+    if (
+      /^'(?:''|[^'])*'$/.test(text)
+      || /^[A-Za-z_][A-Za-z0-9_]*'(?:''|[^'])*'$/.test(text)
+      || /^`(?:``|[^`])*`$/.test(text)
+      || /^\|[\s\S]*\|$/.test(text)
+    ) {
+      return false;
+    }
+    return /^(?:@)?(?:<[^>]+>|[A-Za-z_][A-Za-z0-9_]*)(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)*$/.test(text);
+  }
+
+  function shouldCreateSyntheticOutputValueDecl(obj, entry) {
+    const objectType = String(obj && obj.objectType || "").toUpperCase();
+    if (!objectType || !["MESSAGE", "WRITE"].includes(objectType)) {
+      return true;
+    }
+    const entryName = String(entry && entry.name || "").trim().toLowerCase();
+    if (objectType === "MESSAGE") {
+      const message = obj && obj.extras && obj.extras.message;
+      if (entryName === "raising" || entryName === "withraw") {
+        return false;
+      }
+      if (message && ["shorthand", "reference"].includes(String(message.mode || "")) && ["message", "id", "messagetype", "number"].includes(entryName)) {
+        return false;
+      }
+      return ["message", "id", "messagetype", "number", "displaylike", "into"].includes(entryName)
+        && isOutputIdentifierDataOperand(entry && entry.value);
+    }
+    return ["output", "destination"].includes(entryName)
+      && isOutputIdentifierDataOperand(entry && entry.value);
+  }
+
   function ensureEntryDeclForOutput(obj, entry) {
     if (!entry || typeof entry !== "object") {
+      return entry;
+    }
+    if (!shouldCreateSyntheticOutputValueDecl(obj, entry)) {
       return entry;
     }
     const source = getDeclSourceContextFromObject(obj);
@@ -1474,6 +1544,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const source = getDeclSourceContextFromObject(obj);
     const basePath = buildExtrasEntryPathKey(obj, extrasScope, sectionName, indexOneBased, "item");
     let next = cloneValueEntryForOutput(entry);
+    const objectType = String(obj && obj.objectType || "").toUpperCase();
+    if (["MESSAGE", "WRITE"].includes(objectType) && !isOutputIdentifierDataOperand(next.value)) {
+      return attachOutputSyntheticDeclAliases(next, obj);
+    }
     next = ensureEntryDeclWithSynthetic(next, {
       pathKey: basePath,
       file: source.file,
@@ -1834,6 +1908,35 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const wrap = el("div", { className: "extras" });
     wrap.appendChild(el("div", { className: "muted", text: "Extras" }));
 
+    if (extras.message) {
+      const message = extras.message;
+      wrap.appendChild(el("div", {
+        className: "muted",
+        text: message.mode ? `MESSAGE (${message.mode})` : "MESSAGE"
+      }));
+      const withTable = renderValueListTable("with", message.with, { obj, extrasScope: "message" });
+      if (withTable) {
+        wrap.appendChild(withTable);
+      }
+      return wrap;
+    }
+
+    if (extras.write) {
+      const write = extras.write;
+      wrap.appendChild(el("div", { className: "muted", text: write.newLine ? "WRITE /" : "WRITE" }));
+      const formatRows = (Array.isArray(write.format) ? write.format : []).map((entry) => ({
+        name: entry && entry.keyword ? String(entry.keyword) : "",
+        value: entry && entry.value ? String(entry.value) : "",
+        valueRef: entry && entry.valueRef ? String(entry.valueRef) : "",
+        valueDecl: entry && entry.valueDecl ? entry.valueDecl : null
+      }));
+      const formatTable = renderAssignmentTable("format", formatRows, { obj, extrasScope: "write" });
+      if (formatTable) {
+        wrap.appendChild(formatTable);
+      }
+      return wrap;
+    }
+
     if (extras.form) {
       const form = extras.form;
       const titleParts = [form.name ? `FORM ${form.name}` : ""].filter(Boolean);
@@ -2096,6 +2199,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     header.appendChild(title);
 
     const actions = el("div", { className: "card-actions" });
+    const performSourceControl = typeof createPerformSourceControl === "function"
+      ? createPerformSourceControl(obj)
+      : null;
+    if (performSourceControl) {
+      actions.appendChild(performSourceControl);
+    }
 
     const btnCode = el("button", { className: "btn-ghost", text: "Code" });
     btnCode.type = "button";

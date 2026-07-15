@@ -125,6 +125,30 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         }
       }
 
+      if (extras.message) {
+        for (const key of ["messageDecl", "idDecl", "messageTypeDecl", "numberDecl", "displayLikeDecl", "intoDecl"]) {
+          addDecl(extras.message[key]);
+        }
+        for (const entry of (Array.isArray(extras.message.with) ? extras.message.with : [])) {
+          addDecl(entry && entry.valueDecl);
+        }
+      }
+
+      if (extras.write) {
+        addDecl(extras.write.outputDecl);
+        addDecl(extras.write.destinationDecl);
+        const position = extras.write.position && typeof extras.write.position === "object"
+          ? extras.write.position
+          : null;
+        if (position) {
+          addDecl(position.columnDecl);
+          addDecl(position.lengthDecl);
+        }
+        for (const entry of (Array.isArray(extras.write.format) ? extras.write.format : [])) {
+          addDecl(entry && entry.valueDecl);
+        }
+      }
+
         collectConditionDeclsFromExtras(extras, addDecl);
       });
     }
@@ -1886,21 +1910,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return map;
   }
 
-  function buildRenderableObjects(rawRoots, options) {
-    const roots = Array.isArray(rawRoots) ? rawRoots : [];
-    if (!roots.length) {
-      return [];
-    }
-
-
-    const opts = {
-      expandPerformForms: true,
-      hideFormRoots: true,
-      maxExpandDepth: Number.POSITIVE_INFINITY,
-      ...(options && typeof options === "object" ? options : {})
-    };
-    const maxExpandDepth = Math.max(0, Number(opts.maxExpandDepth) || 0);
-    const formsByNameUpper = opts.expandPerformForms ? buildFormsByNameUpperFromRoots(roots) : new Map();
+  function createPerformExpansionTools() {
     var PERFORM_TRACE_META_KEY_DESC = "__abapPerformTraceBinding";
 
     const getDeclIdentityKey = (decl) => {
@@ -2098,7 +2108,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         return null;
       }
 
-      const bySection = {
+      const formalParamsBySection = {
         USING: [],
         CHANGING: [],
         TABLES: []
@@ -2108,41 +2118,49 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
           continue;
         }
         const section = String(param.section || "").trim().toUpperCase();
-        if (!Object.prototype.hasOwnProperty.call(bySection, section)) {
+        if (!Object.prototype.hasOwnProperty.call(formalParamsBySection, section)) {
           continue;
         }
-        bySection[section].push(param);
+        formalParamsBySection[section].push(param);
       }
 
       const byParamUpper = new Map();
+      const bindingsBySection = {
+        USING: [],
+        CHANGING: [],
+        TABLES: []
+      };
       for (const section of ["USING", "CHANGING", "TABLES"]) {
-        const formalParams = bySection[section] || [];
+        const formalParams = formalParamsBySection[section] || [];
         const actualArgs = Array.isArray(call[section.toLowerCase()]) ? call[section.toLowerCase()] : [];
-        const max = Math.min(formalParams.length, actualArgs.length);
-        for (let index = 0; index < max; index += 1) {
+        for (let index = 0; index < formalParams.length; index += 1) {
           const formalParam = formalParams[index];
-          const actualArg = actualArgs[index];
-          if (!formalParam || !formalParam.name || !actualArg) {
+          const actualArg = actualArgs[index] || null;
+          if (!formalParam || !formalParam.name) {
             continue;
           }
           const paramUpper = String(formalParam.name || "").trim().toUpperCase();
           if (!paramUpper) {
             continue;
           }
-          const traceDecls = resolveActualTraceDecls(actualArg, currentBindingContext);
-          if (!traceDecls.length) {
-            continue;
+          const traceDecls = actualArg
+            ? resolveActualTraceDecls(actualArg, currentBindingContext)
+            : [];
+          bindingsBySection[section].push({
+            formalName: String(formalParam.name || ""),
+            formalParam,
+            actualArg,
+            traceDecls
+          });
+          if (traceDecls.length) {
+            byParamUpper.set(paramUpper, traceDecls);
           }
-          byParamUpper.set(paramUpper, traceDecls);
         }
       }
 
-      if (!byParamUpper.size) {
-        return null;
-      }
-
       return {
-        byParamUpper
+        byParamUpper,
+        bySection: bindingsBySection
       };
     };
 
@@ -2160,6 +2178,364 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         // ignore metadata errors; rendering should keep working without trace metadata.
       }
     };
+
+    return {
+      attachPerformBindingMetadata,
+      buildPerformBindingContext
+    };
+  }
+
+  function getPerformActualEntryText(entry) {
+    if (!entry || typeof entry !== "object") {
+      return "";
+    }
+    return String(entry.value || entry.name || entry.declRef || "").trim();
+  }
+
+  function buildPerformActualSummary(performNode) {
+    const call = performNode && performNode.extras && performNode.extras.performCall
+      && typeof performNode.extras.performCall === "object"
+      ? performNode.extras.performCall
+      : null;
+    if (!call) {
+      return "không có đối số";
+    }
+
+    const parts = [];
+    for (const section of ["using", "changing", "tables"]) {
+      const values = (Array.isArray(call[section]) ? call[section] : [])
+        .map((entry) => getPerformActualEntryText(entry))
+        .filter(Boolean);
+      if (values.length) {
+        parts.push(`${section.toUpperCase()} ${values.join(" ")}`);
+      }
+    }
+    return parts.length ? parts.join(" · ") : "không có đối số";
+  }
+
+  function buildPerformCallPathRegistry(rawRoots) {
+    const roots = Array.isArray(rawRoots) ? rawRoots : [];
+    const formsByNameUpper = buildFormsByNameUpperFromRoots(roots);
+    const candidatesByFormUpper = new Map();
+    const candidateByKey = new Map();
+    const selectedKeyByFormUpper = new Map();
+    const formOrder = [];
+    const tools = createPerformExpansionTools();
+    let sourceOrder = 0;
+
+    const registry = {
+      rawRoots: roots,
+      formsByNameUpper,
+      candidatesByFormUpper,
+      candidateByKey,
+      selectedKeyByFormUpper,
+      formOrder,
+      getActiveCandidates(formNameUpper) {
+        const upper = String(formNameUpper || "").trim().toUpperCase();
+        const candidates = candidatesByFormUpper.get(upper) || [];
+        return candidates.filter((candidate) => {
+          for (const ancestorKey of candidate.ancestry) {
+            const ancestor = candidateByKey.get(ancestorKey);
+            if (!ancestor) {
+              return false;
+            }
+            if (selectedKeyByFormUpper.get(ancestor.formNameUpper) !== ancestor.key) {
+              return false;
+            }
+          }
+          return true;
+        });
+      },
+      getSelectedCandidate(formNameUpper) {
+        const upper = String(formNameUpper || "").trim().toUpperCase();
+        const selectedKey = selectedKeyByFormUpper.get(upper);
+        return selectedKey ? candidateByKey.get(selectedKey) || null : null;
+      },
+      ensureSelections() {
+        for (const formNameUpper of formOrder) {
+          const activeCandidates = this.getActiveCandidates(formNameUpper);
+          const selectedKey = selectedKeyByFormUpper.get(formNameUpper);
+          if (activeCandidates.some((candidate) => candidate.key === selectedKey)) {
+            continue;
+          }
+          if (activeCandidates.length) {
+            selectedKeyByFormUpper.set(formNameUpper, activeCandidates[0].key);
+          } else {
+            selectedKeyByFormUpper.delete(formNameUpper);
+          }
+        }
+      },
+      selectCandidate(formNameUpper, candidateKey) {
+        const upper = String(formNameUpper || "").trim().toUpperCase();
+        const nextKey = String(candidateKey || "").trim();
+        const activeCandidates = this.getActiveCandidates(upper);
+        if (!activeCandidates.some((candidate) => candidate.key === nextKey)) {
+          return false;
+        }
+        const previousKey = selectedKeyByFormUpper.get(upper) || "";
+        if (previousKey === nextKey) {
+          return false;
+        }
+
+        const descendantForms = new Set();
+        for (const candidates of candidatesByFormUpper.values()) {
+          for (const candidate of candidates) {
+            if (candidate.ancestry.includes(previousKey) || candidate.ancestry.includes(nextKey)) {
+              descendantForms.add(candidate.formNameUpper);
+            }
+          }
+        }
+        selectedKeyByFormUpper.set(upper, nextKey);
+        for (const descendantForm of descendantForms) {
+          if (descendantForm !== upper) {
+            selectedKeyByFormUpper.delete(descendantForm);
+          }
+        }
+        this.ensureSelections();
+        return true;
+      }
+    };
+
+    const registerCandidate = (performNode, resolvedForm, formName, formNameUpper, pathToken, ancestry, bindingContext) => {
+      sourceOrder += 1;
+      const key = `PERFORM_SOURCE:${formNameUpper}:${pathToken}`;
+      const candidate = {
+        key,
+        formId: resolvedForm.id === undefined || resolvedForm.id === null ? "" : String(resolvedForm.id),
+        formName,
+        formNameUpper,
+        performId: performNode.id === undefined || performNode.id === null ? "" : String(performNode.id),
+        lineStart: Number(performNode.lineStart) || 0,
+        ancestry: ancestry.slice(),
+        parentCandidateKey: ancestry.length ? ancestry[ancestry.length - 1] : "",
+        actualSummary: buildPerformActualSummary(performNode),
+        bindingContext,
+        sourceOrder
+      };
+      if (!candidatesByFormUpper.has(formNameUpper)) {
+        candidatesByFormUpper.set(formNameUpper, []);
+        formOrder.push(formNameUpper);
+      }
+      candidatesByFormUpper.get(formNameUpper).push(candidate);
+      candidateByKey.set(key, candidate);
+      return candidate;
+    };
+
+    const visitNode = (sourceNode, pathToken, formCallStack, bindingContext, ancestry) => {
+      if (!sourceNode || typeof sourceNode !== "object") {
+        return;
+      }
+
+      let callCandidate = null;
+      let resolvedForm = null;
+      let nextBindingContext = bindingContext;
+      let nextFormCallStack = formCallStack;
+      if (sourceNode.objectType === "PERFORM") {
+        const formName = getPerformFormNameFromNode(sourceNode);
+        const programName = getPerformProgramFromNode(sourceNode);
+        const formNameUpper = formName ? formName.toUpperCase() : "";
+        resolvedForm = !programName && formNameUpper ? formsByNameUpper.get(formNameUpper) : null;
+        const isRecursiveCall = Boolean(formNameUpper) && formCallStack.includes(formNameUpper);
+        if (resolvedForm && !isRecursiveCall) {
+          nextBindingContext = tools.buildPerformBindingContext(sourceNode, resolvedForm, bindingContext);
+          callCandidate = registerCandidate(
+            sourceNode,
+            resolvedForm,
+            formName,
+            formNameUpper,
+            pathToken,
+            ancestry,
+            nextBindingContext
+          );
+          nextFormCallStack = [...formCallStack, formNameUpper];
+        }
+      }
+
+      const sourceChildren = Array.isArray(sourceNode.children) ? sourceNode.children : [];
+      for (let index = 0; index < sourceChildren.length; index += 1) {
+        visitNode(sourceChildren[index], `${pathToken}.C${index}`, formCallStack, bindingContext, ancestry);
+      }
+
+      if (!callCandidate || !resolvedForm) {
+        return;
+      }
+      const formChildren = Array.isArray(resolvedForm.children) ? resolvedForm.children : [];
+      const nextAncestry = [...ancestry, callCandidate.key];
+      for (let index = 0; index < formChildren.length; index += 1) {
+        visitNode(
+          formChildren[index],
+          `${pathToken}.FORM:${callCandidate.formNameUpper}.C${index}`,
+          nextFormCallStack,
+          nextBindingContext,
+          nextAncestry
+        );
+      }
+    };
+
+    for (let index = 0; index < roots.length; index += 1) {
+      const root = roots[index];
+      if (!root || root.objectType === "FORM") {
+        continue;
+      }
+      visitNode(root, `ROOT${index}`, [], null, []);
+    }
+    const compareCandidatesBySource = (left, right) => {
+      const leftLine = Number(left && left.lineStart) > 0 ? Number(left.lineStart) : Number.MAX_SAFE_INTEGER;
+      const rightLine = Number(right && right.lineStart) > 0 ? Number(right.lineStart) : Number.MAX_SAFE_INTEGER;
+      return (leftLine - rightLine) || ((Number(left && left.sourceOrder) || 0) - (Number(right && right.sourceOrder) || 0));
+    };
+    for (const candidates of candidatesByFormUpper.values()) {
+      candidates.sort(compareCandidatesBySource);
+    }
+    registry.ensureSelections();
+    return registry;
+  }
+
+  function getPerformSourceControlModel(obj) {
+    const registry = state.performSourceRegistry;
+    if (!registry || typeof registry.getActiveCandidates !== "function") {
+      return null;
+    }
+    if (!obj || obj.objectType !== "PERFORM" || getPerformProgramFromNode(obj)) {
+      return null;
+    }
+    const formName = getPerformFormNameFromNode(obj);
+    const formNameUpper = formName.toUpperCase();
+    if (!formNameUpper) {
+      return null;
+    }
+    const candidates = registry.getActiveCandidates(formNameUpper);
+    if (candidates.length < 2) {
+      return null;
+    }
+    const selected = registry.getSelectedCandidate(formNameUpper) || candidates[0];
+    return {
+      formName,
+      formNameUpper,
+      candidates,
+      selectedKey: selected.key
+    };
+  }
+
+  function selectPerformSourceCandidate(formNameUpper, candidateKey) {
+    const registry = state.performSourceRegistry;
+    if (!registry || typeof registry.selectCandidate !== "function") {
+      return false;
+    }
+
+    const outputAnchor = typeof captureOutputViewportAnchor === "function"
+      ? captureOutputViewportAnchor()
+      : null;
+    const templateAnchor = typeof captureTemplateViewportAnchor === "function"
+      ? captureTemplateViewportAnchor()
+      : null;
+    if (!registry.selectCandidate(formNameUpper, candidateKey)) {
+      return false;
+    }
+
+    state.pendingOutputViewportAnchor = outputAnchor;
+    state.pendingTemplateViewportAnchor = templateAnchor;
+    state.templatePreviewCache = null;
+    state.renderObjects = buildRenderableObjects(registry.rawRoots, {
+      ...RENDER_TREE_OPTIONS,
+      performSourceRegistry: registry
+    });
+    if (typeof renderOutput === "function") {
+      renderOutput();
+    }
+    if (typeof renderTemplatePreview === "function") {
+      renderTemplatePreview();
+    }
+    if (typeof refreshInputGutterTargets === "function") {
+      refreshInputGutterTargets();
+    }
+    return true;
+  }
+
+  function createPerformSourceControl(obj) {
+    const model = getPerformSourceControlModel(obj);
+    if (!model) {
+      return null;
+    }
+    const attrs = { "data-perform-form": model.formNameUpper };
+    const control = el("div", { className: "perform-source-control", attrs });
+    control.addEventListener("click", (ev) => ev.stopPropagation());
+    control.appendChild(el("span", {
+      className: "perform-source-badge",
+      text: `⇄ ${model.candidates.length} nguồn`,
+      attrs
+    }));
+
+    const select = el("select", {
+      className: "perform-source-select",
+      attrs: {
+        ...attrs,
+        "aria-label": `Nguồn mô tả FORM ${model.formName}`
+      }
+    });
+    const appendSourceOption = (candidate, index) => {
+      const lineLabel = candidate.lineStart > 0 ? String(candidate.lineStart) : "?";
+      const option = el("option", {
+        text: `Nguồn ${index + 1}/${model.candidates.length} · line ${lineLabel} · ${candidate.actualSummary}`,
+        attrs: { value: candidate.key }
+      });
+      select.appendChild(option);
+    };
+    let optionsPopulated = false;
+    const populateSourceOptions = () => {
+      if (optionsPopulated) {
+        return;
+      }
+      optionsPopulated = true;
+      select.replaceChildren();
+      for (let index = 0; index < model.candidates.length; index += 1) {
+        appendSourceOption(model.candidates[index], index);
+      }
+      select.value = model.selectedKey;
+      delete select.dataset.optionsDeferred;
+    };
+    const eagerOptionLimit = 50;
+    if (model.candidates.length <= eagerOptionLimit) {
+      populateSourceOptions();
+    } else {
+      const selectedIndex = Math.max(0, model.candidates.findIndex((candidate) => candidate.key === model.selectedKey));
+      appendSourceOption(model.candidates[selectedIndex], selectedIndex);
+      select.value = model.selectedKey;
+      select.dataset.optionsDeferred = "true";
+      select.addEventListener("focus", populateSourceOptions);
+      select.addEventListener("pointerdown", populateSourceOptions);
+    }
+    select.disabled = model.candidates.length < 2;
+    select.addEventListener("change", (ev) => {
+      ev.stopPropagation();
+      selectPerformSourceCandidate(model.formNameUpper, select.value);
+    });
+    control.appendChild(select);
+    return control;
+  }
+
+  function buildRenderableObjects(rawRoots, options) {
+    const roots = Array.isArray(rawRoots) ? rawRoots : [];
+    if (!roots.length) {
+      return [];
+    }
+
+    const opts = {
+      expandPerformForms: true,
+      hideFormRoots: true,
+      maxExpandDepth: Number.POSITIVE_INFINITY,
+      ...(options && typeof options === "object" ? options : {})
+    };
+    const maxExpandDepth = Math.max(0, Number(opts.maxExpandDepth) || 0);
+    const performSourceRegistry = opts.performSourceRegistry && typeof opts.performSourceRegistry === "object"
+      ? opts.performSourceRegistry
+      : null;
+    const formsByNameUpper = performSourceRegistry && performSourceRegistry.formsByNameUpper instanceof Map
+      ? performSourceRegistry.formsByNameUpper
+      : (opts.expandPerformForms ? buildFormsByNameUpperFromRoots(roots) : new Map());
+    const tools = createPerformExpansionTools();
+    const attachPerformBindingMetadata = tools.attachPerformBindingMetadata;
+    const buildPerformBindingContext = tools.buildPerformBindingContext;
 
     const cloneNode = (sourceNode, parentId, expandDepth, pathToken, forceSyntheticId, formCallStack, bindingContext) => {
       if (!sourceNode || typeof sourceNode !== "object") {
@@ -2212,7 +2588,13 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         const isRecursiveCall = Boolean(formNameUpper) && Array.isArray(formCallStack) && formCallStack.includes(formNameUpper);
 
         if (resolvedForm && !isRecursiveCall) {
-          const nextBindingContext = buildPerformBindingContext(sourceNode, resolvedForm, bindingContext);
+          const selectedCandidate = performSourceRegistry
+            && typeof performSourceRegistry.getSelectedCandidate === "function"
+            ? performSourceRegistry.getSelectedCandidate(formNameUpper)
+            : null;
+          const nextBindingContext = selectedCandidate
+            ? selectedCandidate.bindingContext
+            : buildPerformBindingContext(sourceNode, resolvedForm, bindingContext);
           const nextFormCallStack = formNameUpper
             ? [...(Array.isArray(formCallStack) ? formCallStack : []), formNameUpper]
             : (Array.isArray(formCallStack) ? formCallStack.slice() : []);
@@ -2446,6 +2828,8 @@ window.AbapViewerModules.factories["02-descriptions"] = function registerDescrip
   targetRuntime.api.getFinalDeclDesc = getFinalDeclDesc;
   targetRuntime.api.getEffectiveDeclDesc = getEffectiveDeclDesc;
   targetRuntime.api.resolveValueLevelFinalDesc = resolveValueLevelFinalDesc;
+  targetRuntime.api.buildPerformCallPathRegistry = buildPerformCallPathRegistry;
+  targetRuntime.api.selectPerformSourceCandidate = selectPerformSourceCandidate;
   window.AbapViewerModules.parts["02-descriptions"] = true;
 };
 window.AbapViewerModules.factories["02-descriptions"](window.AbapViewerRuntime);

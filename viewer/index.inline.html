@@ -9,9 +9,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.07.14-r55">
-  <meta name="abap-viewer-updated-at" content="2026-07-15 00:29:14">
-  <meta name="abap-viewer-updated-note" content="Manual scrolling cancels stale alignment and virtual ranges stay populated after remeasurement.">
+  <meta name="abap-viewer-version" content="v2026.07.15-r56">
+  <meta name="abap-viewer-updated-at" content="2026-07-15 19:53:31">
+  <meta name="abap-viewer-updated-note" content="Selectable PERFORM sources, constant values, grouped config backups, table-body cleanup, and MESSAGE/WRITE parsing.">
   <title>ABAP Parser Viewer</title>
   <style>
     :root {
@@ -716,6 +716,33 @@
       gap: 6px;
       flex-wrap: wrap;
       justify-content: flex-end;
+    }
+
+    .perform-source-control {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      max-width: min(520px, 100%);
+    }
+
+    .perform-source-badge {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 3px 7px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .perform-source-select {
+      min-width: 180px;
+      max-width: 360px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 6px;
+      background: var(--panel);
+      color: var(--text);
+      font-size: 12px;
     }
 
     .btn-ghost {
@@ -2416,6 +2443,7 @@
       values,
       commentLines
     });
+    augmentCustomStatementKeywords(keywords, config.object, extras);
     const block = config.block && config.block.endKeyword
       ? {
           endKeyword: config.block.endKeyword,
@@ -2506,6 +2534,14 @@
 
     if (extrasConfig.type === "deleteItab") {
       return buildDeleteItabExtras(context);
+    }
+
+    if (extrasConfig.type === "message") {
+      return buildMessageExtras(context);
+    }
+
+    if (extrasConfig.type === "write") {
+      return buildWriteExtras(context);
     }
 
     return null;
@@ -2745,6 +2781,330 @@
         conditions: parseConditionClauses(whereRaw, { allowImplicitAnd: false })
       }
     };
+  }
+
+  function getCustomValueCodeDesc(values) {
+    const entries = [];
+    if (Array.isArray(values)) {
+      entries.push(...values);
+    } else if (values && typeof values === "object") {
+      for (const entryOrList of Object.values(values)) {
+        if (Array.isArray(entryOrList)) {
+          entries.push(...entryOrList);
+        } else {
+          entries.push(entryOrList);
+        }
+      }
+    }
+    const entry = entries.find((item) => item && typeof item.codeDesc === "string");
+    return entry ? String(entry.codeDesc || "") : "";
+  }
+
+  function replaceCustomCapturedValues(values, entries) {
+    if (!values || typeof values !== "object" || Array.isArray(values)) {
+      return;
+    }
+    for (const key of Object.keys(values)) {
+      delete values[key];
+    }
+    const grouped = groupEntriesByKey(entries, "name");
+    for (const [key, entryOrList] of Object.entries(grouped)) {
+      values[key] = entryOrList;
+    }
+  }
+
+  function makeCustomValueEntry(name, value, label, codeDesc) {
+    const text = String(value === undefined || value === null ? "" : value).trim();
+    if (!text) {
+      return null;
+    }
+    return {
+      name,
+      value: text,
+      label: label || name,
+      userDesc: "",
+      codeDesc: String(codeDesc || "")
+    };
+  }
+
+  function getMessageClauseAt(tokens, index) {
+    const upper = tokens[index] ? String(tokens[index].upper || "") : "";
+    const nextUpper = tokens[index + 1] ? String(tokens[index + 1].upper || "") : "";
+    if (upper === "DISPLAY" && nextUpper === "LIKE") {
+      return { key: "displayLike", length: 2 };
+    }
+    const clauseKeys = {
+      ID: "id",
+      TYPE: "messageType",
+      NUMBER: "number",
+      WITH: "with",
+      INTO: "into",
+      RAISING: "raising"
+    };
+    return clauseKeys[upper] ? { key: clauseKeys[upper], length: 1 } : null;
+  }
+
+  function buildMessageExtras({ raw, values }) {
+    const tokens = tokenize(raw);
+    const codeDesc = getCustomValueCodeDesc(values);
+    const model = {
+      mode: "direct",
+      message: "",
+      id: "",
+      messageType: "",
+      number: "",
+      with: [],
+      displayLike: "",
+      into: "",
+      raising: ""
+    };
+    const valueEntries = [];
+    let index = 1;
+
+    const first = tokens[index] ? String(tokens[index].raw || "").trim() : "";
+    const shorthand = first.match(/^([A-Za-z])(\d{3})\(([^()]+)\)$/);
+    const reference = first.match(/^([A-Za-z])(\d{3})$/);
+    if (shorthand) {
+      model.mode = "shorthand";
+      model.message = first;
+      model.messageType = shorthand[1].toUpperCase();
+      model.number = shorthand[2];
+      model.id = String(shorthand[3] || "").trim();
+      index += 1;
+    } else if (reference) {
+      model.mode = "reference";
+      model.message = first;
+      model.messageType = reference[1].toUpperCase();
+      model.number = reference[2];
+      index += 1;
+    } else if (first && !getMessageClauseAt(tokens, index)) {
+      model.message = first;
+      index += 1;
+    } else {
+      model.mode = "id-type-number";
+    }
+
+    while (index < tokens.length) {
+      const clause = getMessageClauseAt(tokens, index);
+      if (!clause) {
+        index += 1;
+        continue;
+      }
+      index += clause.length;
+      if (clause.key === "with") {
+        const operands = [];
+        while (index < tokens.length && !getMessageClauseAt(tokens, index)) {
+          if (operands.length < 4) {
+            operands.push(String(tokens[index].raw || "").trim());
+          }
+          index += 1;
+        }
+        model.with = operands.filter(Boolean).map((value) => ({ value }));
+        continue;
+      }
+      const token = tokens[index];
+      if (token) {
+        model[clause.key] = String(token.raw || "").trim();
+        index += 1;
+      }
+    }
+
+    const addValue = (name, value, label) => {
+      const entry = makeCustomValueEntry(name, value, label, codeDesc);
+      if (entry) {
+        valueEntries.push(entry);
+      }
+    };
+    addValue("message", model.message, "message");
+    addValue("id", model.id, "id");
+    addValue("messageType", model.messageType, "message-type");
+    addValue("number", model.number, "number");
+    addValue("withRaw", model.with.map((entry) => entry.value).join(" "), "with");
+    addValue("displayLike", model.displayLike, "display-like");
+    addValue("into", model.into, "into");
+    addValue("raising", model.raising, "raising");
+    replaceCustomCapturedValues(values, valueEntries);
+
+    return { message: model };
+  }
+
+  function getWriteFormatSpecAt(tokens, index) {
+    const upper = tokens[index] ? String(tokens[index].upper || "") : "";
+    const nextUpper = tokens[index + 1] ? String(tokens[index + 1].upper || "") : "";
+    const thirdUpper = tokens[index + 2] ? String(tokens[index + 2].upper || "") : "";
+    if (upper === "USING" && nextUpper === "EDIT" && thirdUpper === "MASK") {
+      return { keyword: "USING EDIT MASK", keywordLength: 3, hasValue: true };
+    }
+    const flagKeywords = new Set([
+      "NO-GAP",
+      "LEFT-JUSTIFIED",
+      "RIGHT-JUSTIFIED",
+      "CENTERED",
+      "NO-ZERO",
+      "NO-SIGN",
+      "NO-GROUPING"
+    ]);
+    if (flagKeywords.has(upper)) {
+      return { keyword: upper, keywordLength: 1, hasValue: false };
+    }
+    const valueKeywords = new Set(["UNDER", "CURRENCY", "DECIMALS", "EXPONENT", "ROUND", "UNIT"]);
+    return valueKeywords.has(upper)
+      ? { keyword: upper, keywordLength: 1, hasValue: true }
+      : null;
+  }
+
+  function parseWritePositionToken(rawToken) {
+    let text = String(rawToken || "").trim();
+    let newLine = false;
+    if (text.startsWith("/")) {
+      newLine = true;
+      text = text.slice(1).trim();
+    }
+    if (!text) {
+      return { newLine, column: "", length: "" };
+    }
+    const match = text.match(/^([^()]*)?(?:\(([^()]*)\))?$/);
+    if (!match) {
+      return null;
+    }
+    const hasLength = text.includes("(");
+    return {
+      newLine,
+      column: hasLength ? String(match[1] || "").trim() : text,
+      length: hasLength ? String(match[2] || "").trim() : ""
+    };
+  }
+
+  function buildWriteExtras({ raw, values }) {
+    const tokens = tokenize(raw);
+    const codeDesc = getCustomValueCodeDesc(values);
+    const model = {
+      output: "",
+      destination: "",
+      newLine: false,
+      position: { column: "", length: "" },
+      format: []
+    };
+    const valueEntries = [];
+    let index = 1;
+    let sawAt = false;
+    let positionRaw = "";
+
+    if (tokens[index] && tokens[index].upper === "AT") {
+      sawAt = true;
+      index += 1;
+    }
+
+    const firstPositionToken = tokens[index] ? String(tokens[index].raw || "").trim() : "";
+    if (firstPositionToken.startsWith("/")) {
+      const parsed = parseWritePositionToken(firstPositionToken);
+      if (parsed) {
+        model.newLine = parsed.newLine;
+        model.position.column = parsed.column;
+        model.position.length = parsed.length;
+        positionRaw = firstPositionToken;
+        index += 1;
+        if (sawAt && firstPositionToken === "/" && tokens[index]) {
+          const nextTokenStartsClause = tokens[index + 1]
+            && (tokens[index + 1].upper === "TO" || getWriteFormatSpecAt(tokens, index + 1));
+          const hasSeparateOutput = Boolean(tokens[index + 1] && !nextTokenStartsClause);
+          const followingRaw = String(tokens[index].raw || "").trim();
+          const following = hasSeparateOutput ? parseWritePositionToken(followingRaw) : null;
+          if (following) {
+            model.position.column = following.column;
+            model.position.length = following.length;
+            positionRaw = `/${followingRaw}`;
+            index += 1;
+          }
+        }
+      }
+    } else if (sawAt && firstPositionToken) {
+      const parsed = parseWritePositionToken(firstPositionToken);
+      if (parsed) {
+        model.position.column = parsed.column;
+        model.position.length = parsed.length;
+        positionRaw = firstPositionToken;
+        index += 1;
+      }
+    } else if (
+      /^(?:\d+(?:\(\d+\))?|\(\d+\))$/.test(firstPositionToken)
+      && tokens[index + 1]
+      && tokens[index + 1].upper !== "TO"
+      && !getWriteFormatSpecAt(tokens, index + 1)
+    ) {
+      const parsed = parseWritePositionToken(firstPositionToken);
+      if (parsed) {
+        model.position.column = parsed.column;
+        model.position.length = parsed.length;
+        positionRaw = firstPositionToken;
+        index += 1;
+      }
+    }
+
+    if (tokens[index]) {
+      model.output = String(tokens[index].raw || "").trim();
+      index += 1;
+    }
+
+    const formatRawParts = [];
+    while (index < tokens.length) {
+      if (tokens[index].upper === "TO") {
+        if (tokens[index + 1]) {
+          model.destination = String(tokens[index + 1].raw || "").trim();
+        }
+        index += 2;
+        continue;
+      }
+
+      const spec = getWriteFormatSpecAt(tokens, index);
+      if (!spec) {
+        index += 1;
+        continue;
+      }
+      const rawKeyword = tokens
+        .slice(index, index + spec.keywordLength)
+        .map((token) => token.raw)
+        .join(" ");
+      index += spec.keywordLength;
+      const value = spec.hasValue && tokens[index] ? String(tokens[index].raw || "").trim() : "";
+      if (spec.hasValue && tokens[index]) {
+        index += 1;
+      }
+      model.format.push({ keyword: spec.keyword, value });
+      formatRawParts.push([rawKeyword, value].filter(Boolean).join(" "));
+    }
+
+    const addValue = (name, value, label) => {
+      const entry = makeCustomValueEntry(name, value, label, codeDesc);
+      if (entry) {
+        valueEntries.push(entry);
+      }
+    };
+    addValue("output", model.output, "output");
+    addValue("destination", model.destination, "to");
+    addValue("position", positionRaw, "position");
+    addValue("formatRaw", formatRawParts.join(" "), "format");
+    replaceCustomCapturedValues(values, valueEntries);
+
+    return { write: model };
+  }
+
+  function augmentCustomStatementKeywords(keywords, objectType, extras) {
+    if (String(objectType || "").toUpperCase() !== "WRITE" || !extras || !extras.write) {
+      return;
+    }
+    const position = extras.write.position && typeof extras.write.position === "object"
+      ? extras.write.position
+      : {};
+    const hasPosition = Boolean(
+      extras.write.newLine
+      || String(position.column || "").trim()
+      || String(position.length || "").trim()
+    );
+    if (!hasPosition || keywords.at) {
+      return;
+    }
+    keywords.at = { text: extras.write.newLine ? "/" : "AT", label: "at" };
   }
 
   function attachDeclarationRefs({ statements, objects, fileName }) {
@@ -3898,6 +4258,17 @@
       if (!entry || !entry.value) {
         return;
       }
+      const objectType = String(context && context.obj && context.obj.objectType || "").toUpperCase();
+      const entryName = String(entry.name || "").trim().toLowerCase();
+      if (objectType === "MESSAGE") {
+        const mode = String(context.obj.extras && context.obj.extras.message && context.obj.extras.message.mode || "");
+        if (entryName === "raising" || entryName === "withraw" || (["shorthand", "reference"].includes(mode) && ["message", "id", "messagetype", "number"].includes(entryName))) {
+          return;
+        }
+      }
+      if (objectType === "WRITE" && ["position", "formatraw"].includes(entryName)) {
+        return;
+      }
       const ref = extractFirstIdentifierFromExpression(entry.value);
       if (!ref) {
         return;
@@ -3972,6 +4343,87 @@
 
     if (extras.deleteItab) {
       annotateDeleteItabExtras(extras.deleteItab, context);
+    }
+
+    if (extras.message) {
+      annotateMessageExtras(extras.message, context);
+    }
+
+    if (extras.write) {
+      annotateWriteExtras(extras.write, context);
+    }
+  }
+
+  function annotateScalarDataOperand(container, key, context) {
+    if (!container || typeof container !== "object") {
+      return;
+    }
+    const ref = extractFirstIdentifierFromExpression(container[key]);
+    if (!ref) {
+      return;
+    }
+    container[`${key}Ref`] = ref;
+    const decl = resolveDecl(ref, context);
+    if (decl) {
+      container[`${key}Decl`] = decl;
+    }
+  }
+
+  function annotateMessageExtras(message, context) {
+    if (!message || typeof message !== "object") {
+      return;
+    }
+    if (!["shorthand", "reference"].includes(String(message.mode || ""))) {
+      for (const key of ["message", "id", "messageType", "number"]) {
+        annotateScalarDataOperand(message, key, context);
+      }
+    }
+    for (const key of ["displayLike", "into"]) {
+      annotateScalarDataOperand(message, key, context);
+    }
+    const withValues = Array.isArray(message.with) ? message.with : [];
+    for (const entry of withValues) {
+      if (!entry || typeof entry !== "object") {
+        continue;
+      }
+      const ref = extractFirstIdentifierFromExpression(entry.value);
+      if (!ref) {
+        continue;
+      }
+      entry.valueRef = ref;
+      const decl = resolveDecl(ref, context);
+      if (decl) {
+        entry.valueDecl = decl;
+      }
+    }
+  }
+
+  function annotateWriteExtras(write, context) {
+    if (!write || typeof write !== "object") {
+      return;
+    }
+    for (const key of ["output", "destination"]) {
+      annotateScalarDataOperand(write, key, context);
+    }
+    const position = write.position && typeof write.position === "object" ? write.position : null;
+    if (position) {
+      annotateScalarDataOperand(position, "column", context);
+      annotateScalarDataOperand(position, "length", context);
+    }
+    const format = Array.isArray(write.format) ? write.format : [];
+    for (const entry of format) {
+      if (!entry || typeof entry !== "object") {
+        continue;
+      }
+      const ref = extractFirstIdentifierFromExpression(entry.value);
+      if (!ref) {
+        continue;
+      }
+      entry.valueRef = ref;
+      const decl = resolveDecl(ref, context);
+      if (decl) {
+        entry.valueDecl = decl;
+      }
     }
   }
 
@@ -4228,7 +4680,7 @@
     if (!text) {
       return "";
     }
-    if (text.startsWith("'") || text.startsWith("|")) {
+    if (text.startsWith("'") || text.startsWith("`") || text.startsWith("|")) {
       return "";
     }
     if (/^[+-]?\d/.test(text)) {
@@ -4820,6 +5272,7 @@
     let currentLeadingComment = "";
     let pendingCommentEntries = [];
     let inSingleQuote = false;
+    let inBacktick = false;
     let inPipe = false;
 
     const pushSegment = ({ comment, endLine }) => {
@@ -4909,7 +5362,7 @@
         const char = code[index];
         const next = index + 1 < code.length ? code[index + 1] : "";
 
-        if (char === "'" && !inPipe) {
+        if (char === "'" && !inBacktick && !inPipe) {
           if (inSingleQuote && next === "'") {
             if (!currentStartLine && current.trim().length === 0) {
               currentStartLine = lineNumber || baseLineStart;
@@ -4926,7 +5379,24 @@
           continue;
         }
 
-        if (char === "|" && !inSingleQuote) {
+        if (char === "`" && !inSingleQuote && !inPipe) {
+          if (inBacktick && next === "`") {
+            if (!currentStartLine && current.trim().length === 0) {
+              currentStartLine = lineNumber || baseLineStart;
+            }
+            current += "``";
+            index += 1;
+            continue;
+          }
+          inBacktick = !inBacktick;
+          if (!currentStartLine && current.trim().length === 0) {
+            currentStartLine = lineNumber || baseLineStart;
+          }
+          current += char;
+          continue;
+        }
+
+        if (char === "|" && !inSingleQuote && !inBacktick) {
           if (inPipe && next === "|") {
             if (!currentStartLine && current.trim().length === 0) {
               currentStartLine = lineNumber || baseLineStart;
@@ -4943,14 +5413,14 @@
           continue;
         }
 
-        if (char === "," && !inSingleQuote && !inPipe) {
+        if (char === "," && !inSingleQuote && !inBacktick && !inPipe) {
           const rest = code.slice(index + 1).trim();
           const commentForSegment = rest ? "" : lineComment;
           pushSegment({ comment: commentForSegment, endLine: lineNumber });
           continue;
         }
 
-        if (char === "." && !inSingleQuote && !inPipe) {
+        if (char === "." && !inSingleQuote && !inBacktick && !inPipe) {
           const rest = code.slice(index + 1).trim();
           if (!rest) {
             pushSegment({ comment: lineComment, endLine: lineNumber });
@@ -5005,13 +5475,14 @@
     const parts = [];
     let current = "";
     let inSingleQuote = false;
+    let inBacktick = false;
     let inPipe = false;
 
     for (let index = 0; index < text.length; index += 1) {
       const char = text[index];
       const next = index + 1 < text.length ? text[index + 1] : "";
 
-      if (char === "'" && !inPipe) {
+      if (char === "'" && !inBacktick && !inPipe) {
         if (inSingleQuote && next === "'") {
           current += "''";
           index += 1;
@@ -5022,7 +5493,18 @@
         continue;
       }
 
-      if (char === "|" && !inSingleQuote) {
+      if (char === "`" && !inSingleQuote && !inPipe) {
+        if (inBacktick && next === "`") {
+          current += "``";
+          index += 1;
+          continue;
+        }
+        inBacktick = !inBacktick;
+        current += char;
+        continue;
+      }
+
+      if (char === "|" && !inSingleQuote && !inBacktick) {
         if (inPipe && next === "|") {
           current += "||";
           index += 1;
@@ -5033,7 +5515,7 @@
         continue;
       }
 
-      if (char === "," && !inSingleQuote && !inPipe) {
+      if (char === "," && !inSingleQuote && !inBacktick && !inPipe) {
         parts.push(current.trim());
         current = "";
         continue;
@@ -7111,6 +7593,101 @@
 })();
 </script>
   <script>
+// inlined from: ./configs.generated/message.js
+/* eslint-disable */
+/*
+  AUTO-GENERATED FILE
+
+  Source: /configs/*.json
+  Generator: /scripts/build-viewer-configs.js
+
+  Do not edit this file directly. Regenerate instead.
+*/
+
+(function () {
+  "use strict";
+
+  if (!window.AbapParser || typeof window.AbapParser.registerConfig !== "function") {
+    console.warn("AbapParser not loaded; config not registered: message.json");
+    return;
+  }
+
+  const config = {
+    "_sourceFile": "message.json",
+    "object": "MESSAGE",
+    "match": {
+      "startKeyword": "MESSAGE"
+    },
+    "extras": {
+      "type": "message"
+    },
+    "keywordLabels": {
+      "MESSAGE": "stmt",
+      "ID": "id",
+      "TYPE": "message-type",
+      "NUMBER": "number",
+      "WITH": "with",
+      "DISPLAY": "display",
+      "LIKE": "like",
+      "INTO": "into",
+      "RAISING": "raising"
+    },
+    "keywordPhrases": {
+      "DISPLAY LIKE": "display-like"
+    },
+    "captureRules": [
+      {
+        "after": "MESSAGE",
+        "name": "message",
+        "label": "message"
+      },
+      {
+        "after": "ID",
+        "name": "id",
+        "label": "id"
+      },
+      {
+        "after": "TYPE",
+        "name": "messageType",
+        "label": "message-type"
+      },
+      {
+        "after": "NUMBER",
+        "name": "number",
+        "label": "number"
+      },
+      {
+        "after": "WITH",
+        "name": "withRaw",
+        "label": "with",
+        "capture": "rest",
+        "stopTokens": [
+          "DISPLAY",
+          "INTO",
+          "RAISING"
+        ]
+      },
+      {
+        "after": "DISPLAY LIKE",
+        "name": "displayLike",
+        "label": "display-like"
+      },
+      {
+        "after": "INTO",
+        "name": "into",
+        "label": "into"
+      },
+      {
+        "after": "RAISING",
+        "name": "raising",
+        "label": "raising"
+      }
+    ]
+  };
+  window.AbapParser.registerConfig(config);
+})();
+</script>
+  <script>
 // inlined from: ./configs.generated/method.js
 /* eslint-disable */
 /*
@@ -8333,6 +8910,80 @@
   window.AbapParser.registerConfig(config);
 })();
 </script>
+  <script>
+// inlined from: ./configs.generated/write.js
+/* eslint-disable */
+/*
+  AUTO-GENERATED FILE
+
+  Source: /configs/*.json
+  Generator: /scripts/build-viewer-configs.js
+
+  Do not edit this file directly. Regenerate instead.
+*/
+
+(function () {
+  "use strict";
+
+  if (!window.AbapParser || typeof window.AbapParser.registerConfig !== "function") {
+    console.warn("AbapParser not loaded; config not registered: write.json");
+    return;
+  }
+
+  const config = {
+    "_sourceFile": "write.json",
+    "object": "WRITE",
+    "match": {
+      "startKeyword": "WRITE"
+    },
+    "extras": {
+      "type": "write"
+    },
+    "keywordLabels": {
+      "WRITE": "stmt",
+      "AT": "at",
+      "TO": "to",
+      "NO-GAP": "no-gap",
+      "LEFT-JUSTIFIED": "left-justified",
+      "RIGHT-JUSTIFIED": "right-justified",
+      "CENTERED": "centered",
+      "UNDER": "under",
+      "NO-ZERO": "no-zero",
+      "NO-SIGN": "no-sign",
+      "NO-GROUPING": "no-grouping",
+      "CURRENCY": "currency",
+      "DECIMALS": "decimals",
+      "EXPONENT": "exponent",
+      "ROUND": "round",
+      "UNIT": "unit",
+      "USING": "using",
+      "EDIT": "edit",
+      "MASK": "mask"
+    },
+    "keywordPhrases": {
+      "USING EDIT MASK": "using-edit-mask"
+    },
+    "captureRules": [
+      {
+        "after": "WRITE",
+        "name": "output",
+        "label": "output"
+      },
+      {
+        "after": "AT",
+        "name": "position",
+        "label": "position"
+      },
+      {
+        "after": "TO",
+        "name": "destination",
+        "label": "to"
+      }
+    ]
+  };
+  window.AbapParser.registerConfig(config);
+})();
+</script>
   <!-- abap-parser-configs:end -->
   <script>
 // inlined from: ./variable-descriptions.js
@@ -8468,6 +9119,7 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
   const state = {
     data: null,
     renderObjects: [],
+    performSourceRegistry: null,
     inputMode: "abap",
     inputLineCount: 0,
     inputGutterButtonsByLine: new Map(),
@@ -10008,6 +10660,7 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
       "FIELD-SYMBOLS": createKeywordDescriptionTemplate(),
       IF: createConditionRowTemplate(),
       LOOP_AT_ITAB: createKeywordDescriptionTemplate(),
+      MESSAGE: createKeywordDescriptionTemplate(),
       MODIFY_ITAB: createKeywordDescriptionTemplate(),
       "MOVE-CORRESPONDING": createKeywordDescriptionTemplate(),
       PARAMETERS: createKeywordDescriptionTemplate(),
@@ -10017,7 +10670,8 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
       "SELECT-OPTIONS": createKeywordDescriptionTemplate(),
       SORT_ITAB: createKeywordDescriptionTemplate(),
       TYPES: createKeywordDescriptionTemplate(),
-      WHEN: createKeywordDescriptionTemplate()
+      WHEN: createKeywordDescriptionTemplate(),
+      WRITE: createKeywordDescriptionTemplate()
     }
   };
 
@@ -10961,6 +11615,30 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
           for (const originDecl of origin) {
             addDecl(originDecl);
           }
+        }
+      }
+
+      if (extras.message) {
+        for (const key of ["messageDecl", "idDecl", "messageTypeDecl", "numberDecl", "displayLikeDecl", "intoDecl"]) {
+          addDecl(extras.message[key]);
+        }
+        for (const entry of (Array.isArray(extras.message.with) ? extras.message.with : [])) {
+          addDecl(entry && entry.valueDecl);
+        }
+      }
+
+      if (extras.write) {
+        addDecl(extras.write.outputDecl);
+        addDecl(extras.write.destinationDecl);
+        const position = extras.write.position && typeof extras.write.position === "object"
+          ? extras.write.position
+          : null;
+        if (position) {
+          addDecl(position.columnDecl);
+          addDecl(position.lengthDecl);
+        }
+        for (const entry of (Array.isArray(extras.write.format) ? extras.write.format : [])) {
+          addDecl(entry && entry.valueDecl);
         }
       }
 
@@ -12725,21 +13403,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return map;
   }
 
-  function buildRenderableObjects(rawRoots, options) {
-    const roots = Array.isArray(rawRoots) ? rawRoots : [];
-    if (!roots.length) {
-      return [];
-    }
-
-
-    const opts = {
-      expandPerformForms: true,
-      hideFormRoots: true,
-      maxExpandDepth: Number.POSITIVE_INFINITY,
-      ...(options && typeof options === "object" ? options : {})
-    };
-    const maxExpandDepth = Math.max(0, Number(opts.maxExpandDepth) || 0);
-    const formsByNameUpper = opts.expandPerformForms ? buildFormsByNameUpperFromRoots(roots) : new Map();
+  function createPerformExpansionTools() {
     var PERFORM_TRACE_META_KEY_DESC = "__abapPerformTraceBinding";
 
     const getDeclIdentityKey = (decl) => {
@@ -12937,7 +13601,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         return null;
       }
 
-      const bySection = {
+      const formalParamsBySection = {
         USING: [],
         CHANGING: [],
         TABLES: []
@@ -12947,41 +13611,49 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
           continue;
         }
         const section = String(param.section || "").trim().toUpperCase();
-        if (!Object.prototype.hasOwnProperty.call(bySection, section)) {
+        if (!Object.prototype.hasOwnProperty.call(formalParamsBySection, section)) {
           continue;
         }
-        bySection[section].push(param);
+        formalParamsBySection[section].push(param);
       }
 
       const byParamUpper = new Map();
+      const bindingsBySection = {
+        USING: [],
+        CHANGING: [],
+        TABLES: []
+      };
       for (const section of ["USING", "CHANGING", "TABLES"]) {
-        const formalParams = bySection[section] || [];
+        const formalParams = formalParamsBySection[section] || [];
         const actualArgs = Array.isArray(call[section.toLowerCase()]) ? call[section.toLowerCase()] : [];
-        const max = Math.min(formalParams.length, actualArgs.length);
-        for (let index = 0; index < max; index += 1) {
+        for (let index = 0; index < formalParams.length; index += 1) {
           const formalParam = formalParams[index];
-          const actualArg = actualArgs[index];
-          if (!formalParam || !formalParam.name || !actualArg) {
+          const actualArg = actualArgs[index] || null;
+          if (!formalParam || !formalParam.name) {
             continue;
           }
           const paramUpper = String(formalParam.name || "").trim().toUpperCase();
           if (!paramUpper) {
             continue;
           }
-          const traceDecls = resolveActualTraceDecls(actualArg, currentBindingContext);
-          if (!traceDecls.length) {
-            continue;
+          const traceDecls = actualArg
+            ? resolveActualTraceDecls(actualArg, currentBindingContext)
+            : [];
+          bindingsBySection[section].push({
+            formalName: String(formalParam.name || ""),
+            formalParam,
+            actualArg,
+            traceDecls
+          });
+          if (traceDecls.length) {
+            byParamUpper.set(paramUpper, traceDecls);
           }
-          byParamUpper.set(paramUpper, traceDecls);
         }
       }
 
-      if (!byParamUpper.size) {
-        return null;
-      }
-
       return {
-        byParamUpper
+        byParamUpper,
+        bySection: bindingsBySection
       };
     };
 
@@ -12999,6 +13671,364 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         // ignore metadata errors; rendering should keep working without trace metadata.
       }
     };
+
+    return {
+      attachPerformBindingMetadata,
+      buildPerformBindingContext
+    };
+  }
+
+  function getPerformActualEntryText(entry) {
+    if (!entry || typeof entry !== "object") {
+      return "";
+    }
+    return String(entry.value || entry.name || entry.declRef || "").trim();
+  }
+
+  function buildPerformActualSummary(performNode) {
+    const call = performNode && performNode.extras && performNode.extras.performCall
+      && typeof performNode.extras.performCall === "object"
+      ? performNode.extras.performCall
+      : null;
+    if (!call) {
+      return "không có đối số";
+    }
+
+    const parts = [];
+    for (const section of ["using", "changing", "tables"]) {
+      const values = (Array.isArray(call[section]) ? call[section] : [])
+        .map((entry) => getPerformActualEntryText(entry))
+        .filter(Boolean);
+      if (values.length) {
+        parts.push(`${section.toUpperCase()} ${values.join(" ")}`);
+      }
+    }
+    return parts.length ? parts.join(" · ") : "không có đối số";
+  }
+
+  function buildPerformCallPathRegistry(rawRoots) {
+    const roots = Array.isArray(rawRoots) ? rawRoots : [];
+    const formsByNameUpper = buildFormsByNameUpperFromRoots(roots);
+    const candidatesByFormUpper = new Map();
+    const candidateByKey = new Map();
+    const selectedKeyByFormUpper = new Map();
+    const formOrder = [];
+    const tools = createPerformExpansionTools();
+    let sourceOrder = 0;
+
+    const registry = {
+      rawRoots: roots,
+      formsByNameUpper,
+      candidatesByFormUpper,
+      candidateByKey,
+      selectedKeyByFormUpper,
+      formOrder,
+      getActiveCandidates(formNameUpper) {
+        const upper = String(formNameUpper || "").trim().toUpperCase();
+        const candidates = candidatesByFormUpper.get(upper) || [];
+        return candidates.filter((candidate) => {
+          for (const ancestorKey of candidate.ancestry) {
+            const ancestor = candidateByKey.get(ancestorKey);
+            if (!ancestor) {
+              return false;
+            }
+            if (selectedKeyByFormUpper.get(ancestor.formNameUpper) !== ancestor.key) {
+              return false;
+            }
+          }
+          return true;
+        });
+      },
+      getSelectedCandidate(formNameUpper) {
+        const upper = String(formNameUpper || "").trim().toUpperCase();
+        const selectedKey = selectedKeyByFormUpper.get(upper);
+        return selectedKey ? candidateByKey.get(selectedKey) || null : null;
+      },
+      ensureSelections() {
+        for (const formNameUpper of formOrder) {
+          const activeCandidates = this.getActiveCandidates(formNameUpper);
+          const selectedKey = selectedKeyByFormUpper.get(formNameUpper);
+          if (activeCandidates.some((candidate) => candidate.key === selectedKey)) {
+            continue;
+          }
+          if (activeCandidates.length) {
+            selectedKeyByFormUpper.set(formNameUpper, activeCandidates[0].key);
+          } else {
+            selectedKeyByFormUpper.delete(formNameUpper);
+          }
+        }
+      },
+      selectCandidate(formNameUpper, candidateKey) {
+        const upper = String(formNameUpper || "").trim().toUpperCase();
+        const nextKey = String(candidateKey || "").trim();
+        const activeCandidates = this.getActiveCandidates(upper);
+        if (!activeCandidates.some((candidate) => candidate.key === nextKey)) {
+          return false;
+        }
+        const previousKey = selectedKeyByFormUpper.get(upper) || "";
+        if (previousKey === nextKey) {
+          return false;
+        }
+
+        const descendantForms = new Set();
+        for (const candidates of candidatesByFormUpper.values()) {
+          for (const candidate of candidates) {
+            if (candidate.ancestry.includes(previousKey) || candidate.ancestry.includes(nextKey)) {
+              descendantForms.add(candidate.formNameUpper);
+            }
+          }
+        }
+        selectedKeyByFormUpper.set(upper, nextKey);
+        for (const descendantForm of descendantForms) {
+          if (descendantForm !== upper) {
+            selectedKeyByFormUpper.delete(descendantForm);
+          }
+        }
+        this.ensureSelections();
+        return true;
+      }
+    };
+
+    const registerCandidate = (performNode, resolvedForm, formName, formNameUpper, pathToken, ancestry, bindingContext) => {
+      sourceOrder += 1;
+      const key = `PERFORM_SOURCE:${formNameUpper}:${pathToken}`;
+      const candidate = {
+        key,
+        formId: resolvedForm.id === undefined || resolvedForm.id === null ? "" : String(resolvedForm.id),
+        formName,
+        formNameUpper,
+        performId: performNode.id === undefined || performNode.id === null ? "" : String(performNode.id),
+        lineStart: Number(performNode.lineStart) || 0,
+        ancestry: ancestry.slice(),
+        parentCandidateKey: ancestry.length ? ancestry[ancestry.length - 1] : "",
+        actualSummary: buildPerformActualSummary(performNode),
+        bindingContext,
+        sourceOrder
+      };
+      if (!candidatesByFormUpper.has(formNameUpper)) {
+        candidatesByFormUpper.set(formNameUpper, []);
+        formOrder.push(formNameUpper);
+      }
+      candidatesByFormUpper.get(formNameUpper).push(candidate);
+      candidateByKey.set(key, candidate);
+      return candidate;
+    };
+
+    const visitNode = (sourceNode, pathToken, formCallStack, bindingContext, ancestry) => {
+      if (!sourceNode || typeof sourceNode !== "object") {
+        return;
+      }
+
+      let callCandidate = null;
+      let resolvedForm = null;
+      let nextBindingContext = bindingContext;
+      let nextFormCallStack = formCallStack;
+      if (sourceNode.objectType === "PERFORM") {
+        const formName = getPerformFormNameFromNode(sourceNode);
+        const programName = getPerformProgramFromNode(sourceNode);
+        const formNameUpper = formName ? formName.toUpperCase() : "";
+        resolvedForm = !programName && formNameUpper ? formsByNameUpper.get(formNameUpper) : null;
+        const isRecursiveCall = Boolean(formNameUpper) && formCallStack.includes(formNameUpper);
+        if (resolvedForm && !isRecursiveCall) {
+          nextBindingContext = tools.buildPerformBindingContext(sourceNode, resolvedForm, bindingContext);
+          callCandidate = registerCandidate(
+            sourceNode,
+            resolvedForm,
+            formName,
+            formNameUpper,
+            pathToken,
+            ancestry,
+            nextBindingContext
+          );
+          nextFormCallStack = [...formCallStack, formNameUpper];
+        }
+      }
+
+      const sourceChildren = Array.isArray(sourceNode.children) ? sourceNode.children : [];
+      for (let index = 0; index < sourceChildren.length; index += 1) {
+        visitNode(sourceChildren[index], `${pathToken}.C${index}`, formCallStack, bindingContext, ancestry);
+      }
+
+      if (!callCandidate || !resolvedForm) {
+        return;
+      }
+      const formChildren = Array.isArray(resolvedForm.children) ? resolvedForm.children : [];
+      const nextAncestry = [...ancestry, callCandidate.key];
+      for (let index = 0; index < formChildren.length; index += 1) {
+        visitNode(
+          formChildren[index],
+          `${pathToken}.FORM:${callCandidate.formNameUpper}.C${index}`,
+          nextFormCallStack,
+          nextBindingContext,
+          nextAncestry
+        );
+      }
+    };
+
+    for (let index = 0; index < roots.length; index += 1) {
+      const root = roots[index];
+      if (!root || root.objectType === "FORM") {
+        continue;
+      }
+      visitNode(root, `ROOT${index}`, [], null, []);
+    }
+    const compareCandidatesBySource = (left, right) => {
+      const leftLine = Number(left && left.lineStart) > 0 ? Number(left.lineStart) : Number.MAX_SAFE_INTEGER;
+      const rightLine = Number(right && right.lineStart) > 0 ? Number(right.lineStart) : Number.MAX_SAFE_INTEGER;
+      return (leftLine - rightLine) || ((Number(left && left.sourceOrder) || 0) - (Number(right && right.sourceOrder) || 0));
+    };
+    for (const candidates of candidatesByFormUpper.values()) {
+      candidates.sort(compareCandidatesBySource);
+    }
+    registry.ensureSelections();
+    return registry;
+  }
+
+  function getPerformSourceControlModel(obj) {
+    const registry = state.performSourceRegistry;
+    if (!registry || typeof registry.getActiveCandidates !== "function") {
+      return null;
+    }
+    if (!obj || obj.objectType !== "PERFORM" || getPerformProgramFromNode(obj)) {
+      return null;
+    }
+    const formName = getPerformFormNameFromNode(obj);
+    const formNameUpper = formName.toUpperCase();
+    if (!formNameUpper) {
+      return null;
+    }
+    const candidates = registry.getActiveCandidates(formNameUpper);
+    if (candidates.length < 2) {
+      return null;
+    }
+    const selected = registry.getSelectedCandidate(formNameUpper) || candidates[0];
+    return {
+      formName,
+      formNameUpper,
+      candidates,
+      selectedKey: selected.key
+    };
+  }
+
+  function selectPerformSourceCandidate(formNameUpper, candidateKey) {
+    const registry = state.performSourceRegistry;
+    if (!registry || typeof registry.selectCandidate !== "function") {
+      return false;
+    }
+
+    const outputAnchor = typeof captureOutputViewportAnchor === "function"
+      ? captureOutputViewportAnchor()
+      : null;
+    const templateAnchor = typeof captureTemplateViewportAnchor === "function"
+      ? captureTemplateViewportAnchor()
+      : null;
+    if (!registry.selectCandidate(formNameUpper, candidateKey)) {
+      return false;
+    }
+
+    state.pendingOutputViewportAnchor = outputAnchor;
+    state.pendingTemplateViewportAnchor = templateAnchor;
+    state.templatePreviewCache = null;
+    state.renderObjects = buildRenderableObjects(registry.rawRoots, {
+      ...RENDER_TREE_OPTIONS,
+      performSourceRegistry: registry
+    });
+    if (typeof renderOutput === "function") {
+      renderOutput();
+    }
+    if (typeof renderTemplatePreview === "function") {
+      renderTemplatePreview();
+    }
+    if (typeof refreshInputGutterTargets === "function") {
+      refreshInputGutterTargets();
+    }
+    return true;
+  }
+
+  function createPerformSourceControl(obj) {
+    const model = getPerformSourceControlModel(obj);
+    if (!model) {
+      return null;
+    }
+    const attrs = { "data-perform-form": model.formNameUpper };
+    const control = el("div", { className: "perform-source-control", attrs });
+    control.addEventListener("click", (ev) => ev.stopPropagation());
+    control.appendChild(el("span", {
+      className: "perform-source-badge",
+      text: `⇄ ${model.candidates.length} nguồn`,
+      attrs
+    }));
+
+    const select = el("select", {
+      className: "perform-source-select",
+      attrs: {
+        ...attrs,
+        "aria-label": `Nguồn mô tả FORM ${model.formName}`
+      }
+    });
+    const appendSourceOption = (candidate, index) => {
+      const lineLabel = candidate.lineStart > 0 ? String(candidate.lineStart) : "?";
+      const option = el("option", {
+        text: `Nguồn ${index + 1}/${model.candidates.length} · line ${lineLabel} · ${candidate.actualSummary}`,
+        attrs: { value: candidate.key }
+      });
+      select.appendChild(option);
+    };
+    let optionsPopulated = false;
+    const populateSourceOptions = () => {
+      if (optionsPopulated) {
+        return;
+      }
+      optionsPopulated = true;
+      select.replaceChildren();
+      for (let index = 0; index < model.candidates.length; index += 1) {
+        appendSourceOption(model.candidates[index], index);
+      }
+      select.value = model.selectedKey;
+      delete select.dataset.optionsDeferred;
+    };
+    const eagerOptionLimit = 50;
+    if (model.candidates.length <= eagerOptionLimit) {
+      populateSourceOptions();
+    } else {
+      const selectedIndex = Math.max(0, model.candidates.findIndex((candidate) => candidate.key === model.selectedKey));
+      appendSourceOption(model.candidates[selectedIndex], selectedIndex);
+      select.value = model.selectedKey;
+      select.dataset.optionsDeferred = "true";
+      select.addEventListener("focus", populateSourceOptions);
+      select.addEventListener("pointerdown", populateSourceOptions);
+    }
+    select.disabled = model.candidates.length < 2;
+    select.addEventListener("change", (ev) => {
+      ev.stopPropagation();
+      selectPerformSourceCandidate(model.formNameUpper, select.value);
+    });
+    control.appendChild(select);
+    return control;
+  }
+
+  function buildRenderableObjects(rawRoots, options) {
+    const roots = Array.isArray(rawRoots) ? rawRoots : [];
+    if (!roots.length) {
+      return [];
+    }
+
+    const opts = {
+      expandPerformForms: true,
+      hideFormRoots: true,
+      maxExpandDepth: Number.POSITIVE_INFINITY,
+      ...(options && typeof options === "object" ? options : {})
+    };
+    const maxExpandDepth = Math.max(0, Number(opts.maxExpandDepth) || 0);
+    const performSourceRegistry = opts.performSourceRegistry && typeof opts.performSourceRegistry === "object"
+      ? opts.performSourceRegistry
+      : null;
+    const formsByNameUpper = performSourceRegistry && performSourceRegistry.formsByNameUpper instanceof Map
+      ? performSourceRegistry.formsByNameUpper
+      : (opts.expandPerformForms ? buildFormsByNameUpperFromRoots(roots) : new Map());
+    const tools = createPerformExpansionTools();
+    const attachPerformBindingMetadata = tools.attachPerformBindingMetadata;
+    const buildPerformBindingContext = tools.buildPerformBindingContext;
 
     const cloneNode = (sourceNode, parentId, expandDepth, pathToken, forceSyntheticId, formCallStack, bindingContext) => {
       if (!sourceNode || typeof sourceNode !== "object") {
@@ -13051,7 +14081,13 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         const isRecursiveCall = Boolean(formNameUpper) && Array.isArray(formCallStack) && formCallStack.includes(formNameUpper);
 
         if (resolvedForm && !isRecursiveCall) {
-          const nextBindingContext = buildPerformBindingContext(sourceNode, resolvedForm, bindingContext);
+          const selectedCandidate = performSourceRegistry
+            && typeof performSourceRegistry.getSelectedCandidate === "function"
+            ? performSourceRegistry.getSelectedCandidate(formNameUpper)
+            : null;
+          const nextBindingContext = selectedCandidate
+            ? selectedCandidate.bindingContext
+            : buildPerformBindingContext(sourceNode, resolvedForm, bindingContext);
           const nextFormCallStack = formNameUpper
             ? [...(Array.isArray(formCallStack) ? formCallStack : []), formNameUpper]
             : (Array.isArray(formCallStack) ? formCallStack.slice() : []);
@@ -13285,6 +14321,8 @@ window.AbapViewerModules.factories["02-descriptions"] = function registerDescrip
   targetRuntime.api.getFinalDeclDesc = getFinalDeclDesc;
   targetRuntime.api.getEffectiveDeclDesc = getEffectiveDeclDesc;
   targetRuntime.api.resolveValueLevelFinalDesc = resolveValueLevelFinalDesc;
+  targetRuntime.api.buildPerformCallPathRegistry = buildPerformCallPathRegistry;
+  targetRuntime.api.selectPerformSourceCandidate = selectPerformSourceCandidate;
   window.AbapViewerModules.parts["02-descriptions"] = true;
 };
 window.AbapViewerModules.factories["02-descriptions"](window.AbapViewerRuntime);
@@ -13828,15 +14866,29 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       DELETE_ITAB: ["target", "itab", "from", "to", "index"],
       INSERT_ITAB: ["what", "to", "into", "target", "source", "intotable", "into-table", "index", "assigning", "refinto"],
       LOOP_AT_ITAB: ["itab", "into", "assigning", "refinto", "referenceinto", "reference-into", "from", "to"],
+      MESSAGE: ["message", "id", "messagetype", "number", "displaylike", "into"],
       MODIFY_ITAB: ["itab", "itabordbtab", "target", "from", "assigning", "referenceinto", "reference-into", "index"],
       MOVE: ["source", "to", "target"],
       "MOVE-CORRESPONDING": ["source", "to", "target"],
       READ_TABLE: ["itab", "into", "assigning", "refinto", "referenceinto", "reference-into", "index"],
       SELECT: ["into", "intotable", "into-table", "appendingtable", "appending-table", "assigning", "refinto", "referenceinto", "reference-into"],
-      SORT_ITAB: ["itab"]
+      SORT_ITAB: ["itab"],
+      WRITE: ["output", "destination"]
     };
     const allowed = allowedByType[objectType];
-    return Array.isArray(allowed) && allowed.includes(entryName);
+    if (!Array.isArray(allowed) || !allowed.includes(entryName)) {
+      return false;
+    }
+    if (
+      objectType === "MESSAGE"
+      && sourceObj.extras
+      && sourceObj.extras.message
+      && ["shorthand", "reference"].includes(String(sourceObj.extras.message.mode || ""))
+      && ["message", "id", "messagetype", "number"].includes(entryName)
+    ) {
+      return false;
+    }
+    return true;
   }
 
   function getTemplateCanonicalObjectPathBase(obj) {
@@ -14265,6 +15317,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     "modif-id": ["modifId", "modif-id"],
     "group-name": ["group"],
     "assign": ["expr"],
+    "at": ["position"],
     "if": ["ifCondition", "if"],
     "to": ["to", "target"],
     "lines-of": ["source", "source-itab"],
@@ -14303,11 +15356,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     WHEN: "branch",
     CALL_METHOD: "name",
     CALL_TRANSACTION: "name",
-    MESSAGE: "messageType",
+    MESSAGE: "message",
     MOVE: "source",
     "MOVE-CORRESPONDING": "source",
     CLEAR: "target",
-    METHOD: "name"
+    METHOD: "name",
+    WRITE: "output"
   };
 
   function keywordPositionInRaw(keyword, raw) {
@@ -14634,10 +15688,81 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     )) : null;
   }
 
+  function buildTemplateWritePositionRow(sourceObj, write, ownerContext, objectIndexOneBased) {
+    if (!write || typeof write !== "object") {
+      return null;
+    }
+    const position = write.position && typeof write.position === "object" ? write.position : {};
+    const buildPart = (name) => {
+      const value = String(position[name] || "").trim();
+      if (!value) {
+        return createTemplateExpandedRow("", []);
+      }
+      const capName = `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+      return buildTemplateSemanticValueRow({
+        value,
+        valueRef: position[`${name}Ref`],
+        valueDecl: position[`${name}Decl`]
+      }, ownerContext, {
+        extrasScope: "write",
+        sectionName: `position.${name}`,
+        indexOneBased: 1,
+        objectIndexOneBased
+      });
+    };
+    const column = buildPart("column");
+    const length = buildPart("length");
+    const prefix = write.newLine ? "/" : "";
+    const positionText = `${prefix}${column.text}${length.text ? `(${length.text})` : ""}`;
+    const declCandidates = dedupeTemplateDecls([...column.declCandidates, ...length.declCandidates]);
+    return createTemplateExpandedRow(positionText || prefix, declCandidates, {
+      status: declCandidates.length ? "editable" : "not_applicable",
+      reasonCode: declCandidates.length ? "" : getTemplateNoDeclReason(positionText || prefix, true, false)
+    });
+  }
+
   function getTemplateSemanticSectionRows(sourceObj, keywordLabel, ownerContext, objectIndexOneBased) {
     const extras = sourceObj && sourceObj.extras && typeof sourceObj.extras === "object"
       ? sourceObj.extras
       : {};
+
+    if (extras.message && keywordLabel === "with") {
+      const withValues = Array.isArray(extras.message.with) ? extras.message.with : [];
+      if (withValues.length) {
+        return withValues.map((entry, index) => buildTemplateSemanticValueRow(entry, ownerContext, {
+          extrasScope: "message",
+          sectionName: "with",
+          indexOneBased: index + 1,
+          objectIndexOneBased
+        }));
+      }
+    }
+
+    if (extras.write) {
+      if (keywordLabel === "at") {
+        const positionRow = buildTemplateWritePositionRow(sourceObj, extras.write, ownerContext, objectIndexOneBased);
+        return positionRow ? [positionRow] : null;
+      }
+      const format = Array.isArray(extras.write.format) ? extras.write.format : [];
+      const formatEntry = format.find((entry) => (
+        normalizeTemplatePairToken(entry && entry.keyword).replace(/\s+/g, "-") === keywordLabel
+      ));
+      if (formatEntry) {
+        if (!String(formatEntry.value || "").trim()) {
+          return [createTemplateExpandedRow("", [], {
+            status: "not_applicable",
+            reasonCode: "NON_DECL_SCHEMA_VALUE"
+          })];
+        }
+        return [buildTemplateSemanticValueRow(formatEntry, ownerContext, {
+          extrasScope: "write",
+          sectionName: "format",
+          indexOneBased: format.indexOf(formatEntry) + 1,
+          objectIndexOneBased
+        })];
+      }
+    }
+
     const assignmentSection = extras.callFunction || extras.callMethod;
     if (assignmentSection && ["exporting", "importing", "changing", "tables", "receiving", "exceptions"].includes(keywordLabel)) {
       const assignments = Array.isArray(assignmentSection[keywordLabel]) ? assignmentSection[keywordLabel] : [];
@@ -17266,51 +18391,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return applyTemplateConfigObject(defaultConfig, { save: true });
   }
 
-  function exportTemplateConfig() {
-    const config = state.templateConfig || getDefaultTemplateConfig();
-    const content = safeJson(config, true);
-    const fileName = "abap-template-config.json";
-
-    try {
-      const blob = new Blob([content], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setError("");
-    } catch (err) {
-      setError(`Export failed: ${err && err.message ? err.message : err}`);
-    }
-  }
-
-  async function importTemplateConfigFromFile(file) {
-    if (!file) {
-      return;
-    }
-
-    let text = "";
-    try {
-      text = await file.text();
-    } catch (err) {
-      setTemplateConfigError(`Import failed: ${err && err.message ? err.message : err}`);
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(text);
-      const applied = applyTemplateConfigObject(parsed, { save: true });
-      if (applied) {
-        setError("");
-      }
-    } catch (err) {
-      setTemplateConfigError(`Import JSON parse error: ${err && err.message ? err.message : err}`);
-    }
-  }
-
   async function copyAllTemplateBlocks() {
     if (!els.templatePreviewOutput) {
       return;
@@ -17530,6 +18610,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     if (isInteractive) {
       const actions = el("div", { className: "template-block-actions" });
+      const performSourceControl = typeof createPerformSourceControl === "function"
+        ? createPerformSourceControl(obj)
+        : null;
+      if (performSourceControl) {
+        actions.appendChild(performSourceControl);
+      }
       const codeBtn = el("button", {
         className: "secondary",
         text: "Code",
@@ -19773,6 +20859,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       collectConditionDeclsFromClauses(extras.select.havingConditions, addDeclWithTrace);
     } else if ((entryName === "withkey" || entryName === "withtablekey") && extras.readTable) {
       collectConditionDeclsFromClauses(extras.readTable.conditions, addDeclWithTrace);
+    } else if (entryName === "position" && extras.write && extras.write.position) {
+      addDeclWithTrace(extras.write.position.columnDecl);
+      addDeclWithTrace(extras.write.position.lengthDecl);
     }
 
     return dedupeDecls(decls);
@@ -19795,10 +20884,11 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     decl,
     valueDecl,
     originDecls,
-    valueRef
+    valueRef,
+    rowName
   }) {
     const row = {
-      name: makeSectionIndexName(sectionName, indexOneBased),
+      name: rowName || makeSectionIndexName(sectionName, indexOneBased),
       value: valueText ? String(valueText) : "",
       label: baseEntry && baseEntry.label ? String(baseEntry.label) : sectionName,
       userDesc: baseEntry && baseEntry.userDesc ? String(baseEntry.userDesc) : "",
@@ -19833,6 +20923,24 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       originDecls: item && Array.isArray(item.originDecls) ? item.originDecls : [],
       valueRef: item && item.valueRef ? String(item.valueRef) : ""
     }));
+  }
+
+  function buildParsedRowsFromWriteFormats(list, baseEntry) {
+    const items = Array.isArray(list) ? list : [];
+    return items.map((item, index) => {
+      const keyword = String(item && item.keyword || "").trim();
+      return makeParsedValueRow({
+        sectionName: "format",
+        indexOneBased: index + 1,
+        rowName: `format[${index + 1}].${keyword}`,
+        valueText: item && item.value ? String(item.value) : "",
+        baseEntry,
+        decl: item && item.valueDecl ? item.valueDecl : null,
+        valueDecl: item && item.valueDecl ? item.valueDecl : null,
+        originDecls: item && Array.isArray(item.originDecls) ? item.originDecls : [],
+        valueRef: item && item.valueRef ? String(item.valueRef) : ""
+      });
+    });
   }
 
   function buildParsedRowsFromAssignments(sectionName, list, baseEntry) {
@@ -19921,6 +21029,14 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       }
     }
 
+    if (extras.message && rawName === "withraw") {
+      return buildParsedRowsFromPerformList("with", extras.message.with, baseEntry);
+    }
+
+    if (extras.write && rawName === "formatraw") {
+      return buildParsedRowsFromWriteFormats(extras.write.format, baseEntry);
+    }
+
     if (extras.callFunction) {
       const sectionMap = {
         exportingraw: "exporting",
@@ -20000,8 +21116,48 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return out;
   }
 
+  function isOutputIdentifierDataOperand(value) {
+    const text = String(value === undefined || value === null ? "" : value).trim();
+    if (!text || /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?$/.test(text)) {
+      return false;
+    }
+    if (
+      /^'(?:''|[^'])*'$/.test(text)
+      || /^[A-Za-z_][A-Za-z0-9_]*'(?:''|[^'])*'$/.test(text)
+      || /^`(?:``|[^`])*`$/.test(text)
+      || /^\|[\s\S]*\|$/.test(text)
+    ) {
+      return false;
+    }
+    return /^(?:@)?(?:<[^>]+>|[A-Za-z_][A-Za-z0-9_]*)(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)*$/.test(text);
+  }
+
+  function shouldCreateSyntheticOutputValueDecl(obj, entry) {
+    const objectType = String(obj && obj.objectType || "").toUpperCase();
+    if (!objectType || !["MESSAGE", "WRITE"].includes(objectType)) {
+      return true;
+    }
+    const entryName = String(entry && entry.name || "").trim().toLowerCase();
+    if (objectType === "MESSAGE") {
+      const message = obj && obj.extras && obj.extras.message;
+      if (entryName === "raising" || entryName === "withraw") {
+        return false;
+      }
+      if (message && ["shorthand", "reference"].includes(String(message.mode || "")) && ["message", "id", "messagetype", "number"].includes(entryName)) {
+        return false;
+      }
+      return ["message", "id", "messagetype", "number", "displaylike", "into"].includes(entryName)
+        && isOutputIdentifierDataOperand(entry && entry.value);
+    }
+    return ["output", "destination"].includes(entryName)
+      && isOutputIdentifierDataOperand(entry && entry.value);
+  }
+
   function ensureEntryDeclForOutput(obj, entry) {
     if (!entry || typeof entry !== "object") {
+      return entry;
+    }
+    if (!shouldCreateSyntheticOutputValueDecl(obj, entry)) {
       return entry;
     }
     const source = getDeclSourceContextFromObject(obj);
@@ -20096,6 +21252,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const source = getDeclSourceContextFromObject(obj);
     const basePath = buildExtrasEntryPathKey(obj, extrasScope, sectionName, indexOneBased, "item");
     let next = cloneValueEntryForOutput(entry);
+    const objectType = String(obj && obj.objectType || "").toUpperCase();
+    if (["MESSAGE", "WRITE"].includes(objectType) && !isOutputIdentifierDataOperand(next.value)) {
+      return attachOutputSyntheticDeclAliases(next, obj);
+    }
     next = ensureEntryDeclWithSynthetic(next, {
       pathKey: basePath,
       file: source.file,
@@ -20456,6 +21616,35 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const wrap = el("div", { className: "extras" });
     wrap.appendChild(el("div", { className: "muted", text: "Extras" }));
 
+    if (extras.message) {
+      const message = extras.message;
+      wrap.appendChild(el("div", {
+        className: "muted",
+        text: message.mode ? `MESSAGE (${message.mode})` : "MESSAGE"
+      }));
+      const withTable = renderValueListTable("with", message.with, { obj, extrasScope: "message" });
+      if (withTable) {
+        wrap.appendChild(withTable);
+      }
+      return wrap;
+    }
+
+    if (extras.write) {
+      const write = extras.write;
+      wrap.appendChild(el("div", { className: "muted", text: write.newLine ? "WRITE /" : "WRITE" }));
+      const formatRows = (Array.isArray(write.format) ? write.format : []).map((entry) => ({
+        name: entry && entry.keyword ? String(entry.keyword) : "",
+        value: entry && entry.value ? String(entry.value) : "",
+        valueRef: entry && entry.valueRef ? String(entry.valueRef) : "",
+        valueDecl: entry && entry.valueDecl ? entry.valueDecl : null
+      }));
+      const formatTable = renderAssignmentTable("format", formatRows, { obj, extrasScope: "write" });
+      if (formatTable) {
+        wrap.appendChild(formatTable);
+      }
+      return wrap;
+    }
+
     if (extras.form) {
       const form = extras.form;
       const titleParts = [form.name ? `FORM ${form.name}` : ""].filter(Boolean);
@@ -20718,6 +21907,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     header.appendChild(title);
 
     const actions = el("div", { className: "card-actions" });
+    const performSourceControl = typeof createPerformSourceControl === "function"
+      ? createPerformSourceControl(obj)
+      : null;
+    if (performSourceControl) {
+      actions.appendChild(performSourceControl);
+    }
 
     const btnCode = el("button", { className: "btn-ghost", text: "Code" });
     btnCode.type = "button";
@@ -22089,8 +23284,19 @@ window.AbapViewerModules = window.AbapViewerModules || {};
 window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
   const TEMPLATE_GUI_FILTER_STORAGE_KEY_V1 = "abap-parser-viewer.templateGuiHiddenObjectTypes.v1";
+  const TEMPLATE_FORM_EDITOR_PCT_STORAGE_KEY_V1 = "abap-parser-viewer.templateFormEditorPct.v1";
+  const VIEWER_CONFIG_KIND_V1 = "abap-viewer-config";
+  const VIEWER_CONFIG_VERSION_V1 = 1;
+  const VIEWER_CONFIG_SECTION_DEFS_V1 = Object.freeze([
+    { key: "templates", label: "Templates", fileToken: "templates" },
+    { key: "descriptionSettings", label: "Description settings", fileToken: "description-settings" },
+    { key: "descriptionOverrides", label: "Description overrides", fileToken: "description-overrides" },
+    { key: "appearance", label: "Appearance", fileToken: "appearance" },
+    { key: "templateUi", label: "Template UI", fileToken: "template-ui" }
+  ]);
   let activeTemplateDynamicModal = null;
   let templateFilterModalControls = null;
+  let activeTemplateFormSplitController = null;
 
   function isTemplateDynamicModalOpen() {
     return Boolean(activeTemplateDynamicModal && activeTemplateDynamicModal.root && activeTemplateDynamicModal.root.isConnected);
@@ -22494,6 +23700,597 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     modal.setCleanup(() => {
       templateFilterModalControls = null;
     });
+  }
+
+  function isViewerConfigPlainObject(value) {
+    return Boolean(value && typeof value === "object" && !Array.isArray(value));
+  }
+
+  function cloneViewerConfigValue(value) {
+    const cloned = cloneJsonValue(value);
+    if (cloned === null && value !== null) {
+      throw new Error("Viewer config contains a value that cannot be cloned.");
+    }
+    return cloned;
+  }
+
+  function normalizeTemplateFormEditorPct(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric < 22 || numeric > 78) {
+      return 58;
+    }
+    return Math.round(numeric);
+  }
+
+  function loadTemplateFormEditorPct() {
+    const current = Number(state.templateFormEditorPct);
+    if (Number.isFinite(current) && current >= 22 && current <= 78) {
+      return Math.round(current);
+    }
+
+    let saved = null;
+    try {
+      saved = localStorage.getItem(TEMPLATE_FORM_EDITOR_PCT_STORAGE_KEY_V1);
+    } catch {
+      saved = null;
+    }
+    const normalized = normalizeTemplateFormEditorPct(saved);
+    state.templateFormEditorPct = normalized;
+    return normalized;
+  }
+
+  function applyTemplateFormEditorPct(value, options) {
+    const opts = options && typeof options === "object" ? options : {};
+    const normalized = normalizeTemplateFormEditorPct(value);
+    state.templateFormEditorPct = normalized;
+
+    if (activeTemplateFormSplitController && typeof activeTemplateFormSplitController.apply === "function") {
+      activeTemplateFormSplitController.apply(normalized);
+    }
+
+    if (opts.save === false) {
+      return normalized;
+    }
+    localStorage.setItem(TEMPLATE_FORM_EDITOR_PCT_STORAGE_KEY_V1, String(normalized));
+    return normalized;
+  }
+
+  function getSelectedViewerConfigSectionDefs(sectionKeys) {
+    const requested = new Set(Array.isArray(sectionKeys) ? sectionKeys.map((key) => String(key || "")) : []);
+    return VIEWER_CONFIG_SECTION_DEFS_V1.filter((section) => requested.has(section.key));
+  }
+
+  function canonicalizeDescriptionOverridesForViewerConfig(value, options) {
+    const opts = options && typeof options === "object" ? options : {};
+    if (!isViewerConfigPlainObject(value)) {
+      throw new Error("Description overrides must be an object.");
+    }
+
+    const canonical = {};
+    for (const [key, rawEntry] of Object.entries(value)) {
+      if (!String(key || "").trim()) {
+        throw new Error("Description override keys must not be empty.");
+      }
+      if (typeof rawEntry === "string") {
+        canonical[key] = rawEntry;
+        continue;
+      }
+      if (!isViewerConfigPlainObject(rawEntry)) {
+        throw new Error(`Description override ${key} must be a string or canonical object.`);
+      }
+      if (opts.strict && typeof rawEntry.text !== "string") {
+        throw new Error(`Description override ${key}.text must be a string.`);
+      }
+      if (
+        opts.strict
+        && Object.prototype.hasOwnProperty.call(rawEntry, "noNormalize")
+        && typeof rawEntry.noNormalize !== "boolean"
+      ) {
+        throw new Error(`Description override ${key}.noNormalize must be a boolean.`);
+      }
+      const entry = normalizeDescOverrideEntry(rawEntry);
+      canonical[key] = entry.noNormalize
+        ? { text: entry.text, noNormalize: true }
+        : entry.text;
+    }
+    return canonical;
+  }
+
+  function getViewerConfigSectionValue(sectionKey) {
+    if (sectionKey === "templates") {
+      return cloneViewerConfigValue(state.templateConfig || getDefaultTemplateConfig());
+    }
+    if (sectionKey === "descriptionSettings") {
+      return cloneViewerConfigValue(normalizeSettings(state.settings || {}));
+    }
+    if (sectionKey === "descriptionOverrides") {
+      return canonicalizeDescriptionOverridesForViewerConfig(state.descOverrides || {});
+    }
+    if (sectionKey === "appearance") {
+      return {
+        theme: normalizeTheme(state.theme),
+        layoutLeftPane: normalizeLayoutSplit(state.layoutLeftPane)
+      };
+    }
+    if (sectionKey === "templateUi") {
+      ensureTemplateGuiFilterState();
+      return {
+        hiddenObjectTypes: Array.from(state.templateGuiHiddenTypes.values())
+          .map(normalizeTemplateObjectTypeToken)
+          .filter(Boolean)
+          .sort((left, right) => left.localeCompare(right)),
+        formEditorPct: loadTemplateFormEditorPct()
+      };
+    }
+    throw new Error(`Unknown Viewer config section: ${sectionKey}`);
+  }
+
+  function buildViewerConfigBundle(sectionKeys, exportedAt) {
+    const selectedSections = getSelectedViewerConfigSectionDefs(sectionKeys);
+    const sections = {};
+    for (const section of selectedSections) {
+      sections[section.key] = getViewerConfigSectionValue(section.key);
+    }
+    return {
+      kind: VIEWER_CONFIG_KIND_V1,
+      version: VIEWER_CONFIG_VERSION_V1,
+      exportedAt: exportedAt || new Date().toISOString(),
+      sections
+    };
+  }
+
+  function getViewerConfigExportFileName(sectionKeys) {
+    const selectedSections = getSelectedViewerConfigSectionDefs(sectionKeys);
+    if (selectedSections.length === VIEWER_CONFIG_SECTION_DEFS_V1.length) {
+      return "abap-viewer-config.json";
+    }
+    const suffix = selectedSections.map((section) => section.fileToken).join("-");
+    return suffix ? `abap-viewer-config-${suffix}.json` : "abap-viewer-config.json";
+  }
+
+  function downloadViewerConfigBundle(bundle, fileName) {
+    const content = safeJson(bundle, true);
+    const blob = new Blob([content], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  }
+
+  function openViewerConfigExportModal() {
+    const modal = openTemplateDynamicModal("Export Viewer Config", { contentClass: "template-runtime-modal-content" });
+    const error = document.createElement("div");
+    error.className = "template-error";
+    modal.body.appendChild(error);
+
+    const selectAllLabel = document.createElement("label");
+    selectAllLabel.className = "toggle";
+    const selectAllInput = document.createElement("input");
+    selectAllInput.type = "checkbox";
+    selectAllInput.checked = true;
+    selectAllInput.setAttribute("data-config-select-all", "true");
+    selectAllLabel.appendChild(selectAllInput);
+    selectAllLabel.appendChild(document.createTextNode("Select all"));
+    modal.body.appendChild(selectAllLabel);
+
+    const sectionInputs = [];
+    const sectionList = document.createElement("div");
+    sectionList.className = "controls";
+    for (const section of VIEWER_CONFIG_SECTION_DEFS_V1) {
+      const label = document.createElement("label");
+      label.className = "toggle";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.checked = true;
+      input.value = section.key;
+      input.setAttribute("data-config-section", section.key);
+      label.appendChild(input);
+      label.appendChild(document.createTextNode(section.label));
+      sectionList.appendChild(label);
+      sectionInputs.push(input);
+    }
+    modal.body.appendChild(sectionList);
+
+    const syncSelectAll = () => {
+      selectAllInput.checked = sectionInputs.every((input) => input.checked);
+      selectAllInput.indeterminate = !selectAllInput.checked && sectionInputs.some((input) => input.checked);
+    };
+    selectAllInput.addEventListener("change", () => {
+      for (const input of sectionInputs) {
+        input.checked = selectAllInput.checked;
+      }
+      syncSelectAll();
+    });
+    for (const input of sectionInputs) {
+      input.addEventListener("change", syncSelectAll);
+    }
+
+    const exportButton = document.createElement("button");
+    exportButton.type = "button";
+    exportButton.className = "secondary";
+    exportButton.textContent = "Export selected";
+    exportButton.addEventListener("click", () => {
+      const selectedKeys = sectionInputs.filter((input) => input.checked).map((input) => input.value);
+      if (!selectedKeys.length) {
+        error.textContent = "Select at least one config section.";
+        return;
+      }
+      try {
+        const bundle = buildViewerConfigBundle(selectedKeys);
+        downloadViewerConfigBundle(bundle, getViewerConfigExportFileName(selectedKeys));
+        setError("");
+        closeTemplateDynamicModal();
+      } catch (err) {
+        error.textContent = `Export failed: ${err && err.message ? err.message : err}`;
+      }
+    });
+    modal.actions.prepend(exportButton);
+  }
+
+  function prepareViewerConfigDescriptionSettings(value) {
+    if (!isViewerConfigPlainObject(value)) {
+      throw new Error("Description settings must be an object.");
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(value, "normalizeDeclDesc")
+      && typeof value.normalizeDeclDesc !== "boolean"
+    ) {
+      throw new Error("Description settings normalizeDeclDesc must be a boolean.");
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(value, "declFilterTypes")
+      && !Array.isArray(value.declFilterTypes)
+    ) {
+      throw new Error("Description settings declFilterTypes must be an array.");
+    }
+    if (
+      Array.isArray(value.declFilterTypes)
+      && value.declFilterTypes.some((type) => !DECL_TYPE_OPTIONS.includes(String(type || "").trim().toUpperCase()))
+    ) {
+      throw new Error("Description settings declFilterTypes contains an unsupported type.");
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(value, "structDescTemplate")
+      && (typeof value.structDescTemplate !== "string" || !value.structDescTemplate.trim())
+    ) {
+      throw new Error("Description settings structDescTemplate must be a non-empty string.");
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(value, "nameTemplatesByCode")
+      && !isViewerConfigPlainObject(value.nameTemplatesByCode)
+    ) {
+      throw new Error("Description settings nameTemplatesByCode must be an object.");
+    }
+    if (isViewerConfigPlainObject(value.nameTemplatesByCode)) {
+      for (const [code, template] of Object.entries(value.nameTemplatesByCode)) {
+        if (!NAME_CODE_OPTIONS.some((option) => option.code === code) || typeof template !== "string" || !template.trim()) {
+          throw new Error(`Description settings nameTemplatesByCode.${code} is invalid.`);
+        }
+      }
+    }
+    return normalizeSettings(value);
+  }
+
+  function prepareViewerConfigAppearance(value) {
+    if (!isViewerConfigPlainObject(value)) {
+      throw new Error("Appearance must be an object.");
+    }
+    if (value.theme !== "light" && value.theme !== "dark") {
+      throw new Error("Appearance theme must be light or dark.");
+    }
+    const layoutLeftPane = Number(value.layoutLeftPane);
+    if (!Number.isFinite(layoutLeftPane) || layoutLeftPane < LAYOUT_SPLIT_MIN || layoutLeftPane > LAYOUT_SPLIT_MAX) {
+      throw new Error(`Appearance layoutLeftPane must be between ${LAYOUT_SPLIT_MIN} and ${LAYOUT_SPLIT_MAX}.`);
+    }
+    return { theme: normalizeTheme(value.theme), layoutLeftPane: normalizeLayoutSplit(layoutLeftPane) };
+  }
+
+  function prepareViewerConfigTemplateUi(value) {
+    if (!isViewerConfigPlainObject(value)) {
+      throw new Error("Template UI must be an object.");
+    }
+    if (!Array.isArray(value.hiddenObjectTypes)) {
+      throw new Error("Template UI hiddenObjectTypes must be an array.");
+    }
+    if (value.hiddenObjectTypes.some((item) => typeof item !== "string" || !item.trim())) {
+      throw new Error("Template UI hiddenObjectTypes must contain non-empty strings.");
+    }
+    const formEditorPct = Number(value.formEditorPct);
+    if (!Number.isFinite(formEditorPct) || formEditorPct < 22 || formEditorPct > 78) {
+      throw new Error("Template UI formEditorPct must be between 22 and 78.");
+    }
+    return {
+      hiddenObjectTypes: Array.from(new Set(value.hiddenObjectTypes.map(normalizeTemplateObjectTypeToken)))
+        .filter(Boolean)
+        .sort((left, right) => left.localeCompare(right)),
+      formEditorPct: normalizeTemplateFormEditorPct(formEditorPct)
+    };
+  }
+
+  function prepareViewerConfigTemplates(value) {
+    if (!isViewerConfigPlainObject(value)) {
+      throw new Error("Templates must be a config object.");
+    }
+    const next = cloneViewerConfigValue(value);
+    normalizeTemplateConfigLegacyFieldsInPlace(next);
+    const check = validateTemplateConfig(next);
+    if (!check.valid) {
+      throw new Error(check.errors.join("\n"));
+    }
+    mergeMissingDefaultTemplatesInPlace(next);
+    return next;
+  }
+
+  function validateAndPrepareViewerConfigBundle(value) {
+    const errors = [];
+    if (!isViewerConfigPlainObject(value)) {
+      return { valid: false, errors: ["Viewer config must be a JSON object."], knownSections: [], unknownSections: [], prepared: {} };
+    }
+    if (value.kind !== VIEWER_CONFIG_KIND_V1) {
+      errors.push(`Viewer config kind must be ${VIEWER_CONFIG_KIND_V1}.`);
+    }
+    if (Number(value.version) !== VIEWER_CONFIG_VERSION_V1) {
+      errors.push(`Viewer config version must be ${VIEWER_CONFIG_VERSION_V1}.`);
+    }
+    if (!isViewerConfigPlainObject(value.sections)) {
+      errors.push("Viewer config sections must be an object.");
+      return { valid: false, errors, knownSections: [], unknownSections: [], prepared: {} };
+    }
+
+    const knownKeys = new Set(VIEWER_CONFIG_SECTION_DEFS_V1.map((section) => section.key));
+    const unknownSections = Object.keys(value.sections).filter((key) => !knownKeys.has(key));
+    const knownSections = VIEWER_CONFIG_SECTION_DEFS_V1.filter((section) => (
+      Object.prototype.hasOwnProperty.call(value.sections, section.key)
+    ));
+    if (!knownSections.length) {
+      errors.push("Viewer config has no known config section.");
+    }
+
+    const prepared = {};
+    for (const section of knownSections) {
+      try {
+        const raw = value.sections[section.key];
+        if (section.key === "templates") {
+          prepared.templates = prepareViewerConfigTemplates(raw);
+        } else if (section.key === "descriptionSettings") {
+          prepared.descriptionSettings = prepareViewerConfigDescriptionSettings(raw);
+        } else if (section.key === "descriptionOverrides") {
+          prepared.descriptionOverrides = canonicalizeDescriptionOverridesForViewerConfig(raw, { strict: true });
+        } else if (section.key === "appearance") {
+          prepared.appearance = prepareViewerConfigAppearance(raw);
+        } else if (section.key === "templateUi") {
+          prepared.templateUi = prepareViewerConfigTemplateUi(raw);
+        }
+      } catch (err) {
+        errors.push(`${section.label}: ${err && err.message ? err.message : err}`);
+      }
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+      knownSections,
+      unknownSections,
+      prepared
+    };
+  }
+
+  function getViewerConfigStorageSnapshot() {
+    const keys = [
+      TEMPLATE_CONFIG_STORAGE_KEY_V1,
+      SETTINGS_STORAGE_KEY_V1,
+      DESC_STORAGE_KEY_V2,
+      DESC_STORAGE_KEY_LEGACY_V1,
+      THEME_STORAGE_KEY_V1,
+      LAYOUT_SPLIT_STORAGE_KEY_V1,
+      TEMPLATE_GUI_FILTER_STORAGE_KEY_V1,
+      TEMPLATE_FORM_EDITOR_PCT_STORAGE_KEY_V1
+    ];
+    const snapshot = {};
+    for (const key of keys) {
+      snapshot[key] = localStorage.getItem(key);
+    }
+    return snapshot;
+  }
+
+  function restoreViewerConfigStorageSnapshot(snapshot) {
+    for (const [key, raw] of Object.entries(snapshot || {})) {
+      if (raw === null || raw === undefined) {
+        localStorage.removeItem(key);
+      } else {
+        localStorage.setItem(key, raw);
+      }
+    }
+  }
+
+  function getViewerConfigStateSnapshot() {
+    ensureTemplateGuiFilterState();
+    return {
+      templateConfig: cloneViewerConfigValue(state.templateConfig || getDefaultTemplateConfig()),
+      settings: cloneViewerConfigValue(state.settings || loadSettings()),
+      descOverrides: cloneViewerConfigValue(state.descOverrides || {}),
+      descOverridesLegacy: cloneViewerConfigValue(state.descOverridesLegacy || {}),
+      theme: state.theme,
+      layoutLeftPane: state.layoutLeftPane,
+      hiddenObjectTypes: Array.from(state.templateGuiHiddenTypes.values()),
+      formEditorPct: loadTemplateFormEditorPct()
+    };
+  }
+
+  function rerenderViewerAfterConfigImport() {
+    if (typeof renderSettingsModalUi === "function") {
+      renderSettingsModalUi();
+    }
+    if (typeof renderDeclDescPanelUi === "function") {
+      renderDeclDescPanelUi();
+    }
+    if (typeof renderOutput === "function") {
+      renderOutput();
+    }
+    if (typeof renderTemplateGuiFilterControls === "function") {
+      renderTemplateGuiFilterControls();
+    }
+    if (typeof renderTemplatePreview === "function") {
+      renderTemplatePreview();
+    }
+  }
+
+  function restoreViewerConfigStateSnapshot(snapshot) {
+    state.templateConfig = cloneViewerConfigValue(snapshot.templateConfig);
+    state.settings = cloneViewerConfigValue(snapshot.settings);
+    state.descOverrides = cloneViewerConfigValue(snapshot.descOverrides);
+    state.descOverridesLegacy = cloneViewerConfigValue(snapshot.descOverridesLegacy);
+    state.templateGuiHiddenTypes = new Set(snapshot.hiddenObjectTypes || []);
+    applyTheme(snapshot.theme, { save: false });
+    applyLayoutSplit(snapshot.layoutLeftPane, { save: false });
+    applyTemplateFormEditorPct(snapshot.formEditorPct, { save: false });
+    syncTemplateEditorFromState();
+    rerenderViewerAfterConfigImport();
+  }
+
+  function writePreparedViewerConfigSections(prepared, knownSections) {
+    const selectedKeys = new Set(knownSections.map((section) => section.key));
+    if (selectedKeys.has("templates")) {
+      localStorage.setItem(TEMPLATE_CONFIG_STORAGE_KEY_V1, JSON.stringify(prepared.templates));
+    }
+    if (selectedKeys.has("descriptionSettings")) {
+      localStorage.setItem(SETTINGS_STORAGE_KEY_V1, JSON.stringify(prepared.descriptionSettings));
+    }
+    if (selectedKeys.has("descriptionOverrides")) {
+      localStorage.setItem(DESC_STORAGE_KEY_V2, JSON.stringify(prepared.descriptionOverrides));
+      localStorage.removeItem(DESC_STORAGE_KEY_LEGACY_V1);
+    }
+    if (selectedKeys.has("appearance")) {
+      localStorage.setItem(THEME_STORAGE_KEY_V1, prepared.appearance.theme);
+      localStorage.setItem(LAYOUT_SPLIT_STORAGE_KEY_V1, String(prepared.appearance.layoutLeftPane));
+    }
+    if (selectedKeys.has("templateUi")) {
+      localStorage.setItem(
+        TEMPLATE_GUI_FILTER_STORAGE_KEY_V1,
+        JSON.stringify(prepared.templateUi.hiddenObjectTypes)
+      );
+      localStorage.setItem(
+        TEMPLATE_FORM_EDITOR_PCT_STORAGE_KEY_V1,
+        String(prepared.templateUi.formEditorPct)
+      );
+    }
+  }
+
+  function applyPreparedViewerConfigSections(prepared, knownSections) {
+    const selectedKeys = new Set(knownSections.map((section) => section.key));
+    if (selectedKeys.has("templates")) {
+      const applied = applyTemplateConfigObject(prepared.templates, { save: false });
+      if (!applied) {
+        throw new Error("Templates could not be applied.");
+      }
+    }
+    if (selectedKeys.has("descriptionSettings")) {
+      state.settings = cloneViewerConfigValue(prepared.descriptionSettings);
+    }
+    if (selectedKeys.has("descriptionOverrides")) {
+      state.descOverrides = cloneViewerConfigValue(prepared.descriptionOverrides);
+      state.descOverridesLegacy = {};
+    }
+    if (selectedKeys.has("appearance")) {
+      applyTheme(prepared.appearance.theme, { save: false });
+      applyLayoutSplit(prepared.appearance.layoutLeftPane, { save: false });
+    }
+    if (selectedKeys.has("templateUi")) {
+      state.templateGuiHiddenTypes = new Set(prepared.templateUi.hiddenObjectTypes);
+      applyTemplateFormEditorPct(prepared.templateUi.formEditorPct, { save: false });
+    }
+    syncTemplateEditorFromState();
+    rerenderViewerAfterConfigImport();
+  }
+
+  function importViewerConfigObject(value) {
+    const validation = validateAndPrepareViewerConfigBundle(value);
+    if (!validation.valid) {
+      setTemplateConfigError(`Import failed: ${validation.errors.join("\n")}`);
+      return false;
+    }
+
+    const confirmationLines = validation.knownSections.map((section) => `- ${section.label}`);
+    const confirmed = typeof window.confirm !== "function"
+      || window.confirm(`Import these Viewer config sections?\n${confirmationLines.join("\n")}`);
+    if (!confirmed) {
+      setTemplateConfigError("Import cancelled.");
+      return false;
+    }
+
+    let storageSnapshot = null;
+    let stateSnapshot = null;
+    try {
+      storageSnapshot = getViewerConfigStorageSnapshot();
+      stateSnapshot = getViewerConfigStateSnapshot();
+      writePreparedViewerConfigSections(validation.prepared, validation.knownSections);
+      applyPreparedViewerConfigSections(validation.prepared, validation.knownSections);
+    } catch (err) {
+      let rollbackError = "";
+      try {
+        if (storageSnapshot) {
+          restoreViewerConfigStorageSnapshot(storageSnapshot);
+        }
+        if (stateSnapshot) {
+          restoreViewerConfigStateSnapshot(stateSnapshot);
+        }
+      } catch (restoreErr) {
+        rollbackError = ` Rollback also failed: ${restoreErr && restoreErr.message ? restoreErr.message : restoreErr}`;
+      }
+      setTemplateConfigError(
+        `Import failed and was rolled back: ${err && err.message ? err.message : err}.${rollbackError}`
+      );
+      return false;
+    }
+
+    if (validation.unknownSections.length) {
+      setTemplateConfigError(`Import warning: ignored unknown sections: ${validation.unknownSections.join(", ")}.`);
+    } else {
+      setTemplateConfigError("");
+    }
+    setError("");
+    return true;
+  }
+
+  function isLegacyTemplateConfig(value) {
+    return Boolean(
+      isViewerConfigPlainObject(value)
+      && !Object.prototype.hasOwnProperty.call(value, "kind")
+      && Object.prototype.hasOwnProperty.call(value, "version")
+      && Object.prototype.hasOwnProperty.call(value, "templates")
+    );
+  }
+
+  async function importViewerConfigFromFile(file) {
+    if (!file) {
+      return;
+    }
+
+    let text = "";
+    try {
+      text = await file.text();
+    } catch (err) {
+      setTemplateConfigError(`Import failed: ${err && err.message ? err.message : err}`);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(text);
+      if (isLegacyTemplateConfig(parsed)) {
+        const applied = applyTemplateConfigObject(parsed, { save: true });
+        if (applied) {
+          setError("");
+        }
+        return;
+      }
+      importViewerConfigObject(parsed);
+    } catch (err) {
+      setTemplateConfigError(`Import JSON parse error: ${err && err.message ? err.message : err}`);
+    }
   }
 
   function getRenderableObjectListForTemplate(options) {
@@ -22968,19 +24765,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     workspace.appendChild(workspaceSplit);
     workspace.appendChild(previewPane);
 
-    const TEMPLATE_FORM_SPLIT_KEY = "abap-parser-viewer.templateFormEditorPct.v1";
-    let editorPct = 58;
-    try {
-      const saved = localStorage.getItem(TEMPLATE_FORM_SPLIT_KEY);
-      if (saved != null) {
-        const n = Number(saved);
-        if (Number.isFinite(n) && n >= 22 && n <= 78) {
-          editorPct = Math.round(n);
-        }
-      }
-    } catch {
-      // ignore
-    }
+    let editorPct = loadTemplateFormEditorPct();
     const templateFormMaxWidthMq = window.matchMedia("(max-width: 1180px)");
     const applyTemplateWorkspaceSplit = () => {
       const stacked = templateFormMaxWidthMq.matches;
@@ -22991,6 +24776,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       previewPane.style.minWidth = stacked ? "0" : "220px";
       editorPane.style.minHeight = stacked ? "120px" : "0";
       previewPane.style.minHeight = stacked ? "160px" : "0";
+    };
+    activeTemplateFormSplitController = {
+      apply(nextPercent) {
+        editorPct = normalizeTemplateFormEditorPct(nextPercent);
+        applyTemplateWorkspaceSplit();
+      }
     };
     applyTemplateWorkspaceSplit();
     const onTemplateFormSplitChanged = () => {
@@ -23013,7 +24804,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       templateSplitDrag = null;
       workspace.classList.remove("is-resizing");
       try {
-        localStorage.setItem(TEMPLATE_FORM_SPLIT_KEY, String(editorPct));
+        applyTemplateFormEditorPct(editorPct);
       } catch {
         // ignore
       }
@@ -23049,6 +24840,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         ? (ev.clientY - rect.top) / h
         : (ev.clientX - rect.left) / w;
       editorPct = Math.round(Math.min(78, Math.max(22, ratio * 100)));
+      state.templateFormEditorPct = editorPct;
       applyTemplateWorkspaceSplit();
     });
     workspaceSplit.addEventListener("pointerup", endTemplateSplitDrag);
@@ -23061,6 +24853,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         editorPct = ev.key === "ArrowLeft"
           ? Math.max(22, editorPct - step)
           : Math.min(78, editorPct + step);
+        state.templateFormEditorPct = editorPct;
         applyTemplateWorkspaceSplit();
         return;
       }
@@ -23069,6 +24862,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         editorPct = ev.key === "ArrowUp"
           ? Math.max(22, editorPct - step)
           : Math.min(78, editorPct + step);
+        state.templateFormEditorPct = editorPct;
         applyTemplateWorkspaceSplit();
       }
     });
@@ -24545,6 +26339,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     modal.root.addEventListener("keydown", (ev) => { if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") { ev.preventDefault(); applyFromModal(); } });
     renderActive();
     modal.setCleanup(() => {
+      activeTemplateFormSplitController = null;
       clearPreviewTimer();
       hideTemplateTokenSuggest();
       clearTemplateTokenSuggestionCache();
@@ -26306,6 +28101,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
   function clearParsedResultAfterFailure(message) {
     state.data = null;
     state.renderObjects = [];
+    state.performSourceRegistry = null;
     state.templatePreviewCache = null;
     state.selectedId = "";
     state.selectedTemplateIndex = "";
@@ -26376,7 +28172,11 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     state.collapsedIds.clear();
     state.selectedId = "";
     state.selectedTemplateIndex = "";
-    state.renderObjects = buildRenderableObjects(state.data && state.data.objects, RENDER_TREE_OPTIONS);
+    state.performSourceRegistry = buildPerformCallPathRegistry(state.data && state.data.objects);
+    state.renderObjects = buildRenderableObjects(state.data && state.data.objects, {
+      ...RENDER_TREE_OPTIONS,
+      performSourceRegistry: state.performSourceRegistry
+    });
     refreshTemplateGuiFilterTypes();
     setError("");
     if (state.rightTab === "output") {
@@ -26628,7 +28428,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     if (els.templateExportBtn) {
-      els.templateExportBtn.addEventListener("click", exportTemplateConfig);
+      els.templateExportBtn.addEventListener("click", openViewerConfigExportModal);
     }
 
     if (els.templateImportBtn && els.templateImportInput) {
@@ -26643,7 +28443,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         if (!file) {
           return;
         }
-        await importTemplateConfigFromFile(file);
+        await importViewerConfigFromFile(file);
         els.templateImportInput.value = "";
       });
     }
@@ -26781,6 +28581,9 @@ window.AbapViewerModules.factories["05-main"] = function registerMain(runtime) {
   targetRuntime.api.jumpInputToCodeRange = jumpInputToCodeRange;
   targetRuntime.api.findDeclSegmentIndex = findDeclSegmentIndex;
   targetRuntime.api.getSegmentRangesForLineText = getSegmentRangesForLineText;
+  targetRuntime.api.buildViewerConfigBundle = buildViewerConfigBundle;
+  targetRuntime.api.getViewerConfigExportFileName = getViewerConfigExportFileName;
+  targetRuntime.api.importViewerConfigObject = importViewerConfigObject;
 
   window.AbapViewerModules.start = function startAbapViewer() {
     if (document.readyState === "loading") {
