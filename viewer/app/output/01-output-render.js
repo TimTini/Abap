@@ -2094,6 +2094,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     header.appendChild(title);
 
     const actions = el("div", { className: "card-actions" });
+    const performSourceControl = typeof createPerformSourceControl === "function"
+      ? createPerformSourceControl(obj)
+      : null;
+    if (performSourceControl) {
+      actions.appendChild(performSourceControl);
+    }
 
     const btnCode = el("button", { className: "btn-ghost", text: "Code" });
     btnCode.type = "button";

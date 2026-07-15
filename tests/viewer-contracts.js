@@ -2334,8 +2334,8 @@ async function assertExpandedPerformTraceUsesRootDeclarations() {
   assert.deepStrictEqual(getBindingNames(firstIf, "is_inner"), ["is_outer", "gs_root"]);
   assert.deepStrictEqual(getBindingNames(firstIf, "cv_inner"), ["cv_outer", "gv_change"]);
   assert.deepStrictEqual(getBindingNames(firstIf, "tt_inner"), ["tt_outer", "gt_root"]);
-  assert.deepStrictEqual(getBindingNames(secondIf, "iv_inner"), ["iv_outer", "gv_other"]);
-  assert.deepStrictEqual(getBindingNames(secondIf, "is_inner"), ["is_outer", "gs_other"]);
+  assert.deepStrictEqual(getBindingNames(secondIf, "iv_inner"), ["iv_outer", "gv_root"]);
+  assert.deepStrictEqual(getBindingNames(secondIf, "is_inner"), ["is_outer", "gs_root"]);
 
   const externalPerform = performRoots[3];
   assert.strictEqual(
@@ -2394,11 +2394,11 @@ async function assertExpandedPerformTraceUsesRootDeclarations() {
   ]);
   assertTemplateRows(performRoots[1], "iv_inner = iv_inner && '-x'.", [
     ["Đích", "Nguồn"],
-    ["gv_other", "gv_other && '-x'"]
+    ["gv_root", "gv_root && '-x'"]
   ]);
   assertTemplateRows(performRoots[1], "is_inner-city = is_inner-name.", [
     ["Đích", "Nguồn"],
-    ["gs_other-city", "gs_other-name"]
+    ["gs_root-city", "gs_root-name"]
   ]);
   assertTemplateRows(performRoots[0], "CLEAR iv_local.", [["CLEAR", "lv_local"]]);
   assertTemplateRows(performRoots[2], "CLEAR iv_literal.", [["CLEAR", "iv_literal"]]);
@@ -2429,6 +2429,226 @@ async function assertExpandedPerformTraceUsesRootDeclarations() {
     ["is_inner-city", "is_outer-city", "gs_root-city"],
     "Expected Output to keep the complete structure-field trace chain."
   );
+
+  dom.window.close();
+}
+
+async function assertGlobalPerformSourceSelection() {
+  const source = [
+    "DATA gv_first TYPE string.",
+    "DATA gv_second TYPE string.",
+    "DATA gv_third TYPE string.",
+    "DATA gv_change_first TYPE string.",
+    "DATA gv_change_second TYPE string.",
+    "DATA gv_change_third TYPE string.",
+    "PERFORM frm_outer USING gv_first CHANGING gv_change_first.",
+    "PERFORM frm_outer USING gv_second CHANGING gv_change_second.",
+    "PERFORM frm_outer USING gv_third CHANGING gv_change_third.",
+    "PERFORM frm_literal USING 'X'.",
+    "PERFORM frm_external IN PROGRAM zother USING gv_first.",
+    "PERFORM frm_cycle USING gv_first.",
+    "FORM frm_outer USING iv_outer TYPE string iv_missing TYPE string",
+    "               CHANGING cv_outer TYPE string.",
+    "  DATA lv_local TYPE string.",
+    "  lv_local = iv_outer.",
+    "  iv_missing = iv_outer.",
+    "  PERFORM frm_inner USING iv_outer.",
+    "  PERFORM frm_inner USING cv_outer.",
+    "ENDFORM.",
+    "FORM frm_inner USING iv_inner TYPE string.",
+    "  CLEAR iv_inner.",
+    "ENDFORM.",
+    "FORM frm_literal USING iv_literal TYPE string.",
+    "  CLEAR iv_literal.",
+    "ENDFORM.",
+    "FORM frm_cycle USING iv_cycle TYPE string.",
+    "  PERFORM frm_cycle USING iv_cycle.",
+    "ENDFORM."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
+
+  const registry = state.performSourceRegistry;
+  assert(registry && registry.candidatesByFormUpper instanceof window.Map, "Expected a per-input PERFORM source registry.");
+  assert(registry.selectedKeyByFormUpper instanceof window.Map, "Expected global FORM selections in runtime-only state.");
+
+  const outerCandidates = registry.candidatesByFormUpper.get("FRM_OUTER") || [];
+  const innerCandidates = registry.candidatesByFormUpper.get("FRM_INNER") || [];
+  assert.strictEqual(outerCandidates.length, 3, "Expected all three top-level call sites to be indexed.");
+  assert.strictEqual(innerCandidates.length, 6, "Expected two static nested calls under each of three ancestries.");
+  assert.strictEqual(registry.selectedKeyByFormUpper.get("FRM_OUTER"), outerCandidates[0].key);
+  assert.strictEqual(registry.selectedKeyByFormUpper.get("FRM_INNER"), innerCandidates[0].key);
+  assert.deepStrictEqual(Array.from(outerCandidates[0].ancestry || []), []);
+  assert.deepStrictEqual(Array.from(innerCandidates[0].ancestry || []), [outerCandidates[0].key]);
+  assert.strictEqual(outerCandidates[0].lineStart, 7);
+  assert.strictEqual(outerCandidates[0].bindingContext.bySection.USING.length, 2);
+  assert.strictEqual(outerCandidates[0].bindingContext.bySection.USING[0].actualArg.value, "gv_first");
+  assert.strictEqual(outerCandidates[0].bindingContext.bySection.USING[1].actualArg, null);
+  assert.strictEqual(outerCandidates[0].bindingContext.bySection.CHANGING[0].actualArg.value, "gv_change_first");
+
+  const firstNestedPerformId = innerCandidates[0].performId;
+  const sameStaticNestedCandidates = innerCandidates.filter((candidate) => candidate.performId === firstNestedPerformId);
+  assert.strictEqual(sameStaticNestedCandidates.length, 3, "Expected the same static nested call to stay distinct per ancestry.");
+  assert.strictEqual(new Set(sameStaticNestedCandidates.map((candidate) => candidate.key)).size, 3);
+
+  els.rightTabOutputBtn.click();
+  await settleViewerUi(window);
+  const getSourceSelect = (container, formUpper) => container.querySelector(
+    `.perform-source-select[data-perform-form="${formUpper}"]`
+  );
+  const getSourceBadge = (container, formUpper) => container.querySelector(
+    `.perform-source-badge[data-perform-form="${formUpper}"]`
+  );
+  let outputOuterSelect = getSourceSelect(els.output, "FRM_OUTER");
+  assert(outputOuterSelect, "Expected Output PERFORM header source selector.");
+  assert.strictEqual(getSourceBadge(els.output, "FRM_OUTER")?.textContent, "⇄ 3 nguồn");
+  assert.strictEqual(outputOuterSelect.options.length, 3);
+  assert.strictEqual(outputOuterSelect.options[0].textContent, "Nguồn 1/3 · line 7 · USING gv_first · CHANGING gv_change_first");
+  assert.strictEqual(outputOuterSelect.options[1].textContent, "Nguồn 2/3 · line 8 · USING gv_second · CHANGING gv_change_second");
+
+  els.rightTabTemplateBtn.click();
+  await settleViewerUi(window);
+  const templateOuterSelect = getSourceSelect(els.templatePreviewOutput, "FRM_OUTER");
+  assert(templateOuterSelect, "Expected Template PERFORM header source selector.");
+  assert.strictEqual(templateOuterSelect.value, outerCandidates[0].key);
+
+  state.selectedId = String((state.renderObjects || []).find((obj) => obj && obj.objectType === "PERFORM")?.id || "");
+  state.selectedTemplateIndex = "0";
+  els.output.scrollTop = 120;
+  els.templatePreviewOutput.scrollTop = 80;
+
+  outputOuterSelect = getSourceSelect(els.output, "FRM_OUTER");
+  outputOuterSelect.value = outerCandidates[1].key;
+  outputOuterSelect.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await settleViewerUi(window, 10);
+
+  assert.strictEqual(registry.selectedKeyByFormUpper.get("FRM_OUTER"), outerCandidates[1].key);
+  assert.strictEqual(getSourceSelect(els.output, "FRM_OUTER")?.value, outerCandidates[1].key);
+  assert.strictEqual(getSourceSelect(els.templatePreviewOutput, "FRM_OUTER")?.value, outerCandidates[1].key);
+  assert.strictEqual(state.selectedId, String((state.renderObjects || []).find((obj) => obj && obj.objectType === "PERFORM")?.id || ""));
+  assert.strictEqual(state.selectedTemplateIndex, "0");
+  assert(Math.abs(els.output.scrollTop - 120) <= 40, "Expected Output logical viewport anchor to stay near its prior offset.");
+  assert(Math.abs(els.templatePreviewOutput.scrollTop - 80) <= 40, "Expected Template logical viewport anchor to stay near its prior offset.");
+  assert(els.output.querySelector(`.card.selected[data-id="${state.selectedId}"]`), "Expected Output selection anchor to survive rebuild.");
+  assert(els.templatePreviewOutput.querySelector('.template-block.selected[data-template-index="0"]'), "Expected Template selection anchor to survive rebuild.");
+
+  Object.defineProperty(els.output, "clientHeight", { configurable: true, value: 100000 });
+  Object.defineProperty(els.templatePreviewOutput, "clientHeight", { configurable: true, value: 100000 });
+  runtime.api.renderOutput();
+  runtime.api.renderTemplatePreview();
+  await settleViewerUi(window, 8);
+
+  const findDescendant = (root, predicate) => {
+    const queue = root ? [root] : [];
+    while (queue.length) {
+      const current = queue.shift();
+      if (predicate(current)) {
+        return current;
+      }
+      queue.push(...(Array.isArray(current && current.children) ? current.children : []));
+    }
+    return null;
+  };
+  const getBindingNames = (obj, paramName) => {
+    const binding = obj && obj.__abapPerformTraceBinding;
+    const decls = binding && binding.byParamUpper instanceof window.Map
+      ? binding.byParamUpper.get(String(paramName || "").toUpperCase())
+      : [];
+    return Array.from(decls || [], (decl) => String(decl && decl.name || ""));
+  };
+  const outerPerformRoots = (state.renderObjects || []).filter((obj) => (
+    obj && obj.objectType === "PERFORM" && obj.extras?.performCall?.form === "frm_outer"
+  ));
+  assert.strictEqual(outerPerformRoots.length, 3);
+  let firstLocalAssignment = null;
+  let firstMissingAssignment = null;
+  for (const root of outerPerformRoots) {
+    const localAssignment = findDescendant(root, (obj) => String(obj && obj.raw || "").trim() === "lv_local = iv_outer.");
+    const missingAssignment = findDescendant(root, (obj) => String(obj && obj.raw || "").trim() === "iv_missing = iv_outer.");
+    assert(localAssignment && missingAssignment);
+    firstLocalAssignment = firstLocalAssignment || localAssignment;
+    firstMissingAssignment = firstMissingAssignment || missingAssignment;
+    assert.deepStrictEqual(getBindingNames(localAssignment, "iv_outer"), ["gv_second"]);
+    assert.strictEqual(localAssignment.values?.target?.decl?.name, "lv_local", "Expected local DATA to stay local.");
+    assert.deepStrictEqual(getBindingNames(missingAssignment, "iv_missing"), [], "Expected missing actual argument to use local FORM_PARAM fallback.");
+  }
+
+  const findTemplateTable = (obj) => {
+    const idText = `#${String(obj && obj.id || "")}`;
+    const block = Array.from(els.templatePreviewOutput.querySelectorAll(".template-block"))
+      .find((candidate) => String(candidate.querySelector(".template-block-meta")?.textContent || "").includes(idText));
+    return block ? block.querySelector("table.template-preview-table") : null;
+  };
+  const firstLocalCard = els.output.querySelector(`[data-id="${String(firstLocalAssignment.id)}"]`);
+  assert(firstLocalCard && String(firstLocalCard.textContent || "").includes("gv_second"), "Expected Output FORM params to use call-site 2 globally.");
+  assert.deepStrictEqual(getTemplateTableRows(findTemplateTable(firstLocalAssignment)), [
+    ["Đích", "Nguồn"],
+    ["lv_local", "gv_second"]
+  ]);
+  assert.deepStrictEqual(getTemplateTableRows(findTemplateTable(firstMissingAssignment)), [
+    ["Đích", "Nguồn"],
+    ["iv_missing", "gv_second"]
+  ]);
+
+  let activeInnerCandidates = registry.getActiveCandidates("FRM_INNER");
+  assert.strictEqual(activeInnerCandidates.length, 2, "Expected nested selector candidates only from the selected parent branch.");
+  let outputInnerSelect = getSourceSelect(els.output, "FRM_INNER");
+  assert(outputInnerSelect);
+  assert.strictEqual(outputInnerSelect.options.length, 2);
+  outputInnerSelect.value = activeInnerCandidates[1].key;
+  outputInnerSelect.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await settleViewerUi(window, 10);
+  assert.strictEqual(registry.selectedKeyByFormUpper.get("FRM_INNER"), activeInnerCandidates[1].key);
+
+  const currentOuterSelect = getSourceSelect(els.output, "FRM_OUTER");
+  currentOuterSelect.value = outerCandidates[2].key;
+  currentOuterSelect.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await settleViewerUi(window, 10);
+  activeInnerCandidates = registry.getActiveCandidates("FRM_INNER");
+  assert.strictEqual(activeInnerCandidates.length, 2);
+  assert.strictEqual(
+    registry.selectedKeyByFormUpper.get("FRM_INNER"),
+    activeInnerCandidates[0].key,
+    "Expected changing a parent source to reset descendant FORM selection to the new branch default."
+  );
+  const innerClear = findDescendant(
+    (state.renderObjects || []).find((obj) => obj && obj.objectType === "PERFORM" && obj.extras?.performCall?.form === "frm_outer"),
+    (obj) => String(obj && obj.raw || "").trim() === "CLEAR iv_inner."
+  );
+  assert(innerClear);
+  assert.deepStrictEqual(getBindingNames(innerClear, "iv_inner"), ["iv_outer", "gv_third"]);
+  const innerClearCard = els.output.querySelector(`[data-id="${String(innerClear.id)}"]`);
+  assert(innerClearCard && String(innerClearCard.textContent || "").includes("gv_third"), "Expected nested Output bindings to follow the new parent branch.");
+  assert.deepStrictEqual(getTemplateTableRows(findTemplateTable(innerClear)), [["CLEAR", "gv_third"]]);
+
+  const literalRoot = (state.renderObjects || []).find((obj) => obj && obj.extras?.performCall?.form === "frm_literal");
+  const literalClear = findDescendant(literalRoot, (obj) => String(obj && obj.raw || "").trim() === "CLEAR iv_literal.");
+  assert(literalClear);
+  assert.deepStrictEqual(getBindingNames(literalClear, "iv_literal"), [], "Expected literal actual to keep local fallback.");
+
+  const externalRoot = (state.renderObjects || []).find((obj) => obj && obj.extras?.performCall?.program === "zother");
+  assert(externalRoot);
+  assert.strictEqual(Array.isArray(externalRoot.children) ? externalRoot.children.length : 0, 0);
+  const externalCard = els.output.querySelector(`[data-id="${String(externalRoot.id)}"]`);
+  assert(externalCard);
+  assert.strictEqual(getSourceSelect(externalCard, "FRM_EXTERNAL"), null);
+
+  const cycleRoot = (state.renderObjects || []).find((obj) => obj && obj.extras?.performCall?.form === "frm_cycle");
+  const recursivePerform = findDescendant(cycleRoot, (obj) => obj !== cycleRoot && obj?.extras?.performCall?.form === "frm_cycle");
+  assert(recursivePerform, "Expected the recursive call statement itself to remain visible.");
+  assert.strictEqual(Array.isArray(recursivePerform.children) ? recursivePerform.children.length : 0, 0, "Expected cycle guard to stop recursive expansion.");
+
+  assert(!Object.prototype.hasOwnProperty.call(state.data, "performSourceRegistry"));
+  assert(!JSON.stringify(state.data).includes("__abapPerformSource"));
+  assert(!Array.from({ length: window.localStorage.length }, (_, index) => window.localStorage.key(index))
+    .some((key) => /perform.*source/i.test(String(key || ""))), "Expected source selection not to be persisted.");
+
+  els.parseBtn.click();
+  await settleViewerUi(window, 10);
+  assert.notStrictEqual(state.performSourceRegistry, registry, "Expected a new input/render to replace runtime selection state.");
+  assert.strictEqual(state.performSourceRegistry.selectedKeyByFormUpper.get("FRM_OUTER"), state.performSourceRegistry.candidatesByFormUpper.get("FRM_OUTER")[0].key);
 
   dom.window.close();
 }
@@ -3121,6 +3341,9 @@ async function main() {
   }
   if (!focus || focus === "perform-root-trace") {
     await assertExpandedPerformTraceUsesRootDeclarations();
+  }
+  if (!focus || focus === "perform-source-selection") {
+    await assertGlobalPerformSourceSelection();
   }
   if (!focus || focus === "struct-field-finaldesc") {
     await assertStructFieldFinalDescNormalizesParentOnly();

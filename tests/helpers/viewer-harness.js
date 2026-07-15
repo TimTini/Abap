@@ -5,34 +5,31 @@ const path = require("path");
 const { JSDOM } = require("jsdom");
 
 const viewerDir = path.resolve(__dirname, "..", "..", "viewer");
-const indexHtmlPath = path.join(viewerDir, "index.html");
-
-const viewerSourcePartByBundle = new Map([
+const sourceHtmlPath = path.join(viewerDir, "index.html");
+const sourcePartByBundleSrc = new Map([
   ["./app/01-core.js", "./app/core/01-runtime-state.js"],
   ["./app/02-descriptions.js", "./app/descriptions/01-normalize-and-desc.js"],
   ["./app/03-template-preview.js", "./app/template/01-path-resolver.js"],
   ["./app/04-output-render.js", "./app/output/01-output-render.js"]
 ]);
 
-function buildViewerTestHtml() {
-  let html = fs.readFileSync(indexHtmlPath, "utf8");
-  for (const [bundlePath, sourcePartPath] of viewerSourcePartByBundle.entries()) {
-    html = html.replace(`src="${bundlePath}"`, `src="${sourcePartPath}"`);
-  }
-
-  return html.replace(/<script\b([^>]*?)\bsrc=(['"])([^'"]+)\2([^>]*)><\/script>/gi, (
-    block,
-    beforeSrc,
-    quote,
-    sourcePath
-  ) => {
-    if (/^(?:https?:)?\/\//i.test(sourcePath)) {
-      return block;
+function buildViewerHtmlFromSources() {
+  const html = fs.readFileSync(sourceHtmlPath, "utf8");
+  return html.replace(
+    /<script\b([^>]*?)\bsrc=(['"])([^'"]+)\2([^>]*)><\/script>/gi,
+    (block, beforeSrc, quote, rawSrc) => {
+      const sourceSrc = sourcePartByBundleSrc.get(rawSrc) || rawSrc;
+      if (/^(?:https?:)?\/\//i.test(sourceSrc)) {
+        return block;
+      }
+      const scriptPath = path.resolve(viewerDir, sourceSrc);
+      if (!fs.existsSync(scriptPath)) {
+        throw new Error(`Viewer source script not found: ${sourceSrc}`);
+      }
+      const script = fs.readFileSync(scriptPath, "utf8").replace(/<\/script>/gi, "<\\/script>");
+      return `<script>\n// test-inlined from: ${sourceSrc}\n${script}\n</script>`;
     }
-    const absoluteSourcePath = path.resolve(viewerDir, sourcePath);
-    const source = fs.readFileSync(absoluteSourcePath, "utf8").replace(/<\/script>/gi, "<\\/script>");
-    return `<script>\n${source}\n</script>`;
-  });
+  );
 }
 
 function createMatchMediaStub() {
@@ -63,7 +60,7 @@ function setStableElementMetrics(element, metrics) {
 }
 
 async function loadViewerDom() {
-  const html = buildViewerTestHtml();
+  const html = buildViewerHtmlFromSources();
   const dom = new JSDOM(html, {
     url: "https://local.abap-viewer.test/",
     runScripts: "dangerously",

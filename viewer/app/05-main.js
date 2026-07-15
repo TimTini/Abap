@@ -4816,6 +4816,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
   function clearParsedResultAfterFailure(message) {
     state.data = null;
     state.renderObjects = [];
+    state.performSourceRegistry = null;
     state.templatePreviewCache = null;
     state.selectedId = "";
     state.selectedTemplateIndex = "";
@@ -4886,7 +4887,11 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     state.collapsedIds.clear();
     state.selectedId = "";
     state.selectedTemplateIndex = "";
-    state.renderObjects = buildRenderableObjects(state.data && state.data.objects, RENDER_TREE_OPTIONS);
+    state.performSourceRegistry = buildPerformCallPathRegistry(state.data && state.data.objects);
+    state.renderObjects = buildRenderableObjects(state.data && state.data.objects, {
+      ...RENDER_TREE_OPTIONS,
+      performSourceRegistry: state.performSourceRegistry
+    });
     refreshTemplateGuiFilterTypes();
     setError("");
     if (state.rightTab === "output") {

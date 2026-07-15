@@ -4190,6 +4190,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     if (isInteractive) {
       const actions = el("div", { className: "template-block-actions" });
+      const performSourceControl = typeof createPerformSourceControl === "function"
+        ? createPerformSourceControl(obj)
+        : null;
+      if (performSourceControl) {
+        actions.appendChild(performSourceControl);
+      }
       const codeBtn = el("button", {
         className: "secondary",
         text: "Code",

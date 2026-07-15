@@ -77,6 +77,7 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
   const state = {
     data: null,
     renderObjects: [],
+    performSourceRegistry: null,
     inputMode: "abap",
     inputLineCount: 0,
     inputGutterButtonsByLine: new Map(),
