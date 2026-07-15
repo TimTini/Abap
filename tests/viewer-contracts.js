@@ -2627,6 +2627,14 @@ async function assertGlobalPerformSourceSelection() {
   const literalClear = findDescendant(literalRoot, (obj) => String(obj && obj.raw || "").trim() === "CLEAR iv_literal.");
   assert(literalClear);
   assert.deepStrictEqual(getBindingNames(literalClear, "iv_literal"), [], "Expected literal actual to keep local fallback.");
+  const literalCard = els.output.querySelector(`[data-id="${String(literalRoot.id)}"]`);
+  assert(literalCard);
+  assert.strictEqual(
+    getSourceSelect(literalCard, "FRM_LITERAL"),
+    null,
+    "Expected a FORM with only one source not to show a redundant selector."
+  );
+  assert.strictEqual(getSourceBadge(literalCard, "FRM_LITERAL"), null);
 
   const externalRoot = (state.renderObjects || []).find((obj) => obj && obj.extras?.performCall?.program === "zother");
   assert(externalRoot);

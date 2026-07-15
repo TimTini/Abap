@@ -2371,7 +2371,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       return null;
     }
     const candidates = registry.getActiveCandidates(formNameUpper);
-    if (!candidates.length) {
+    if (candidates.length < 2) {
       return null;
     }
     const selected = registry.getSelectedCandidate(formNameUpper) || candidates[0];
