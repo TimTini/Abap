@@ -3464,6 +3464,7 @@ async function assertMessageAndWriteViewerContracts() {
     "MESSAGE 'literal message' TYPE 'I'.",
     "MESSAGE e001.",
     "WRITE AT /lv_column(lv_length) lv_output TO lv_destination NO-GAP CURRENCY lv_currency USING EDIT MASK '==XX'.",
+    "WRITE 5(10) lv_output.",
     "WRITE 'literal output'.",
     ""
   ].join("\n");
@@ -3475,7 +3476,7 @@ async function assertMessageAndWriteViewerContracts() {
   assert(state.templateConfig.templates.WRITE, "Expected an explicit WRITE default template.");
   const renderObjects = Array.isArray(state.renderObjects) ? state.renderObjects : [];
   assert.strictEqual(renderObjects.filter((obj) => obj && obj.objectType === "MESSAGE").length, 3);
-  assert.strictEqual(renderObjects.filter((obj) => obj && obj.objectType === "WRITE").length, 2);
+  assert.strictEqual(renderObjects.filter((obj) => obj && obj.objectType === "WRITE").length, 3);
 
   Object.defineProperty(els.templatePreviewOutput, "clientHeight", {
     configurable: true,
@@ -3489,7 +3490,7 @@ async function assertMessageAndWriteViewerContracts() {
   const messageTables = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="MESSAGE"]'));
   const writeTables = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="WRITE"]'));
   assert.strictEqual(messageTables.length, 3, "Expected dynamic, literal, and static-reference MESSAGE blocks.");
-  assert.strictEqual(writeTables.length, 2, "Expected both WRITE template blocks.");
+  assert.strictEqual(writeTables.length, 3, "Expected positioned, numeric-position, and literal WRITE blocks.");
 
   const messageRows = getTemplateTableRows(messageTables[0]);
   assert(messageRows.some((row) => row.includes("MESSAGE") && row.includes("Message text")), "MESSAGE primary row must map to values.message.");
@@ -3507,6 +3508,12 @@ async function assertMessageAndWriteViewerContracts() {
   assert(writeRows.some((row) => row.includes("NO-GAP")), "Flag formatting must stay visible.");
   assert(writeRows.some((row) => row.includes("CURRENCY") && row.includes("Currency")), "Formatting data operands must retain provenance.");
   assert(writeRows.some((row) => row.includes("USING EDIT MASK") && row.includes("'==XX'")), "Literal format operands must stay visible.");
+  const numericPositionRows = getTemplateTableRows(writeTables[1]);
+  assert(
+    numericPositionRows.some((row) => row.includes("AT") && row.includes("5(10)")),
+    "WRITE with an omitted AT keyword must still render its numeric position."
+  );
+  assert(numericPositionRows.some((row) => row.includes("WRITE") && row.includes("Output value")));
 
   const messageCell = findTemplateCellByText(messageTables[0], "Message text");
   assert(messageCell, "Expected editable MESSAGE primary cell.");
@@ -3531,7 +3538,7 @@ async function assertMessageAndWriteViewerContracts() {
   modal = await openTemplateCellDescriptionTab(window, literalMessageCell);
   assert(modal.querySelector("textarea.template-config-json").disabled, "Literal MESSAGE must stay locked.");
 
-  const literalWriteCell = findTemplateCellByText(writeTables[1], "'literal output'");
+  const literalWriteCell = findTemplateCellByText(writeTables[2], "'literal output'");
   assert.strictEqual(literalWriteCell && literalWriteCell.__templateCellMeta && literalWriteCell.__templateCellMeta.reasonCode, "LITERAL_NO_DECL");
   modal = await openTemplateCellDescriptionTab(window, literalWriteCell);
   assert(modal.querySelector("textarea.template-config-json").disabled, "Literal WRITE output must stay locked.");

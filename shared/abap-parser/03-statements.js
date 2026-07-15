@@ -435,10 +435,18 @@
     if (String(objectType || "").toUpperCase() !== "WRITE" || !extras || !extras.write) {
       return;
     }
-    if (!extras.write.newLine || keywords.at) {
+    const position = extras.write.position && typeof extras.write.position === "object"
+      ? extras.write.position
+      : {};
+    const hasPosition = Boolean(
+      extras.write.newLine
+      || String(position.column || "").trim()
+      || String(position.length || "").trim()
+    );
+    if (!hasPosition || keywords.at) {
       return;
     }
-    keywords.at = { text: "/", label: "at" };
+    keywords.at = { text: extras.write.newLine ? "/" : "AT", label: "at" };
   }
 
   function attachDeclarationRefs({ statements, objects, fileName }) {
