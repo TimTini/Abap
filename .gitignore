@@ -20,6 +20,7 @@ node_modules/
 
 # Local agent runtime files
 # These files change per machine/session and can include prompt previews.
+.worktrees/
 .omx/logs/*.jsonl
 .omx/state/*.json
 .omx/metrics.json
