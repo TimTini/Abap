@@ -125,6 +125,302 @@
     };
   }
 
+  function getCustomValueCodeDesc(values) {
+    const entries = [];
+    if (Array.isArray(values)) {
+      entries.push(...values);
+    } else if (values && typeof values === "object") {
+      for (const entryOrList of Object.values(values)) {
+        if (Array.isArray(entryOrList)) {
+          entries.push(...entryOrList);
+        } else {
+          entries.push(entryOrList);
+        }
+      }
+    }
+    const entry = entries.find((item) => item && typeof item.codeDesc === "string");
+    return entry ? String(entry.codeDesc || "") : "";
+  }
+
+  function replaceCustomCapturedValues(values, entries) {
+    if (!values || typeof values !== "object" || Array.isArray(values)) {
+      return;
+    }
+    for (const key of Object.keys(values)) {
+      delete values[key];
+    }
+    const grouped = groupEntriesByKey(entries, "name");
+    for (const [key, entryOrList] of Object.entries(grouped)) {
+      values[key] = entryOrList;
+    }
+  }
+
+  function makeCustomValueEntry(name, value, label, codeDesc) {
+    const text = String(value === undefined || value === null ? "" : value).trim();
+    if (!text) {
+      return null;
+    }
+    return {
+      name,
+      value: text,
+      label: label || name,
+      userDesc: "",
+      codeDesc: String(codeDesc || "")
+    };
+  }
+
+  function getMessageClauseAt(tokens, index) {
+    const upper = tokens[index] ? String(tokens[index].upper || "") : "";
+    const nextUpper = tokens[index + 1] ? String(tokens[index + 1].upper || "") : "";
+    if (upper === "DISPLAY" && nextUpper === "LIKE") {
+      return { key: "displayLike", length: 2 };
+    }
+    const clauseKeys = {
+      ID: "id",
+      TYPE: "messageType",
+      NUMBER: "number",
+      WITH: "with",
+      INTO: "into",
+      RAISING: "raising"
+    };
+    return clauseKeys[upper] ? { key: clauseKeys[upper], length: 1 } : null;
+  }
+
+  function buildMessageExtras({ raw, values }) {
+    const tokens = tokenize(raw);
+    const codeDesc = getCustomValueCodeDesc(values);
+    const model = {
+      mode: "direct",
+      message: "",
+      id: "",
+      messageType: "",
+      number: "",
+      with: [],
+      displayLike: "",
+      into: "",
+      raising: ""
+    };
+    const valueEntries = [];
+    let index = 1;
+
+    const first = tokens[index] ? String(tokens[index].raw || "").trim() : "";
+    const shorthand = first.match(/^([A-Za-z])(\d{3})\(([^()]+)\)$/);
+    if (shorthand) {
+      model.mode = "shorthand";
+      model.message = first;
+      model.messageType = shorthand[1].toUpperCase();
+      model.number = shorthand[2];
+      model.id = String(shorthand[3] || "").trim();
+      index += 1;
+    } else if (first && !getMessageClauseAt(tokens, index)) {
+      model.message = first;
+      index += 1;
+    } else {
+      model.mode = "id-type-number";
+    }
+
+    while (index < tokens.length) {
+      const clause = getMessageClauseAt(tokens, index);
+      if (!clause) {
+        index += 1;
+        continue;
+      }
+      index += clause.length;
+      if (clause.key === "with") {
+        const operands = [];
+        while (index < tokens.length && !getMessageClauseAt(tokens, index)) {
+          if (operands.length < 4) {
+            operands.push(String(tokens[index].raw || "").trim());
+          }
+          index += 1;
+        }
+        model.with = operands.filter(Boolean).map((value) => ({ value }));
+        continue;
+      }
+      const token = tokens[index];
+      if (token) {
+        model[clause.key] = String(token.raw || "").trim();
+        index += 1;
+      }
+    }
+
+    const addValue = (name, value, label) => {
+      const entry = makeCustomValueEntry(name, value, label, codeDesc);
+      if (entry) {
+        valueEntries.push(entry);
+      }
+    };
+    addValue("message", model.message, "message");
+    addValue("id", model.id, "id");
+    addValue("messageType", model.messageType, "message-type");
+    addValue("number", model.number, "number");
+    addValue("withRaw", model.with.map((entry) => entry.value).join(" "), "with");
+    addValue("displayLike", model.displayLike, "display-like");
+    addValue("into", model.into, "into");
+    addValue("raising", model.raising, "raising");
+    replaceCustomCapturedValues(values, valueEntries);
+
+    return { message: model };
+  }
+
+  function getWriteFormatSpecAt(tokens, index) {
+    const upper = tokens[index] ? String(tokens[index].upper || "") : "";
+    const nextUpper = tokens[index + 1] ? String(tokens[index + 1].upper || "") : "";
+    const thirdUpper = tokens[index + 2] ? String(tokens[index + 2].upper || "") : "";
+    if (upper === "USING" && nextUpper === "EDIT" && thirdUpper === "MASK") {
+      return { keyword: "USING EDIT MASK", keywordLength: 3, hasValue: true };
+    }
+    const flagKeywords = new Set([
+      "NO-GAP",
+      "LEFT-JUSTIFIED",
+      "RIGHT-JUSTIFIED",
+      "CENTERED",
+      "NO-ZERO",
+      "NO-SIGN",
+      "NO-GROUPING"
+    ]);
+    if (flagKeywords.has(upper)) {
+      return { keyword: upper, keywordLength: 1, hasValue: false };
+    }
+    const valueKeywords = new Set(["UNDER", "CURRENCY", "DECIMALS", "EXPONENT", "ROUND", "UNIT"]);
+    return valueKeywords.has(upper)
+      ? { keyword: upper, keywordLength: 1, hasValue: true }
+      : null;
+  }
+
+  function parseWritePositionToken(rawToken) {
+    let text = String(rawToken || "").trim();
+    let newLine = false;
+    if (text.startsWith("/")) {
+      newLine = true;
+      text = text.slice(1).trim();
+    }
+    if (!text) {
+      return { newLine, column: "", length: "" };
+    }
+    const match = text.match(/^([^()]*)?(?:\(([^()]*)\))?$/);
+    if (!match) {
+      return null;
+    }
+    const hasLength = text.includes("(");
+    return {
+      newLine,
+      column: hasLength ? String(match[1] || "").trim() : text,
+      length: hasLength ? String(match[2] || "").trim() : ""
+    };
+  }
+
+  function buildWriteExtras({ raw, values }) {
+    const tokens = tokenize(raw);
+    const codeDesc = getCustomValueCodeDesc(values);
+    const model = {
+      output: "",
+      destination: "",
+      newLine: false,
+      position: { column: "", length: "" },
+      format: []
+    };
+    const valueEntries = [];
+    let index = 1;
+    let sawAt = false;
+    let positionRaw = "";
+
+    if (tokens[index] && tokens[index].upper === "AT") {
+      sawAt = true;
+      index += 1;
+    }
+
+    const firstPositionToken = tokens[index] ? String(tokens[index].raw || "").trim() : "";
+    if (firstPositionToken.startsWith("/")) {
+      const parsed = parseWritePositionToken(firstPositionToken);
+      if (parsed) {
+        model.newLine = parsed.newLine;
+        model.position.column = parsed.column;
+        model.position.length = parsed.length;
+        positionRaw = firstPositionToken;
+        index += 1;
+        if (sawAt && firstPositionToken === "/" && tokens[index]) {
+          const nextTokenStartsClause = tokens[index + 1]
+            && (tokens[index + 1].upper === "TO" || getWriteFormatSpecAt(tokens, index + 1));
+          const hasSeparateOutput = Boolean(tokens[index + 1] && !nextTokenStartsClause);
+          const followingRaw = String(tokens[index].raw || "").trim();
+          const following = hasSeparateOutput ? parseWritePositionToken(followingRaw) : null;
+          if (following) {
+            model.position.column = following.column;
+            model.position.length = following.length;
+            positionRaw = `/${followingRaw}`;
+            index += 1;
+          }
+        }
+      }
+    } else if (sawAt && firstPositionToken) {
+      const parsed = parseWritePositionToken(firstPositionToken);
+      if (parsed) {
+        model.position.column = parsed.column;
+        model.position.length = parsed.length;
+        positionRaw = firstPositionToken;
+        index += 1;
+      }
+    }
+
+    if (tokens[index]) {
+      model.output = String(tokens[index].raw || "").trim();
+      index += 1;
+    }
+
+    const formatRawParts = [];
+    while (index < tokens.length) {
+      if (tokens[index].upper === "TO") {
+        if (tokens[index + 1]) {
+          model.destination = String(tokens[index + 1].raw || "").trim();
+        }
+        index += 2;
+        continue;
+      }
+
+      const spec = getWriteFormatSpecAt(tokens, index);
+      if (!spec) {
+        index += 1;
+        continue;
+      }
+      const rawKeyword = tokens
+        .slice(index, index + spec.keywordLength)
+        .map((token) => token.raw)
+        .join(" ");
+      index += spec.keywordLength;
+      const value = spec.hasValue && tokens[index] ? String(tokens[index].raw || "").trim() : "";
+      if (spec.hasValue && tokens[index]) {
+        index += 1;
+      }
+      model.format.push({ keyword: spec.keyword, value });
+      formatRawParts.push([rawKeyword, value].filter(Boolean).join(" "));
+    }
+
+    const addValue = (name, value, label) => {
+      const entry = makeCustomValueEntry(name, value, label, codeDesc);
+      if (entry) {
+        valueEntries.push(entry);
+      }
+    };
+    addValue("output", model.output, "output");
+    addValue("destination", model.destination, "to");
+    addValue("position", positionRaw, "position");
+    addValue("formatRaw", formatRawParts.join(" "), "format");
+    replaceCustomCapturedValues(values, valueEntries);
+
+    return { write: model };
+  }
+
+  function augmentCustomStatementKeywords(keywords, objectType, extras) {
+    if (String(objectType || "").toUpperCase() !== "WRITE" || !extras || !extras.write) {
+      return;
+    }
+    if (!extras.write.newLine || keywords.at) {
+      return;
+    }
+    keywords.at = { text: "/", label: "at" };
+  }
+
   function attachDeclarationRefs({ statements, objects, fileName }) {
     const allObjects = collectAllObjects(objects);
     const idToObject = new Map(allObjects.filter((obj) => obj && obj.id).map((obj) => [obj.id, obj]));

@@ -123,6 +123,30 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         }
       }
 
+      if (extras.message) {
+        for (const key of ["messageDecl", "idDecl", "messageTypeDecl", "numberDecl", "displayLikeDecl", "intoDecl"]) {
+          addDecl(extras.message[key]);
+        }
+        for (const entry of (Array.isArray(extras.message.with) ? extras.message.with : [])) {
+          addDecl(entry && entry.valueDecl);
+        }
+      }
+
+      if (extras.write) {
+        addDecl(extras.write.outputDecl);
+        addDecl(extras.write.destinationDecl);
+        const position = extras.write.position && typeof extras.write.position === "object"
+          ? extras.write.position
+          : null;
+        if (position) {
+          addDecl(position.columnDecl);
+          addDecl(position.lengthDecl);
+        }
+        for (const entry of (Array.isArray(extras.write.format) ? extras.write.format : [])) {
+          addDecl(entry && entry.valueDecl);
+        }
+      }
+
         collectConditionDeclsFromExtras(extras, addDecl);
       });
     }

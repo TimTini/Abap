@@ -1,0 +1,34 @@
+{
+  "object": "WRITE",
+  "match": { "startKeyword": "WRITE" },
+  "extras": { "type": "write" },
+  "keywordLabels": {
+    "WRITE": "stmt",
+    "AT": "at",
+    "TO": "to",
+    "NO-GAP": "no-gap",
+    "LEFT-JUSTIFIED": "left-justified",
+    "RIGHT-JUSTIFIED": "right-justified",
+    "CENTERED": "centered",
+    "UNDER": "under",
+    "NO-ZERO": "no-zero",
+    "NO-SIGN": "no-sign",
+    "NO-GROUPING": "no-grouping",
+    "CURRENCY": "currency",
+    "DECIMALS": "decimals",
+    "EXPONENT": "exponent",
+    "ROUND": "round",
+    "UNIT": "unit",
+    "USING": "using",
+    "EDIT": "edit",
+    "MASK": "mask"
+  },
+  "keywordPhrases": {
+    "USING EDIT MASK": "using-edit-mask"
+  },
+  "captureRules": [
+    { "after": "WRITE", "name": "output", "label": "output" },
+    { "after": "AT", "name": "position", "label": "position" },
+    { "after": "TO", "name": "destination", "label": "to" }
+  ]
+}

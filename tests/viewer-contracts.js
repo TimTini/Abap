@@ -31,6 +31,7 @@ const STATEMENT_TEMPLATE_KEYS = [
   "FIELD-SYMBOLS",
   "IF",
   "LOOP_AT_ITAB",
+  "MESSAGE",
   "MODIFY_ITAB",
   "MOVE-CORRESPONDING",
   "PARAMETERS",
@@ -40,7 +41,8 @@ const STATEMENT_TEMPLATE_KEYS = [
   "SELECT-OPTIONS",
   "SORT_ITAB",
   "TYPES",
-  "WHEN"
+  "WHEN",
+  "WRITE"
 ];
 
 const VIEWER_CONFIG_SECTION_KEYS = [
@@ -2903,6 +2905,8 @@ async function assertStatementSpecificTwentyCellTemplates() {
     "MOVE-CORRESPONDING ls_row TO lv_b.",
     "CALL FUNCTION 'Z_DEMO' EXPORTING iv_user = p_user IMPORTING ev_text = lv_b.",
     "PERFORM missing_form USING lv_a.",
+    "MESSAGE lv_a TYPE 'I'.",
+    "WRITE lv_a.",
     "SELECT * FROM usr02 INTO TABLE lt_rows WHERE bname = p_user.",
     "DO 1 TIMES.",
     "ENDDO.",
@@ -3370,6 +3374,102 @@ async function assertViewerFixture(fileName) {
   dom.window.close();
 }
 
+async function assertMessageAndWriteViewerContracts() {
+  const source = [
+    "DATA lv_message TYPE string. \"Message text",
+    "DATA lv_first TYPE string. \"First value",
+    "DATA lv_output TYPE string. \"Output value",
+    "DATA lv_destination TYPE string. \"Destination",
+    "DATA lv_column TYPE i. \"Column",
+    "DATA lv_length TYPE i. \"Length",
+    "DATA lv_currency TYPE string. \"Currency",
+    "MESSAGE lv_message TYPE lv_type WITH lv_first 'fixed' DISPLAY LIKE lv_like INTO lv_target RAISING static_error.",
+    "MESSAGE 'literal message' TYPE 'I'.",
+    "WRITE AT /lv_column(lv_length) lv_output TO lv_destination NO-GAP CURRENCY lv_currency USING EDIT MASK '==XX'.",
+    "WRITE 'literal output'.",
+    ""
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+
+  assert(state.templateConfig.templates.MESSAGE, "Expected an explicit MESSAGE default template.");
+  assert(state.templateConfig.templates.WRITE, "Expected an explicit WRITE default template.");
+  const renderObjects = Array.isArray(state.renderObjects) ? state.renderObjects : [];
+  assert.strictEqual(renderObjects.filter((obj) => obj && obj.objectType === "MESSAGE").length, 2);
+  assert.strictEqual(renderObjects.filter((obj) => obj && obj.objectType === "WRITE").length, 2);
+
+  els.rightTabTemplateBtn.click();
+  await settleViewerUi(window);
+
+  const messageTables = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="MESSAGE"]'));
+  const writeTables = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="WRITE"]'));
+  assert.strictEqual(messageTables.length, 2, "Expected both MESSAGE template blocks.");
+  assert.strictEqual(writeTables.length, 2, "Expected both WRITE template blocks.");
+
+  const messageRows = getTemplateTableRows(messageTables[0]);
+  assert(messageRows.some((row) => row.includes("MESSAGE") && row.includes("Message text")), "MESSAGE primary row must map to values.message.");
+  assert(messageRows.some((row) => row.includes("TYPE") && row.includes("lv_type")));
+  assert(messageRows.some((row) => row.includes("WITH") && row.includes("First value")), "WITH operands must expand to editable rows.");
+  assert(messageRows.some((row) => row.includes("WITH") && row.includes("'fixed'")), "Literal WITH operands must remain visible.");
+  assert(messageRows.some((row) => row.includes("DISPLAY LIKE") && row.includes("lv_like")));
+  assert(messageRows.some((row) => row.includes("INTO") && row.includes("lv_target")));
+  assert(messageRows.some((row) => row.includes("RAISING") && row.includes("static_error")));
+
+  const writeRows = getTemplateTableRows(writeTables[0]);
+  assert(writeRows.some((row) => row.includes("WRITE") && row.includes("Output value")), "WRITE primary row must map to values.output.");
+  assert(writeRows.some((row) => row.includes("AT") && row.join(" ").includes("Column") && row.join(" ").includes("Length")), "WRITE position operands must retain both edit targets.");
+  assert(writeRows.some((row) => row.includes("TO") && row.includes("Destination")));
+  assert(writeRows.some((row) => row.includes("NO-GAP")), "Flag formatting must stay visible.");
+  assert(writeRows.some((row) => row.includes("CURRENCY") && row.includes("Currency")), "Formatting data operands must retain provenance.");
+  assert(writeRows.some((row) => row.includes("USING EDIT MASK") && row.includes("'==XX'")), "Literal format operands must stay visible.");
+
+  const messageCell = findTemplateCellByText(messageTables[0], "Message text");
+  assert(messageCell, "Expected editable MESSAGE primary cell.");
+  const messageCandidates = messageCell.__templateCellMeta && messageCell.__templateCellMeta.declCandidates;
+  assert(Array.isArray(messageCandidates) && messageCandidates.length > 0);
+  assert.strictEqual(String(messageCandidates[0].name || ""), "lv_message");
+  const messageDeclKey = window.getDeclOverrideStorageKey(messageCandidates[0]);
+  let modal = await openTemplateCellDescriptionTab(window, messageCell);
+  await saveTemplateCellDescription(window, modal, "Edited message");
+  assert.strictEqual(String(state.descOverrides[messageDeclKey] || ""), "Edited message");
+  assert(String(els.output.textContent || "").includes("Edited message"), "MESSAGE save must refresh Output.");
+  assert(findTemplateCellByText(els.templatePreviewOutput, "Edited message"), "MESSAGE save must refresh Template.");
+
+  const refreshedMessageTable = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="MESSAGE"]'))[0];
+  modal = await openTemplateCellDescriptionTab(window, findTemplateCellByText(refreshedMessageTable, "Edited message"));
+  await saveTemplateCellDescription(window, modal, "");
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(state.descOverrides, messageDeclKey), false);
+  assert(findTemplateCellByText(els.templatePreviewOutput, "Message text"), "MESSAGE clear must restore declaration description.");
+
+  const literalMessageCell = findTemplateCellByText(messageTables[1], "'literal message'");
+  assert.strictEqual(literalMessageCell && literalMessageCell.__templateCellMeta && literalMessageCell.__templateCellMeta.reasonCode, "LITERAL_NO_DECL");
+  modal = await openTemplateCellDescriptionTab(window, literalMessageCell);
+  assert(modal.querySelector("textarea.template-config-json").disabled, "Literal MESSAGE must stay locked.");
+
+  const literalWriteCell = findTemplateCellByText(writeTables[1], "'literal output'");
+  assert.strictEqual(literalWriteCell && literalWriteCell.__templateCellMeta && literalWriteCell.__templateCellMeta.reasonCode, "LITERAL_NO_DECL");
+  modal = await openTemplateCellDescriptionTab(window, literalWriteCell);
+  assert(modal.querySelector("textarea.template-config-json").disabled, "Literal WRITE output must stay locked.");
+
+  const literalWithCell = findTemplateCellByText(messageTables[0], "'fixed'");
+  assert.strictEqual(literalWithCell && literalWithCell.__templateCellMeta && literalWithCell.__templateCellMeta.reasonCode, "LITERAL_NO_DECL");
+  const literalMaskCell = findTemplateCellByText(writeTables[0], "'==XX'");
+  assert.strictEqual(literalMaskCell && literalMaskCell.__templateCellMeta && literalMaskCell.__templateCellMeta.reasonCode, "LITERAL_NO_DECL");
+
+  els.rightTabOutputBtn.click();
+  await settleViewerUi(window);
+  els.output.scrollTop = 2200;
+  els.output.dispatchEvent(new window.Event("scroll"));
+  await settleViewerUi(window, 10);
+  const outputText = String(els.output.textContent || "");
+  assert(outputText.includes("with[1]"), "Output Values must expose each MESSAGE WITH operand.");
+  assert(outputText.includes("format[1].NO-GAP"), "Output Values must expose WRITE formatting rows.");
+  assert(outputText.includes("format[2].CURRENCY"), "Output Values must retain formatting operand provenance.");
+
+  dom.window.close();
+}
+
 async function main() {
   const focus = String(process.argv[2] || "").trim();
   if (!focus || focus === "fixtures") {
@@ -3442,6 +3542,9 @@ async function main() {
     await assertTemplateDirectSchemaPathsStayLocked();
     await assertTemplateFallbackAllowlistCoversExistingItabOperands();
     await assertTemplateResolverWarnsOnceWithCellMetadata();
+  }
+  if (!focus || focus === "message-write") {
+    await assertMessageAndWriteViewerContracts();
   }
   if (!focus || focus === "scroll-navigation") {
     await assertInputPitchAndCodeNavigationUseNativeTextareaMetrics();

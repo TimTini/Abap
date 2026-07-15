@@ -188,6 +188,7 @@
       values,
       commentLines
     });
+    augmentCustomStatementKeywords(keywords, config.object, extras);
     const block = config.block && config.block.endKeyword
       ? {
           endKeyword: config.block.endKeyword,
@@ -278,6 +279,14 @@
 
     if (extrasConfig.type === "deleteItab") {
       return buildDeleteItabExtras(context);
+    }
+
+    if (extrasConfig.type === "message") {
+      return buildMessageExtras(context);
+    }
+
+    if (extrasConfig.type === "write") {
+      return buildWriteExtras(context);
     }
 
     return null;

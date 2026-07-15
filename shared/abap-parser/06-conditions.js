@@ -79,6 +79,17 @@
       if (!entry || !entry.value) {
         return;
       }
+      const objectType = String(context && context.obj && context.obj.objectType || "").toUpperCase();
+      const entryName = String(entry.name || "").trim().toLowerCase();
+      if (objectType === "MESSAGE") {
+        const mode = String(context.obj.extras && context.obj.extras.message && context.obj.extras.message.mode || "");
+        if (entryName === "raising" || entryName === "withraw" || (mode === "shorthand" && ["message", "id", "messagetype", "number"].includes(entryName))) {
+          return;
+        }
+      }
+      if (objectType === "WRITE" && ["position", "formatraw"].includes(entryName)) {
+        return;
+      }
       const ref = extractFirstIdentifierFromExpression(entry.value);
       if (!ref) {
         return;
@@ -153,6 +164,87 @@
 
     if (extras.deleteItab) {
       annotateDeleteItabExtras(extras.deleteItab, context);
+    }
+
+    if (extras.message) {
+      annotateMessageExtras(extras.message, context);
+    }
+
+    if (extras.write) {
+      annotateWriteExtras(extras.write, context);
+    }
+  }
+
+  function annotateScalarDataOperand(container, key, context) {
+    if (!container || typeof container !== "object") {
+      return;
+    }
+    const ref = extractFirstIdentifierFromExpression(container[key]);
+    if (!ref) {
+      return;
+    }
+    container[`${key}Ref`] = ref;
+    const decl = resolveDecl(ref, context);
+    if (decl) {
+      container[`${key}Decl`] = decl;
+    }
+  }
+
+  function annotateMessageExtras(message, context) {
+    if (!message || typeof message !== "object") {
+      return;
+    }
+    if (String(message.mode || "") !== "shorthand") {
+      for (const key of ["message", "id", "messageType", "number"]) {
+        annotateScalarDataOperand(message, key, context);
+      }
+    }
+    for (const key of ["displayLike", "into"]) {
+      annotateScalarDataOperand(message, key, context);
+    }
+    const withValues = Array.isArray(message.with) ? message.with : [];
+    for (const entry of withValues) {
+      if (!entry || typeof entry !== "object") {
+        continue;
+      }
+      const ref = extractFirstIdentifierFromExpression(entry.value);
+      if (!ref) {
+        continue;
+      }
+      entry.valueRef = ref;
+      const decl = resolveDecl(ref, context);
+      if (decl) {
+        entry.valueDecl = decl;
+      }
+    }
+  }
+
+  function annotateWriteExtras(write, context) {
+    if (!write || typeof write !== "object") {
+      return;
+    }
+    for (const key of ["output", "destination"]) {
+      annotateScalarDataOperand(write, key, context);
+    }
+    const position = write.position && typeof write.position === "object" ? write.position : null;
+    if (position) {
+      annotateScalarDataOperand(position, "column", context);
+      annotateScalarDataOperand(position, "length", context);
+    }
+    const format = Array.isArray(write.format) ? write.format : [];
+    for (const entry of format) {
+      if (!entry || typeof entry !== "object") {
+        continue;
+      }
+      const ref = extractFirstIdentifierFromExpression(entry.value);
+      if (!ref) {
+        continue;
+      }
+      entry.valueRef = ref;
+      const decl = resolveDecl(ref, context);
+      if (decl) {
+        entry.valueDecl = decl;
+      }
     }
   }
 
