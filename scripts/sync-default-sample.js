@@ -15,7 +15,7 @@ if (start < 0) {
   throw new Error("SAMPLE_ABAP start not found in viewer/app/core/01-runtime-state.js");
 }
 
-const endMarker = '].join(\\"\\\\n\\");';
+const endMarker = '].join("\\n");';
 const end = runtimeText.indexOf(endMarker, start);
 if (end < 0) {
   throw new Error("SAMPLE_ABAP end marker not found in viewer/app/core/01-runtime-state.js");
@@ -26,20 +26,15 @@ if (lines.length && lines[lines.length - 1] === "") {
   lines.pop();
 }
 
-const innerSnippet = [
+const nextSnippet = [
   "const SAMPLE_ABAP = [",
   ...lines.map((line, index) => `    ${JSON.stringify(line)}${index === lines.length - 1 ? "" : ","}`),
   '  ].join("\\n");'
 ].join("\n");
 
-const embeddedSnippet = innerSnippet
-  .replace(/\\/g, "\\\\")
-  .replace(/"/g, '\\"')
-  .replace(/\r?\n/g, "\\n");
-
 const nextRuntimeText =
   runtimeText.slice(0, start) +
-  embeddedSnippet +
+  nextSnippet +
   runtimeText.slice(end + endMarker.length);
 
 fs.writeFileSync(runtimePath, nextRuntimeText, "utf8");

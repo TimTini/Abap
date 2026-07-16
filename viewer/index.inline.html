@@ -9,9 +9,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.07.15-r56">
-  <meta name="abap-viewer-updated-at" content="2026-07-15 19:53:31">
-  <meta name="abap-viewer-updated-note" content="Selectable PERFORM sources, constant values, grouped config backups, table-body cleanup, and MESSAGE/WRITE parsing.">
+  <meta name="abap-viewer-version" content="v2026.07.16-r58">
+  <meta name="abap-viewer-updated-at" content="2026-07-16 12:50:00">
+  <meta name="abap-viewer-updated-note" content="PERFORM chain desc save writes root only (no shared FORM_PARAM bleed across sources).">
   <title>ABAP Parser Viewer</title>
   <style>
     :root {
@@ -9372,6 +9372,24 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     "  lr_line TYPE REF TO ty_flight. \"Reference tới một dòng flight",
     "",
     "*---------------------------------------------------------------------*",
+    "* CHECK: Description Target vs PERFORM nguồn (manual QA)",
+    "* CASE 1: FORM gọi 1 lần — Description KHÔNG hiện Target (gv/iv cùng chain)",
+    "* CASE 2: DATA local trong FORM — 1 decl, không Target",
+    "* CASE 3: FORM gọi 2 lần — card PERFORM hiện ⇄ 2 nguồn",
+    "* CASE 4: Nested PERFORM + multi nguồn outer",
+    "* CASE 5: Literal — Description khóa",
+    "* CASE 6: IF 2 biến khác nhau — Target left/right nếu cần",
+    "*---------------------------------------------------------------------*",
+    "DATA:",
+    "  gv_chk_once  TYPE string, \"CHK Root once\"",
+    "  gv_chk_a     TYPE string, \"CHK Root A\"",
+    "  gv_chk_b     TYPE string, \"CHK Root B\"",
+    "  gv_chk_n1    TYPE string, \"CHK Nest one\"",
+    "  gv_chk_n2    TYPE string, \"CHK Nest two\"",
+    "  gv_chk_left  TYPE string, \"CHK Left op\"",
+    "  gv_chk_right TYPE string. \"CHK Right op\"",
+    "",
+    "*---------------------------------------------------------------------*",
     "* INITIALIZATION",
     "*---------------------------------------------------------------------*",
     "INITIALIZATION.",
@@ -9422,6 +9440,16 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     "",
     "  PERFORM frm_build_summary.",
     "  PERFORM frm_cleanup_examples.",
+    "",
+    "  \" CHECK: Description Target vs PERFORM nguồn (manual QA)",
+    "  PERFORM frm_chk_once USING gv_chk_once.",
+    "  PERFORM frm_chk_multi USING gv_chk_a.",
+    "  PERFORM frm_chk_multi USING gv_chk_b.",
+    "  PERFORM frm_chk_outer USING gv_chk_n1 gv_chk_n2.",
+    "  PERFORM frm_chk_outer USING gv_chk_n2 gv_chk_n1.",
+    "  PERFORM frm_chk_lit USING 'X'.",
+    "  IF gv_chk_left = gv_chk_right.",
+    "  ENDIF.",
     "",
     "*---------------------------------------------------------------------*",
     "* END-OF-SELECTION",
@@ -10527,6 +10555,32 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     "    WRITE: / lv_log.",
     "  ENDLOOP.",
     "",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* CHECK FORMs: Description Target vs PERFORM nguồn (manual QA)",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_chk_once USING iv_chk_once TYPE string.",
+    "  DATA lv_chk_local TYPE string. \"CHK Local once\"",
+    "  lv_chk_local = iv_chk_once.",
+    "  CLEAR iv_chk_once.",
+    "ENDFORM.",
+    "",
+    "FORM frm_chk_multi USING iv_chk_multi TYPE string.",
+    "  CLEAR iv_chk_multi.",
+    "ENDFORM.",
+    "",
+    "FORM frm_chk_outer USING iv_chk_o1 TYPE string iv_chk_o2 TYPE string.",
+    "  PERFORM frm_chk_inner USING iv_chk_o1 iv_chk_o2.",
+    "ENDFORM.",
+    "",
+    "FORM frm_chk_inner USING iv_chk_i1 TYPE string iv_chk_i2 TYPE string.",
+    "  CLEAR iv_chk_i1.",
+    "  CLEAR iv_chk_i2.",
+    "ENDFORM.",
+    "",
+    "FORM frm_chk_lit USING iv_chk_lit TYPE string.",
+    "  CLEAR iv_chk_lit.",
     "ENDFORM."
   ].join("\n");
 
@@ -18894,17 +18948,15 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
           reasonCode: String(cellMeta.reasonCode || "MISSING_PROVENANCE"),
           sourcePath: String(cellMeta.sourcePath || token),
           declCandidates: modalDeclCandidates,
-          onSaveDesc: ({ decl, text: nextDesc, skipNormalize }) => {
-            if (!decl || typeof decl !== "object") {
-              return { ok: false, error: "Decl target is unavailable." };
-            }
+          onSaveDesc: ({ decl, decls, text: nextDesc, skipNormalize }) => {
             if (typeof getDeclOverrideStorageKey !== "function" || typeof saveDescOverrides !== "function") {
               return { ok: false, error: "Description override helpers are unavailable." };
             }
-            const lookupKeys = getDeclLookupKeysSafe(decl);
-            const declKey = lookupKeys.length ? lookupKeys[0] : getDeclOverrideStorageKey(decl);
-            if (!declKey) {
-              return { ok: false, error: "Decl key is unavailable." };
+            const targetDecls = Array.isArray(decls) && decls.length
+              ? decls.filter((item) => item && typeof item === "object")
+              : (decl && typeof decl === "object" ? [decl] : []);
+            if (!targetDecls.length) {
+              return { ok: false, error: "Decl target is unavailable." };
             }
             const raw = String(nextDesc === undefined || nextDesc === null ? "" : nextDesc);
             const trimmed = raw.trim();
@@ -18914,14 +18966,45 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
               gridRow: Number(cellElement && cellElement.getAttribute("data-template-grid-row")),
               gridCol: Number(cellElement && cellElement.getAttribute("data-template-grid-col"))
             });
-            for (const key of lookupKeys.length ? lookupKeys : [declKey]) {
-              delete state.descOverrides[key];
-              if (state.descOverridesLegacy && typeof state.descOverridesLegacy === "object") {
-                delete state.descOverridesLegacy[key];
+
+            let wroteAnyKey = false;
+            for (const targetDecl of targetDecls) {
+              let lookupKeys = [];
+              let declKey = "";
+              try {
+                lookupKeys = getDeclLookupKeysSafe(targetDecl);
+                declKey = lookupKeys.length
+                  ? lookupKeys[0]
+                  : getDeclOverrideStorageKey(targetDecl);
+              } catch (err) {
+                warnTemplateProvenanceOnce("decl-key", {
+                  objectId: obj && obj.id,
+                  line: obj && obj.lineStart,
+                  template: templateKey,
+                  range: rangeKey,
+                  token,
+                  error: err
+                });
+                continue;
               }
+              if (!declKey) {
+                continue;
+              }
+              for (const key of lookupKeys.length ? lookupKeys : [declKey]) {
+                delete state.descOverrides[key];
+                if (state.descOverridesLegacy && typeof state.descOverridesLegacy === "object") {
+                  delete state.descOverridesLegacy[key];
+                }
+              }
+              if (stored) {
+                state.descOverrides[declKey] = skipNormalize ? { text: stored, noNormalize: true } : stored;
+              }
+              wroteAnyKey = true;
             }
-            if (stored) {
-              state.descOverrides[declKey] = skipNormalize ? { text: stored, noNormalize: true } : stored;
+
+            if (!wroteAnyKey) {
+              state.pendingTemplateViewportAnchor = null;
+              return { ok: false, error: "Decl key is unavailable." };
             }
             const saved = saveDescOverrides();
             if (saved === false) {
@@ -26634,6 +26717,46 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       return raw;
     };
 
+    const isPerformTraceableDeclForModal = (decl) => {
+      if (!decl || typeof decl !== "object") {
+        return false;
+      }
+      const objectType = String(decl.objectType || "").toUpperCase();
+      if (objectType === "FORM_PARAM") {
+        return true;
+      }
+      return objectType === "STRUCT_FIELD"
+        && String(decl.structObjectType || "").toUpperCase() === "FORM_PARAM"
+        && String(decl.structName || "").trim() !== ""
+        && String(decl.fieldPath || "").trim() !== "";
+    };
+
+    // One PERFORM param chain (root + FORM_PARAM[+nested]) — not unrelated left/right operands.
+    const isSinglePerformTraceFamilyCandidates = (candidates) => {
+      const decls = (Array.isArray(candidates) ? candidates : [])
+        .map((candidate) => (candidate && candidate.decl && typeof candidate.decl === "object" ? candidate.decl : null))
+        .filter(Boolean);
+      if (decls.length < 2) {
+        return false;
+      }
+      const formParams = decls.filter(isPerformTraceableDeclForModal);
+      if (!formParams.length) {
+        return false;
+      }
+      const roots = decls.filter((decl) => !isPerformTraceableDeclForModal(decl));
+      if (roots.length > 1) {
+        return false;
+      }
+      return formParams.length + roots.length === decls.length;
+    };
+
+    // Never persist shared FORM_PARAM keys — they collide across multiple PERFORM sources.
+    const getPerformTraceChainSaveDecls = (candidates) => {
+      return (Array.isArray(candidates) ? candidates : [])
+        .map((candidate) => (candidate && candidate.decl && typeof candidate.decl === "object" ? candidate.decl : null))
+        .filter((decl) => decl && !isPerformTraceableDeclForModal(decl));
+    };
+
     const normalizeDeclCandidate = (candidate, index) => {
       if (!candidate || typeof candidate !== "object") {
         return null;
@@ -26754,6 +26877,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     const hasDecl = Boolean(declCandidates.length && onSaveDesc);
+    const applyDescToPerformTraceChain = isSinglePerformTraceFamilyCandidates(declCandidates);
+    const showDeclTargetSelect = hasDecl && declCandidates.length > 1 && !applyDescToPerformTraceChain;
     const modal = openTemplateDynamicModal("Edit Template Cell", { contentClass: "template-runtime-modal-content template-runtime-modal-wide" });
 
     const saveBtn = document.createElement("button");
@@ -26975,7 +27100,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       descInfo.style.marginBottom = "6px";
       tabContent.appendChild(descInfo);
 
-      if (hasDecl && declCandidates.length > 1) {
+      if (showDeclTargetSelect) {
         const selectorLabel = document.createElement("div");
         selectorLabel.className = "muted";
         selectorLabel.style.marginBottom = "4px";
@@ -27324,11 +27449,20 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
             || Boolean(draft.skipNormalize) !== Boolean(draft.initialSkipNormalize)
           );
           if (descChanged) {
+            const chainDecls = applyDescToPerformTraceChain
+              ? getPerformTraceChainSaveDecls(declCandidates)
+              : [];
+            const saveDecl = chainDecls.length
+              ? chainDecls[0]
+              : (selected ? selected.decl : null);
             operations.push({
               label: "description",
               run: () => onSaveDesc({
-                decl: selected ? selected.decl : null,
-                declKey: selected ? selected.declKey : "",
+                decl: saveDecl,
+                decls: chainDecls.length > 1 ? chainDecls : undefined,
+                declKey: saveDecl && typeof getDeclOverrideStorageKey === "function"
+                  ? String(getDeclOverrideStorageKey(saveDecl) || "")
+                  : (selected ? selected.declKey : ""),
                 text: String(draft.text || ""),
                 skipNormalize: Boolean(draft.skipNormalize)
               }),

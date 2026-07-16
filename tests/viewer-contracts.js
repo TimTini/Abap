@@ -1126,7 +1126,7 @@ async function assertTemplateRowDescriptionKeepsNestedPerformTrace() {
   ].join("\n");
   const dom = await renderFixture(source);
   const { window } = dom;
-  const { els } = window.AbapViewerRuntime;
+  const { els, state } = window.AbapViewerRuntime;
 
   els.rightTabTemplateBtn.click();
   await waitForViewerUi(window);
@@ -1134,16 +1134,54 @@ async function assertTemplateRowDescriptionKeepsNestedPerformTrace() {
   const performTables = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="PERFORM"]'));
   let nestedTable = performTables.find((table) => getTemplateTableRows(table).some((row) => row.includes("frm_inner")));
   assert(nestedTable, "Expected the nested PERFORM template table.");
-  let modal = await openTemplateCellDescriptionTab(window, findTemplateCellByText(nestedTable, "Root two"));
-  const targetSelect = modal.querySelector("select");
-  assert(targetSelect, "Expected the traced PERFORM row to expose a target selector.");
-  const targetLabels = Array.from(targetSelect.options, (option) => String(option.textContent || ""));
-  assert(targetLabels[0].includes("gv_root_two"), "Expected the displayed root declaration to be selected first.");
-  assert(targetLabels.some((label) => label.includes("gv_root_two")), "Expected the displayed root declaration to be the first editable trace target.");
-  assert(targetLabels.some((label) => label.includes("iv_outer_two")), "Expected the caller-local FORM_PARAM to remain available in the target list.");
-  assert(!targetLabels.some((label) => label.includes("gv_root_one") || label.includes("iv_outer_one")), "Expected the second PERFORM row not to inherit targets from the first row.");
+  const rootTwoCell = findTemplateCellByText(nestedTable, "Root two");
+  assert(rootTwoCell, "Expected Root two cell in nested PERFORM.");
+  const cellCandidates = rootTwoCell.__templateCellMeta && Array.isArray(rootTwoCell.__templateCellMeta.declCandidates)
+    ? rootTwoCell.__templateCellMeta.declCandidates
+    : [];
+  assert(cellCandidates.length > 1, "Expected the traced PERFORM row to keep the full decl chain in cell meta.");
+  assert(
+    cellCandidates.some((decl) => String(decl && decl.name || "").toLowerCase() === "gv_root_two"),
+    "Expected chain to include gv_root_two."
+  );
+  assert(
+    cellCandidates.some((decl) => String(decl && decl.name || "").toLowerCase() === "iv_outer_two"),
+    "Expected chain to include iv_outer_two."
+  );
+  assert(
+    !cellCandidates.some((decl) => {
+      const name = String(decl && decl.name || "").toLowerCase();
+      return name === "gv_root_one" || name === "iv_outer_one";
+    }),
+    "Expected the second PERFORM row not to inherit targets from the first row."
+  );
+
+  let modal = await openTemplateCellDescriptionTab(window, rootTwoCell);
+  assert(!modal.querySelector("select"), "Expected a single PERFORM call chain not to show Description Target select.");
+  assert(String(modal.textContent || "").includes("gv_root_two"), "Expected Description tab to show the root decl label.");
 
   await saveTemplateCellDescription(window, modal, "Root two edited");
+  const rootTwoDecl = cellCandidates.find((decl) => String(decl && decl.name || "").toLowerCase() === "gv_root_two");
+  const rootTwoKey = window.getDeclOverrideStorageKey(rootTwoDecl);
+  assert(rootTwoKey, "Expected a storage key for gv_root_two.");
+  const storedRoot = state.descOverrides[rootTwoKey];
+  assert.strictEqual(
+    typeof storedRoot === "object" ? String(storedRoot.text || "") : String(storedRoot || ""),
+    "Root two edited",
+    "Expected save to persist the root declaration override."
+  );
+  for (const decl of cellCandidates) {
+    if (String(decl && decl.objectType || "").toUpperCase() !== "FORM_PARAM") {
+      continue;
+    }
+    const formParamKey = window.getDeclOverrideStorageKey(decl);
+    assert.strictEqual(
+      Object.prototype.hasOwnProperty.call(state.descOverrides || {}, formParamKey),
+      false,
+      `Expected FORM_PARAM ${formParamKey} to stay free of shared overrides.`
+    );
+  }
+
   nestedTable = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="PERFORM"]'))
     .find((table) => getTemplateTableRows(table).some((row) => row.includes("frm_inner")));
   assert.deepStrictEqual(getTemplateTableRows(nestedTable), [
@@ -1161,6 +1199,83 @@ async function assertTemplateRowDescriptionKeepsNestedPerformTrace() {
   assert(!String(modal.textContent || "").includes("Khong tim thay decl cho o nay."), "Expected the generic missing-declaration message to be replaced.");
   const literalTextarea = modal.querySelector("textarea.template-config-json");
   assert(literalTextarea && literalTextarea.disabled, "Expected the literal Description textarea to stay disabled.");
+
+  dom.window.close();
+}
+
+async function assertTemplatePerformSourceEditDoesNotBleedAcrossSources() {
+  const source = [
+    'DATA gv_a TYPE string. "Root A"',
+    'DATA gv_b TYPE string. "Root B"',
+    "PERFORM frm_m USING gv_a.",
+    "PERFORM frm_m USING gv_b.",
+    "FORM frm_m USING iv_m TYPE string.",
+    "  CLEAR iv_m.",
+    "ENDFORM."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const registry = state.performSourceRegistry;
+  assert(registry && typeof registry.selectCandidate === "function", "Expected PERFORM source registry.");
+  const candidates = registry.candidatesByFormUpper.get("FRM_M") || [];
+  assert.strictEqual(candidates.length, 2, "Expected two PERFORM sources for frm_m.");
+
+  const findClearChainCell = () => Array.from(els.templatePreviewOutput.querySelectorAll("td")).find((cell) => {
+    const declCandidates = cell && cell.__templateCellMeta && Array.isArray(cell.__templateCellMeta.declCandidates)
+      ? cell.__templateCellMeta.declCandidates
+      : [];
+    return declCandidates.length > 1
+      && declCandidates.some((decl) => String(decl && decl.name || "").toLowerCase() === "iv_m")
+      && declCandidates.some((decl) => String(decl && decl.name || "").toLowerCase() === "gv_a");
+  });
+
+  const clearCell = findClearChainCell();
+  assert(clearCell, "Expected expanded CLEAR cell with gv_a + iv_m chain under source 1.");
+  const modal = await openTemplateCellDescriptionTab(window, clearCell);
+  assert(!modal.querySelector("select.template-config-json"), "Expected no Description Target select for PERFORM chain.");
+  await saveTemplateCellDescription(window, modal, "Edited source A");
+
+  const gvA = (state.data.decls || []).find((decl) => String(decl && decl.name || "").toLowerCase() === "gv_a");
+  const gvB = (state.data.decls || []).find((decl) => String(decl && decl.name || "").toLowerCase() === "gv_b");
+  const ivM = (state.data.decls || []).find((decl) => String(decl && decl.name || "").toLowerCase() === "iv_m");
+  const gvAKey = window.getDeclOverrideStorageKey(gvA);
+  const gvBKey = window.getDeclOverrideStorageKey(gvB);
+  const ivKey = window.getDeclOverrideStorageKey(ivM);
+  assert.strictEqual(String(state.descOverrides[gvAKey] || ""), "Edited source A", "Expected source A root override.");
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(state.descOverrides || {}, gvBKey), false, "Expected source B root to stay untouched.");
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(state.descOverrides || {}, ivKey), false, "Expected shared FORM_PARAM key to stay free of overrides.");
+
+  assert(
+    typeof window.AbapViewerRuntime.api.selectPerformSourceCandidate === "function",
+    "Expected selectPerformSourceCandidate API."
+  );
+  assert(
+    window.AbapViewerRuntime.api.selectPerformSourceCandidate("FRM_M", candidates[1].key),
+    "Expected switch to source 2."
+  );
+  await waitForViewerUi(window);
+
+  const sourceBCell = Array.from(els.templatePreviewOutput.querySelectorAll("td")).find((cell) => {
+    const declCandidates = cell && cell.__templateCellMeta && Array.isArray(cell.__templateCellMeta.declCandidates)
+      ? cell.__templateCellMeta.declCandidates
+      : [];
+    return declCandidates.length > 1
+      && declCandidates.some((decl) => String(decl && decl.name || "").toLowerCase() === "iv_m")
+      && declCandidates.some((decl) => String(decl && decl.name || "").toLowerCase() === "gv_b");
+  });
+  assert(sourceBCell, "Expected expanded CLEAR cell to remap to gv_b after switching source.");
+  if (typeof window.AbapViewerRuntime.api.getEffectiveDeclDesc === "function" && ivM) {
+    assert.notStrictEqual(
+      String(window.AbapViewerRuntime.api.getEffectiveDeclDesc(ivM) || ""),
+      "Edited source A",
+      "Expected shared FORM_PARAM effective desc not to carry source A override."
+    );
+  }
 
   dom.window.close();
 }
@@ -3626,6 +3741,7 @@ async function main() {
   }
   if (!focus || focus === "template-row-description-perform") {
     await assertTemplateRowDescriptionKeepsNestedPerformTrace();
+    await assertTemplatePerformSourceEditDoesNotBleedAcrossSources();
   }
   if (!focus || focus === "template-row-description-condition") {
     await assertTemplateRowDescriptionTargetsExactConditionDecls();

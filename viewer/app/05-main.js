@@ -3354,6 +3354,46 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       return raw;
     };
 
+    const isPerformTraceableDeclForModal = (decl) => {
+      if (!decl || typeof decl !== "object") {
+        return false;
+      }
+      const objectType = String(decl.objectType || "").toUpperCase();
+      if (objectType === "FORM_PARAM") {
+        return true;
+      }
+      return objectType === "STRUCT_FIELD"
+        && String(decl.structObjectType || "").toUpperCase() === "FORM_PARAM"
+        && String(decl.structName || "").trim() !== ""
+        && String(decl.fieldPath || "").trim() !== "";
+    };
+
+    // One PERFORM param chain (root + FORM_PARAM[+nested]) — not unrelated left/right operands.
+    const isSinglePerformTraceFamilyCandidates = (candidates) => {
+      const decls = (Array.isArray(candidates) ? candidates : [])
+        .map((candidate) => (candidate && candidate.decl && typeof candidate.decl === "object" ? candidate.decl : null))
+        .filter(Boolean);
+      if (decls.length < 2) {
+        return false;
+      }
+      const formParams = decls.filter(isPerformTraceableDeclForModal);
+      if (!formParams.length) {
+        return false;
+      }
+      const roots = decls.filter((decl) => !isPerformTraceableDeclForModal(decl));
+      if (roots.length > 1) {
+        return false;
+      }
+      return formParams.length + roots.length === decls.length;
+    };
+
+    // Never persist shared FORM_PARAM keys — they collide across multiple PERFORM sources.
+    const getPerformTraceChainSaveDecls = (candidates) => {
+      return (Array.isArray(candidates) ? candidates : [])
+        .map((candidate) => (candidate && candidate.decl && typeof candidate.decl === "object" ? candidate.decl : null))
+        .filter((decl) => decl && !isPerformTraceableDeclForModal(decl));
+    };
+
     const normalizeDeclCandidate = (candidate, index) => {
       if (!candidate || typeof candidate !== "object") {
         return null;
@@ -3474,6 +3514,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     const hasDecl = Boolean(declCandidates.length && onSaveDesc);
+    const applyDescToPerformTraceChain = isSinglePerformTraceFamilyCandidates(declCandidates);
+    const showDeclTargetSelect = hasDecl && declCandidates.length > 1 && !applyDescToPerformTraceChain;
     const modal = openTemplateDynamicModal("Edit Template Cell", { contentClass: "template-runtime-modal-content template-runtime-modal-wide" });
 
     const saveBtn = document.createElement("button");
@@ -3695,7 +3737,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       descInfo.style.marginBottom = "6px";
       tabContent.appendChild(descInfo);
 
-      if (hasDecl && declCandidates.length > 1) {
+      if (showDeclTargetSelect) {
         const selectorLabel = document.createElement("div");
         selectorLabel.className = "muted";
         selectorLabel.style.marginBottom = "4px";
@@ -4044,11 +4086,20 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
             || Boolean(draft.skipNormalize) !== Boolean(draft.initialSkipNormalize)
           );
           if (descChanged) {
+            const chainDecls = applyDescToPerformTraceChain
+              ? getPerformTraceChainSaveDecls(declCandidates)
+              : [];
+            const saveDecl = chainDecls.length
+              ? chainDecls[0]
+              : (selected ? selected.decl : null);
             operations.push({
               label: "description",
               run: () => onSaveDesc({
-                decl: selected ? selected.decl : null,
-                declKey: selected ? selected.declKey : "",
+                decl: saveDecl,
+                decls: chainDecls.length > 1 ? chainDecls : undefined,
+                declKey: saveDecl && typeof getDeclOverrideStorageKey === "function"
+                  ? String(getDeclOverrideStorageKey(saveDecl) || "")
+                  : (selected ? selected.declKey : ""),
                 text: String(draft.text || ""),
                 skipNormalize: Boolean(draft.skipNormalize)
               }),

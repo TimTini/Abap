@@ -4563,17 +4563,15 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
           reasonCode: String(cellMeta.reasonCode || "MISSING_PROVENANCE"),
           sourcePath: String(cellMeta.sourcePath || token),
           declCandidates: modalDeclCandidates,
-          onSaveDesc: ({ decl, text: nextDesc, skipNormalize }) => {
-            if (!decl || typeof decl !== "object") {
-              return { ok: false, error: "Decl target is unavailable." };
-            }
+          onSaveDesc: ({ decl, decls, text: nextDesc, skipNormalize }) => {
             if (typeof getDeclOverrideStorageKey !== "function" || typeof saveDescOverrides !== "function") {
               return { ok: false, error: "Description override helpers are unavailable." };
             }
-            const lookupKeys = getDeclLookupKeysSafe(decl);
-            const declKey = lookupKeys.length ? lookupKeys[0] : getDeclOverrideStorageKey(decl);
-            if (!declKey) {
-              return { ok: false, error: "Decl key is unavailable." };
+            const targetDecls = Array.isArray(decls) && decls.length
+              ? decls.filter((item) => item && typeof item === "object")
+              : (decl && typeof decl === "object" ? [decl] : []);
+            if (!targetDecls.length) {
+              return { ok: false, error: "Decl target is unavailable." };
             }
             const raw = String(nextDesc === undefined || nextDesc === null ? "" : nextDesc);
             const trimmed = raw.trim();
@@ -4583,14 +4581,45 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
               gridRow: Number(cellElement && cellElement.getAttribute("data-template-grid-row")),
               gridCol: Number(cellElement && cellElement.getAttribute("data-template-grid-col"))
             });
-            for (const key of lookupKeys.length ? lookupKeys : [declKey]) {
-              delete state.descOverrides[key];
-              if (state.descOverridesLegacy && typeof state.descOverridesLegacy === "object") {
-                delete state.descOverridesLegacy[key];
+
+            let wroteAnyKey = false;
+            for (const targetDecl of targetDecls) {
+              let lookupKeys = [];
+              let declKey = "";
+              try {
+                lookupKeys = getDeclLookupKeysSafe(targetDecl);
+                declKey = lookupKeys.length
+                  ? lookupKeys[0]
+                  : getDeclOverrideStorageKey(targetDecl);
+              } catch (err) {
+                warnTemplateProvenanceOnce("decl-key", {
+                  objectId: obj && obj.id,
+                  line: obj && obj.lineStart,
+                  template: templateKey,
+                  range: rangeKey,
+                  token,
+                  error: err
+                });
+                continue;
               }
+              if (!declKey) {
+                continue;
+              }
+              for (const key of lookupKeys.length ? lookupKeys : [declKey]) {
+                delete state.descOverrides[key];
+                if (state.descOverridesLegacy && typeof state.descOverridesLegacy === "object") {
+                  delete state.descOverridesLegacy[key];
+                }
+              }
+              if (stored) {
+                state.descOverrides[declKey] = skipNormalize ? { text: stored, noNormalize: true } : stored;
+              }
+              wroteAnyKey = true;
             }
-            if (stored) {
-              state.descOverrides[declKey] = skipNormalize ? { text: stored, noNormalize: true } : stored;
+
+            if (!wroteAnyKey) {
+              state.pendingTemplateViewportAnchor = null;
+              return { ok: false, error: "Decl key is unavailable." };
             }
             const saved = saveDescOverrides();
             if (saved === false) {
