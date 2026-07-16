@@ -2040,6 +2040,134 @@ async function assertTemplateAppendDeclaredOperandsPreferRealDeclarations() {
   dom.window.close();
 }
 
+async function assertTemplateMultiSelectionAndClipboardSpacing() {
+  const source = Array.from({ length: 45 }, (_, index) => `WRITE / 'Row ${String(index + 1).padStart(2, "0")}'.`)
+    .join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  assert(els.templateCopySelectedBtn, "Expected Copy Selected toolbar button.");
+  assert.strictEqual(els.templateCopySelectedBtn.disabled, true);
+  assert.strictEqual(els.templateCopySelectedBtn.textContent.trim(), "Copy Selected (0)");
+
+  const ensureBlock = async (index) => {
+    assert.strictEqual(typeof runtime.api.ensureTemplateWindowContainsIndex, "function");
+    runtime.api.ensureTemplateWindowContainsIndex(index);
+    await waitForViewerUi(window);
+    const block = els.templatePreviewOutput.querySelector(`.template-block[data-template-index="${index}"]`);
+    assert(block, `Expected virtual Template block ${index}.`);
+    return block;
+  };
+  const clickBlock = async (index, modifiers) => {
+    const block = await ensureBlock(index);
+    block.dispatchEvent(new window.MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      ...(modifiers || {})
+    }));
+    await waitForViewerUi(window);
+  };
+  const selectedIndexes = () => Array.from(state.selectedTemplateIndexes || [])
+    .map(String)
+    .sort((left, right) => Number(left) - Number(right));
+
+  await clickBlock(1);
+  assert.deepStrictEqual(selectedIndexes(), ["1"]);
+  assert.strictEqual(state.selectedTemplateIndex, "1");
+
+  await clickBlock(3, { ctrlKey: true });
+  assert.deepStrictEqual(selectedIndexes(), ["1", "3"]);
+
+  await clickBlock(5, { shiftKey: true });
+  assert.deepStrictEqual(selectedIndexes(), ["3", "4", "5"]);
+
+  await clickBlock(7, { ctrlKey: true, shiftKey: true });
+  assert.deepStrictEqual(selectedIndexes(), ["3", "4", "5", "6", "7"]);
+
+  await clickBlock(5, { ctrlKey: true });
+  assert.deepStrictEqual(selectedIndexes(), ["3", "4", "6", "7"]);
+
+  await clickBlock(30, { ctrlKey: true });
+  assert.deepStrictEqual(selectedIndexes(), ["3", "4", "6", "7", "30"]);
+  let block = await ensureBlock(30);
+  assert(block.classList.contains("selected"), "Expected offscreen selection to restore after virtual rerender.");
+  assert.strictEqual(block.getAttribute("aria-selected"), "true");
+
+  block = await ensureBlock(5);
+  assert(!block.classList.contains("selected"), "Expected toggled-off block to stay unselected after virtual rerender.");
+  assert.strictEqual(block.getAttribute("aria-selected"), "false");
+
+  assert.strictEqual(els.templateCopySelectedBtn.disabled, false);
+  assert.strictEqual(els.templateCopySelectedBtn.textContent.trim(), "Copy Selected (5)");
+
+  const selectionBeforeRerender = selectedIndexes();
+  runtime.api.renderTemplatePreview();
+  await waitForViewerUi(window);
+  assert.deepStrictEqual(selectedIndexes(), selectionBeforeRerender, "Expected config rerender to preserve valid selected indexes.");
+
+  window.__clipboardWrites.length = 0;
+  els.templateCopySelectedBtn.click();
+  await waitForViewerUi(window);
+  const selectedClipboard = window.__clipboardWrites[window.__clipboardWrites.length - 1];
+  assert(selectedClipboard && selectedClipboard.type === "text", "Expected Copy Selected clipboard write.");
+  const selectedText = selectedClipboard.text;
+  for (const expected of ["Row 04", "Row 05", "Row 07", "Row 08", "Row 31"]) {
+    assert(selectedText.includes(expected), `Expected selected clipboard text to include ${expected}.`);
+  }
+  assert(!selectedText.includes("Row 06"), "Expected toggled-off template not to be copied.");
+  assert(
+    selectedText.indexOf("Row 04") < selectedText.indexOf("Row 31"),
+    "Expected clipboard order to follow document order, not click order."
+  );
+
+  const virtual = state.templateVirtual;
+  const config = virtual.config;
+  assert.strictEqual(typeof runtime.api.buildTemplateCollectionCopyPayload, "function");
+  const tablePayload = runtime.api.buildTemplateCollectionCopyPayload(virtual.items, [30, 3, 7], config, true);
+  const tableHost = window.document.createElement("div");
+  tableHost.innerHTML = tablePayload.html;
+  assert.strictEqual(tableHost.querySelectorAll("table").length, 1, "Expected one combined table for Excel paste.");
+  assert.strictEqual(tableHost.querySelectorAll("tr[data-template-spacer]").length, 2, "Expected N-1 spacer rows.");
+  assert(!tableHost.querySelector("tr:last-child").hasAttribute("data-template-spacer"), "Expected no trailing spacer row.");
+  assert.strictEqual(tablePayload.text.split("\n\n").length, 3, "Expected one blank plain-text line between templates.");
+
+  const singlePayload = runtime.api.buildTemplateCollectionCopyPayload(virtual.items, [3], config, true);
+  const singleHost = window.document.createElement("div");
+  singleHost.innerHTML = singlePayload.html;
+  assert.strictEqual(singleHost.querySelectorAll("tr[data-template-spacer]").length, 0);
+
+  const fullPayload = runtime.api.buildTemplateCollectionCopyPayload(virtual.items, [3, 7, 30], config, false);
+  const fullHost = window.document.createElement("div");
+  fullHost.innerHTML = fullPayload.html;
+  assert.strictEqual(fullHost.querySelectorAll("[data-template-spacer]").length, 2, "Expected one full-block separator node between templates.");
+  assert(!fullHost.lastElementChild.hasAttribute("data-template-spacer"), "Expected no trailing full-block separator.");
+
+  const allIndexes = virtual.items.map((_, index) => index);
+  const allPayload = runtime.api.buildTemplateCollectionCopyPayload(virtual.items, allIndexes, config, true);
+  const allHost = window.document.createElement("div");
+  allHost.innerHTML = allPayload.html;
+  assert.strictEqual(allHost.querySelectorAll("tr[data-template-spacer]").length, virtual.items.length - 1, "Expected Copy All builder to use the same spacing rule.");
+
+  window.__clipboardWrites.length = 0;
+  els.templateCopyAllBtn.click();
+  await waitForViewerUi(window);
+  const allClipboard = window.__clipboardWrites[window.__clipboardWrites.length - 1];
+  assert(allClipboard && allClipboard.text.includes("Row 01") && allClipboard.text.includes("Row 45"), "Expected Copy All to use the shared collection builder.");
+
+  els.parseBtn.click();
+  await waitForViewerUi(window);
+  assert.deepStrictEqual(selectedIndexes(), [], "Expected reparse to clear multi-selection.");
+  assert.strictEqual(state.selectedTemplateIndex, "");
+  assert.strictEqual(els.templateCopySelectedBtn.disabled, true);
+
+  dom.window.close();
+}
+
 async function assertAppendVariantsExposeStableExtrasAndDedicatedTemplate() {
   const source = [
     'DATA ls_row TYPE i. "Flight row',
@@ -2790,6 +2918,8 @@ async function assertGlobalPerformSourceSelection() {
 
   state.selectedId = String((state.renderObjects || []).find((obj) => obj && obj.objectType === "PERFORM")?.id || "");
   state.selectedTemplateIndex = "0";
+  state.selectedTemplateIndexes = new window.Set(["0", "2"]);
+  state.templateSelectionAnchorIndex = "2";
   els.output.scrollTop = 120;
   els.templatePreviewOutput.scrollTop = 80;
 
@@ -2803,10 +2933,12 @@ async function assertGlobalPerformSourceSelection() {
   assert.strictEqual(getSourceSelect(els.templatePreviewOutput, "FRM_OUTER")?.value, outerCandidates[1].key);
   assert.strictEqual(state.selectedId, String((state.renderObjects || []).find((obj) => obj && obj.objectType === "PERFORM")?.id || ""));
   assert.strictEqual(state.selectedTemplateIndex, "0");
+  assert.deepStrictEqual(Array.from(state.selectedTemplateIndexes).sort(), ["0", "2"], "Expected source switching to preserve multi-selection.");
   assert(Math.abs(els.output.scrollTop - 120) <= 40, "Expected Output logical viewport anchor to stay near its prior offset.");
   assert(Math.abs(els.templatePreviewOutput.scrollTop - 80) <= 40, "Expected Template logical viewport anchor to stay near its prior offset.");
   assert(els.output.querySelector(`.card.selected[data-id="${state.selectedId}"]`), "Expected Output selection anchor to survive rebuild.");
   assert(els.templatePreviewOutput.querySelector('.template-block.selected[data-template-index="0"]'), "Expected Template selection anchor to survive rebuild.");
+  assert(els.templatePreviewOutput.querySelector('.template-block.selected[data-template-index="2"]'), "Expected secondary Template selection to survive rebuild.");
 
   Object.defineProperty(els.output, "clientHeight", { configurable: true, value: 100000 });
   Object.defineProperty(els.templatePreviewOutput, "clientHeight", { configurable: true, value: 100000 });
@@ -3883,6 +4015,9 @@ async function main() {
   }
   if (!focus || focus === "append-variants") {
     await assertAppendVariantsExposeStableExtrasAndDedicatedTemplate();
+  }
+  if (!focus || focus === "template-multi-select") {
+    await assertTemplateMultiSelectionAndClipboardSpacing();
   }
   if (!focus || focus === "message-write") {
     await assertMessageAndWriteViewerContracts();

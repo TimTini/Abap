@@ -275,38 +275,181 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
   }
 
-  function setSelectedTemplateBlock(index, options) {
+  function getSelectedTemplateIndexSet() {
+    if (!(state.selectedTemplateIndexes instanceof Set)) {
+      state.selectedTemplateIndexes = new Set(Array.isArray(state.selectedTemplateIndexes)
+        ? state.selectedTemplateIndexes.map(String)
+        : []);
+    }
+    return state.selectedTemplateIndexes;
+  }
+
+  function getSortedSelectedTemplateIndexes() {
+    return Array.from(getSelectedTemplateIndexSet())
+      .map((value) => String(value || "").trim())
+      .filter((value) => /^\d+$/.test(value))
+      .sort((left, right) => Number(left) - Number(right));
+  }
+
+  function updateTemplateCopySelectedButton() {
+    if (!els.templateCopySelectedBtn) {
+      return;
+    }
+    const count = getSelectedTemplateIndexSet().size;
+    els.templateCopySelectedBtn.textContent = `Copy Selected (${count})`;
+    els.templateCopySelectedBtn.disabled = count === 0;
+  }
+
+  function syncRenderedTemplateSelection() {
     if (!els.templatePreviewOutput) {
+      updateTemplateCopySelectedButton();
       return;
     }
-
-    const opts = options && typeof options === "object" ? options : {};
-    const shouldScroll = opts.scroll !== false;
-    const scrollMode = String(opts.scrollMode || "start").toLowerCase();
-    const normalized = String(index === undefined || index === null ? "" : index).trim();
-    if (!normalized) {
-      return;
+    const selectedIndexes = getSelectedTemplateIndexSet();
+    for (const block of Array.from(els.templatePreviewOutput.querySelectorAll(".template-block[data-template-index]"))) {
+      const indexText = String(block.getAttribute("data-template-index") || "");
+      const selected = selectedIndexes.has(indexText);
+      block.classList.toggle("selected", selected);
+      block.setAttribute("aria-selected", selected ? "true" : "false");
     }
+    updateTemplateCopySelectedButton();
+  }
 
-    if (state.selectedTemplateIndex !== "") {
-      const prev = els.templatePreviewOutput.querySelector(
-        `.template-block[data-template-index="${escapeSelectorValue(state.selectedTemplateIndex)}"]`
-      );
-      if (prev) {
-        prev.classList.remove("selected");
+  function clearTemplateBlockSelection() {
+    getSelectedTemplateIndexSet().clear();
+    state.selectedTemplateIndex = "";
+    state.templateSelectionAnchorIndex = "";
+    syncRenderedTemplateSelection();
+  }
+
+  function pruneTemplateBlockSelection(itemCount) {
+    const total = Math.max(0, Number(itemCount) || 0);
+    const selectedIndexes = getSelectedTemplateIndexSet();
+    const primary = String(state.selectedTemplateIndex || "").trim();
+    if (!selectedIndexes.size && /^\d+$/.test(primary) && Number(primary) < total) {
+      selectedIndexes.add(primary);
+    }
+    for (const indexText of Array.from(selectedIndexes)) {
+      if (!/^\d+$/.test(indexText) || Number(indexText) < 0 || Number(indexText) >= total) {
+        selectedIndexes.delete(indexText);
       }
     }
+    if (!selectedIndexes.has(primary)) {
+      state.selectedTemplateIndex = getSortedSelectedTemplateIndexes()[0] || "";
+    }
+    const anchor = String(state.templateSelectionAnchorIndex || "").trim();
+    if (!/^\d+$/.test(anchor) || Number(anchor) < 0 || Number(anchor) >= total) {
+      state.templateSelectionAnchorIndex = "";
+    }
+    syncRenderedTemplateSelection();
+  }
 
-    state.selectedTemplateIndex = normalized;
-    const next = els.templatePreviewOutput.querySelector(
+  function chooseNearestSelectedTemplateIndex(targetIndex) {
+    const target = Number(targetIndex);
+    const indexes = getSortedSelectedTemplateIndexes();
+    indexes.sort((left, right) => {
+      const leftDistance = Math.abs(Number(left) - target);
+      const rightDistance = Math.abs(Number(right) - target);
+      return leftDistance === rightDistance ? Number(left) - Number(right) : leftDistance - rightDistance;
+    });
+    return indexes[0] || "";
+  }
+
+  function updateTemplateBlockSelection(index, options) {
+    if (!els.templatePreviewOutput) {
+      return false;
+    }
+    const opts = options && typeof options === "object" ? options : {};
+    const normalized = String(index === undefined || index === null ? "" : index).trim();
+    if (!/^\d+$/.test(normalized)) {
+      return false;
+    }
+    const targetIndex = Number(normalized);
+    const selectedIndexes = getSelectedTemplateIndexSet();
+    const event = opts.event && typeof opts.event === "object" ? opts.event : null;
+    const useInteractionModifiers = opts.interactionMode === "event";
+    const additive = useInteractionModifiers && Boolean(event && (event.ctrlKey || event.metaKey));
+    const ranged = useInteractionModifiers && Boolean(event && event.shiftKey);
+
+    if (ranged) {
+      const primary = String(state.selectedTemplateIndex || "").trim();
+      const anchorText = /^\d+$/.test(String(state.templateSelectionAnchorIndex || ""))
+        ? String(state.templateSelectionAnchorIndex)
+        : (/^\d+$/.test(primary) ? primary : normalized);
+      const anchorIndex = Number(anchorText);
+      if (!additive) {
+        selectedIndexes.clear();
+      }
+      const start = Math.min(anchorIndex, targetIndex);
+      const end = Math.max(anchorIndex, targetIndex);
+      for (let current = start; current <= end; current += 1) {
+        selectedIndexes.add(String(current));
+      }
+      state.selectedTemplateIndex = normalized;
+      state.templateSelectionAnchorIndex = anchorText;
+    } else if (additive) {
+      if (selectedIndexes.has(normalized)) {
+        selectedIndexes.delete(normalized);
+        if (state.selectedTemplateIndex === normalized) {
+          state.selectedTemplateIndex = chooseNearestSelectedTemplateIndex(targetIndex);
+        }
+      } else {
+        selectedIndexes.add(normalized);
+        state.selectedTemplateIndex = normalized;
+      }
+      state.templateSelectionAnchorIndex = normalized;
+    } else {
+      selectedIndexes.clear();
+      selectedIndexes.add(normalized);
+      state.selectedTemplateIndex = normalized;
+      state.templateSelectionAnchorIndex = normalized;
+    }
+
+    const shouldEnsure = opts.ensure !== false;
+    let next = els.templatePreviewOutput.querySelector(
       `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`
     );
-    if (next) {
-      next.classList.add("selected");
-      if (shouldScroll) {
+    if (!next && shouldEnsure && typeof ensureTemplateWindowContainsIndex === "function") {
+      ensureTemplateWindowContainsIndex(targetIndex);
+      next = els.templatePreviewOutput.querySelector(
+        `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`
+      );
+    }
+    syncRenderedTemplateSelection();
+
+    if (next && opts.scroll !== false) {
+      const scrollMode = String(opts.scrollMode || "start").toLowerCase();
+      const virtual = typeof getTemplateVirtualStateForOutput === "function"
+        ? getTemplateVirtualStateForOutput()
+        : null;
+      if (scrollMode === "start" && virtual && virtual.isInitialized && typeof alignVirtualTargetAfterRender === "function") {
+        alignVirtualTargetAfterRender(
+          els.templatePreviewOutput,
+          virtual,
+          `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`,
+          next
+        );
+      } else {
         scrollElementInContainer(els.templatePreviewOutput, next, { mode: scrollMode, padTop: 10, padBottom: 10 });
       }
     }
+    return true;
+  }
+
+  function selectTemplateBlockFromInteraction(index, event) {
+    return updateTemplateBlockSelection(index, {
+      interactionMode: "event",
+      event,
+      scroll: false,
+      ensure: false
+    });
+  }
+
+  function setSelectedTemplateBlock(index, options) {
+    return updateTemplateBlockSelection(index, {
+      ...(options && typeof options === "object" ? options : {}),
+      interactionMode: "replace"
+    });
   }
 
   function setSelectedDeclRow(declKey) {
@@ -3147,58 +3290,10 @@ function resetOutputVirtualState() {
   }
 
   function setSelectedTemplateBlock(index, options) {
-    if (!els.templatePreviewOutput) {
-      return;
-    }
-
-    const opts = options && typeof options === "object" ? options : {};
-    const shouldScroll = opts.scroll !== false;
-    const shouldEnsure = opts.ensure !== false;
-    const scrollMode = String(opts.scrollMode || "start").toLowerCase();
-    const normalized = String(index === undefined || index === null ? "" : index).trim();
-    if (!normalized) {
-      return;
-    }
-
-    if (state.selectedTemplateIndex !== "") {
-      const prev = els.templatePreviewOutput.querySelector(
-        `.template-block[data-template-index="${escapeSelectorValue(state.selectedTemplateIndex)}"]`
-      );
-      if (prev) {
-        prev.classList.remove("selected");
-      }
-    }
-
-    state.selectedTemplateIndex = normalized;
-    let next = els.templatePreviewOutput.querySelector(
-      `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`
-    );
-    if (!next && shouldEnsure && typeof ensureTemplateWindowContainsIndex === "function") {
-      const targetIndex = Number(normalized);
-      if (Number.isFinite(targetIndex)) {
-        ensureTemplateWindowContainsIndex(targetIndex);
-        next = els.templatePreviewOutput.querySelector(
-          `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`
-        );
-      }
-    }
-
-    if (next) {
-      next.classList.add("selected");
-      if (shouldScroll) {
-        const virtual = getTemplateVirtualStateForOutput();
-        if (scrollMode === "start" && virtual.isInitialized) {
-          alignVirtualTargetAfterRender(
-            els.templatePreviewOutput,
-            virtual,
-            `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`,
-            next
-          );
-        } else {
-          scrollElementInContainer(els.templatePreviewOutput, next, { mode: scrollMode, padTop: 10, padBottom: 10 });
-        }
-      }
-    }
+    return updateTemplateBlockSelection(index, {
+      ...(options && typeof options === "object" ? options : {}),
+      interactionMode: "replace"
+    });
   }
 
   function getInputGutterLineHeightPx() {
@@ -3567,6 +3662,9 @@ window.AbapViewerModules.factories["04-output-render"] = function registerOutput
   targetRuntime.api = targetRuntime.api || {};
   targetRuntime.api.renderOutput = renderOutput;
   targetRuntime.api.setRightTab = setRightTab;
+  targetRuntime.api.selectTemplateBlockFromInteraction = selectTemplateBlockFromInteraction;
+  targetRuntime.api.getSelectedTemplateIndexes = getSortedSelectedTemplateIndexes;
+  targetRuntime.api.clearTemplateBlockSelection = clearTemplateBlockSelection;
   window.AbapViewerModules.parts["04-output-render"] = true;
 };
 window.AbapViewerModules.factories["04-output-render"](window.AbapViewerRuntime);

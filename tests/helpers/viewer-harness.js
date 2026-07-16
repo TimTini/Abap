@@ -112,9 +112,14 @@ async function loadViewerDom() {
       window.prompt = () => "";
       window.URL.createObjectURL = () => "blob:local";
       window.URL.revokeObjectURL = () => {};
+      window.__clipboardWrites = [];
       window.navigator.clipboard = {
-        writeText: async () => {},
-        write: async () => {}
+        writeText: async (text) => {
+          window.__clipboardWrites.push({ type: "text", text: String(text || "") });
+        },
+        write: async (items) => {
+          window.__clipboardWrites.push({ type: "items", items });
+        }
       };
       if (window.HTMLElement && window.HTMLElement.prototype) {
         window.HTMLElement.prototype.scrollIntoView = function scrollIntoView() {};

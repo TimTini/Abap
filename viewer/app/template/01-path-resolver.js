@@ -4003,8 +4003,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     els.templatePreviewOutput.classList.remove("muted");
     els.templatePreviewOutput.replaceChildren(fragment);
     state.templatePreviewCache = { count: items.length };
-    if (state.selectedTemplateIndex !== "" && typeof setSelectedTemplateBlock === "function") {
-      setSelectedTemplateBlock(state.selectedTemplateIndex, { scroll: false });
+    if (typeof syncRenderedTemplateSelection === "function") {
+      syncRenderedTemplateSelection();
     }
     if (typeof refreshInputGutterTargets === "function") {
       refreshInputGutterTargets();
@@ -4275,8 +4275,15 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const indexText = String(absIndex);
     const templateContextObj = buildTemplateContextObject(obj, absIndex + 1);
     const resolved = resolveTemplateMapForObject(obj, config);
-    const selected = state.selectedTemplateIndex !== "" && state.selectedTemplateIndex === indexText;
-    const blockAttrs = { "data-template-index": indexText, "data-depth": String(depth) };
+    const selectedIndexes = typeof getSelectedTemplateIndexSet === "function"
+      ? getSelectedTemplateIndexSet()
+      : new Set(state.selectedTemplateIndex !== "" ? [String(state.selectedTemplateIndex)] : []);
+    const selected = selectedIndexes.has(indexText);
+    const blockAttrs = {
+      "data-template-index": indexText,
+      "data-depth": String(depth),
+      "aria-selected": selected ? "true" : "false"
+    };
     if (lineStart > 0) {
       blockAttrs["data-line-start"] = String(lineStart);
     }
@@ -4310,7 +4317,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         text: "Code",
         attrs: { type: "button", "data-template-action": "code" }
       });
-      codeBtn.addEventListener("click", () => {
+      codeBtn.addEventListener("click", (ev) => {
+        if (ev && typeof ev.stopPropagation === "function") {
+          ev.stopPropagation();
+        }
         if (typeof setSelectedTemplateBlock === "function") {
           setSelectedTemplateBlock(indexText);
         } else {
@@ -4341,7 +4351,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         text: "Copy",
         attrs: { type: "button", "data-template-action": "copy" }
       });
-      copyBtn.addEventListener("click", async () => {
+      copyBtn.addEventListener("click", async (ev) => {
+        if (ev && typeof ev.stopPropagation === "function") {
+          ev.stopPropagation();
+        }
         try {
           const payload = buildTemplateCopyPayloadFromBlock(block);
           if (!payload.node) {
@@ -4357,8 +4370,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       actions.appendChild(copyBtn);
       header.appendChild(actions);
 
-      block.addEventListener("click", () => {
-        if (typeof setSelectedTemplateBlock === "function") {
+      block.addEventListener("click", (ev) => {
+        if (typeof selectTemplateBlockFromInteraction === "function") {
+          selectTemplateBlockFromInteraction(indexText, ev);
+        } else if (typeof setSelectedTemplateBlock === "function") {
           setSelectedTemplateBlock(indexText, { scroll: false });
         } else {
           state.selectedTemplateIndex = indexText;
@@ -4715,6 +4730,83 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     };
   }
 
+  function normalizeTemplateCopyIndexes(indexes, itemCount) {
+    const total = Math.max(0, Number(itemCount) || 0);
+    return Array.from(new Set((Array.isArray(indexes) ? indexes : [])
+      .map((value) => Number(value))
+      .filter((value) => Number.isInteger(value) && value >= 0 && value < total)))
+      .sort((left, right) => left - right);
+  }
+
+  function buildTemplateCollectionCopyPayload(items, indexes, config, tableOnly) {
+    const sourceItems = Array.isArray(items) ? items : [];
+    const orderedIndexes = normalizeTemplateCopyIndexes(indexes, sourceItems.length);
+    const payloads = [];
+    for (const index of orderedIndexes) {
+      const payload = buildTemplateBlockCopyPayload(sourceItems[index], index, config, Boolean(tableOnly));
+      if (payload && payload.node) {
+        payloads.push(payload);
+      }
+    }
+
+    if (!payloads.length) {
+      return { node: null, html: "", text: "", count: 0, spacerCount: 0 };
+    }
+
+    const plainText = payloads.map((payload) => String(payload.text || "").trim()).join("\n\n");
+    if (tableOnly) {
+      const combinedTable = payloads[0].node.cloneNode(false);
+      const tbody = document.createElement("tbody");
+      let maxColumns = 1;
+      for (const payload of payloads) {
+        for (const row of Array.from(payload.node.querySelectorAll("tr"))) {
+          const columnCount = Array.from(row.children).reduce((sum, cell) => sum + Math.max(1, Number(cell.colSpan) || 1), 0);
+          maxColumns = Math.max(maxColumns, columnCount);
+        }
+      }
+      payloads.forEach((payload, payloadIndex) => {
+        if (payloadIndex > 0) {
+          const spacerRow = document.createElement("tr");
+          spacerRow.setAttribute("data-template-spacer", "true");
+          const spacerCell = document.createElement("td");
+          spacerCell.colSpan = maxColumns;
+          spacerCell.setAttribute("data-template-spacer-cell", "true");
+          spacerRow.appendChild(spacerCell);
+          tbody.appendChild(spacerRow);
+        }
+        for (const row of Array.from(payload.node.querySelectorAll("tr"))) {
+          tbody.appendChild(row.cloneNode(true));
+        }
+      });
+      combinedTable.appendChild(tbody);
+      return {
+        node: combinedTable,
+        html: combinedTable.outerHTML,
+        text: plainText,
+        count: payloads.length,
+        spacerCount: Math.max(0, payloads.length - 1)
+      };
+    }
+
+    const wrapper = document.createElement("div");
+    payloads.forEach((payload, payloadIndex) => {
+      if (payloadIndex > 0) {
+        const separator = document.createElement("div");
+        separator.setAttribute("data-template-spacer", "true");
+        separator.appendChild(document.createElement("br"));
+        wrapper.appendChild(separator);
+      }
+      wrapper.appendChild(payload.node);
+    });
+    return {
+      node: wrapper,
+      html: wrapper.innerHTML,
+      text: plainText,
+      count: payloads.length,
+      spacerCount: Math.max(0, payloads.length - 1)
+    };
+  }
+
   function getTemplateEstimatedItemHeight(virtual) {
     return Math.max(24, Number(virtual && virtual.avgItemHeight) || 140);
   }
@@ -4999,6 +5091,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     virtual.sourceRenderObjects = state.renderObjects;
     virtual.items = list;
     virtual.itemCount = list.length;
+    if (typeof pruneTemplateBlockSelection === "function") {
+      pruneTemplateBlockSelection(virtual.itemCount);
+    }
     ensureTemplateHeightCache(virtual, virtual.itemCount);
     rebuildTemplatePrefixOffsets(virtual);
     virtual.lineTargetMap = buildTemplateLineTargetMap(list);
@@ -5368,8 +5463,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     restoreTemplateViewportAnchor(viewportAnchor);
     state.templatePreviewCache = { count: items.length };
 
-    if (state.selectedTemplateIndex !== "" && typeof setSelectedTemplateBlock === "function") {
-      setSelectedTemplateBlock(state.selectedTemplateIndex, { scroll: false, ensure: false });
+    if (typeof syncRenderedTemplateSelection === "function") {
+      syncRenderedTemplateSelection();
     }
     if (typeof refreshInputGutterTargets === "function") {
       refreshInputGutterTargets();
@@ -5421,6 +5516,8 @@ window.AbapViewerModules.factories["03-template-preview"] = function registerTem
   targetRuntime.api = targetRuntime.api || {};
   targetRuntime.api.renderTemplatePreview = renderTemplatePreview;
   targetRuntime.api.applyTemplateConfigFromEditor = applyTemplateConfigFromEditor;
+  targetRuntime.api.ensureTemplateWindowContainsIndex = ensureTemplateWindowContainsIndex;
+  targetRuntime.api.buildTemplateCollectionCopyPayload = buildTemplateCollectionCopyPayload;
   window.AbapViewerModules.parts["03-template-preview"] = true;
 };
 window.AbapViewerModules.factories["03-template-preview"](window.AbapViewerRuntime);

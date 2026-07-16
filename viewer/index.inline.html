@@ -1613,6 +1613,7 @@
               <input type="checkbox" id="templateCopyTableOnly" checked>
               Copy table only
             </label>
+            <button type="button" id="templateCopySelectedBtn" class="secondary" disabled>Copy Selected (0)</button>
             <button type="button" id="templateCopyAllBtn" class="secondary">Copy All</button>
             <button type="button" id="templateResetBtn" class="secondary">Reset default</button>
             <button type="button" id="templateExportBtn" class="secondary">Export config</button>
@@ -2536,6 +2537,10 @@
       return buildDeleteItabExtras(context);
     }
 
+    if (extrasConfig.type === "append") {
+      return buildAppendExtras(context);
+    }
+
     if (extrasConfig.type === "message") {
       return buildMessageExtras(context);
     }
@@ -2665,6 +2670,49 @@
       name: valueMap.name || "",
       params: [...importingParams, ...exportingParams, ...changingParams, ...returningParams],
       exceptions
+    };
+  }
+
+  function getValueEntryList(values, name) {
+    if (!values || typeof values !== "object") {
+      return [];
+    }
+    const entryOrList = values[name];
+    if (Array.isArray(entryOrList)) {
+      return entryOrList.filter((entry) => entry && typeof entry === "object");
+    }
+    return entryOrList && typeof entryOrList === "object" ? [entryOrList] : [];
+  }
+
+  function getFirstValueEntry(values, name) {
+    const entries = getValueEntryList(values, name);
+    return entries.length ? entries[0] : null;
+  }
+
+  function buildAppendExtras({ values }) {
+    const what = getFirstValueEntry(values, "what");
+    const linesSource = getFirstValueEntry(values, "source");
+    const toEntries = getValueEntryList(values, "to");
+    const isLinesOf = Boolean(linesSource);
+    const isInitialLine = !isLinesOf && String(what && what.value || "").trim().toUpperCase() === "INITIAL";
+    const target = toEntries.length ? toEntries[toEntries.length - 1] : null;
+
+    return {
+      append: {
+        variant: isLinesOf ? "linesOf" : (isInitialLine ? "initialLine" : "single"),
+        source: isLinesOf ? linesSource : (isInitialLine ? null : what),
+        target,
+        range: {
+          from: getFirstValueEntry(values, "from"),
+          to: isLinesOf && toEntries.length > 1 ? toEntries[toEntries.length - 2] : null,
+          step: getFirstValueEntry(values, "step"),
+          usingKey: getFirstValueEntry(values, "usingKey")
+        },
+        result: {
+          assigning: getFirstValueEntry(values, "assigning"),
+          refInto: getFirstValueEntry(values, "refInto")
+        }
+      }
     };
   }
 
@@ -5956,6 +6004,10 @@
       "OF": "of",
       "INITIAL": "initial",
       "LINE": "line",
+      "FROM": "from",
+      "STEP": "step",
+      "USING": "using",
+      "KEY": "key",
       "ASSIGNING": "assigning",
       "REFERENCE": "reference",
       "INTO": "into"
@@ -5963,6 +6015,7 @@
     "keywordPhrases": {
       "LINES OF": "lines-of",
       "INITIAL LINE": "initial-line",
+      "USING KEY": "using-key",
       "REFERENCE INTO": "reference-into"
     },
     "captureRules": [
@@ -5977,9 +6030,24 @@
         "label": "source-itab"
       },
       {
+        "after": "FROM",
+        "name": "from",
+        "label": "from"
+      },
+      {
         "after": "TO",
         "name": "to",
         "label": "to-itab"
+      },
+      {
+        "after": "STEP",
+        "name": "step",
+        "label": "step"
+      },
+      {
+        "after": "USING KEY",
+        "name": "usingKey",
+        "label": "using-key"
       },
       {
         "after": "ASSIGNING",
@@ -5991,7 +6059,10 @@
         "name": "refInto",
         "label": "reference-into"
       }
-    ]
+    ],
+    "extras": {
+      "type": "append"
+    }
   };
   window.AbapParser.registerConfig(config);
 })();
@@ -9069,6 +9140,7 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     templatePreviewPanel: document.getElementById("templatePreviewPanel"),
     templateKeyMode: document.getElementById("templateKeyMode"),
     templateCopyTableOnly: document.getElementById("templateCopyTableOnly"),
+    templateCopySelectedBtn: document.getElementById("templateCopySelectedBtn"),
     templateCopyAllBtn: document.getElementById("templateCopyAllBtn"),
     templateResetBtn: document.getElementById("templateResetBtn"),
     templateExportBtn: document.getElementById("templateExportBtn"),
@@ -9132,6 +9204,8 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     collapsedIds: new Set(),
     selectedId: "",
     selectedTemplateIndex: "",
+    selectedTemplateIndexes: new Set(),
+    templateSelectionAnchorIndex: "",
     selectedDeclKey: "",
     descOverrides: {},
     descOverridesLegacy: {},
@@ -10628,6 +10702,32 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     };
   }
 
+  function createAppendLinesOfTemplate() {
+    const template = {
+      _options: {
+        hideEmptyRows: true,
+        hideRowsWithoutValues: true,
+        expandMultilineRows: false
+      }
+    };
+    const rows = [
+      ["APPEND LINES OF", "{extras.append.source.finalDesc}"],
+      ["FROM", "{extras.append.range.from.finalDesc}"],
+      ["TO", "{extras.append.range.to.finalDesc}"],
+      ["STEP", "{extras.append.range.step.finalDesc}"],
+      ["USING KEY", "{extras.append.range.usingKey.value}"],
+      ["TO", "{extras.append.target.finalDesc}"]
+    ];
+    rows.forEach(([label, token], index) => {
+      const row = index + 1;
+      template[`A${row}:T${row}`] = createTemplateBaseStyle("#dbeef4");
+      template[`A${row}`] = { text: label };
+      template[`U${row}:AN${row}`] = createTemplateBaseStyle("#ffffff");
+      template[`U${row}`] = { text: token };
+    });
+    return template;
+  }
+
   const UNIFIED_KEYWORD_ROW_TEMPLATE_V1 = createKeywordDescriptionTemplate();
 
   const ASSIGNMENT_ROW_TEMPLATE_V1 = {
@@ -10701,6 +10801,7 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     templates: {
       DEFAULT: UNIFIED_KEYWORD_ROW_TEMPLATE_V1,
       APPEND: createKeywordDescriptionTemplate(),
+      APPEND_LINES_OF: createAppendLinesOfTemplate(),
       ASSIGNMENT: ASSIGNMENT_ROW_TEMPLATE_V1,
       CALL_FUNCTION: createKeywordDescriptionTemplate(),
       CASE: createKeywordDescriptionTemplate(),
@@ -11014,6 +11115,14 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     return cloned && typeof cloned === "object" ? cloned : { version: 1, templates: {} };
   }
 
+  function templateDefinitionsEqual(left, right) {
+    try {
+      return JSON.stringify(left) === JSON.stringify(right);
+    } catch {
+      return false;
+    }
+  }
+
   function mergeMissingDefaultTemplatesInPlace(config) {
     if (!config || typeof config !== "object" || Array.isArray(config)) {
       return false;
@@ -11023,6 +11132,19 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     }
 
     let changed = false;
+    if (!Object.prototype.hasOwnProperty.call(config.templates, "APPEND_LINES_OF")) {
+      const legacyAppend = config.templates.APPEND;
+      const defaultAppend = TEMPLATE_DEFAULT_CONFIG_V1.templates.APPEND;
+      const dedicatedDefault = TEMPLATE_DEFAULT_CONFIG_V1.templates.APPEND_LINES_OF;
+      const sourceTemplate = legacyAppend && !templateDefinitionsEqual(legacyAppend, defaultAppend)
+        ? legacyAppend
+        : dedicatedDefault;
+      const cloned = cloneJsonValue(sourceTemplate);
+      if (cloned && typeof cloned === "object") {
+        config.templates.APPEND_LINES_OF = cloned;
+        changed = true;
+      }
+    }
     for (const [templateKey, templateDef] of Object.entries(TEMPLATE_DEFAULT_CONFIG_V1.templates)) {
       if (Object.prototype.hasOwnProperty.call(config.templates, templateKey)) {
         continue;
@@ -12305,6 +12427,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       keys.push(key);
     };
 
+    if (decl && typeof decl === "object") {
+      pushKey(decl.__abapPerformChainOverrideKey);
+    }
+
     if (isPathDeclForOverrideKey(decl)) {
       for (const key of getPathDeclOverrideLookupKeys(decl)) {
         pushKey(key);
@@ -12315,6 +12441,82 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     pushKey(getLegacyDeclKey(decl));
     pushKey(getDeclFallbackKey(decl));
     return keys;
+  }
+
+  function getPerformChainSourceScope(ownerContext) {
+    if (!ownerContext || typeof ownerContext !== "object") {
+      return "";
+    }
+    const directScope = String(ownerContext.__abapPerformChainScope || "").trim();
+    if (directScope) {
+      return directScope;
+    }
+    const bindingScope = String(ownerContext.sourceScope || "").trim();
+    if (bindingScope) {
+      return bindingScope;
+    }
+    const bindingContext = ownerContext.__abapPerformTraceBinding;
+    return bindingContext && typeof bindingContext === "object"
+      ? String(bindingContext.sourceScope || "").trim()
+      : "";
+  }
+
+  function getPerformFormalParamKey(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+    const objectType = String(decl.objectType || "").trim().toUpperCase();
+    let paramName = "";
+    let fieldPath = "";
+    if (objectType === "FORM_PARAM") {
+      paramName = String(decl.name || "").trim().toUpperCase();
+    } else if (objectType === "STRUCT_FIELD" && String(decl.structObjectType || "").trim().toUpperCase() === "FORM_PARAM") {
+      paramName = String(decl.structName || "").trim().toUpperCase();
+      fieldPath = String(decl.fieldPath || "").trim().toUpperCase();
+    }
+    if (!paramName) {
+      return "";
+    }
+    return encodeURIComponent([
+      String(decl.scopeLabel || "").trim().toUpperCase(),
+      paramName,
+      fieldPath
+    ].join("|"));
+  }
+
+  function buildPerformChainOverrideKey(ownerContext, formalDecl) {
+    const sourceScope = getPerformChainSourceScope(ownerContext);
+    const formalParamKey = getPerformFormalParamKey(formalDecl);
+    if (!sourceScope || !formalParamKey) {
+      return "";
+    }
+    return `PERFORM_CHAIN:${sourceScope}:${formalParamKey}`;
+  }
+
+  function cloneDeclWithPerformChainOverride(decl, ownerContext, formalDecl) {
+    if (!decl || typeof decl !== "object") {
+      return decl;
+    }
+    const chainKey = buildPerformChainOverrideKey(ownerContext, formalDecl);
+    if (!chainKey) {
+      return decl;
+    }
+    const clone = { ...decl };
+    try {
+      Object.defineProperty(clone, "__abapPerformChainOverrideKey", {
+        value: chainKey,
+        enumerable: false,
+        configurable: true
+      });
+      Object.defineProperty(clone, "__abapPerformChainScope", {
+        value: getPerformChainSourceScope(ownerContext),
+        enumerable: false,
+        configurable: true
+      });
+    } catch {
+      return decl;
+    }
+    return clone;
   }
 
   function getDeclOverrideStorageKey(decl) {
@@ -12919,12 +13121,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       return;
     }
 
-    const isStructField = isStructFieldDecl(decl);
-
     const key = getDeclOverrideStorageKey(decl);
     if (!key) {
       return;
     }
+    const isScopedPerformChain = String(key).startsWith("PERFORM_CHAIN:");
+    const isStructField = isStructFieldDecl(decl) && !isScopedPerformChain;
 
     const settings = state.settings || DEFAULT_SETTINGS;
     const normalizeEnabled = Boolean(settings.normalizeDeclDesc);
@@ -13721,14 +13923,49 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
           enumerable: false,
           configurable: true
         });
+        if (String(bindingContext.sourceScope || "").trim()) {
+          Object.defineProperty(node, "__abapPerformChainScope", {
+            value: String(bindingContext.sourceScope || "").trim(),
+            enumerable: false,
+            configurable: true
+          });
+        }
       } catch {
         // ignore metadata errors; rendering should keep working without trace metadata.
       }
     };
 
+    const clonePerformScopedData = (value, bindingContext, seen) => {
+      if (!value || typeof value !== "object") {
+        return value;
+      }
+      const visited = seen instanceof WeakMap ? seen : new WeakMap();
+      if (visited.has(value)) {
+        return visited.get(value);
+      }
+      if (getPerformFormalParamKey(value)) {
+        return cloneDeclWithPerformChainOverride(value, bindingContext, value);
+      }
+      if (Array.isArray(value)) {
+        const output = [];
+        visited.set(value, output);
+        for (const item of value) {
+          output.push(clonePerformScopedData(item, bindingContext, visited));
+        }
+        return output;
+      }
+      const output = {};
+      visited.set(value, output);
+      for (const key of Object.keys(value)) {
+        output[key] = clonePerformScopedData(value[key], bindingContext, visited);
+      }
+      return output;
+    };
+
     return {
       attachPerformBindingMetadata,
-      buildPerformBindingContext
+      buildPerformBindingContext,
+      clonePerformScopedData
     };
   }
 
@@ -13758,6 +13995,32 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       }
     }
     return parts.length ? parts.join(" · ") : "không có đối số";
+  }
+
+  function hashPerformSourceScope(value) {
+    const text = String(value || "");
+    let hash = 2166136261;
+    for (let index = 0; index < text.length; index += 1) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(36).toUpperCase();
+  }
+
+  function buildPerformSourceScope(performNode, formNameUpper, pathToken, ancestry) {
+    const normalizedRaw = String(performNode && performNode.raw || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toUpperCase();
+    const fingerprint = [
+      String(formNameUpper || "").trim().toUpperCase(),
+      String(performNode && performNode.file || "").trim().toUpperCase(),
+      Number(performNode && performNode.lineStart) || 0,
+      normalizedRaw,
+      String(pathToken || ""),
+      (Array.isArray(ancestry) ? ancestry : []).join(">")
+    ].join("|");
+    return `${String(formNameUpper || "FORM").trim().toUpperCase()}-${hashPerformSourceScope(fingerprint)}`;
   }
 
   function buildPerformCallPathRegistry(rawRoots) {
@@ -13846,8 +14109,13 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const registerCandidate = (performNode, resolvedForm, formName, formNameUpper, pathToken, ancestry, bindingContext) => {
       sourceOrder += 1;
       const key = `PERFORM_SOURCE:${formNameUpper}:${pathToken}`;
+      const sourceScope = buildPerformSourceScope(performNode, formNameUpper, pathToken, ancestry);
+      if (bindingContext && typeof bindingContext === "object") {
+        bindingContext.sourceScope = sourceScope;
+      }
       const candidate = {
         key,
+        sourceScope,
         formId: resolvedForm.id === undefined || resolvedForm.id === null ? "" : String(resolvedForm.id),
         formName,
         formNameUpper,
@@ -14083,6 +14351,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const tools = createPerformExpansionTools();
     const attachPerformBindingMetadata = tools.attachPerformBindingMetadata;
     const buildPerformBindingContext = tools.buildPerformBindingContext;
+    const clonePerformScopedData = tools.clonePerformScopedData;
 
     const cloneNode = (sourceNode, parentId, expandDepth, pathToken, forceSyntheticId, formCallStack, bindingContext) => {
       if (!sourceNode || typeof sourceNode !== "object") {
@@ -14109,6 +14378,14 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         out.parent = parentId;
       }
       attachPerformBindingMetadata(out, bindingContext);
+      if (bindingContext && String(bindingContext.sourceScope || "").trim()) {
+        if (out.values && typeof out.values === "object") {
+          out.values = clonePerformScopedData(out.values, bindingContext);
+        }
+        if (out.extras && typeof out.extras === "object") {
+          out.extras = clonePerformScopedData(out.extras, bindingContext);
+        }
+      }
 
       const ownId = out.id !== null && out.id !== undefined && String(out.id).trim() ? out.id : undefined;
       const outChildren = [];
@@ -15227,7 +15504,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const remappedTraceDecls = localDeclType === "STRUCT_FIELD"
       ? traceDecls.map((traceDecl) => buildExpandedPerformTemplateTraceDecl(traceDecl, decl, ownerContext)).filter(Boolean)
       : traceDecls;
-    return dedupeTemplateDecls(remappedTraceDecls);
+    const scopedTraceDecls = typeof cloneDeclWithPerformChainOverride === "function"
+      ? remappedTraceDecls.map((traceDecl) => cloneDeclWithPerformChainOverride(traceDecl, ownerContext, decl))
+      : remappedTraceDecls;
+    return dedupeTemplateDecls(scopedTraceDecls);
   }
 
   function selectExpandedPerformTemplateRootDecl(traceDecls) {
@@ -15292,10 +15572,17 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     const existingOrigins = Array.isArray(value.originDecls) ? value.originDecls : [];
-    const originDecls = dedupeTemplateDecls([localDecl, ...externalTraceDecls, ...existingOrigins]);
+    const scopedLocalDecl = typeof cloneDeclWithPerformChainOverride === "function"
+      ? cloneDeclWithPerformChainOverride(localDecl, ownerContext, localDecl)
+      : localDecl;
+    const scopedExistingOrigins = typeof cloneDeclWithPerformChainOverride === "function"
+      ? existingOrigins.map((originDecl) => cloneDeclWithPerformChainOverride(originDecl, ownerContext, localDecl))
+      : existingOrigins;
+    const originDecls = dedupeTemplateDecls([scopedLocalDecl, ...externalTraceDecls, ...scopedExistingOrigins]);
     return {
       ...value,
       decl: rootTraceDecl,
+      valueDecl: scopedLocalDecl,
       originDecls
     };
   }
@@ -15591,7 +15878,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
     const traceDecls = resolveExpandedPerformTemplateTraceDecls(ownerContext, decl);
     const rootDecl = selectExpandedPerformTemplateRootDecl(traceDecls) || decl;
-    return dedupeTemplateDecls([rootDecl, decl, ...traceDecls]);
+    const scopedLocalDecl = typeof cloneDeclWithPerformChainOverride === "function"
+      ? cloneDeclWithPerformChainOverride(decl, ownerContext, decl)
+      : decl;
+    return dedupeTemplateDecls([rootDecl, scopedLocalDecl, ...traceDecls]);
   }
 
   function buildTemplateSemanticValueEntry(entry, ownerContext) {
@@ -18114,17 +18404,26 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       ? config.templates
       : {};
     const objectType = obj && obj.objectType ? String(obj.objectType) : "";
-    if (objectType && Object.prototype.hasOwnProperty.call(templates, objectType)) {
-      const resolved = resolveTemplateDefinitionForPreview(templates[objectType]);
-      return { key: objectType, map: resolved.map, options: resolved.options };
+    const isAppendLinesOf = objectType === "APPEND"
+      && obj.extras
+      && obj.extras.append
+      && String(obj.extras.append.variant || "") === "linesOf";
+    const preferredKeys = isAppendLinesOf ? ["APPEND_LINES_OF", "APPEND"] : [objectType];
+    for (const templateKey of preferredKeys) {
+      if (templateKey && Object.prototype.hasOwnProperty.call(templates, templateKey)) {
+        const resolved = resolveTemplateDefinitionForPreview(templates[templateKey]);
+        return { key: templateKey, map: resolved.map, options: resolved.options };
+      }
     }
     const defaultConfig = getDefaultTemplateConfig();
     const defaultTemplates = defaultConfig && defaultConfig.templates && typeof defaultConfig.templates === "object"
       ? defaultConfig.templates
       : {};
-    if (objectType && Object.prototype.hasOwnProperty.call(defaultTemplates, objectType)) {
-      const resolved = resolveTemplateDefinitionForPreview(defaultTemplates[objectType]);
-      return { key: objectType, map: resolved.map, options: resolved.options };
+    for (const templateKey of preferredKeys) {
+      if (templateKey && Object.prototype.hasOwnProperty.call(defaultTemplates, templateKey)) {
+        const resolved = resolveTemplateDefinitionForPreview(defaultTemplates[templateKey]);
+        return { key: templateKey, map: resolved.map, options: resolved.options };
+      }
     }
     if (Object.prototype.hasOwnProperty.call(templates, "DEFAULT")) {
       const resolved = resolveTemplateDefinitionForPreview(templates.DEFAULT);
@@ -18368,8 +18667,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     els.templatePreviewOutput.classList.remove("muted");
     els.templatePreviewOutput.replaceChildren(fragment);
     state.templatePreviewCache = { count: items.length };
-    if (state.selectedTemplateIndex !== "" && typeof setSelectedTemplateBlock === "function") {
-      setSelectedTemplateBlock(state.selectedTemplateIndex, { scroll: false });
+    if (typeof syncRenderedTemplateSelection === "function") {
+      syncRenderedTemplateSelection();
     }
     if (typeof refreshInputGutterTargets === "function") {
       refreshInputGutterTargets();
@@ -18640,8 +18939,15 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const indexText = String(absIndex);
     const templateContextObj = buildTemplateContextObject(obj, absIndex + 1);
     const resolved = resolveTemplateMapForObject(obj, config);
-    const selected = state.selectedTemplateIndex !== "" && state.selectedTemplateIndex === indexText;
-    const blockAttrs = { "data-template-index": indexText, "data-depth": String(depth) };
+    const selectedIndexes = typeof getSelectedTemplateIndexSet === "function"
+      ? getSelectedTemplateIndexSet()
+      : new Set(state.selectedTemplateIndex !== "" ? [String(state.selectedTemplateIndex)] : []);
+    const selected = selectedIndexes.has(indexText);
+    const blockAttrs = {
+      "data-template-index": indexText,
+      "data-depth": String(depth),
+      "aria-selected": selected ? "true" : "false"
+    };
     if (lineStart > 0) {
       blockAttrs["data-line-start"] = String(lineStart);
     }
@@ -18675,7 +18981,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         text: "Code",
         attrs: { type: "button", "data-template-action": "code" }
       });
-      codeBtn.addEventListener("click", () => {
+      codeBtn.addEventListener("click", (ev) => {
+        if (ev && typeof ev.stopPropagation === "function") {
+          ev.stopPropagation();
+        }
         if (typeof setSelectedTemplateBlock === "function") {
           setSelectedTemplateBlock(indexText);
         } else {
@@ -18706,7 +19015,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         text: "Copy",
         attrs: { type: "button", "data-template-action": "copy" }
       });
-      copyBtn.addEventListener("click", async () => {
+      copyBtn.addEventListener("click", async (ev) => {
+        if (ev && typeof ev.stopPropagation === "function") {
+          ev.stopPropagation();
+        }
         try {
           const payload = buildTemplateCopyPayloadFromBlock(block);
           if (!payload.node) {
@@ -18722,8 +19034,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       actions.appendChild(copyBtn);
       header.appendChild(actions);
 
-      block.addEventListener("click", () => {
-        if (typeof setSelectedTemplateBlock === "function") {
+      block.addEventListener("click", (ev) => {
+        if (typeof selectTemplateBlockFromInteraction === "function") {
+          selectTemplateBlockFromInteraction(indexText, ev);
+        } else if (typeof setSelectedTemplateBlock === "function") {
           setSelectedTemplateBlock(indexText, { scroll: false });
         } else {
           state.selectedTemplateIndex = indexText;
@@ -18990,7 +19304,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
               if (!declKey) {
                 continue;
               }
-              for (const key of lookupKeys.length ? lookupKeys : [declKey]) {
+              const deleteKeys = String(declKey).startsWith("PERFORM_CHAIN:")
+                ? [declKey]
+                : (lookupKeys.length ? lookupKeys : [declKey]);
+              for (const key of deleteKeys) {
                 delete state.descOverrides[key];
                 if (state.descOverridesLegacy && typeof state.descOverridesLegacy === "object") {
                   delete state.descOverridesLegacy[key];
@@ -19074,6 +19391,83 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return {
       node: clone,
       text: buildTemplatePlainTextFromBlock(clone)
+    };
+  }
+
+  function normalizeTemplateCopyIndexes(indexes, itemCount) {
+    const total = Math.max(0, Number(itemCount) || 0);
+    return Array.from(new Set((Array.isArray(indexes) ? indexes : [])
+      .map((value) => Number(value))
+      .filter((value) => Number.isInteger(value) && value >= 0 && value < total)))
+      .sort((left, right) => left - right);
+  }
+
+  function buildTemplateCollectionCopyPayload(items, indexes, config, tableOnly) {
+    const sourceItems = Array.isArray(items) ? items : [];
+    const orderedIndexes = normalizeTemplateCopyIndexes(indexes, sourceItems.length);
+    const payloads = [];
+    for (const index of orderedIndexes) {
+      const payload = buildTemplateBlockCopyPayload(sourceItems[index], index, config, Boolean(tableOnly));
+      if (payload && payload.node) {
+        payloads.push(payload);
+      }
+    }
+
+    if (!payloads.length) {
+      return { node: null, html: "", text: "", count: 0, spacerCount: 0 };
+    }
+
+    const plainText = payloads.map((payload) => String(payload.text || "").trim()).join("\n\n");
+    if (tableOnly) {
+      const combinedTable = payloads[0].node.cloneNode(false);
+      const tbody = document.createElement("tbody");
+      let maxColumns = 1;
+      for (const payload of payloads) {
+        for (const row of Array.from(payload.node.querySelectorAll("tr"))) {
+          const columnCount = Array.from(row.children).reduce((sum, cell) => sum + Math.max(1, Number(cell.colSpan) || 1), 0);
+          maxColumns = Math.max(maxColumns, columnCount);
+        }
+      }
+      payloads.forEach((payload, payloadIndex) => {
+        if (payloadIndex > 0) {
+          const spacerRow = document.createElement("tr");
+          spacerRow.setAttribute("data-template-spacer", "true");
+          const spacerCell = document.createElement("td");
+          spacerCell.colSpan = maxColumns;
+          spacerCell.setAttribute("data-template-spacer-cell", "true");
+          spacerRow.appendChild(spacerCell);
+          tbody.appendChild(spacerRow);
+        }
+        for (const row of Array.from(payload.node.querySelectorAll("tr"))) {
+          tbody.appendChild(row.cloneNode(true));
+        }
+      });
+      combinedTable.appendChild(tbody);
+      return {
+        node: combinedTable,
+        html: combinedTable.outerHTML,
+        text: plainText,
+        count: payloads.length,
+        spacerCount: Math.max(0, payloads.length - 1)
+      };
+    }
+
+    const wrapper = document.createElement("div");
+    payloads.forEach((payload, payloadIndex) => {
+      if (payloadIndex > 0) {
+        const separator = document.createElement("div");
+        separator.setAttribute("data-template-spacer", "true");
+        separator.appendChild(document.createElement("br"));
+        wrapper.appendChild(separator);
+      }
+      wrapper.appendChild(payload.node);
+    });
+    return {
+      node: wrapper,
+      html: wrapper.innerHTML,
+      text: plainText,
+      count: payloads.length,
+      spacerCount: Math.max(0, payloads.length - 1)
     };
   }
 
@@ -19361,6 +19755,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     virtual.sourceRenderObjects = state.renderObjects;
     virtual.items = list;
     virtual.itemCount = list.length;
+    if (typeof pruneTemplateBlockSelection === "function") {
+      pruneTemplateBlockSelection(virtual.itemCount);
+    }
     ensureTemplateHeightCache(virtual, virtual.itemCount);
     rebuildTemplatePrefixOffsets(virtual);
     virtual.lineTargetMap = buildTemplateLineTargetMap(list);
@@ -19730,8 +20127,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     restoreTemplateViewportAnchor(viewportAnchor);
     state.templatePreviewCache = { count: items.length };
 
-    if (state.selectedTemplateIndex !== "" && typeof setSelectedTemplateBlock === "function") {
-      setSelectedTemplateBlock(state.selectedTemplateIndex, { scroll: false, ensure: false });
+    if (typeof syncRenderedTemplateSelection === "function") {
+      syncRenderedTemplateSelection();
     }
     if (typeof refreshInputGutterTargets === "function") {
       refreshInputGutterTargets();
@@ -19783,6 +20180,8 @@ window.AbapViewerModules.factories["03-template-preview"] = function registerTem
   targetRuntime.api = targetRuntime.api || {};
   targetRuntime.api.renderTemplatePreview = renderTemplatePreview;
   targetRuntime.api.applyTemplateConfigFromEditor = applyTemplateConfigFromEditor;
+  targetRuntime.api.ensureTemplateWindowContainsIndex = ensureTemplateWindowContainsIndex;
+  targetRuntime.api.buildTemplateCollectionCopyPayload = buildTemplateCollectionCopyPayload;
   window.AbapViewerModules.parts["03-template-preview"] = true;
 };
 window.AbapViewerModules.factories["03-template-preview"](window.AbapViewerRuntime);
@@ -20068,38 +20467,181 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
   }
 
-  function setSelectedTemplateBlock(index, options) {
+  function getSelectedTemplateIndexSet() {
+    if (!(state.selectedTemplateIndexes instanceof Set)) {
+      state.selectedTemplateIndexes = new Set(Array.isArray(state.selectedTemplateIndexes)
+        ? state.selectedTemplateIndexes.map(String)
+        : []);
+    }
+    return state.selectedTemplateIndexes;
+  }
+
+  function getSortedSelectedTemplateIndexes() {
+    return Array.from(getSelectedTemplateIndexSet())
+      .map((value) => String(value || "").trim())
+      .filter((value) => /^\d+$/.test(value))
+      .sort((left, right) => Number(left) - Number(right));
+  }
+
+  function updateTemplateCopySelectedButton() {
+    if (!els.templateCopySelectedBtn) {
+      return;
+    }
+    const count = getSelectedTemplateIndexSet().size;
+    els.templateCopySelectedBtn.textContent = `Copy Selected (${count})`;
+    els.templateCopySelectedBtn.disabled = count === 0;
+  }
+
+  function syncRenderedTemplateSelection() {
     if (!els.templatePreviewOutput) {
+      updateTemplateCopySelectedButton();
       return;
     }
-
-    const opts = options && typeof options === "object" ? options : {};
-    const shouldScroll = opts.scroll !== false;
-    const scrollMode = String(opts.scrollMode || "start").toLowerCase();
-    const normalized = String(index === undefined || index === null ? "" : index).trim();
-    if (!normalized) {
-      return;
+    const selectedIndexes = getSelectedTemplateIndexSet();
+    for (const block of Array.from(els.templatePreviewOutput.querySelectorAll(".template-block[data-template-index]"))) {
+      const indexText = String(block.getAttribute("data-template-index") || "");
+      const selected = selectedIndexes.has(indexText);
+      block.classList.toggle("selected", selected);
+      block.setAttribute("aria-selected", selected ? "true" : "false");
     }
+    updateTemplateCopySelectedButton();
+  }
 
-    if (state.selectedTemplateIndex !== "") {
-      const prev = els.templatePreviewOutput.querySelector(
-        `.template-block[data-template-index="${escapeSelectorValue(state.selectedTemplateIndex)}"]`
-      );
-      if (prev) {
-        prev.classList.remove("selected");
+  function clearTemplateBlockSelection() {
+    getSelectedTemplateIndexSet().clear();
+    state.selectedTemplateIndex = "";
+    state.templateSelectionAnchorIndex = "";
+    syncRenderedTemplateSelection();
+  }
+
+  function pruneTemplateBlockSelection(itemCount) {
+    const total = Math.max(0, Number(itemCount) || 0);
+    const selectedIndexes = getSelectedTemplateIndexSet();
+    const primary = String(state.selectedTemplateIndex || "").trim();
+    if (!selectedIndexes.size && /^\d+$/.test(primary) && Number(primary) < total) {
+      selectedIndexes.add(primary);
+    }
+    for (const indexText of Array.from(selectedIndexes)) {
+      if (!/^\d+$/.test(indexText) || Number(indexText) < 0 || Number(indexText) >= total) {
+        selectedIndexes.delete(indexText);
       }
     }
+    if (!selectedIndexes.has(primary)) {
+      state.selectedTemplateIndex = getSortedSelectedTemplateIndexes()[0] || "";
+    }
+    const anchor = String(state.templateSelectionAnchorIndex || "").trim();
+    if (!/^\d+$/.test(anchor) || Number(anchor) < 0 || Number(anchor) >= total) {
+      state.templateSelectionAnchorIndex = "";
+    }
+    syncRenderedTemplateSelection();
+  }
 
-    state.selectedTemplateIndex = normalized;
-    const next = els.templatePreviewOutput.querySelector(
+  function chooseNearestSelectedTemplateIndex(targetIndex) {
+    const target = Number(targetIndex);
+    const indexes = getSortedSelectedTemplateIndexes();
+    indexes.sort((left, right) => {
+      const leftDistance = Math.abs(Number(left) - target);
+      const rightDistance = Math.abs(Number(right) - target);
+      return leftDistance === rightDistance ? Number(left) - Number(right) : leftDistance - rightDistance;
+    });
+    return indexes[0] || "";
+  }
+
+  function updateTemplateBlockSelection(index, options) {
+    if (!els.templatePreviewOutput) {
+      return false;
+    }
+    const opts = options && typeof options === "object" ? options : {};
+    const normalized = String(index === undefined || index === null ? "" : index).trim();
+    if (!/^\d+$/.test(normalized)) {
+      return false;
+    }
+    const targetIndex = Number(normalized);
+    const selectedIndexes = getSelectedTemplateIndexSet();
+    const event = opts.event && typeof opts.event === "object" ? opts.event : null;
+    const useInteractionModifiers = opts.interactionMode === "event";
+    const additive = useInteractionModifiers && Boolean(event && (event.ctrlKey || event.metaKey));
+    const ranged = useInteractionModifiers && Boolean(event && event.shiftKey);
+
+    if (ranged) {
+      const primary = String(state.selectedTemplateIndex || "").trim();
+      const anchorText = /^\d+$/.test(String(state.templateSelectionAnchorIndex || ""))
+        ? String(state.templateSelectionAnchorIndex)
+        : (/^\d+$/.test(primary) ? primary : normalized);
+      const anchorIndex = Number(anchorText);
+      if (!additive) {
+        selectedIndexes.clear();
+      }
+      const start = Math.min(anchorIndex, targetIndex);
+      const end = Math.max(anchorIndex, targetIndex);
+      for (let current = start; current <= end; current += 1) {
+        selectedIndexes.add(String(current));
+      }
+      state.selectedTemplateIndex = normalized;
+      state.templateSelectionAnchorIndex = anchorText;
+    } else if (additive) {
+      if (selectedIndexes.has(normalized)) {
+        selectedIndexes.delete(normalized);
+        if (state.selectedTemplateIndex === normalized) {
+          state.selectedTemplateIndex = chooseNearestSelectedTemplateIndex(targetIndex);
+        }
+      } else {
+        selectedIndexes.add(normalized);
+        state.selectedTemplateIndex = normalized;
+      }
+      state.templateSelectionAnchorIndex = normalized;
+    } else {
+      selectedIndexes.clear();
+      selectedIndexes.add(normalized);
+      state.selectedTemplateIndex = normalized;
+      state.templateSelectionAnchorIndex = normalized;
+    }
+
+    const shouldEnsure = opts.ensure !== false;
+    let next = els.templatePreviewOutput.querySelector(
       `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`
     );
-    if (next) {
-      next.classList.add("selected");
-      if (shouldScroll) {
+    if (!next && shouldEnsure && typeof ensureTemplateWindowContainsIndex === "function") {
+      ensureTemplateWindowContainsIndex(targetIndex);
+      next = els.templatePreviewOutput.querySelector(
+        `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`
+      );
+    }
+    syncRenderedTemplateSelection();
+
+    if (next && opts.scroll !== false) {
+      const scrollMode = String(opts.scrollMode || "start").toLowerCase();
+      const virtual = typeof getTemplateVirtualStateForOutput === "function"
+        ? getTemplateVirtualStateForOutput()
+        : null;
+      if (scrollMode === "start" && virtual && virtual.isInitialized && typeof alignVirtualTargetAfterRender === "function") {
+        alignVirtualTargetAfterRender(
+          els.templatePreviewOutput,
+          virtual,
+          `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`,
+          next
+        );
+      } else {
         scrollElementInContainer(els.templatePreviewOutput, next, { mode: scrollMode, padTop: 10, padBottom: 10 });
       }
     }
+    return true;
+  }
+
+  function selectTemplateBlockFromInteraction(index, event) {
+    return updateTemplateBlockSelection(index, {
+      interactionMode: "event",
+      event,
+      scroll: false,
+      ensure: false
+    });
+  }
+
+  function setSelectedTemplateBlock(index, options) {
+    return updateTemplateBlockSelection(index, {
+      ...(options && typeof options === "object" ? options : {}),
+      interactionMode: "replace"
+    });
   }
 
   function setSelectedDeclRow(declKey) {
@@ -20721,13 +21263,18 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const remappedTraceDecls = localDeclType === "STRUCT_FIELD"
       ? traceDecls.map((traceDecl) => buildExpandedPerformOutputTraceDecl(traceDecl, decl, obj)).filter(Boolean)
       : traceDecls;
-    return dedupeDecls(remappedTraceDecls.filter((item) => item && typeof item === "object"));
+    const scopedTraceDecls = typeof cloneDeclWithPerformChainOverride === "function"
+      ? remappedTraceDecls.map((traceDecl) => cloneDeclWithPerformChainOverride(traceDecl, obj, decl))
+      : remappedTraceDecls;
+    return dedupeDecls(scopedTraceDecls.filter((item) => item && typeof item === "object"));
   }
 
   function buildDeclTraceListForObject(obj, decl) {
     const list = [];
     if (decl && typeof decl === "object") {
-      list.push(decl);
+      list.push(typeof cloneDeclWithPerformChainOverride === "function"
+        ? cloneDeclWithPerformChainOverride(decl, obj, decl)
+        : decl);
     }
     const traceDecls = resolveExpandedPerformTraceDecls(obj, decl);
     if (traceDecls.length) {
@@ -22935,58 +23482,10 @@ function resetOutputVirtualState() {
   }
 
   function setSelectedTemplateBlock(index, options) {
-    if (!els.templatePreviewOutput) {
-      return;
-    }
-
-    const opts = options && typeof options === "object" ? options : {};
-    const shouldScroll = opts.scroll !== false;
-    const shouldEnsure = opts.ensure !== false;
-    const scrollMode = String(opts.scrollMode || "start").toLowerCase();
-    const normalized = String(index === undefined || index === null ? "" : index).trim();
-    if (!normalized) {
-      return;
-    }
-
-    if (state.selectedTemplateIndex !== "") {
-      const prev = els.templatePreviewOutput.querySelector(
-        `.template-block[data-template-index="${escapeSelectorValue(state.selectedTemplateIndex)}"]`
-      );
-      if (prev) {
-        prev.classList.remove("selected");
-      }
-    }
-
-    state.selectedTemplateIndex = normalized;
-    let next = els.templatePreviewOutput.querySelector(
-      `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`
-    );
-    if (!next && shouldEnsure && typeof ensureTemplateWindowContainsIndex === "function") {
-      const targetIndex = Number(normalized);
-      if (Number.isFinite(targetIndex)) {
-        ensureTemplateWindowContainsIndex(targetIndex);
-        next = els.templatePreviewOutput.querySelector(
-          `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`
-        );
-      }
-    }
-
-    if (next) {
-      next.classList.add("selected");
-      if (shouldScroll) {
-        const virtual = getTemplateVirtualStateForOutput();
-        if (scrollMode === "start" && virtual.isInitialized) {
-          alignVirtualTargetAfterRender(
-            els.templatePreviewOutput,
-            virtual,
-            `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`,
-            next
-          );
-        } else {
-          scrollElementInContainer(els.templatePreviewOutput, next, { mode: scrollMode, padTop: 10, padBottom: 10 });
-        }
-      }
-    }
+    return updateTemplateBlockSelection(index, {
+      ...(options && typeof options === "object" ? options : {}),
+      interactionMode: "replace"
+    });
   }
 
   function getInputGutterLineHeightPx() {
@@ -23355,6 +23854,9 @@ window.AbapViewerModules.factories["04-output-render"] = function registerOutput
   targetRuntime.api = targetRuntime.api || {};
   targetRuntime.api.renderOutput = renderOutput;
   targetRuntime.api.setRightTab = setRightTab;
+  targetRuntime.api.selectTemplateBlockFromInteraction = selectTemplateBlockFromInteraction;
+  targetRuntime.api.getSelectedTemplateIndexes = getSortedSelectedTemplateIndexes;
+  targetRuntime.api.clearTemplateBlockSelection = clearTemplateBlockSelection;
   window.AbapViewerModules.parts["04-output-render"] = true;
 };
 window.AbapViewerModules.factories["04-output-render"](window.AbapViewerRuntime);
@@ -23659,10 +24161,22 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return !state.templateGuiHiddenTypes.has(token);
   }
 
-  function rerenderTemplateForGuiFilterChange() {
-    if (state.selectedTemplateIndex !== "") {
-      state.selectedTemplateIndex = "";
+  function resetTemplateSelectionStateMain() {
+    if (typeof clearTemplateBlockSelection === "function") {
+      clearTemplateBlockSelection();
+      return;
     }
+    state.selectedTemplateIndex = "";
+    state.selectedTemplateIndexes = new Set();
+    state.templateSelectionAnchorIndex = "";
+    if (els.templateCopySelectedBtn) {
+      els.templateCopySelectedBtn.textContent = "Copy Selected (0)";
+      els.templateCopySelectedBtn.disabled = true;
+    }
+  }
+
+  function rerenderTemplateForGuiFilterChange() {
+    resetTemplateSelectionStateMain();
     if (state.data && Array.isArray(state.renderObjects) && typeof renderTemplatePreview === "function") {
       renderTemplatePreview();
       return;
@@ -24404,44 +24918,53 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return out;
   }
 
-  async function copyAllTemplateBlocks() {
-    const items = getRenderableObjectListForTemplate({ includeHidden: true });
-    if (!items.length) {
-      setError("Nothing to copy.");
-      return;
-    }
-
+  function getTemplateCopyItemsAndConfig() {
     const virtual = typeof getTemplateVirtualState === "function" ? getTemplateVirtualState() : null;
+    const items = virtual && Array.isArray(virtual.items) && virtual.items.length
+      ? virtual.items
+      : getRenderableObjectListForTemplate();
     const config = virtual && virtual.config && typeof virtual.config === "object"
       ? virtual.config
       : (state.templateConfig && typeof state.templateConfig === "object"
         ? state.templateConfig
         : getDefaultTemplateConfig());
+    return { items, config };
+  }
 
-    const wrapper = document.createElement("div");
-    const plainLines = [];
-    const tableOnly = typeof isTemplateCopyTableOnlyEnabled === "function"
-      ? isTemplateCopyTableOnlyEnabled()
-      : Boolean(els.templateCopyTableOnly && els.templateCopyTableOnly.checked);
-
-    for (let index = 0; index < items.length; index += 1) {
-      const payload = buildTemplateBlockCopyPayload(items[index], index, config, tableOnly);
-      if (!payload || !payload.node) {
-        continue;
-      }
-      wrapper.appendChild(payload.node);
-      if (tableOnly) {
-        wrapper.appendChild(document.createElement("br"));
-      }
-      plainLines.push(payload.text);
-    }
-
-    if (!wrapper.childNodes.length) {
+  async function copyTemplateBlocksByIndexes(indexes) {
+    const { items, config } = getTemplateCopyItemsAndConfig();
+    if (!items.length) {
       setError("Nothing to copy.");
       return;
     }
+    const tableOnly = typeof isTemplateCopyTableOnlyEnabled === "function"
+      ? isTemplateCopyTableOnlyEnabled()
+      : Boolean(els.templateCopyTableOnly && els.templateCopyTableOnly.checked);
+    if (typeof buildTemplateCollectionCopyPayload !== "function") {
+      throw new Error("Template clipboard builder is unavailable.");
+    }
+    const payload = buildTemplateCollectionCopyPayload(items, indexes, config, tableOnly);
+    if (!payload || !payload.node) {
+      setError("Nothing to copy.");
+      return;
+    }
+    await copyHtmlWithFallback(payload.html, payload.text);
+  }
 
-    await copyHtmlWithFallback(wrapper.innerHTML, plainLines.filter(Boolean).join("\n\n"));
+  async function copySelectedTemplateBlocks() {
+    const indexes = typeof getSortedSelectedTemplateIndexes === "function"
+      ? getSortedSelectedTemplateIndexes().map(Number)
+      : Array.from(state.selectedTemplateIndexes instanceof Set ? state.selectedTemplateIndexes : []).map(Number);
+    if (!indexes.length) {
+      setError("Select at least one template block first.");
+      return;
+    }
+    await copyTemplateBlocksByIndexes(indexes);
+  }
+
+  async function copyAllTemplateBlocks() {
+    const { items } = getTemplateCopyItemsAndConfig();
+    await copyTemplateBlocksByIndexes(items.map((_, index) => index));
   }
 
   function writeTemplateConfigDraftToTextarea(textarea) {
@@ -26807,6 +27330,16 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         : (String(candidate && candidate.currentDesc ? candidate.currentDesc : "") || getAtomicEffectiveDescSafe(decl));
       const itemDisplay = stripStructPrefixForModalItemText(itemDisplayRaw, String(decl.structName || ""));
 
+      if (String(candidate && candidate.declKey || "").startsWith("PERFORM_CHAIN:")) {
+        return {
+          mode: "single",
+          text: itemDisplay,
+          skipNormalize: Boolean(itemEntry.noNormalize || (candidate && candidate.skipNormalize)),
+          initialText: String(itemDisplay || ""),
+          initialSkipNormalize: Boolean(itemEntry.noNormalize || (candidate && candidate.skipNormalize))
+        };
+      }
+
       if (!isStructFieldDeclForModal(decl)) {
         return {
           mode: "single",
@@ -26861,6 +27394,20 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       .map((candidate, index) => normalizeDeclCandidate(candidate, index))
       .filter(Boolean);
 
+    const uniqueDeclCandidates = [];
+    const seenDeclCandidateKeys = new Set();
+    for (const candidate of declCandidates) {
+      const groupKey = String(candidate && candidate.declKey || "").trim();
+      if (groupKey && seenDeclCandidateKeys.has(groupKey)) {
+        continue;
+      }
+      if (groupKey) {
+        seenDeclCandidateKeys.add(groupKey);
+      }
+      uniqueDeclCandidates.push(candidate);
+    }
+    declCandidates = uniqueDeclCandidates;
+
     if (!declCandidates.length && legacyDecl) {
       declCandidates = [{
         decl: legacyDecl,
@@ -26877,8 +27424,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     const hasDecl = Boolean(declCandidates.length && onSaveDesc);
-    const applyDescToPerformTraceChain = isSinglePerformTraceFamilyCandidates(declCandidates);
-    const showDeclTargetSelect = hasDecl && declCandidates.length > 1 && !applyDescToPerformTraceChain;
+    const showDeclTargetSelect = hasDecl && declCandidates.length > 1;
     const modal = openTemplateDynamicModal("Edit Template Cell", { contentClass: "template-runtime-modal-content template-runtime-modal-wide" });
 
     const saveBtn = document.createElement("button");
@@ -27449,17 +27995,11 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
             || Boolean(draft.skipNormalize) !== Boolean(draft.initialSkipNormalize)
           );
           if (descChanged) {
-            const chainDecls = applyDescToPerformTraceChain
-              ? getPerformTraceChainSaveDecls(declCandidates)
-              : [];
-            const saveDecl = chainDecls.length
-              ? chainDecls[0]
-              : (selected ? selected.decl : null);
+            const saveDecl = selected ? selected.decl : null;
             operations.push({
               label: "description",
               run: () => onSaveDesc({
                 decl: saveDecl,
-                decls: chainDecls.length > 1 ? chainDecls : undefined,
                 declKey: saveDecl && typeof getDeclOverrideStorageKey === "function"
                   ? String(getDeclOverrideStorageKey(saveDecl) || "")
                   : (selected ? selected.declKey : ""),
@@ -28238,7 +28778,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     state.performSourceRegistry = null;
     state.templatePreviewCache = null;
     state.selectedId = "";
-    state.selectedTemplateIndex = "";
+    resetTemplateSelectionStateMain();
     state.selectedDeclKey = "";
     if (state.collapsedIds instanceof Set) {
       state.collapsedIds.clear();
@@ -28305,7 +28845,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     state.collapsedIds.clear();
     state.selectedId = "";
-    state.selectedTemplateIndex = "";
+    resetTemplateSelectionStateMain();
     state.performSourceRegistry = buildPerformCallPathRegistry(state.data && state.data.objects);
     state.renderObjects = buildRenderableObjects(state.data && state.data.objects, {
       ...RENDER_TREE_OPTIONS,
@@ -28547,6 +29087,17 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     if (els.rightTabDescBtn) {
       els.rightTabDescBtn.addEventListener("click", () => setRightTab("descriptions"));
+    }
+
+    if (els.templateCopySelectedBtn) {
+      els.templateCopySelectedBtn.addEventListener("click", (ev) => {
+        if (ev && typeof ev.stopPropagation === "function") {
+          ev.stopPropagation();
+        }
+        copySelectedTemplateBlocks()
+          .then(() => setError(""))
+          .catch((err) => setError(`Copy failed: ${err && err.message ? err.message : err}`));
+      });
     }
 
     if (els.templateCopyAllBtn) {

@@ -296,10 +296,22 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return !state.templateGuiHiddenTypes.has(token);
   }
 
-  function rerenderTemplateForGuiFilterChange() {
-    if (state.selectedTemplateIndex !== "") {
-      state.selectedTemplateIndex = "";
+  function resetTemplateSelectionStateMain() {
+    if (typeof clearTemplateBlockSelection === "function") {
+      clearTemplateBlockSelection();
+      return;
     }
+    state.selectedTemplateIndex = "";
+    state.selectedTemplateIndexes = new Set();
+    state.templateSelectionAnchorIndex = "";
+    if (els.templateCopySelectedBtn) {
+      els.templateCopySelectedBtn.textContent = "Copy Selected (0)";
+      els.templateCopySelectedBtn.disabled = true;
+    }
+  }
+
+  function rerenderTemplateForGuiFilterChange() {
+    resetTemplateSelectionStateMain();
     if (state.data && Array.isArray(state.renderObjects) && typeof renderTemplatePreview === "function") {
       renderTemplatePreview();
       return;
@@ -1041,44 +1053,53 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return out;
   }
 
-  async function copyAllTemplateBlocks() {
-    const items = getRenderableObjectListForTemplate({ includeHidden: true });
-    if (!items.length) {
-      setError("Nothing to copy.");
-      return;
-    }
-
+  function getTemplateCopyItemsAndConfig() {
     const virtual = typeof getTemplateVirtualState === "function" ? getTemplateVirtualState() : null;
+    const items = virtual && Array.isArray(virtual.items) && virtual.items.length
+      ? virtual.items
+      : getRenderableObjectListForTemplate();
     const config = virtual && virtual.config && typeof virtual.config === "object"
       ? virtual.config
       : (state.templateConfig && typeof state.templateConfig === "object"
         ? state.templateConfig
         : getDefaultTemplateConfig());
+    return { items, config };
+  }
 
-    const wrapper = document.createElement("div");
-    const plainLines = [];
-    const tableOnly = typeof isTemplateCopyTableOnlyEnabled === "function"
-      ? isTemplateCopyTableOnlyEnabled()
-      : Boolean(els.templateCopyTableOnly && els.templateCopyTableOnly.checked);
-
-    for (let index = 0; index < items.length; index += 1) {
-      const payload = buildTemplateBlockCopyPayload(items[index], index, config, tableOnly);
-      if (!payload || !payload.node) {
-        continue;
-      }
-      wrapper.appendChild(payload.node);
-      if (tableOnly) {
-        wrapper.appendChild(document.createElement("br"));
-      }
-      plainLines.push(payload.text);
-    }
-
-    if (!wrapper.childNodes.length) {
+  async function copyTemplateBlocksByIndexes(indexes) {
+    const { items, config } = getTemplateCopyItemsAndConfig();
+    if (!items.length) {
       setError("Nothing to copy.");
       return;
     }
+    const tableOnly = typeof isTemplateCopyTableOnlyEnabled === "function"
+      ? isTemplateCopyTableOnlyEnabled()
+      : Boolean(els.templateCopyTableOnly && els.templateCopyTableOnly.checked);
+    if (typeof buildTemplateCollectionCopyPayload !== "function") {
+      throw new Error("Template clipboard builder is unavailable.");
+    }
+    const payload = buildTemplateCollectionCopyPayload(items, indexes, config, tableOnly);
+    if (!payload || !payload.node) {
+      setError("Nothing to copy.");
+      return;
+    }
+    await copyHtmlWithFallback(payload.html, payload.text);
+  }
 
-    await copyHtmlWithFallback(wrapper.innerHTML, plainLines.filter(Boolean).join("\n\n"));
+  async function copySelectedTemplateBlocks() {
+    const indexes = typeof getSortedSelectedTemplateIndexes === "function"
+      ? getSortedSelectedTemplateIndexes().map(Number)
+      : Array.from(state.selectedTemplateIndexes instanceof Set ? state.selectedTemplateIndexes : []).map(Number);
+    if (!indexes.length) {
+      setError("Select at least one template block first.");
+      return;
+    }
+    await copyTemplateBlocksByIndexes(indexes);
+  }
+
+  async function copyAllTemplateBlocks() {
+    const { items } = getTemplateCopyItemsAndConfig();
+    await copyTemplateBlocksByIndexes(items.map((_, index) => index));
   }
 
   function writeTemplateConfigDraftToTextarea(textarea) {
@@ -4892,7 +4913,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     state.performSourceRegistry = null;
     state.templatePreviewCache = null;
     state.selectedId = "";
-    state.selectedTemplateIndex = "";
+    resetTemplateSelectionStateMain();
     state.selectedDeclKey = "";
     if (state.collapsedIds instanceof Set) {
       state.collapsedIds.clear();
@@ -4959,7 +4980,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     state.collapsedIds.clear();
     state.selectedId = "";
-    state.selectedTemplateIndex = "";
+    resetTemplateSelectionStateMain();
     state.performSourceRegistry = buildPerformCallPathRegistry(state.data && state.data.objects);
     state.renderObjects = buildRenderableObjects(state.data && state.data.objects, {
       ...RENDER_TREE_OPTIONS,
@@ -5201,6 +5222,17 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     if (els.rightTabDescBtn) {
       els.rightTabDescBtn.addEventListener("click", () => setRightTab("descriptions"));
+    }
+
+    if (els.templateCopySelectedBtn) {
+      els.templateCopySelectedBtn.addEventListener("click", (ev) => {
+        if (ev && typeof ev.stopPropagation === "function") {
+          ev.stopPropagation();
+        }
+        copySelectedTemplateBlocks()
+          .then(() => setError(""))
+          .catch((err) => setError(`Copy failed: ${err && err.message ? err.message : err}`));
+      });
     }
 
     if (els.templateCopyAllBtn) {
