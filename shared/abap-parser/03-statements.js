@@ -10,6 +10,49 @@
     };
   }
 
+  function getValueEntryList(values, name) {
+    if (!values || typeof values !== "object") {
+      return [];
+    }
+    const entryOrList = values[name];
+    if (Array.isArray(entryOrList)) {
+      return entryOrList.filter((entry) => entry && typeof entry === "object");
+    }
+    return entryOrList && typeof entryOrList === "object" ? [entryOrList] : [];
+  }
+
+  function getFirstValueEntry(values, name) {
+    const entries = getValueEntryList(values, name);
+    return entries.length ? entries[0] : null;
+  }
+
+  function buildAppendExtras({ values }) {
+    const what = getFirstValueEntry(values, "what");
+    const linesSource = getFirstValueEntry(values, "source");
+    const toEntries = getValueEntryList(values, "to");
+    const isLinesOf = Boolean(linesSource);
+    const isInitialLine = !isLinesOf && String(what && what.value || "").trim().toUpperCase() === "INITIAL";
+    const target = toEntries.length ? toEntries[toEntries.length - 1] : null;
+
+    return {
+      append: {
+        variant: isLinesOf ? "linesOf" : (isInitialLine ? "initialLine" : "single"),
+        source: isLinesOf ? linesSource : (isInitialLine ? null : what),
+        target,
+        range: {
+          from: getFirstValueEntry(values, "from"),
+          to: isLinesOf && toEntries.length > 1 ? toEntries[toEntries.length - 2] : null,
+          step: getFirstValueEntry(values, "step"),
+          usingKey: getFirstValueEntry(values, "usingKey")
+        },
+        result: {
+          assigning: getFirstValueEntry(values, "assigning"),
+          refInto: getFirstValueEntry(values, "refInto")
+        }
+      }
+    };
+  }
+
   function buildPerformCallExtras({ values }) {
     const map = valuesToFirstValueMap(values);
     const ifCondition = map.ifCondition || "";

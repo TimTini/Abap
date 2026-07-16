@@ -2040,6 +2040,79 @@ async function assertTemplateAppendDeclaredOperandsPreferRealDeclarations() {
   dom.window.close();
 }
 
+async function assertAppendVariantsExposeStableExtrasAndDedicatedTemplate() {
+  const source = [
+    'DATA ls_row TYPE i. "Flight row',
+    'DATA lt_source TYPE STANDARD TABLE OF i. "Source rows',
+    'DATA lt_target TYPE STANDARD TABLE OF i. "Target rows',
+    "FIELD-SYMBOLS <ls_target> TYPE i.",
+    "APPEND ls_row TO lt_target.",
+    "APPEND INITIAL LINE TO lt_target ASSIGNING <ls_target>.",
+    "APPEND LINES OF lt_source FROM 2 TO 4 STEP 2 USING KEY primary_key TO lt_target."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+  const appendObjects = (state.data && Array.isArray(state.data.objects) ? state.data.objects : [])
+    .filter((obj) => obj && obj.objectType === "APPEND");
+  assert.strictEqual(appendObjects.length, 3, "Expected all APPEND variants to keep objectType APPEND.");
+
+  const [single, initialLine, linesOf] = appendObjects;
+  assert.strictEqual(single.extras.append.variant, "single");
+  assert.strictEqual(single.extras.append.source.value, "ls_row");
+  assert.strictEqual(single.extras.append.target.value, "lt_target");
+  assert.strictEqual(single.extras.append.result.assigning, null);
+
+  assert.strictEqual(initialLine.extras.append.variant, "initialLine");
+  assert.strictEqual(initialLine.extras.append.source, null);
+  assert.strictEqual(initialLine.extras.append.target.value, "lt_target");
+  assert.strictEqual(initialLine.extras.append.result.assigning.value, "<ls_target>");
+
+  assert.strictEqual(linesOf.extras.append.variant, "linesOf");
+  assert.strictEqual(single.values.what.value, "ls_row", "Expected legacy values.what compatibility for single-row APPEND.");
+  assert.strictEqual(linesOf.values.source.value, "lt_source", "Expected legacy values.source compatibility.");
+  assert.deepStrictEqual(
+    Array.from(linesOf.values.to || []).map((entry) => entry.value),
+    ["4", "lt_target"],
+    "Expected the last legacy TO value to remain the target."
+  );
+  assert.strictEqual(linesOf.extras.append.source, linesOf.values.source);
+  assert.strictEqual(linesOf.extras.append.target, linesOf.values.to[1]);
+  assert.strictEqual(linesOf.extras.append.range.from.value, "2");
+  assert.strictEqual(linesOf.extras.append.range.to.value, "4");
+  assert.strictEqual(linesOf.extras.append.range.step.value, "2");
+  assert.strictEqual(linesOf.extras.append.range.usingKey.value, "primary_key");
+  assert.strictEqual(linesOf.extras.append.source.decl.name, "lt_source");
+  assert.strictEqual(linesOf.extras.append.target.decl.name, "lt_target");
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+  const linesTable = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="APPEND"]'))
+    .find((table) => table.getAttribute("data-template-key") === "APPEND_LINES_OF");
+  assert(linesTable, "Expected APPEND LINES OF to resolve the dedicated template key.");
+  assert.deepStrictEqual(getTemplateTableRows(linesTable), [
+    ["APPEND LINES OF", "Source rows"],
+    ["FROM", "2"],
+    ["TO", "4"],
+    ["STEP", "2"],
+    ["USING KEY", "primary_key"],
+    ["TO", "Target rows"]
+  ]);
+  const sourceCell = findTemplateCellByText(linesTable, "Source rows");
+  const targetCell = findTemplateCellByText(linesTable, "Target rows");
+  assert.strictEqual(sourceCell.__templateCellMeta.declCandidates[0].name, "lt_source");
+  assert.strictEqual(targetCell.__templateCellMeta.declCandidates[0].name, "lt_target");
+
+  delete state.templateConfig.templates.APPEND_LINES_OF;
+  window.AbapViewerRuntime.api.renderTemplatePreview();
+  await waitForViewerUi(window);
+  const fallbackAppendTables = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="APPEND"]'))
+    .filter((table) => table.getAttribute("data-template-key") === "APPEND");
+  assert.strictEqual(fallbackAppendTables.length, 3, "Expected missing APPEND_LINES_OF config to fall back to APPEND.");
+
+  dom.window.close();
+}
+
 async function assertTemplateAppendLiteralKeepsOnlyTargetEditable() {
   const dom = await renderFixture("APPEND 'X' TO b.");
   const { window } = dom;
@@ -3166,6 +3239,13 @@ async function assertStatementSpecificTwentyCellTemplates() {
     assert.strictEqual(template.U1.text, "{rows.finalDesc}");
   }
 
+  const appendLinesOf = state.templateConfig.templates.APPEND_LINES_OF;
+  assert(appendLinesOf, "Expected a dedicated APPEND_LINES_OF template config.");
+  assert.strictEqual(appendLinesOf.A1.text, "APPEND LINES OF");
+  assert.strictEqual(appendLinesOf.U1.text, "{extras.append.source.finalDesc}");
+  assert.strictEqual(appendLinesOf.A6.text, "TO");
+  assert.strictEqual(appendLinesOf.U6.text, "{extras.append.target.finalDesc}");
+
   const assignment = state.templateConfig.templates.ASSIGNMENT;
   assert.strictEqual(assignment.A1.text, "Đích");
   assert.strictEqual(assignment.U1.text, "Nguồn");
@@ -3272,6 +3352,11 @@ async function assertLegacyTemplateImportAddsMissingSpecificConfigs() {
       ASSIGNMENT: {
         _options: { hideEmptyRows: true },
         "A1:T1": { text: "Custom assignment" }
+      },
+      APPEND: {
+        _options: { hideEmptyRows: true },
+        "A1:T1": { text: "Custom append" },
+        "U1:AN1": { text: "{rows.finalDesc}" }
       }
     }
   };
@@ -3292,6 +3377,11 @@ async function assertLegacyTemplateImportAddsMissingSpecificConfigs() {
   assert.strictEqual(state.templateConfig.version, 1);
   assert.strictEqual(state.templateConfig.templates.DEFAULT["A1:T1"].text, "Custom default");
   assert.strictEqual(state.templateConfig.templates.ASSIGNMENT["A1:T1"].text, "Custom assignment");
+  assert.deepStrictEqual(
+    state.templateConfig.templates.APPEND_LINES_OF,
+    state.templateConfig.templates.APPEND,
+    "Expected a legacy custom APPEND template to clone into APPEND_LINES_OF."
+  );
   for (const templateKey of STATEMENT_TEMPLATE_KEYS) {
     assert(
       Object.prototype.hasOwnProperty.call(state.templateConfig.templates, templateKey),
@@ -3790,6 +3880,9 @@ async function main() {
     await assertTemplateDirectSchemaPathsStayLocked();
     await assertTemplateFallbackAllowlistCoversExistingItabOperands();
     await assertTemplateResolverWarnsOnceWithCellMetadata();
+  }
+  if (!focus || focus === "append-variants") {
+    await assertAppendVariantsExposeStableExtrasAndDedicatedTemplate();
   }
   if (!focus || focus === "message-write") {
     await assertMessageAndWriteViewerContracts();

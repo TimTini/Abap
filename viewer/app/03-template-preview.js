@@ -3742,17 +3742,26 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       ? config.templates
       : {};
     const objectType = obj && obj.objectType ? String(obj.objectType) : "";
-    if (objectType && Object.prototype.hasOwnProperty.call(templates, objectType)) {
-      const resolved = resolveTemplateDefinitionForPreview(templates[objectType]);
-      return { key: objectType, map: resolved.map, options: resolved.options };
+    const isAppendLinesOf = objectType === "APPEND"
+      && obj.extras
+      && obj.extras.append
+      && String(obj.extras.append.variant || "") === "linesOf";
+    const preferredKeys = isAppendLinesOf ? ["APPEND_LINES_OF", "APPEND"] : [objectType];
+    for (const templateKey of preferredKeys) {
+      if (templateKey && Object.prototype.hasOwnProperty.call(templates, templateKey)) {
+        const resolved = resolveTemplateDefinitionForPreview(templates[templateKey]);
+        return { key: templateKey, map: resolved.map, options: resolved.options };
+      }
     }
     const defaultConfig = getDefaultTemplateConfig();
     const defaultTemplates = defaultConfig && defaultConfig.templates && typeof defaultConfig.templates === "object"
       ? defaultConfig.templates
       : {};
-    if (objectType && Object.prototype.hasOwnProperty.call(defaultTemplates, objectType)) {
-      const resolved = resolveTemplateDefinitionForPreview(defaultTemplates[objectType]);
-      return { key: objectType, map: resolved.map, options: resolved.options };
+    for (const templateKey of preferredKeys) {
+      if (templateKey && Object.prototype.hasOwnProperty.call(defaultTemplates, templateKey)) {
+        const resolved = resolveTemplateDefinitionForPreview(defaultTemplates[templateKey]);
+        return { key: templateKey, map: resolved.map, options: resolved.options };
+      }
     }
     if (Object.prototype.hasOwnProperty.call(templates, "DEFAULT")) {
       const resolved = resolveTemplateDefinitionForPreview(templates.DEFAULT);

@@ -281,6 +281,10 @@
       return buildDeleteItabExtras(context);
     }
 
+    if (extrasConfig.type === "append") {
+      return buildAppendExtras(context);
+    }
+
     if (extrasConfig.type === "message") {
       return buildMessageExtras(context);
     }

@@ -1586,6 +1586,32 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     };
   }
 
+  function createAppendLinesOfTemplate() {
+    const template = {
+      _options: {
+        hideEmptyRows: true,
+        hideRowsWithoutValues: true,
+        expandMultilineRows: false
+      }
+    };
+    const rows = [
+      ["APPEND LINES OF", "{extras.append.source.finalDesc}"],
+      ["FROM", "{extras.append.range.from.finalDesc}"],
+      ["TO", "{extras.append.range.to.finalDesc}"],
+      ["STEP", "{extras.append.range.step.finalDesc}"],
+      ["USING KEY", "{extras.append.range.usingKey.value}"],
+      ["TO", "{extras.append.target.finalDesc}"]
+    ];
+    rows.forEach(([label, token], index) => {
+      const row = index + 1;
+      template[`A${row}:T${row}`] = createTemplateBaseStyle("#dbeef4");
+      template[`A${row}`] = { text: label };
+      template[`U${row}:AN${row}`] = createTemplateBaseStyle("#ffffff");
+      template[`U${row}`] = { text: token };
+    });
+    return template;
+  }
+
   const UNIFIED_KEYWORD_ROW_TEMPLATE_V1 = createKeywordDescriptionTemplate();
 
   const ASSIGNMENT_ROW_TEMPLATE_V1 = {
@@ -1659,6 +1685,7 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     templates: {
       DEFAULT: UNIFIED_KEYWORD_ROW_TEMPLATE_V1,
       APPEND: createKeywordDescriptionTemplate(),
+      APPEND_LINES_OF: createAppendLinesOfTemplate(),
       ASSIGNMENT: ASSIGNMENT_ROW_TEMPLATE_V1,
       CALL_FUNCTION: createKeywordDescriptionTemplate(),
       CASE: createKeywordDescriptionTemplate(),
@@ -1972,6 +1999,14 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     return cloned && typeof cloned === "object" ? cloned : { version: 1, templates: {} };
   }
 
+  function templateDefinitionsEqual(left, right) {
+    try {
+      return JSON.stringify(left) === JSON.stringify(right);
+    } catch {
+      return false;
+    }
+  }
+
   function mergeMissingDefaultTemplatesInPlace(config) {
     if (!config || typeof config !== "object" || Array.isArray(config)) {
       return false;
@@ -1981,6 +2016,19 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     }
 
     let changed = false;
+    if (!Object.prototype.hasOwnProperty.call(config.templates, "APPEND_LINES_OF")) {
+      const legacyAppend = config.templates.APPEND;
+      const defaultAppend = TEMPLATE_DEFAULT_CONFIG_V1.templates.APPEND;
+      const dedicatedDefault = TEMPLATE_DEFAULT_CONFIG_V1.templates.APPEND_LINES_OF;
+      const sourceTemplate = legacyAppend && !templateDefinitionsEqual(legacyAppend, defaultAppend)
+        ? legacyAppend
+        : dedicatedDefault;
+      const cloned = cloneJsonValue(sourceTemplate);
+      if (cloned && typeof cloned === "object") {
+        config.templates.APPEND_LINES_OF = cloned;
+        changed = true;
+      }
+    }
     for (const [templateKey, templateDef] of Object.entries(TEMPLATE_DEFAULT_CONFIG_V1.templates)) {
       if (Object.prototype.hasOwnProperty.call(config.templates, templateKey)) {
         continue;

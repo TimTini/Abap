@@ -29,6 +29,10 @@
       "OF": "of",
       "INITIAL": "initial",
       "LINE": "line",
+      "FROM": "from",
+      "STEP": "step",
+      "USING": "using",
+      "KEY": "key",
       "ASSIGNING": "assigning",
       "REFERENCE": "reference",
       "INTO": "into"
@@ -36,6 +40,7 @@
     "keywordPhrases": {
       "LINES OF": "lines-of",
       "INITIAL LINE": "initial-line",
+      "USING KEY": "using-key",
       "REFERENCE INTO": "reference-into"
     },
     "captureRules": [
@@ -50,9 +55,24 @@
         "label": "source-itab"
       },
       {
+        "after": "FROM",
+        "name": "from",
+        "label": "from"
+      },
+      {
         "after": "TO",
         "name": "to",
         "label": "to-itab"
+      },
+      {
+        "after": "STEP",
+        "name": "step",
+        "label": "step"
+      },
+      {
+        "after": "USING KEY",
+        "name": "usingKey",
+        "label": "using-key"
       },
       {
         "after": "ASSIGNING",
@@ -64,7 +84,10 @@
         "name": "refInto",
         "label": "reference-into"
       }
-    ]
+    ],
+    "extras": {
+      "type": "append"
+    }
   };
   window.AbapParser.registerConfig(config);
 })();
