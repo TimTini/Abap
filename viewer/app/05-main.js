@@ -3444,6 +3444,16 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         : (String(candidate && candidate.currentDesc ? candidate.currentDesc : "") || getAtomicEffectiveDescSafe(decl));
       const itemDisplay = stripStructPrefixForModalItemText(itemDisplayRaw, String(decl.structName || ""));
 
+      if (String(candidate && candidate.declKey || "").startsWith("PERFORM_CHAIN:")) {
+        return {
+          mode: "single",
+          text: itemDisplay,
+          skipNormalize: Boolean(itemEntry.noNormalize || (candidate && candidate.skipNormalize)),
+          initialText: String(itemDisplay || ""),
+          initialSkipNormalize: Boolean(itemEntry.noNormalize || (candidate && candidate.skipNormalize))
+        };
+      }
+
       if (!isStructFieldDeclForModal(decl)) {
         return {
           mode: "single",
@@ -3498,6 +3508,20 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       .map((candidate, index) => normalizeDeclCandidate(candidate, index))
       .filter(Boolean);
 
+    const uniqueDeclCandidates = [];
+    const seenDeclCandidateKeys = new Set();
+    for (const candidate of declCandidates) {
+      const groupKey = String(candidate && candidate.declKey || "").trim();
+      if (groupKey && seenDeclCandidateKeys.has(groupKey)) {
+        continue;
+      }
+      if (groupKey) {
+        seenDeclCandidateKeys.add(groupKey);
+      }
+      uniqueDeclCandidates.push(candidate);
+    }
+    declCandidates = uniqueDeclCandidates;
+
     if (!declCandidates.length && legacyDecl) {
       declCandidates = [{
         decl: legacyDecl,
@@ -3514,8 +3538,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     const hasDecl = Boolean(declCandidates.length && onSaveDesc);
-    const applyDescToPerformTraceChain = isSinglePerformTraceFamilyCandidates(declCandidates);
-    const showDeclTargetSelect = hasDecl && declCandidates.length > 1 && !applyDescToPerformTraceChain;
+    const showDeclTargetSelect = hasDecl && declCandidates.length > 1;
     const modal = openTemplateDynamicModal("Edit Template Cell", { contentClass: "template-runtime-modal-content template-runtime-modal-wide" });
 
     const saveBtn = document.createElement("button");
@@ -4086,17 +4109,11 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
             || Boolean(draft.skipNormalize) !== Boolean(draft.initialSkipNormalize)
           );
           if (descChanged) {
-            const chainDecls = applyDescToPerformTraceChain
-              ? getPerformTraceChainSaveDecls(declCandidates)
-              : [];
-            const saveDecl = chainDecls.length
-              ? chainDecls[0]
-              : (selected ? selected.decl : null);
+            const saveDecl = selected ? selected.decl : null;
             operations.push({
               label: "description",
               run: () => onSaveDesc({
                 decl: saveDecl,
-                decls: chainDecls.length > 1 ? chainDecls : undefined,
                 declKey: saveDecl && typeof getDeclOverrideStorageKey === "function"
                   ? String(getDeclOverrideStorageKey(saveDecl) || "")
                   : (selected ? selected.declKey : ""),

@@ -842,7 +842,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const remappedTraceDecls = localDeclType === "STRUCT_FIELD"
       ? traceDecls.map((traceDecl) => buildExpandedPerformTemplateTraceDecl(traceDecl, decl, ownerContext)).filter(Boolean)
       : traceDecls;
-    return dedupeTemplateDecls(remappedTraceDecls);
+    const scopedTraceDecls = typeof cloneDeclWithPerformChainOverride === "function"
+      ? remappedTraceDecls.map((traceDecl) => cloneDeclWithPerformChainOverride(traceDecl, ownerContext, decl))
+      : remappedTraceDecls;
+    return dedupeTemplateDecls(scopedTraceDecls);
   }
 
   function selectExpandedPerformTemplateRootDecl(traceDecls) {
@@ -907,10 +910,17 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     const existingOrigins = Array.isArray(value.originDecls) ? value.originDecls : [];
-    const originDecls = dedupeTemplateDecls([localDecl, ...externalTraceDecls, ...existingOrigins]);
+    const scopedLocalDecl = typeof cloneDeclWithPerformChainOverride === "function"
+      ? cloneDeclWithPerformChainOverride(localDecl, ownerContext, localDecl)
+      : localDecl;
+    const scopedExistingOrigins = typeof cloneDeclWithPerformChainOverride === "function"
+      ? existingOrigins.map((originDecl) => cloneDeclWithPerformChainOverride(originDecl, ownerContext, localDecl))
+      : existingOrigins;
+    const originDecls = dedupeTemplateDecls([scopedLocalDecl, ...externalTraceDecls, ...scopedExistingOrigins]);
     return {
       ...value,
       decl: rootTraceDecl,
+      valueDecl: scopedLocalDecl,
       originDecls
     };
   }
@@ -1206,7 +1216,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
     const traceDecls = resolveExpandedPerformTemplateTraceDecls(ownerContext, decl);
     const rootDecl = selectExpandedPerformTemplateRootDecl(traceDecls) || decl;
-    return dedupeTemplateDecls([rootDecl, decl, ...traceDecls]);
+    const scopedLocalDecl = typeof cloneDeclWithPerformChainOverride === "function"
+      ? cloneDeclWithPerformChainOverride(decl, ownerContext, decl)
+      : decl;
+    return dedupeTemplateDecls([rootDecl, scopedLocalDecl, ...traceDecls]);
   }
 
   function buildTemplateSemanticValueEntry(entry, ownerContext) {
@@ -4605,7 +4618,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
               if (!declKey) {
                 continue;
               }
-              for (const key of lookupKeys.length ? lookupKeys : [declKey]) {
+              const deleteKeys = String(declKey).startsWith("PERFORM_CHAIN:")
+                ? [declKey]
+                : (lookupKeys.length ? lookupKeys : [declKey]);
+              for (const key of deleteKeys) {
                 delete state.descOverrides[key];
                 if (state.descOverridesLegacy && typeof state.descOverridesLegacy === "object") {
                   delete state.descOverridesLegacy[key];

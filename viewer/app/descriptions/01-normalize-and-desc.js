@@ -756,6 +756,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       keys.push(key);
     };
 
+    if (decl && typeof decl === "object") {
+      pushKey(decl.__abapPerformChainOverrideKey);
+    }
+
     if (isPathDeclForOverrideKey(decl)) {
       for (const key of getPathDeclOverrideLookupKeys(decl)) {
         pushKey(key);
@@ -766,6 +770,82 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     pushKey(getLegacyDeclKey(decl));
     pushKey(getDeclFallbackKey(decl));
     return keys;
+  }
+
+  function getPerformChainSourceScope(ownerContext) {
+    if (!ownerContext || typeof ownerContext !== "object") {
+      return "";
+    }
+    const directScope = String(ownerContext.__abapPerformChainScope || "").trim();
+    if (directScope) {
+      return directScope;
+    }
+    const bindingScope = String(ownerContext.sourceScope || "").trim();
+    if (bindingScope) {
+      return bindingScope;
+    }
+    const bindingContext = ownerContext.__abapPerformTraceBinding;
+    return bindingContext && typeof bindingContext === "object"
+      ? String(bindingContext.sourceScope || "").trim()
+      : "";
+  }
+
+  function getPerformFormalParamKey(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+    const objectType = String(decl.objectType || "").trim().toUpperCase();
+    let paramName = "";
+    let fieldPath = "";
+    if (objectType === "FORM_PARAM") {
+      paramName = String(decl.name || "").trim().toUpperCase();
+    } else if (objectType === "STRUCT_FIELD" && String(decl.structObjectType || "").trim().toUpperCase() === "FORM_PARAM") {
+      paramName = String(decl.structName || "").trim().toUpperCase();
+      fieldPath = String(decl.fieldPath || "").trim().toUpperCase();
+    }
+    if (!paramName) {
+      return "";
+    }
+    return encodeURIComponent([
+      String(decl.scopeLabel || "").trim().toUpperCase(),
+      paramName,
+      fieldPath
+    ].join("|"));
+  }
+
+  function buildPerformChainOverrideKey(ownerContext, formalDecl) {
+    const sourceScope = getPerformChainSourceScope(ownerContext);
+    const formalParamKey = getPerformFormalParamKey(formalDecl);
+    if (!sourceScope || !formalParamKey) {
+      return "";
+    }
+    return `PERFORM_CHAIN:${sourceScope}:${formalParamKey}`;
+  }
+
+  function cloneDeclWithPerformChainOverride(decl, ownerContext, formalDecl) {
+    if (!decl || typeof decl !== "object") {
+      return decl;
+    }
+    const chainKey = buildPerformChainOverrideKey(ownerContext, formalDecl);
+    if (!chainKey) {
+      return decl;
+    }
+    const clone = { ...decl };
+    try {
+      Object.defineProperty(clone, "__abapPerformChainOverrideKey", {
+        value: chainKey,
+        enumerable: false,
+        configurable: true
+      });
+      Object.defineProperty(clone, "__abapPerformChainScope", {
+        value: getPerformChainSourceScope(ownerContext),
+        enumerable: false,
+        configurable: true
+      });
+    } catch {
+      return decl;
+    }
+    return clone;
   }
 
   function getDeclOverrideStorageKey(decl) {
@@ -1370,12 +1450,12 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       return;
     }
 
-    const isStructField = isStructFieldDecl(decl);
-
     const key = getDeclOverrideStorageKey(decl);
     if (!key) {
       return;
     }
+    const isScopedPerformChain = String(key).startsWith("PERFORM_CHAIN:");
+    const isStructField = isStructFieldDecl(decl) && !isScopedPerformChain;
 
     const settings = state.settings || DEFAULT_SETTINGS;
     const normalizeEnabled = Boolean(settings.normalizeDeclDesc);
@@ -2172,14 +2252,49 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
           enumerable: false,
           configurable: true
         });
+        if (String(bindingContext.sourceScope || "").trim()) {
+          Object.defineProperty(node, "__abapPerformChainScope", {
+            value: String(bindingContext.sourceScope || "").trim(),
+            enumerable: false,
+            configurable: true
+          });
+        }
       } catch {
         // ignore metadata errors; rendering should keep working without trace metadata.
       }
     };
 
+    const clonePerformScopedData = (value, bindingContext, seen) => {
+      if (!value || typeof value !== "object") {
+        return value;
+      }
+      const visited = seen instanceof WeakMap ? seen : new WeakMap();
+      if (visited.has(value)) {
+        return visited.get(value);
+      }
+      if (getPerformFormalParamKey(value)) {
+        return cloneDeclWithPerformChainOverride(value, bindingContext, value);
+      }
+      if (Array.isArray(value)) {
+        const output = [];
+        visited.set(value, output);
+        for (const item of value) {
+          output.push(clonePerformScopedData(item, bindingContext, visited));
+        }
+        return output;
+      }
+      const output = {};
+      visited.set(value, output);
+      for (const key of Object.keys(value)) {
+        output[key] = clonePerformScopedData(value[key], bindingContext, visited);
+      }
+      return output;
+    };
+
     return {
       attachPerformBindingMetadata,
-      buildPerformBindingContext
+      buildPerformBindingContext,
+      clonePerformScopedData
     };
   }
 
@@ -2209,6 +2324,32 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       }
     }
     return parts.length ? parts.join(" · ") : "không có đối số";
+  }
+
+  function hashPerformSourceScope(value) {
+    const text = String(value || "");
+    let hash = 2166136261;
+    for (let index = 0; index < text.length; index += 1) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(36).toUpperCase();
+  }
+
+  function buildPerformSourceScope(performNode, formNameUpper, pathToken, ancestry) {
+    const normalizedRaw = String(performNode && performNode.raw || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toUpperCase();
+    const fingerprint = [
+      String(formNameUpper || "").trim().toUpperCase(),
+      String(performNode && performNode.file || "").trim().toUpperCase(),
+      Number(performNode && performNode.lineStart) || 0,
+      normalizedRaw,
+      String(pathToken || ""),
+      (Array.isArray(ancestry) ? ancestry : []).join(">")
+    ].join("|");
+    return `${String(formNameUpper || "FORM").trim().toUpperCase()}-${hashPerformSourceScope(fingerprint)}`;
   }
 
   function buildPerformCallPathRegistry(rawRoots) {
@@ -2297,8 +2438,13 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const registerCandidate = (performNode, resolvedForm, formName, formNameUpper, pathToken, ancestry, bindingContext) => {
       sourceOrder += 1;
       const key = `PERFORM_SOURCE:${formNameUpper}:${pathToken}`;
+      const sourceScope = buildPerformSourceScope(performNode, formNameUpper, pathToken, ancestry);
+      if (bindingContext && typeof bindingContext === "object") {
+        bindingContext.sourceScope = sourceScope;
+      }
       const candidate = {
         key,
+        sourceScope,
         formId: resolvedForm.id === undefined || resolvedForm.id === null ? "" : String(resolvedForm.id),
         formName,
         formNameUpper,
@@ -2534,6 +2680,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const tools = createPerformExpansionTools();
     const attachPerformBindingMetadata = tools.attachPerformBindingMetadata;
     const buildPerformBindingContext = tools.buildPerformBindingContext;
+    const clonePerformScopedData = tools.clonePerformScopedData;
 
     const cloneNode = (sourceNode, parentId, expandDepth, pathToken, forceSyntheticId, formCallStack, bindingContext) => {
       if (!sourceNode || typeof sourceNode !== "object") {
@@ -2560,6 +2707,14 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         out.parent = parentId;
       }
       attachPerformBindingMetadata(out, bindingContext);
+      if (bindingContext && String(bindingContext.sourceScope || "").trim()) {
+        if (out.values && typeof out.values === "object") {
+          out.values = clonePerformScopedData(out.values, bindingContext);
+        }
+        if (out.extras && typeof out.extras === "object") {
+          out.extras = clonePerformScopedData(out.extras, bindingContext);
+        }
+      }
 
       const ownId = out.id !== null && out.id !== undefined && String(out.id).trim() ? out.id : undefined;
       const outChildren = [];

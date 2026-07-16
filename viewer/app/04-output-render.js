@@ -930,13 +930,18 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const remappedTraceDecls = localDeclType === "STRUCT_FIELD"
       ? traceDecls.map((traceDecl) => buildExpandedPerformOutputTraceDecl(traceDecl, decl, obj)).filter(Boolean)
       : traceDecls;
-    return dedupeDecls(remappedTraceDecls.filter((item) => item && typeof item === "object"));
+    const scopedTraceDecls = typeof cloneDeclWithPerformChainOverride === "function"
+      ? remappedTraceDecls.map((traceDecl) => cloneDeclWithPerformChainOverride(traceDecl, obj, decl))
+      : remappedTraceDecls;
+    return dedupeDecls(scopedTraceDecls.filter((item) => item && typeof item === "object"));
   }
 
   function buildDeclTraceListForObject(obj, decl) {
     const list = [];
     if (decl && typeof decl === "object") {
-      list.push(decl);
+      list.push(typeof cloneDeclWithPerformChainOverride === "function"
+        ? cloneDeclWithPerformChainOverride(decl, obj, decl)
+        : decl);
     }
     const traceDecls = resolveExpandedPerformTraceDecls(obj, decl);
     if (traceDecls.length) {
