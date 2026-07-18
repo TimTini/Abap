@@ -176,6 +176,7 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
 
   const DECL_TYPE_OPTIONS = [
     "DATA",
+    "INLINE",
     "TYPES",
     "PARAMETERS",
     "SELECT-OPTIONS",
@@ -183,7 +184,9 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     "RANGES",
     "STATICS",
     "CLASS-DATA",
-    "FIELD-SYMBOLS"
+    "FIELD-SYMBOLS",
+    "FORM_PARAM",
+    "METHOD_PARAM"
   ];
 
   const NAME_CODE_OPTIONS = [
@@ -198,7 +201,20 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
 
   const DEFAULT_SETTINGS = {
     normalizeDeclDesc: true,
-    declFilterTypes: ["DATA", "TYPES", "PARAMETERS"],
+    declFilterTypes: [
+      "DATA",
+      "INLINE",
+      "TYPES",
+      "PARAMETERS",
+      "SELECT-OPTIONS",
+      "CONSTANTS",
+      "RANGES",
+      "STATICS",
+      "CLASS-DATA",
+      "FIELD-SYMBOLS",
+      "FORM_PARAM",
+      "METHOD_PARAM"
+    ],
     structDescTemplate: "{{struct}}-{{item}}",
     nameTemplatesByCode: {
       CN: "HẰNG:{{desc}}",

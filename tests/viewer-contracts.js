@@ -130,6 +130,18 @@ async function waitForViewerUi(window) {
   await new Promise((resolve) => window.setTimeout(resolve, 0));
 }
 
+function findDataDeclGroup(els, scopeLabel) {
+  const expectedScope = String(scopeLabel || "").trim().toUpperCase();
+  return Array.from(els.declDescTable.querySelectorAll(".data-decl-group"))
+    .find((group) => String(group.getAttribute("data-scope-label") || "").trim().toUpperCase() === expectedScope);
+}
+
+function findDataDeclRow(group, declName) {
+  const expectedName = String(declName || "").trim().toUpperCase();
+  return Array.from(group ? group.querySelectorAll("tbody tr[data-decl-name]") : [])
+    .find((row) => String(row.getAttribute("data-decl-name") || "").trim().toUpperCase() === expectedName);
+}
+
 async function settleViewerUi(window, ticks = 6) {
   for (let index = 0; index < ticks; index += 1) {
     await waitForViewerUi(window);
@@ -3565,7 +3577,7 @@ async function assertViewerFixture(fileName) {
     await new Promise((resolve) => window.setTimeout(resolve, 0));
     const secondRow = els.declDescTable.querySelectorAll("tbody tr")[1];
     assert(secondRow, "Expected second descriptions row for multi-statement fixture.");
-    const techCell = secondRow.querySelector("td:nth-child(3) div div");
+    const techCell = secondRow.querySelector("td:nth-child(2) > div > div");
     assert(techCell, "Expected clickable technical id cell.");
     techCell.click();
     await new Promise((resolve) => window.setTimeout(resolve, 0));
@@ -3938,6 +3950,186 @@ async function assertMessageAndWriteViewerContracts() {
   dom.window.close();
 }
 
+async function assertDataCatalogGroupsEverySourceDeclaration() {
+  const source = [
+    "TYPES ty_code TYPE string.",
+    "DATA gv_root TYPE ty_code. \"Root description",
+    "CONSTANTS gc_kind TYPE string VALUE 'A'. \"Kind description",
+    "PERFORM frm_catalog USING gv_root.",
+    "FORM frm_catalog USING iv_value TYPE string.",
+    "  DATA lv_local TYPE string. \"Local description",
+    "  DATA(lv_inline) = iv_value.",
+    "  FIELD-SYMBOLS <fs_value> TYPE string.",
+    "ENDFORM."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+
+  els.rightTabDescBtn.click();
+  await waitForViewerUi(window);
+
+  assert.strictEqual(String(els.rightTabDescBtn.textContent || "").trim(), "Data");
+  assert.strictEqual(String(els.rightPanelTitle.textContent || "").trim(), "Data");
+  assert.strictEqual(els.declDescMissingOnly.checked, false, "Data must show every declaration by default.");
+
+  const globalGroup = findDataDeclGroup(els, "GLOBAL");
+  const formGroup = findDataDeclGroup(els, "FORM:FRM_CATALOG");
+  assert(globalGroup, "Expected a Global declaration group.");
+  assert(formGroup, "Expected a FORM:FRM_CATALOG declaration group.");
+  assert(findDataDeclRow(globalGroup, "ty_code"), "Expected TYPES in the Global group.");
+  assert(findDataDeclRow(globalGroup, "gv_root"), "Expected DATA in the Global group.");
+  assert(findDataDeclRow(globalGroup, "gc_kind"), "Expected CONSTANTS in the Global group.");
+  assert(findDataDeclRow(formGroup, "iv_value"), "Expected FORM_PARAM in the FORM group.");
+  assert(findDataDeclRow(formGroup, "lv_local"), "Expected local DATA in the FORM group.");
+  assert(findDataDeclRow(formGroup, "lv_inline"), "Expected INLINE data in the FORM group.");
+  assert(findDataDeclRow(formGroup, "<fs_value>"), "Expected FIELD-SYMBOLS in the FORM group.");
+
+  const expectedKeys = new Set((state.data.decls || [])
+    .filter((decl) => {
+      const objectType = String(decl && decl.objectType || "").toUpperCase();
+      const scopeType = String(decl && decl.scopeType || "").toUpperCase();
+      return decl && decl.name
+        && !["SYSTEM", "CONDITION", "PATH_DECL"].includes(objectType)
+        && !["SYSTEM", "PATH"].includes(scopeType);
+    })
+    .map((decl) => window.getDeclOverrideStorageKey(decl))
+    .filter(Boolean));
+  const renderedKeys = new Set(Array.from(els.declDescTable.querySelectorAll("tbody tr[data-source-decl-key]"))
+    .map((row) => String(row.getAttribute("data-source-decl-key") || ""))
+    .filter(Boolean));
+  assert.deepStrictEqual(Array.from(renderedKeys).sort(), Array.from(expectedKeys).sort());
+
+  const headerLabels = Array.from(globalGroup.querySelectorAll("thead th"))
+    .map((cell) => String(cell.textContent || "").trim());
+  assert.deepStrictEqual(headerLabels, [
+    "Type",
+    "Technical ID",
+    "Trace → Root",
+    "Code description",
+    "User description",
+    "Effective description",
+    "Edit"
+  ]);
+
+  dom.window.close();
+}
+
+async function assertDataCatalogTracesNestedPerformAndEditsSelectedChain() {
+  const source = [
+    "DATA gv_root TYPE string. \"Root description",
+    "PERFORM frm_outer USING gv_root.",
+    "FORM frm_outer USING iv_outer TYPE string.",
+    "  PERFORM frm_inner USING iv_outer.",
+    "ENDFORM.",
+    "FORM frm_inner USING iv_inner TYPE string.",
+    "  CLEAR iv_inner.",
+    "ENDFORM."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+
+  els.rightTabDescBtn.click();
+  await waitForViewerUi(window);
+
+  let innerGroup = findDataDeclGroup(els, "FORM:FRM_INNER");
+  let innerRow = findDataDeclRow(innerGroup, "iv_inner");
+  assert(innerRow, "Expected the inner FORM parameter row.");
+  assert.strictEqual(
+    String(innerRow.querySelector('[data-column="trace"]')?.textContent || "").trim(),
+    "iv_inner ← iv_outer ← gv_root"
+  );
+  assert.strictEqual(
+    String(innerRow.querySelector('[data-column="effective-description"]')?.textContent || "").trim(),
+    "Root description"
+  );
+
+  const chainKey = String(innerRow.getAttribute("data-decl-key") || "");
+  assert.match(chainKey, /^PERFORM_CHAIN:/, "Expected traced Data edits to use the selected call-chain key.");
+  innerRow.querySelector('button[data-action="edit-description"]').click();
+  await waitForViewerUi(window);
+  els.editDesc.value = "Inner chain only";
+  els.editSaveBtn.click();
+  await waitForViewerUi(window);
+  assert.strictEqual(String(state.descOverrides[chainKey] || ""), "Inner chain only");
+
+  innerGroup = findDataDeclGroup(els, "FORM:FRM_INNER");
+  innerRow = findDataDeclRow(innerGroup, "iv_inner");
+  assert.strictEqual(
+    String(innerRow.querySelector('[data-column="effective-description"]')?.textContent || "").trim(),
+    "Inner chain only"
+  );
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+  assert(
+    String(els.templatePreviewOutput.textContent || "").includes("Inner chain only"),
+    "Template must resolve the description saved from Data through the same chain key."
+  );
+
+  els.rightTabDescBtn.click();
+  await waitForViewerUi(window);
+  innerGroup = findDataDeclGroup(els, "FORM:FRM_INNER");
+  innerRow = findDataDeclRow(innerGroup, "iv_inner");
+  innerRow.querySelector('button[data-action="edit-description"]').click();
+  await waitForViewerUi(window);
+  els.editClearBtn.click();
+  await waitForViewerUi(window);
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(state.descOverrides, chainKey), false);
+  innerRow = findDataDeclRow(findDataDeclGroup(els, "FORM:FRM_INNER"), "iv_inner");
+  assert.strictEqual(
+    String(innerRow.querySelector('[data-column="effective-description"]')?.textContent || "").trim(),
+    "Root description",
+    "Clearing the chain override must fall back to the root declaration description."
+  );
+
+  dom.window.close();
+}
+
+async function assertDataCatalogSourceSelectorStaysSynchronized() {
+  const source = [
+    "DATA gv_a TYPE string. \"Root A",
+    "DATA gv_b TYPE string. \"Root B",
+    "PERFORM frm_pick USING gv_a.",
+    "PERFORM frm_pick USING gv_b.",
+    "FORM frm_pick USING iv_value TYPE string.",
+    "  CLEAR iv_value.",
+    "ENDFORM."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+
+  els.rightTabDescBtn.click();
+  await waitForViewerUi(window);
+
+  const candidates = state.performSourceRegistry.candidatesByFormUpper.get("FRM_PICK") || [];
+  assert.strictEqual(candidates.length, 2);
+  let group = findDataDeclGroup(els, "FORM:FRM_PICK");
+  let selector = group.querySelector("select.data-perform-source-select");
+  assert(selector, "Expected a source selector for a FORM with multiple call sites.");
+  assert.strictEqual(selector.value, candidates[0].key);
+  assert(String(findDataDeclRow(group, "iv_value").textContent || "").includes("gv_a"));
+
+  selector.value = candidates[1].key;
+  selector.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await waitForViewerUi(window);
+  assert.strictEqual(state.performSourceRegistry.getSelectedCandidate("FRM_PICK").key, candidates[1].key);
+  group = findDataDeclGroup(els, "FORM:FRM_PICK");
+  selector = group.querySelector("select.data-perform-source-select");
+  assert.strictEqual(selector.value, candidates[1].key);
+  assert(String(findDataDeclRow(group, "iv_value").textContent || "").includes("gv_b"));
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+  const templateSourceSelect = els.templatePreviewOutput.querySelector('select[data-perform-form="FRM_PICK"]');
+  assert(templateSourceSelect, "Expected Template to expose the shared FORM source selector.");
+  assert.strictEqual(templateSourceSelect.value, candidates[1].key);
+
+  dom.window.close();
+}
+
 async function main() {
   const focus = String(process.argv[2] || "").trim();
   if (!focus || focus === "fixtures") {
@@ -4021,6 +4213,13 @@ async function main() {
   }
   if (!focus || focus === "message-write") {
     await assertMessageAndWriteViewerContracts();
+  }
+  if (!focus || focus === "data-catalog") {
+    await assertDataCatalogGroupsEverySourceDeclaration();
+  }
+  if (!focus || focus === "data-perform-trace") {
+    await assertDataCatalogTracesNestedPerformAndEditsSelectedChain();
+    await assertDataCatalogSourceSelectorStaysSynchronized();
   }
   if (!focus || focus === "scroll-navigation") {
     await assertInputPitchAndCodeNavigationUseNativeTextareaMetrics();

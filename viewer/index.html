@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.07.16-r59">
-  <meta name="abap-viewer-updated-at" content="2026-07-16 18:15:02">
-  <meta name="abap-viewer-updated-note" content="Natural flight demo; source-scoped PERFORM descriptions; dedicated APPEND LINES OF; multi-block Excel copy.">
+  <meta name="abap-viewer-version" content="v2026.07.18-r60">
+  <meta name="abap-viewer-updated-at" content="2026-07-18 14:37:47">
+  <meta name="abap-viewer-updated-note" content="Data catalog groups declarations by scope, traces FORM parameters to root descriptions, and shares edits with Template.">
   <title>ABAP Parser Viewer</title>
   <style>
     :root {
@@ -418,6 +418,62 @@
       min-height: 0;
       overflow: auto;
       padding-right: 6px;
+    }
+
+    .data-decl-groups {
+      display: grid;
+      gap: 10px;
+    }
+
+    .data-decl-group {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      overflow: hidden;
+    }
+
+    .data-decl-group > summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 10px;
+      cursor: pointer;
+      background: var(--code-bg);
+      font-weight: 600;
+    }
+
+    .data-decl-group-title {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .data-decl-group-meta {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 400;
+      white-space: nowrap;
+    }
+
+    .data-decl-group-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px 0;
+      flex-wrap: wrap;
+    }
+
+    .data-perform-source-select {
+      max-width: min(620px, 100%);
+    }
+
+    .data-decl-table-wrap {
+      overflow-x: auto;
+      padding: 0 10px 10px;
+    }
+
+    .data-trace-chain {
+      white-space: nowrap;
     }
 
     #templatePreviewPanel {
@@ -1555,7 +1611,7 @@
       <button type="button" id="expandAllBtn" class="secondary">Expand all</button>
       <button type="button" id="collapseAllBtn" class="secondary">Collapse all</button>
       <button type="button" id="clearFiltersBtn" class="secondary">Clear</button>
-      <button type="button" id="descBtn" class="secondary">Descriptions</button>
+      <button type="button" id="descBtn" class="secondary">Data</button>
       <button type="button" id="settingsBtn" class="secondary">Settings</button>
       <span class="muted hint">Tip: click “Code” on a card to select the corresponding lines in the input; click “JSON” to inspect the raw object.</span>
     </div>
@@ -1592,7 +1648,7 @@
           <div class="panel-tabs">
             <button type="button" id="rightTabOutputBtn" class="secondary tab-btn">Output</button>
             <button type="button" id="rightTabTemplateBtn" class="secondary tab-btn active">Template</button>
-            <button type="button" id="rightTabDescBtn" class="secondary tab-btn">Descriptions</button>
+            <button type="button" id="rightTabDescBtn" class="secondary tab-btn">Data</button>
             <button type="button" id="declDescJsonBtn" class="secondary" hidden>Storage JSON</button>
           </div>
         </div>
@@ -1621,8 +1677,8 @@
         </div>
         <div id="declDescPanel" hidden>
           <div class="controls" style="margin-bottom:8px">
-            <input type="search" id="declDescSearch" placeholder="Search (type/scope/id/desc)…">
-            <label class="toggle"><input type="checkbox" id="declDescMissingOnly" checked>missing only</label>
+            <input type="search" id="declDescSearch" placeholder="Search (type/scope/id/trace/desc)…">
+            <label class="toggle"><input type="checkbox" id="declDescMissingOnly">missing only</label>
           </div>
           <div class="muted" style="margin-bottom:6px">Declaration types</div>
           <div id="declDescTypes" class="controls" style="margin-bottom:8px"></div>
@@ -1699,7 +1755,7 @@
         </div>
 
         <div style="margin-bottom:16px">
-          <div class="muted" style="margin-bottom:6px">Declaration types shown in Descriptions modal</div>
+          <div class="muted" style="margin-bottom:6px">Declaration types shown in Data</div>
           <div id="settingsDeclTypes" class="controls" style="margin-bottom:0"></div>
         </div>
 

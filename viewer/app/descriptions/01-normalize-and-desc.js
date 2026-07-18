@@ -14,146 +14,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
   }
 
-  function collectConditionDeclsFromExtras(extras, addDecl) {
-    if (!extras || typeof extras !== "object" || typeof addDecl !== "function") {
-      return;
-    }
-
-    if (extras.ifCondition) {
-      collectConditionDeclsFromClauses(extras.ifCondition.conditions, addDecl);
-    }
-
-    if (extras.performCall) {
-      collectConditionDeclsFromClauses(extras.performCall.ifConditions, addDecl);
-    }
-
-    if (extras.select) {
-      collectConditionDeclsFromClauses(extras.select.whereConditions, addDecl);
-      collectConditionDeclsFromClauses(extras.select.havingConditions, addDecl);
-    }
-
-    for (const key of ["readTable", "loopAtItab", "modifyItab", "deleteItab"]) {
-      if (extras[key]) {
-        collectConditionDeclsFromClauses(extras[key].conditions, addDecl);
-      }
-    }
-  }
-
-  function getDeclsForDescriptionsModal() {
-    const decls = [];
-    const seen = new Set();
-
-    const addDecl = (decl) => {
-      if (!decl || typeof decl !== "object") {
-        return;
-      }
-      const key = getDeclOverrideStorageKey(decl) || stringifyDecl(decl);
-      if (!key || seen.has(key)) {
-        return;
-      }
-      seen.add(key);
-      decls.push(decl);
-    };
-
-    for (const decl of (state.data && typeof state.data === "object" && Array.isArray(state.data.decls))
-      ? state.data.decls
-      : []) {
-      addDecl(decl);
-    }
-
-    const objectSources = [];
-    if (Array.isArray(state.renderObjects) && state.renderObjects.length) {
-      objectSources.push(state.renderObjects);
-    }
-    if (state.data && Array.isArray(state.data.objects)) {
-      objectSources.push(state.data.objects);
-    }
-
-    for (const objectList of objectSources) {
-      walkObjects(objectList, (obj) => {
-      for (const value of getValueEntries(obj)) {
-        addDecl(value && value.decl);
-      }
-
-      const extras = obj && obj.extras && typeof obj.extras === "object" ? obj.extras : null;
-      if (!extras) {
-        return;
-      }
-
-      const collectFromAssignmentSections = (container, sections) => {
-        for (const sectionName of sections) {
-          const list = container && Array.isArray(container[sectionName]) ? container[sectionName] : [];
-          for (const entry of list) {
-            const origin = entry && Array.isArray(entry.originDecls) ? entry.originDecls : [];
-            for (const originDecl of origin) {
-              addDecl(originDecl);
-            }
-            addDecl(entry && entry.valueDecl);
-          }
-        }
-      };
-
-      if (extras.callFunction) {
-        collectFromAssignmentSections(extras.callFunction, ["exporting", "importing", "changing", "tables", "exceptions"]);
-      }
-
-      if (extras.callMethod) {
-        collectFromAssignmentSections(extras.callMethod, ["exporting", "importing", "changing", "receiving", "exceptions"]);
-      }
-
-      if (extras.performCall) {
-        for (const sectionName of ["using", "changing", "tables"]) {
-          const list = Array.isArray(extras.performCall[sectionName]) ? extras.performCall[sectionName] : [];
-          for (const entry of list) {
-            const origin = entry && Array.isArray(entry.originDecls) ? entry.originDecls : [];
-            for (const originDecl of origin) {
-              addDecl(originDecl);
-            }
-            addDecl(entry && entry.valueDecl);
-          }
-        }
-      }
-
-      if (extras.form && Array.isArray(extras.form.params)) {
-        for (const param of extras.form.params) {
-          const origin = param && Array.isArray(param.originDecls) ? param.originDecls : [];
-          for (const originDecl of origin) {
-            addDecl(originDecl);
-          }
-        }
-      }
-
-      if (extras.message) {
-        for (const key of ["messageDecl", "idDecl", "messageTypeDecl", "numberDecl", "displayLikeDecl", "intoDecl"]) {
-          addDecl(extras.message[key]);
-        }
-        for (const entry of (Array.isArray(extras.message.with) ? extras.message.with : [])) {
-          addDecl(entry && entry.valueDecl);
-        }
-      }
-
-      if (extras.write) {
-        addDecl(extras.write.outputDecl);
-        addDecl(extras.write.destinationDecl);
-        const position = extras.write.position && typeof extras.write.position === "object"
-          ? extras.write.position
-          : null;
-        if (position) {
-          addDecl(position.columnDecl);
-          addDecl(position.lengthDecl);
-        }
-        for (const entry of (Array.isArray(extras.write.format) ? extras.write.format : [])) {
-          addDecl(entry && entry.valueDecl);
-        }
-      }
-
-        collectConditionDeclsFromExtras(extras, addDecl);
-      });
-    }
-
-    return decls;
-  }
-
   function getDeclCodeDesc(decl) {
     const source = getSourceDeclDesc(decl);
     if (source) {
@@ -181,6 +41,287 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     wrap.appendChild(itemLine);
 
     return wrap;
+  }
+
+  const DATA_CATALOG_EXCLUDED_OBJECT_TYPES = new Set(["SYSTEM", "CONDITION", "PATH_DECL"]);
+  const DATA_CATALOG_EXCLUDED_SCOPE_TYPES = new Set(["SYSTEM", "PATH"]);
+
+  function isDataCatalogSourceDecl(decl) {
+    if (!decl || typeof decl !== "object" || !decl.name || !decl.scopeLabel) {
+      return false;
+    }
+    const objectType = String(decl.objectType || "").trim().toUpperCase();
+    const scopeType = String(decl.scopeType || "").trim().toUpperCase();
+    return !DATA_CATALOG_EXCLUDED_OBJECT_TYPES.has(objectType)
+      && !DATA_CATALOG_EXCLUDED_SCOPE_TYPES.has(scopeType);
+  }
+
+  function getDataCatalogSourceDecls() {
+    const sourceDecls = state.data && Array.isArray(state.data.decls) ? state.data.decls : [];
+    const rows = [];
+    const seen = new Set();
+    for (const decl of sourceDecls) {
+      if (!isDataCatalogSourceDecl(decl)) {
+        continue;
+      }
+      const key = getDeclOverrideStorageKey(decl) || stringifyDecl(decl);
+      if (!key || seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      rows.push(decl);
+    }
+    return rows;
+  }
+
+  function getDataCatalogFilterType(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+    const objectType = String(decl.objectType || "").trim().toUpperCase();
+    if (objectType === "STRUCT_FIELD") {
+      return String(decl.structObjectType || objectType).trim().toUpperCase();
+    }
+    return objectType;
+  }
+
+  function getDataCatalogPerformParamUpper(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+    const objectType = String(decl.objectType || "").trim().toUpperCase();
+    if (objectType === "FORM_PARAM") {
+      return String(decl.name || "").trim().toUpperCase();
+    }
+    if (objectType === "STRUCT_FIELD" && String(decl.structObjectType || "").trim().toUpperCase() === "FORM_PARAM") {
+      return String(decl.structName || "").trim().toUpperCase();
+    }
+    return "";
+  }
+
+  function dedupeDataCatalogDecls(decls) {
+    const output = [];
+    const seen = new Set();
+    for (const decl of Array.isArray(decls) ? decls : []) {
+      if (!decl || typeof decl !== "object") {
+        continue;
+      }
+      const key = [
+        String(decl.scopeLabel || "").trim().toUpperCase(),
+        String(decl.objectType || "").trim().toUpperCase(),
+        String(decl.name || "").trim().toUpperCase(),
+        String(decl.fieldPath || "").trim().toUpperCase()
+      ].join("|");
+      if (!key || seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      output.push(decl);
+    }
+    return output;
+  }
+
+  function selectDataCatalogRootDecl(traceDecls) {
+    const list = Array.isArray(traceDecls) ? traceDecls : [];
+    for (let index = list.length - 1; index >= 0; index -= 1) {
+      const candidate = list[index];
+      if (candidate && !getDataCatalogPerformParamUpper(candidate)) {
+        return candidate;
+      }
+    }
+    return list.length ? list[list.length - 1] : null;
+  }
+
+  function buildDataCatalogTraceModel(decl) {
+    const localParamUpper = getDataCatalogPerformParamUpper(decl);
+    const scopeType = String(decl && decl.scopeType || "").trim().toUpperCase();
+    const scopeName = String(decl && decl.scopeName || "").trim();
+    if (!localParamUpper || scopeType !== "FORM" || !scopeName) {
+      return {
+        editDecl: decl,
+        traceText: ""
+      };
+    }
+
+    const registry = state.performSourceRegistry;
+    const formNameUpper = scopeName.toUpperCase();
+    const selectedCandidate = registry && typeof registry.getSelectedCandidate === "function"
+      ? registry.getSelectedCandidate(formNameUpper)
+      : null;
+    const bindingContext = selectedCandidate && selectedCandidate.bindingContext
+      && typeof selectedCandidate.bindingContext === "object"
+      ? selectedCandidate.bindingContext
+      : null;
+    const byParamUpper = bindingContext && bindingContext.byParamUpper
+      && typeof bindingContext.byParamUpper.get === "function"
+      ? bindingContext.byParamUpper
+      : null;
+    const traceDecls = dedupeDataCatalogDecls(byParamUpper ? byParamUpper.get(localParamUpper) : []);
+    const rootDecl = selectDataCatalogRootDecl(traceDecls);
+    if (!rootDecl) {
+      return {
+        editDecl: decl,
+        traceText: "No root binding"
+      };
+    }
+
+    const editDecl = typeof cloneDeclWithPerformChainOverride === "function"
+      ? cloneDeclWithPerformChainOverride(rootDecl, bindingContext, decl)
+      : rootDecl;
+    const displayDecls = dedupeDataCatalogDecls([decl, ...traceDecls]);
+    const traceText = displayDecls
+      .map((traceDecl) => String(getDeclTechName(traceDecl) || traceDecl.name || "").trim())
+      .filter(Boolean)
+      .join(" ← ");
+    return {
+      editDecl,
+      traceText
+    };
+  }
+
+  function buildDataCatalogDescriptionModel(decl, settings) {
+    const isStructField = isStructFieldDecl(decl);
+    if (!isStructField) {
+      const codeDescRaw = String(getDeclCodeDesc(decl) || "");
+      const userEntry = getDeclOverrideEntry(decl);
+      const userDescRaw = userEntry.text ? String(userEntry.text) : "";
+      const codeDesc = settings.normalizeDeclDesc ? normalizeDeclDescText(decl, codeDescRaw) : codeDescRaw;
+      const userDesc = (!settings.normalizeDeclDesc || userEntry.noNormalize)
+        ? userDescRaw
+        : normalizeDeclDescText(decl, userDescRaw);
+      return {
+        isStructField: false,
+        codeDesc,
+        userDesc,
+        effectiveDesc: String(getEffectiveDeclDesc(decl) || ""),
+        missing: !codeDescRaw.trim() && !userDescRaw.trim(),
+        searchParts: [codeDescRaw, userDescRaw, codeDesc, userDesc]
+      };
+    }
+
+    const structDecl = buildStructDeclFromFieldDecl(decl);
+    const structCodeRaw = structDecl ? String(getDeclCodeDesc(structDecl) || "") : "";
+    const structUserRaw = structDecl ? String(getDeclOverrideDesc(structDecl) || "") : "";
+    const itemCodeRaw = String(getDeclCodeDesc(decl) || "");
+    const itemEntry = getDeclOverrideEntry(decl);
+    const itemUserRaw = itemEntry.text ? String(itemEntry.text) : "";
+    const structCode = structDecl && settings.normalizeDeclDesc
+      ? normalizeDeclDescText(structDecl, structCodeRaw)
+      : structCodeRaw;
+    const structUser = structDecl && settings.normalizeDeclDesc
+      ? normalizeDeclDescText(structDecl, structUserRaw)
+      : structUserRaw;
+    const itemCode = settings.normalizeDeclDesc ? normalizeDeclDescText(decl, itemCodeRaw) : itemCodeRaw;
+    const itemUser = (!settings.normalizeDeclDesc || itemEntry.noNormalize)
+      ? itemUserRaw
+      : normalizeDeclDescText(decl, itemUserRaw);
+    return {
+      isStructField: true,
+      codeDesc: { structText: structCode, itemText: itemCode },
+      userDesc: { structText: structUser, itemText: itemUser },
+      effectiveDesc: String(getEffectiveDeclDesc(decl) || ""),
+      missing: (!structCodeRaw.trim() && !structUserRaw.trim()) || (!itemCodeRaw.trim() && !itemUserRaw.trim()),
+      searchParts: [
+        structCodeRaw,
+        structUserRaw,
+        itemCodeRaw,
+        itemUserRaw,
+        structCode,
+        structUser,
+        itemCode,
+        itemUser
+      ]
+    };
+  }
+
+  function buildDataCatalogRowModel(decl, settings) {
+    const traceModel = buildDataCatalogTraceModel(decl);
+    const descriptionModel = buildDataCatalogDescriptionModel(traceModel.editDecl, settings);
+    const techName = String(getDeclTechName(decl) || decl.name || "").trim();
+    const objectType = String(decl.objectType || "").trim().toUpperCase();
+    const scopeLabel = String(decl.scopeLabel || "").trim();
+    const traceText = traceModel.traceText || (getDataCatalogPerformParamUpper(decl) ? "No root binding" : "");
+    return {
+      decl,
+      editDecl: traceModel.editDecl,
+      selectedCandidate: traceModel.selectedCandidate,
+      objectType,
+      filterType: getDataCatalogFilterType(decl),
+      scopeLabel,
+      scopeType: String(decl.scopeType || "").trim().toUpperCase(),
+      scopeName: String(decl.scopeName || "").trim(),
+      techName,
+      traceText,
+      descriptionModel,
+      searchText: [
+        objectType,
+        scopeLabel,
+        techName,
+        traceText,
+        descriptionModel.effectiveDesc,
+        ...descriptionModel.searchParts
+      ].filter(Boolean).join("\n").toLowerCase()
+    };
+  }
+
+  function getDataCatalogGroupLabel(group) {
+    const scopeType = String(group && group.scopeType || "").trim().toUpperCase();
+    const scopeName = String(group && group.scopeName || "").trim();
+    const scopeLabel = String(group && group.scopeLabel || "").trim();
+    if (scopeType === "GLOBAL" || scopeLabel.toUpperCase() === "GLOBAL") {
+      return "Global";
+    }
+    if (scopeType === "FORM") {
+      return `Subroutine / FORM: ${scopeName || scopeLabel.replace(/^FORM:/i, "")}`;
+    }
+    if (scopeType === "METHOD" || scopeType === "METHODSIG") {
+      return `Method: ${scopeName || scopeLabel}`;
+    }
+    if (scopeType === "CLASS") {
+      return `Class: ${scopeName || scopeLabel}`;
+    }
+    return scopeLabel || "Other scope";
+  }
+
+  function createDataCatalogPerformSourceControl(group) {
+    if (!group || group.scopeType !== "FORM" || !group.scopeName) {
+      return null;
+    }
+    const registry = state.performSourceRegistry;
+    if (!registry || typeof registry.getActiveCandidates !== "function") {
+      return null;
+    }
+    const formNameUpper = group.scopeName.toUpperCase();
+    const candidates = registry.getActiveCandidates(formNameUpper);
+    if (candidates.length < 2) {
+      return null;
+    }
+    const selected = registry.getSelectedCandidate(formNameUpper) || candidates[0];
+    const control = el("div", { className: "data-decl-group-controls" });
+    control.appendChild(el("span", { className: "muted", text: "PERFORM source" }));
+    const select = el("select", {
+      className: "data-perform-source-select",
+      attrs: {
+        "data-perform-form": formNameUpper,
+        "aria-label": `PERFORM source for ${group.scopeName}`
+      }
+    });
+    for (let index = 0; index < candidates.length; index += 1) {
+      const candidate = candidates[index];
+      const lineLabel = candidate.lineStart > 0 ? String(candidate.lineStart) : "?";
+      select.appendChild(el("option", {
+        text: `Source ${index + 1}/${candidates.length} · line ${lineLabel} · ${candidate.actualSummary || "no arguments"}`,
+        attrs: { value: candidate.key }
+      }));
+    }
+    select.value = selected.key;
+    select.addEventListener("click", (ev) => ev.stopPropagation());
+    select.addEventListener("change", (ev) => {
+      ev.stopPropagation();
+      selectPerformSourceCandidate(formNameUpper, select.value, { originTab: "descriptions" });
+    });
+    control.appendChild(select);
+    return control;
   }
 
   function renderDeclDescPanelUi() {
@@ -220,7 +361,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       }
     }
 
-    const decls = getDeclsForDescriptionsModal();
+    const decls = getDataCatalogSourceDecls();
     const types = new Set((state.settings && Array.isArray(state.settings.declFilterTypes))
       ? state.settings.declFilterTypes
       : DEFAULT_SETTINGS.declFilterTypes);
@@ -229,152 +370,40 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const missingOnly = Boolean(els.declDescMissingOnly && els.declDescMissingOnly.checked);
 
     const rows = [];
-    let totalRows = 0;
+    const allRows = [];
     let missingRows = 0;
 
     for (const decl of decls) {
-      if (!decl || typeof decl !== "object" || !decl.objectType || !decl.name) {
-        continue;
-      }
-
-      const objectType = String(decl.objectType || "").trim().toUpperCase();
-      if (objectType === "STRUCT_FIELD") {
-        const structType = String(decl.structObjectType || "").trim().toUpperCase();
-        if (structType && !types.has(structType)) {
-          continue;
-        }
-      } else if (!types.has(objectType)) {
-        continue;
-      }
-
-      totalRows += 1;
-
-      const techName = getDeclTechName(decl);
-      const scopeLabel = String(decl.scopeLabel || "");
-
-      const isStructField = isStructFieldDecl(decl);
-      if (!isStructField) {
-        const codeDescRaw = String(getDeclCodeDesc(decl) || "");
-        const userEntry = getDeclOverrideEntry(decl);
-        const userDescRaw = userEntry.text ? String(userEntry.text) : "";
-
-        const codeDesc = settings.normalizeDeclDesc ? normalizeDeclDescText(decl, codeDescRaw) : codeDescRaw;
-        const userDesc = (!settings.normalizeDeclDesc || userEntry.noNormalize)
-          ? userDescRaw
-          : normalizeDeclDescText(decl, userDescRaw);
-
-        const missing = !codeDescRaw.trim() && !userDescRaw.trim();
-        if (missing) {
-          missingRows += 1;
-        }
-        if (missingOnly && !missing) {
-          continue;
-        }
-
-        const haystack = [
-          objectType,
-          scopeLabel,
-          techName,
-          codeDescRaw,
-          userDescRaw,
-          codeDesc,
-          userDesc
-        ]
-          .filter(Boolean)
-          .join("\n")
-          .toLowerCase();
-
-        if (query && !haystack.includes(query)) {
-          continue;
-        }
-
-        rows.push({
-          decl,
-          objectType,
-          scopeLabel,
-          techName,
-          missing,
-          codeDesc,
-          userDesc
-        });
-        continue;
-      }
-
-      const structDecl = buildStructDeclFromFieldDecl(decl);
-      const structCodeRaw = structDecl ? String(getDeclCodeDesc(structDecl) || "") : "";
-      const structUserRaw = structDecl ? String(getDeclOverrideDesc(structDecl) || "") : "";
-      const itemCodeRaw = String(getDeclCodeDesc(decl) || "");
-      const itemEntry = getDeclOverrideEntry(decl);
-      const itemUserRaw = itemEntry.text ? String(itemEntry.text) : "";
-
-      const structCode = structDecl && settings.normalizeDeclDesc ? normalizeDeclDescText(structDecl, structCodeRaw) : structCodeRaw;
-      const structUser = structDecl && settings.normalizeDeclDesc ? normalizeDeclDescText(structDecl, structUserRaw) : structUserRaw;
-      const itemCode = settings.normalizeDeclDesc ? normalizeDeclDescText(decl, itemCodeRaw) : itemCodeRaw;
-      const itemUser = (!settings.normalizeDeclDesc || itemEntry.noNormalize)
-        ? itemUserRaw
-        : normalizeDeclDescText(decl, itemUserRaw);
-
-      const structMissing = !structCodeRaw.trim() && !structUserRaw.trim();
-      const itemMissing = !itemCodeRaw.trim() && !itemUserRaw.trim();
-      const missing = structMissing || itemMissing;
-      if (missing) {
+      const row = buildDataCatalogRowModel(decl, settings);
+      allRows.push(row);
+      if (row.descriptionModel.missing) {
         missingRows += 1;
       }
-      if (missingOnly && !missing) {
+      if (DECL_TYPE_OPTIONS.includes(row.filterType) && !types.has(row.filterType)) {
         continue;
       }
-
-      const haystack = [
-        objectType,
-        scopeLabel,
-        techName,
-        structCodeRaw,
-        structUserRaw,
-        itemCodeRaw,
-        itemUserRaw,
-        structCode,
-        structUser,
-        itemCode,
-        itemUser
-      ]
-        .filter(Boolean)
-        .join("\n")
-        .toLowerCase();
-
-      if (query && !haystack.includes(query)) {
+      if (missingOnly && !row.descriptionModel.missing) {
         continue;
       }
-
-      rows.push({
-        decl,
-        objectType,
-        scopeLabel,
-        techName,
-        missing,
-        structMissing,
-        itemMissing,
-        structCode,
-        structUser,
-        itemCode,
-        itemUser
-      });
+      if (query && !row.searchText.includes(query)) {
+        continue;
+      }
+      rows.push(row);
     }
 
     rows.sort((a, b) => {
-      const scopeCmp = String(a.scopeLabel || "").localeCompare(String(b.scopeLabel || ""));
-      if (scopeCmp) {
-        return scopeCmp;
-      }
-      const typeCmp = String(a.objectType || "").localeCompare(String(b.objectType || ""));
-      if (typeCmp) {
-        return typeCmp;
-      }
-      return String(a.techName || "").localeCompare(String(b.techName || ""));
+      const leftLine = Number(a.decl && a.decl.lineStart) > 0 ? Number(a.decl.lineStart) : Number.MAX_SAFE_INTEGER;
+      const rightLine = Number(b.decl && b.decl.lineStart) > 0 ? Number(b.decl.lineStart) : Number.MAX_SAFE_INTEGER;
+      const leftSegment = Number.isFinite(Number(a.decl && a.decl.segmentIndex)) ? Number(a.decl.segmentIndex) : 0;
+      const rightSegment = Number.isFinite(Number(b.decl && b.decl.segmentIndex)) ? Number(b.decl.segmentIndex) : 0;
+      return (leftLine - rightLine)
+        || (leftSegment - rightSegment)
+        || String(a.techName || "").localeCompare(String(b.techName || ""));
     });
 
     if (els.declDescSummary) {
       const shown = rows.length;
-      els.declDescSummary.textContent = `Showing ${shown} of ${totalRows} decls • Missing: ${missingRows}`;
+      els.declDescSummary.textContent = `Showing ${shown} of ${allRows.length} declarations • Missing: ${missingRows}`;
     }
 
     if (!els.declDescTable) {
@@ -388,125 +417,184 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       return;
     }
 
-    const table = document.createElement("table");
-    const thead = document.createElement("thead");
-    const headRow = document.createElement("tr");
-    for (const title of ["type", "scope", "technical id", "code desc", "user desc", ""]) {
-      const th = document.createElement("th");
-      th.textContent = title;
-      headRow.appendChild(th);
-    }
-    thead.appendChild(headRow);
-    table.appendChild(thead);
-
-    const tbody = document.createElement("tbody");
+    const groupsByScope = new Map();
     for (const row of rows) {
-      const tr = document.createElement("tr");
-      const declKey = getDeclOverrideStorageKey(row.decl);
-      if (declKey) {
-        tr.setAttribute("data-decl-key", declKey);
-        if (declKey === state.selectedDeclKey) {
-          tr.classList.add("desc-selected");
-        }
-      }
-      if (row.decl && row.decl.lineStart) {
-        tr.setAttribute("data-line-start", String(row.decl.lineStart));
-      }
-
-      const typeCell = document.createElement("td");
-      typeCell.textContent = row.objectType || "";
-      tr.appendChild(typeCell);
-
-      const scopeCell = document.createElement("td");
-      scopeCell.textContent = row.scopeLabel || "";
-      tr.appendChild(scopeCell);
-
-      const idCell = document.createElement("td");
-      const idWrap = document.createElement("div");
-      const idLine = document.createElement("div");
-      idLine.textContent = row.techName || "";
-      const title = buildDeclTitle(row.decl);
-      if (title) {
-        idLine.title = title;
-      }
-      if (row.decl && row.decl.lineStart) {
-        idLine.style.cursor = "pointer";
-        idLine.addEventListener("click", (ev) => {
-          ev.stopPropagation();
-          const api = window.AbapViewerRuntime && window.AbapViewerRuntime.api ? window.AbapViewerRuntime.api : null;
-          const segmentIndex = Number.isFinite(Number(row.decl && row.decl.segmentIndex))
-            ? Math.max(0, Math.floor(Number(row.decl.segmentIndex)))
-            : (api && typeof api.findDeclSegmentIndex === "function"
-              ? api.findDeclSegmentIndex(row.decl)
-              : null);
-          if (api && typeof api.jumpInputToCodeRange === "function") {
-            api.jumpInputToCodeRange(
-              row.decl.lineStart,
-              row.decl.block && row.decl.block.lineEnd ? row.decl.block.lineEnd : row.decl.lineStart,
-              segmentIndex
-            );
-          } else {
-            selectCodeLines(row.decl.lineStart, row.decl.lineStart);
-          }
-          if (row.decl.id) {
-            setSelectedCard(row.decl.id);
-          }
+      if (!groupsByScope.has(row.scopeLabel)) {
+        groupsByScope.set(row.scopeLabel, {
+          scopeLabel: row.scopeLabel,
+          scopeType: row.scopeType,
+          scopeName: row.scopeName,
+          rows: [],
+          firstLine: Number(row.decl && row.decl.lineStart) || Number.MAX_SAFE_INTEGER
         });
       }
-      idWrap.appendChild(idLine);
-
-      if (row.objectType === "STRUCT_FIELD") {
-        const pills = document.createElement("div");
-        if (row.structMissing) {
-          pills.appendChild(el("span", { className: "pill", text: "struct missing" }));
-        }
-        if (row.itemMissing) {
-          pills.appendChild(el("span", { className: "pill", text: "item missing" }));
-        }
-        if (pills.childNodes.length) {
-          idWrap.appendChild(pills);
-        }
-      } else if (row.missing) {
-        idWrap.appendChild(el("span", { className: "pill", text: "missing" }));
-      }
-
-      idCell.appendChild(idWrap);
-      tr.appendChild(idCell);
-
-      const codeCell = document.createElement("td");
-      if (row.objectType === "STRUCT_FIELD") {
-        codeCell.appendChild(renderDeclDescCellLines({ structText: row.structCode || "", itemText: row.itemCode || "" }));
-      } else {
-        codeCell.textContent = row.codeDesc || "";
-      }
-      tr.appendChild(codeCell);
-
-      const userCell = document.createElement("td");
-      if (row.objectType === "STRUCT_FIELD") {
-        userCell.appendChild(renderDeclDescCellLines({ structText: row.structUser || "", itemText: row.itemUser || "" }));
-      } else {
-        userCell.textContent = row.userDesc || "";
-      }
-      tr.appendChild(userCell);
-
-      const actionCell = document.createElement("td");
-      const btn = el("button", {
-        className: "icon-btn",
-        text: "✎",
-        attrs: { type: "button", title: "Edit description", "aria-label": "Edit description" }
-      });
-      btn.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        editDeclDesc(row.decl);
-      });
-      actionCell.appendChild(btn);
-      tr.appendChild(actionCell);
-
-      tbody.appendChild(tr);
+      groupsByScope.get(row.scopeLabel).rows.push(row);
     }
-    table.appendChild(tbody);
+    const groups = Array.from(groupsByScope.values()).sort((left, right) => {
+      const leftGlobal = left.scopeType === "GLOBAL" || left.scopeLabel.toUpperCase() === "GLOBAL";
+      const rightGlobal = right.scopeType === "GLOBAL" || right.scopeLabel.toUpperCase() === "GLOBAL";
+      if (leftGlobal !== rightGlobal) {
+        return leftGlobal ? -1 : 1;
+      }
+      return (left.firstLine - right.firstLine) || left.scopeLabel.localeCompare(right.scopeLabel);
+    });
 
-    els.declDescTable.replaceChildren(table);
+    const groupContainer = el("div", { className: "data-decl-groups" });
+    for (const group of groups) {
+      const details = document.createElement("details");
+      details.className = "data-decl-group";
+      details.open = true;
+      details.setAttribute("data-scope-label", group.scopeLabel);
+      const summary = document.createElement("summary");
+      summary.appendChild(el("span", { className: "data-decl-group-title", text: getDataCatalogGroupLabel(group) }));
+      summary.appendChild(el("span", { className: "data-decl-group-meta", text: `${group.rows.length} declarations` }));
+      details.appendChild(summary);
+      const sourceControl = createDataCatalogPerformSourceControl(group);
+      if (sourceControl) {
+        details.appendChild(sourceControl);
+      }
+
+      const tableWrap = el("div", { className: "data-decl-table-wrap" });
+      const table = document.createElement("table");
+      const thead = document.createElement("thead");
+      const headRow = document.createElement("tr");
+      for (const title of [
+        "Type",
+        "Technical ID",
+        "Trace → Root",
+        "Code description",
+        "User description",
+        "Effective description",
+        "Edit"
+      ]) {
+        headRow.appendChild(el("th", { text: title }));
+      }
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+      const tbody = document.createElement("tbody");
+
+      for (const row of group.rows) {
+        const tr = document.createElement("tr");
+        const declKey = getDeclOverrideStorageKey(row.editDecl);
+        const sourceDeclKey = getDeclOverrideStorageKey(row.decl);
+        if (declKey) {
+          tr.setAttribute("data-decl-key", declKey);
+          if (declKey === state.selectedDeclKey) {
+            tr.classList.add("desc-selected");
+          }
+        }
+        if (sourceDeclKey) {
+          tr.setAttribute("data-source-decl-key", sourceDeclKey);
+        }
+        tr.setAttribute("data-decl-name", row.techName);
+        if (row.decl && row.decl.lineStart) {
+          tr.setAttribute("data-line-start", String(row.decl.lineStart));
+        }
+
+        const typeCell = document.createElement("td");
+        typeCell.textContent = row.objectType || "";
+        tr.appendChild(typeCell);
+
+        const idCell = document.createElement("td");
+        const idWrap = document.createElement("div");
+        const idLine = document.createElement("div");
+        idLine.textContent = row.techName || "";
+        const title = buildDeclTitle(row.decl);
+        if (title) {
+          idLine.title = title;
+        }
+        if (row.decl && row.decl.lineStart) {
+          idLine.style.cursor = "pointer";
+          idLine.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            const api = window.AbapViewerRuntime && window.AbapViewerRuntime.api ? window.AbapViewerRuntime.api : null;
+            const segmentIndex = Number.isFinite(Number(row.decl && row.decl.segmentIndex))
+              ? Math.max(0, Math.floor(Number(row.decl.segmentIndex)))
+              : (api && typeof api.findDeclSegmentIndex === "function"
+                ? api.findDeclSegmentIndex(row.decl)
+                : null);
+            if (api && typeof api.jumpInputToCodeRange === "function") {
+              api.jumpInputToCodeRange(
+                row.decl.lineStart,
+                row.decl.block && row.decl.block.lineEnd ? row.decl.block.lineEnd : row.decl.lineStart,
+                segmentIndex
+              );
+            } else {
+              selectCodeLines(row.decl.lineStart, row.decl.lineStart);
+            }
+            if (row.decl.id) {
+              setSelectedCard(row.decl.id);
+            }
+          });
+        }
+        idWrap.appendChild(idLine);
+        if (row.descriptionModel.missing) {
+          idWrap.appendChild(el("span", { className: "pill", text: "missing" }));
+        }
+        idCell.appendChild(idWrap);
+        tr.appendChild(idCell);
+
+        const traceCell = document.createElement("td");
+        traceCell.setAttribute("data-column", "trace");
+        traceCell.appendChild(el("span", {
+          className: "data-trace-chain",
+          text: row.traceText || "—"
+        }));
+        tr.appendChild(traceCell);
+
+        const codeCell = document.createElement("td");
+        codeCell.setAttribute("data-column", "code-description");
+        if (row.descriptionModel.isStructField) {
+          codeCell.appendChild(renderDeclDescCellLines(row.descriptionModel.codeDesc));
+        } else {
+          codeCell.textContent = row.descriptionModel.codeDesc || "";
+        }
+        tr.appendChild(codeCell);
+
+        const userCell = document.createElement("td");
+        userCell.setAttribute("data-column", "user-description");
+        if (row.descriptionModel.isStructField) {
+          userCell.appendChild(renderDeclDescCellLines(row.descriptionModel.userDesc));
+        } else {
+          userCell.textContent = row.descriptionModel.userDesc || "";
+        }
+        tr.appendChild(userCell);
+
+        const effectiveCell = document.createElement("td");
+        effectiveCell.setAttribute("data-column", "effective-description");
+        effectiveCell.textContent = row.descriptionModel.effectiveDesc || "";
+        tr.appendChild(effectiveCell);
+
+        const actionCell = document.createElement("td");
+        const btn = el("button", {
+          className: "icon-btn",
+          text: "✎",
+          attrs: {
+            type: "button",
+            title: "Edit description",
+            "aria-label": "Edit description",
+            "data-action": "edit-description"
+          }
+        });
+        btn.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          editDeclDesc(row.editDecl);
+        });
+        actionCell.appendChild(btn);
+        tr.appendChild(actionCell);
+
+        tbody.appendChild(tr);
+        }
+      table.appendChild(tbody);
+      tableWrap.appendChild(table);
+      details.appendChild(tableWrap);
+      groupContainer.appendChild(details);
+    }
+
+    if (!groups.length) {
+      groupContainer.appendChild(el("div", { className: "muted", text: "No declarations match the current filters." }));
+    }
+    els.declDescTable.replaceChildren(groupContainer);
     refreshInputGutterTargets();
   }
 
@@ -531,7 +619,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     if (els.rightPanelTitle) {
       els.rightPanelTitle.textContent = showDescriptions
-        ? "Descriptions"
+        ? "Data"
         : (showTemplate ? "Template Preview" : "Output");
     }
 
@@ -1435,6 +1523,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     saveDescOverrides();
+    state.templatePreviewCache = null;
     renderOutput();
     if (state.rightTab === "template") {
       if (typeof renderTemplatePreview === "function") {
@@ -2561,11 +2650,13 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     };
   }
 
-  function selectPerformSourceCandidate(formNameUpper, candidateKey) {
+  function selectPerformSourceCandidate(formNameUpper, candidateKey, options) {
     const registry = state.performSourceRegistry;
     if (!registry || typeof registry.selectCandidate !== "function") {
       return false;
     }
+    const opts = options && typeof options === "object" ? options : {};
+    const fromDataTab = opts.originTab === "descriptions";
 
     const outputAnchor = typeof captureOutputViewportAnchor === "function"
       ? captureOutputViewportAnchor()
@@ -2584,11 +2675,20 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       ...RENDER_TREE_OPTIONS,
       performSourceRegistry: registry
     });
-    if (typeof renderOutput === "function") {
-      renderOutput();
-    }
-    if (typeof renderTemplatePreview === "function") {
-      renderTemplatePreview();
+    if (fromDataTab) {
+      if (typeof renderDeclDescPanelUi === "function") {
+        renderDeclDescPanelUi();
+      }
+    } else {
+      if (typeof renderOutput === "function") {
+        renderOutput();
+      }
+      if (typeof renderTemplatePreview === "function") {
+        renderTemplatePreview();
+      }
+      if (state.rightTab === "descriptions" && typeof renderDeclDescPanelUi === "function") {
+        renderDeclDescPanelUi();
+      }
     }
     if (typeof refreshInputGutterTargets === "function") {
       refreshInputGutterTargets();

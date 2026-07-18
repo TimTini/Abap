@@ -125,17 +125,20 @@ function normalizeViewerState(window) {
   const data = state.data && typeof state.data === "object" ? state.data : {};
   const renderObjects = Array.isArray(state.renderObjects) ? state.renderObjects : [];
   const declRows = els.declDescTable
-    ? Array.from(els.declDescTable.querySelectorAll("tbody tr")).map((row) => {
+      ? Array.from(els.declDescTable.querySelectorAll("tbody tr")).map((row) => {
         const cells = Array.from(row.querySelectorAll("td"));
+        const group = row.closest(".data-decl-group");
         return {
           declKey: String(row.getAttribute("data-decl-key") || ""),
           lineStart: Number(row.getAttribute("data-line-start") || 0) || 0,
           selected: row.classList.contains("desc-selected"),
           type: cells[0] ? String(cells[0].textContent || "").trim() : "",
-          scope: cells[1] ? String(cells[1].textContent || "").trim() : "",
-          techId: cells[2] ? String(cells[2].textContent || "").trim() : "",
+          scope: group ? String(group.getAttribute("data-scope-label") || "").trim() : "",
+          techId: cells[1] ? String(cells[1].textContent || "").trim() : "",
+          trace: cells[2] ? String(cells[2].textContent || "").trim() : "",
           codeDesc: cells[3] ? String(cells[3].textContent || "").trim() : "",
-          userDesc: cells[4] ? String(cells[4].textContent || "").trim() : ""
+          userDesc: cells[4] ? String(cells[4].textContent || "").trim() : "",
+          effectiveDesc: cells[5] ? String(cells[5].textContent || "").trim() : ""
         };
       })
     : [];
