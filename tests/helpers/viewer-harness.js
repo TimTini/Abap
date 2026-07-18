@@ -133,12 +133,11 @@ async function loadViewerDom() {
 
   const runtime = dom.window.AbapViewerRuntime || {};
   const els = runtime.els || {};
-  if (!els.inputText || !els.output || !els.templatePreviewOutput) {
+  if (!els.inputText || !els.templatePreviewOutput || !els.declDescPanel) {
     throw new Error("Viewer runtime did not initialize expected DOM references.");
   }
 
   setStableElementMetrics(els.inputText, { clientHeight: 540, scrollHeight: 1800 });
-  setStableElementMetrics(els.output, { clientHeight: 800, scrollHeight: 2400 });
   setStableElementMetrics(els.templatePreviewOutput, { clientHeight: 800, scrollHeight: 2400 });
 
   return dom;

@@ -522,9 +522,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
             } else {
               selectCodeLines(row.decl.lineStart, row.decl.lineStart);
             }
-            if (row.decl.id) {
-              setSelectedCard(row.decl.id);
-            }
           });
         }
         idWrap.appendChild(idLine);
@@ -598,18 +595,22 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     refreshInputGutterTargets();
   }
 
+  function renderActiveRightPanel() {
+    if (state.rightTab === "descriptions") {
+      renderDeclDescPanelUi();
+      return;
+    }
+    if (typeof renderTemplatePreview === "function") {
+      renderTemplatePreview();
+    }
+  }
+
   function setRightTab(nextTab) {
-    const tab = nextTab === "descriptions"
-      ? "descriptions"
-      : (nextTab === "template" ? "template" : "output");
+    const tab = nextTab === "descriptions" ? "descriptions" : "template";
     state.rightTab = tab;
 
     const showDescriptions = tab === "descriptions";
     const showTemplate = tab === "template";
-    const showOutput = tab === "output";
-    if (els.output) {
-      els.output.hidden = !showOutput;
-    }
     if (els.templatePreviewPanel) {
       els.templatePreviewPanel.hidden = !showTemplate;
     }
@@ -620,12 +621,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (els.rightPanelTitle) {
       els.rightPanelTitle.textContent = showDescriptions
         ? "Data"
-        : (showTemplate ? "Template Preview" : "Output");
-    }
-
-    if (els.rightTabOutputBtn) {
-      els.rightTabOutputBtn.classList.toggle("active", showOutput);
-      els.rightTabOutputBtn.setAttribute("aria-selected", String(showOutput));
+        : "Template Preview";
     }
     if (els.rightTabTemplateBtn) {
       els.rightTabTemplateBtn.classList.toggle("active", showTemplate);
@@ -646,8 +642,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
           els.declDescSearch.focus();
         }
       }, 0);
-    } else if (showOutput) {
-      renderOutput();
     } else if (showTemplate) {
       renderTemplatePreview();
     }
@@ -693,14 +687,16 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     state.settings = normalizeSettings(next);
     saveSettings(state.settings);
-    renderOutput();
+    state.templatePreviewCache = null;
+    renderActiveRightPanel();
   }
 
   function resetSettingsToDefault() {
     state.settings = normalizeSettings(DEFAULT_SETTINGS);
     saveSettings(state.settings);
     renderSettingsModalUi();
-    renderOutput();
+    state.templatePreviewCache = null;
+    renderActiveRightPanel();
   }
 
   function normalizeKeyToken(value) {
@@ -1473,14 +1469,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     const mode = state.activeEdit.mode === "structField" ? "structField" : "single";
     const skipNormalize = Boolean(els.editSkipNormalize && els.editSkipNormalize.checked);
-    state.pendingOutputViewportAnchor = state.rightTab === "output" && typeof captureOutputViewportAnchor === "function"
-      ? captureOutputViewportAnchor()
-      : null;
-
     if (mode === "single") {
       const key = state.activeEdit.key;
       if (!key) {
-        state.pendingOutputViewportAnchor = null;
         return;
       }
 
@@ -1498,7 +1489,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       const structKey = state.activeEdit.structKey;
       const itemKey = state.activeEdit.itemKey;
       if (!structKey || !itemKey) {
-        state.pendingOutputViewportAnchor = null;
         return;
       }
 
@@ -1524,14 +1514,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     saveDescOverrides();
     state.templatePreviewCache = null;
-    renderOutput();
-    if (state.rightTab === "template") {
-      if (typeof renderTemplatePreview === "function") {
-        renderTemplatePreview();
-      }
-    } else if (state.rightTab === "descriptions") {
-      renderDeclDescPanelUi();
-    }
+    renderActiveRightPanel();
   }
 
   function editDeclDesc(decl) {
@@ -2655,12 +2638,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (!registry || typeof registry.selectCandidate !== "function") {
       return false;
     }
-    const opts = options && typeof options === "object" ? options : {};
-    const fromDataTab = opts.originTab === "descriptions";
-
-    const outputAnchor = typeof captureOutputViewportAnchor === "function"
-      ? captureOutputViewportAnchor()
-      : null;
     const templateAnchor = typeof captureTemplateViewportAnchor === "function"
       ? captureTemplateViewportAnchor()
       : null;
@@ -2668,28 +2645,13 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       return false;
     }
 
-    state.pendingOutputViewportAnchor = outputAnchor;
     state.pendingTemplateViewportAnchor = templateAnchor;
     state.templatePreviewCache = null;
     state.renderObjects = buildRenderableObjects(registry.rawRoots, {
       ...RENDER_TREE_OPTIONS,
       performSourceRegistry: registry
     });
-    if (fromDataTab) {
-      if (typeof renderDeclDescPanelUi === "function") {
-        renderDeclDescPanelUi();
-      }
-    } else {
-      if (typeof renderOutput === "function") {
-        renderOutput();
-      }
-      if (typeof renderTemplatePreview === "function") {
-        renderTemplatePreview();
-      }
-      if (state.rightTab === "descriptions" && typeof renderDeclDescPanelUi === "function") {
-        renderDeclDescPanelUi();
-      }
-    }
+    renderActiveRightPanel();
     if (typeof refreshInputGutterTargets === "function") {
       refreshInputGutterTargets();
     }

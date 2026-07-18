@@ -857,18 +857,11 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (typeof renderSettingsModalUi === "function") {
       renderSettingsModalUi();
     }
-    if (typeof renderDeclDescPanelUi === "function") {
-      renderDeclDescPanelUi();
-    }
-    if (typeof renderOutput === "function") {
-      renderOutput();
-    }
     if (typeof renderTemplateGuiFilterControls === "function") {
       renderTemplateGuiFilterControls();
     }
-    if (typeof renderTemplatePreview === "function") {
-      renderTemplatePreview();
-    }
+    state.templatePreviewCache = null;
+    renderActiveRightPanel();
   }
 
   function restoreViewerConfigStateSnapshot(snapshot) {
@@ -1235,39 +1228,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       segmentIndex,
       anchorRatio: 0.28
     });
-  }
-
-  function interceptOutputCodeButtonClick(ev) {
-    if (!els.output || !ev || !ev.target || !(ev.target instanceof Element)) {
-      return;
-    }
-    const btn = ev.target.closest("button.btn-ghost");
-    if (!btn || !els.output.contains(btn)) {
-      return;
-    }
-    if (String(btn.textContent || "").trim().toLowerCase() !== "code") {
-      return;
-    }
-    const card = btn.closest(".card[data-id]");
-    if (!card) {
-      return;
-    }
-    const objId = String(card.getAttribute("data-id") || "").trim();
-    const obj = findRenderObjectById(objId);
-    const lineStart = Number(obj && obj.lineStart) || Number(card.getAttribute("data-line-start")) || 0;
-    const lineEnd = Number(obj && obj.block && obj.block.lineEnd) || lineStart;
-    const segmentIndex = Number.isFinite(Number(obj && obj.segmentIndex))
-      ? Math.max(0, Math.floor(Number(obj.segmentIndex)))
-      : null;
-    if (lineStart <= 0) {
-      return;
-    }
-    ev.preventDefault();
-    ev.stopPropagation();
-    if (typeof ev.stopImmediatePropagation === "function") {
-      ev.stopImmediatePropagation();
-    }
-    jumpInputToCodeRange(lineStart, lineEnd, segmentIndex);
   }
 
   function interceptTemplateCodeButtonClick(ev) {
@@ -3990,15 +3950,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     };
 
     const rerenderAfterDescOverrideChange = () => {
-      if (typeof renderOutput === "function") {
-        renderOutput();
-      }
-      if (typeof renderTemplatePreview === "function") {
-        renderTemplatePreview();
-      }
-      if (typeof renderDeclDescPanelUi === "function" && state.rightTab === "descriptions") {
-        renderDeclDescPanelUi();
-      }
+      state.templatePreviewCache = null;
+      renderActiveRightPanel();
     };
 
     const restoreModalSnapshots = (snapshots) => {
@@ -4912,21 +4865,13 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     state.renderObjects = [];
     state.performSourceRegistry = null;
     state.templatePreviewCache = null;
-    state.selectedId = "";
     resetTemplateSelectionStateMain();
     state.selectedDeclKey = "";
-    if (state.collapsedIds instanceof Set) {
-      state.collapsedIds.clear();
-    }
 
-    if (typeof resetOutputVirtualState === "function") {
-      resetOutputVirtualState();
-    }
     if (typeof resetTemplateVirtualState === "function") {
       resetTemplateVirtualState();
     }
 
-    setOutputMessage("No data loaded.");
     setTemplatePreviewMessage("No data loaded.");
     if (typeof renderDeclDescPanelUi === "function") {
       renderDeclDescPanelUi();
@@ -4978,8 +4923,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         augmentSyntheticStructFieldDecls(state.data);
         rebuildConstantInitializerIndex(state.data);
 
-    state.collapsedIds.clear();
-    state.selectedId = "";
     resetTemplateSelectionStateMain();
     state.performSourceRegistry = buildPerformCallPathRegistry(state.data && state.data.objects);
     state.renderObjects = buildRenderableObjects(state.data && state.data.objects, {
@@ -4988,29 +4931,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     });
     refreshTemplateGuiFilterTypes();
     setError("");
-    if (state.rightTab === "output") {
-      renderOutput();
-    } else if (state.rightTab === "descriptions") {
-      renderDeclDescPanelUi();
-    } else if (state.rightTab === "template") {
-      renderTemplatePreview();
-    }
-  }
-
-  function resetUi() {
-    state.collapsedIds.clear();
-    state.selectedId = "";
-  }
-
-  function collapseAll() {
-    state.collapsedIds.clear();
-    walkObjects(state.renderObjects, (obj) => {
-      const id = normalizeId(obj && obj.id);
-      const children = Array.isArray(obj && obj.children) ? obj.children : [];
-      if (id && children.length) {
-        state.collapsedIds.add(id);
-      }
-    });
+    renderActiveRightPanel();
   }
 
   let virtualGeometryRefreshFrameMain = 0;
@@ -5072,15 +4993,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     virtualGeometryRefreshFrameMain = requestAnimationFrame(() => {
       virtualGeometryRefreshFrameMain = 0;
       if (!state.data || !Array.isArray(state.renderObjects) || !state.renderObjects.length) {
-        return;
-      }
-      if (
-        state.rightTab === "output"
-        && els.output
-        && !els.output.hidden
-        && typeof renderOutput === "function"
-      ) {
-        renderOutput();
         return;
       }
       if (
@@ -5151,15 +5063,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         window.visualViewport.addEventListener("resize", scheduleVirtualGeometryRefreshMain, { passive: true });
       }
     }
-    if (els.output && typeof handleOutputVirtualScroll === "function") {
-      els.output.addEventListener("scroll", handleOutputVirtualScroll, { passive: true });
-    }
-    if (els.output && typeof handleOutputVirtualUserIntent === "function") {
-      addVirtualUserIntentListenersMain(els.output, handleOutputVirtualUserIntent);
-    }
-    if (els.output) {
-      els.output.addEventListener("click", interceptOutputCodeButtonClick, true);
-    }
     if (els.templatePreviewOutput && typeof handleTemplateVirtualScroll === "function") {
       els.templatePreviewOutput.addEventListener("scroll", handleTemplateVirtualScroll, { passive: true });
     }
@@ -5190,31 +5093,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
     els.parseBtn.addEventListener("click", () => parseFromTextarea("input.abap"));
 
-    els.expandAllBtn.addEventListener("click", () => {
-      state.collapsedIds.clear();
-      renderOutput();
-    });
-
-    els.collapseAllBtn.addEventListener("click", () => {
-      if (!state.data) {
-        return;
-      }
-      collapseAll();
-      renderOutput();
-    });
-
-    els.clearFiltersBtn.addEventListener("click", () => {
-      resetUi();
-      renderOutput();
-    });
-
     els.descBtn.addEventListener("click", () => {
       setRightTab("descriptions");
     });
-
-    if (els.rightTabOutputBtn) {
-      els.rightTabOutputBtn.addEventListener("click", () => setRightTab("output"));
-    }
 
     if (els.rightTabTemplateBtn) {
       els.rightTabTemplateBtn.addEventListener("click", () => setRightTab("template"));

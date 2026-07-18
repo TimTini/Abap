@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.07.18-r60">
-  <meta name="abap-viewer-updated-at" content="2026-07-18 14:37:47">
-  <meta name="abap-viewer-updated-note" content="Data catalog groups declarations by scope, traces FORM parameters to root descriptions, and shares edits with Template.">
+  <meta name="abap-viewer-version" content="v2026.07.18-r61">
+  <meta name="abap-viewer-updated-at" content="2026-07-18 15:28:36">
+  <meta name="abap-viewer-updated-note" content="Output tab and its dedicated renderer were removed; Template and Data remain synchronized.">
   <title>ABAP Parser Viewer</title>
   <style>
     :root {
@@ -405,14 +405,6 @@
       white-space: pre-wrap;
     }
 
-    #output {
-      flex: 1;
-      min-height: 0;
-      overflow: auto;
-      overflow-anchor: none;
-      padding-right: 6px;
-    }
-
     #declDescPanel {
       flex: 1;
       min-height: 0;
@@ -487,7 +479,6 @@
       gap: 8px;
     }
 
-    #output[hidden],
     #templatePreviewPanel[hidden],
     #declDescPanel[hidden] {
       display: none !important;
@@ -622,7 +613,7 @@
       box-sizing: border-box;
     }
 
-    /* Match .card.selected (outline + soft outer ring). Inset-only shadow clips oddly beside scrollbars on narrow split panes. */
+    /* Keep selected template blocks visible beside scrollbars on narrow split panes. */
     .template-block.selected {
       border-color: var(--selected-focus-ring);
       background: linear-gradient(var(--selected-focus-fill), var(--selected-focus-fill)), var(--panel);
@@ -728,46 +719,6 @@
       white-space: pre-wrap;
     }
 
-    .card {
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 12px;
-    }
-
-    .card.block {
-      border-left: 4px solid var(--accent);
-    }
-
-    .card.selected {
-      border-color: var(--selected-focus-ring);
-      background: linear-gradient(var(--selected-focus-fill), var(--selected-focus-fill)), var(--panel);
-      outline: 2px solid var(--selected-focus-ring);
-      outline-offset: 1px;
-      box-shadow: 0 0 0 1px color-mix(in srgb, var(--selected-focus-ring) 45%, transparent);
-    }
-
-    .card-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      margin-bottom: 8px;
-    }
-
-    .card-title {
-      margin: 0;
-      font-size: 16px;
-      line-height: 1.2;
-    }
-
-    .card-actions {
-      display: inline-flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-    }
-
     .perform-source-control {
       display: inline-flex;
       align-items: center;
@@ -795,34 +746,9 @@
       font-size: 12px;
     }
 
-    .btn-ghost {
-      border: 1px solid var(--border);
-      background: var(--panel);
-      color: var(--text);
-      padding: 4px 8px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 12px;
-    }
-
-    .btn-ghost:hover {
-      background: var(--hover);
-    }
-
     .muted {
       color: var(--muted);
       font-size: 13px;
-    }
-
-    .raw {
-      margin-top: 8px;
-      padding: 8px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: var(--code-bg);
-      font-family: Consolas, monospace;
-      font-size: 13px;
-      white-space: pre-wrap;
     }
 
     .pill {
@@ -853,19 +779,6 @@
       background: var(--selected-row-bg);
     }
 
-    .decl-desc,
-    .decl-desc-line {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-    }
-
-    .decl-desc-text {
-      flex: 1;
-      min-width: 0;
-      white-space: pre-wrap;
-    }
-
     .icon-btn {
       border: 1px solid var(--border);
       background: transparent;
@@ -890,18 +803,6 @@
     th {
       color: var(--muted);
       font-weight: 600;
-    }
-
-    .children {
-      margin-top: 12px;
-      padding-left: 12px;
-      border-left: 2px solid var(--border);
-    }
-
-    .extras {
-      margin-top: 10px;
-      padding-top: 8px;
-      border-top: 1px dashed var(--border);
     }
 
     pre {
@@ -1608,12 +1509,9 @@
     <div class="controls" id="appControls">
       <button type="button" id="parseBtn">Render</button>
       <label class="toggle"><input type="checkbox" id="themeToggle" checked>dark</label>
-      <button type="button" id="expandAllBtn" class="secondary">Expand all</button>
-      <button type="button" id="collapseAllBtn" class="secondary">Collapse all</button>
-      <button type="button" id="clearFiltersBtn" class="secondary">Clear</button>
       <button type="button" id="descBtn" class="secondary">Data</button>
       <button type="button" id="settingsBtn" class="secondary">Settings</button>
-      <span class="muted hint">Tip: click “Code” on a card to select the corresponding lines in the input; click “JSON” to inspect the raw object.</span>
+      <span class="muted hint">Tip: use Template or Data to inspect parsed declarations and jump to source lines.</span>
     </div>
 
     <div class="layout" id="mainLayout">
@@ -1637,7 +1535,7 @@
         class="splitter"
         id="panelSplitter"
         role="separator"
-        aria-label="Resize code and output panels"
+        aria-label="Resize code and detail panels"
         aria-orientation="vertical"
         tabindex="0"
       ></div>
@@ -1646,13 +1544,11 @@
         <div class="panel-header">
           <h2 id="rightPanelTitle">Template Preview</h2>
           <div class="panel-tabs">
-            <button type="button" id="rightTabOutputBtn" class="secondary tab-btn">Output</button>
             <button type="button" id="rightTabTemplateBtn" class="secondary tab-btn active">Template</button>
             <button type="button" id="rightTabDescBtn" class="secondary tab-btn">Data</button>
             <button type="button" id="declDescJsonBtn" class="secondary" hidden>Storage JSON</button>
           </div>
         </div>
-        <div id="output" class="muted" hidden>No data loaded.</div>
         <div id="templatePreviewPanel">
           <div class="template-controls">
             <span class="template-key-mode">

@@ -4666,9 +4666,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
               state.pendingTemplateViewportAnchor = null;
               return { ok: false, error: "Failed to persist description override." };
             }
-            if (typeof renderOutput === "function") {
-              renderOutput();
-            }
             if (typeof renderTemplatePreview === "function") {
               renderTemplatePreview();
             }

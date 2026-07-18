@@ -307,12 +307,11 @@ async function assertFailedRenderClearsPreviousResult() {
     "Expected failed Render to keep a useful error message visible."
   );
 
-  els.rightTabOutputBtn.click();
+  els.rightTabDescBtn.click();
   await waitForViewerUi(window);
-  assert.strictEqual(
-    String(els.output.textContent || "").trim(),
-    "No data loaded.",
-    "Expected switching tabs after a failed Render not to restore stale output."
+  assert(
+    String(els.declDescTable.textContent || "").includes("No data loaded."),
+    "Expected switching to Data after a failed Render not to restore stale declarations."
   );
   assert(
     String(els.error.textContent || "").includes("JSON parse error"),
@@ -681,14 +680,14 @@ async function assertGroupedConfigImportValidatesAndRollsBack() {
     VIEWER_CONFIG_STORAGE_KEYS.legacyDescriptionOverrides,
     JSON.stringify(originalLegacyOverrides)
   );
-  const originalRenderOutput = window.renderOutput;
+  const originalRenderActiveRightPanel = window.renderActiveRightPanel;
   let renderFailureInjected = false;
-  window.renderOutput = function failFirstImportedOverrideRender() {
+  window.renderActiveRightPanel = function failFirstImportedOverrideRender() {
     if (!renderFailureInjected) {
       renderFailureInjected = true;
       throw new Error("injected render failure");
     }
-    return originalRenderOutput.apply(this, arguments);
+    return originalRenderActiveRightPanel.apply(this, arguments);
   };
   try {
     assert.strictEqual(api.importViewerConfigObject({
@@ -698,7 +697,7 @@ async function assertGroupedConfigImportValidatesAndRollsBack() {
       sections: { descriptionOverrides: { replacement: "Replacement" } }
     }), false);
   } finally {
-    window.renderOutput = originalRenderOutput;
+    window.renderActiveRightPanel = originalRenderActiveRightPanel;
   }
   assert.strictEqual(renderFailureInjected, true);
   assert.deepStrictEqual(cloneTestJson(state.descOverrides), originalOverrides);
@@ -1102,8 +1101,6 @@ async function assertTemplateRowDescriptionEditsLocalLoopDecl() {
     "Updated list",
     "Expected Save to persist the exact local table override."
   );
-  assert(String(els.output.textContent || "").includes("Updated list"), "Expected Output to refresh after the row description edit.");
-
   loopTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="LOOP_AT_ITAB"]');
   assert(findTemplateCellByText(loopTable, "Updated list"), "Expected Template Preview to refresh after Save.");
   modal = await openTemplateCellDescriptionTab(window, findTemplateCellByText(loopTable, "Updated list"));
@@ -1365,9 +1362,7 @@ async function assertTemplateAppendUnboundOperandsUseCanonicalTargets() {
   const { els, state } = runtime;
   const legacySourceKey = "PATH:OBJECTS/OBJECT[1]/VALUES/WHAT/DECL:A";
   state.descOverrides[legacySourceKey] = "Legacy A";
-  runtime.api.renderOutput();
   runtime.api.renderTemplatePreview();
-  assert(String(els.output.textContent || "").includes("Legacy A"), "Expected Output to read the legacy PATH_DECL alias before migration.");
 
   els.rightTabTemplateBtn.click();
   await waitForViewerUi(window);
@@ -1382,10 +1377,9 @@ async function assertTemplateAppendUnboundOperandsUseCanonicalTargets() {
   const sourceKey = "PATH:OBJECT:1/VALUES/WHAT/DECL:A";
   const targetKey = "PATH:OBJECT:1/VALUES/TO/DECL:B";
   await saveTemplateCellDescription(window, sourceModal, "Source A");
-  assert.strictEqual(String(state.descOverrides[sourceKey] || ""), "Source A", "Expected APPEND source to save under the canonical Output PATH_DECL key.");
+  assert.strictEqual(String(state.descOverrides[sourceKey] || ""), "Source A", "Expected APPEND source to save under the canonical PATH_DECL key.");
   assert.strictEqual(Object.prototype.hasOwnProperty.call(state.descOverrides, legacySourceKey), false, "Expected canonical Save to remove the legacy Template alias.");
   assert.strictEqual(Object.prototype.hasOwnProperty.call(state.descOverrides, targetKey), false, "Expected editing a not to modify b.");
-  assert(String(els.output.textContent || "").includes("Source A"), "Expected Output to refresh the canonical source override.");
 
   appendTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="APPEND"]');
   assert(findTemplateCellByText(appendTable, "Source A"), "Expected Template to refresh the APPEND source override.");
@@ -1404,7 +1398,7 @@ async function assertTemplateAppendUnboundOperandsUseCanonicalTargets() {
   const targetModal = await openTemplateCellDescriptionTab(window, findTemplateCellByText(appendTable, "b"));
   assert(String(targetModal.textContent || "").includes("b"), "Expected APPEND target cell to target b.");
   await saveTemplateCellDescription(window, targetModal, "Target B");
-  assert.strictEqual(String(state.descOverrides[targetKey] || ""), "Target B", "Expected APPEND target to save under its own canonical Output PATH_DECL key.");
+  assert.strictEqual(String(state.descOverrides[targetKey] || ""), "Target B", "Expected APPEND target to save under its own canonical PATH_DECL key.");
   assert.strictEqual(Object.prototype.hasOwnProperty.call(state.descOverrides, sourceKey), false, "Expected editing b not to recreate a.");
 
   dom.window.close();
@@ -1431,13 +1425,8 @@ async function assertLegacyPathAliasUsesTemplateIndexAfterPerformExpansion() {
   assert.strictEqual(appendIndex, 2, "Expected expanded FORM content to shift APPEND to Template object 3.");
 
   state.descOverrides[legacySourceKey] = "Legacy shifted A";
-  runtime.api.renderOutput();
   runtime.api.renderTemplatePreview();
 
-  assert(
-    String(els.output.textContent || "").includes("Legacy shifted A"),
-    "Expected Output to resolve the legacy Template index alias after PERFORM expansion."
-  );
   const appendTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="APPEND"]');
   assert(findTemplateCellByText(appendTable, "Legacy shifted A"), "Expected Template to resolve the same shifted legacy alias.");
 
@@ -1535,7 +1524,7 @@ async function assertVirtualGutterJumpSettlesInOneClick() {
       {
         scrollEventViaRaf: true,
         scrollConvergenceFactor: 1,
-        visualScale: kind === "output" ? 0.8 : 1.25
+        visualScale: 1.25
       }
     );
     try {
@@ -1570,13 +1559,6 @@ async function assertVirtualGutterJumpSettlesInOneClick() {
   };
 
   await runJumpAssertion({
-    kind: "output",
-    container: els.output,
-    tabButton: els.rightTabOutputBtn,
-    getItemHeight: (index) => 90 + ((index % 4) * 70),
-    selectedSelector: ".card.selected"
-  });
-  await runJumpAssertion({
     kind: "template",
     container: els.templatePreviewOutput,
     tabButton: els.rightTabTemplateBtn,
@@ -1604,7 +1586,7 @@ async function assertManualScrollCancelsPendingVirtualAlignment() {
       kind,
       itemCount,
       getItemHeight,
-      { scrollEventViaRaf: true, visualScale: kind === "output" ? 0.8 : 1.25 }
+      { scrollEventViaRaf: true, visualScale: 1.25 }
     );
     try {
       els.inputText.scrollTop = (targetLine - 1) * 18;
@@ -1657,12 +1639,6 @@ async function assertManualScrollCancelsPendingVirtualAlignment() {
   };
 
   await runTakeoverAssertion({
-    kind: "output",
-    container: els.output,
-    tabButton: els.rightTabOutputBtn,
-    getItemHeight: (index) => 120 + ((index % 4) * 24)
-  });
-  await runTakeoverAssertion({
     kind: "template",
     container: els.templatePreviewOutput,
     tabButton: els.rightTabTemplateBtn,
@@ -1688,7 +1664,7 @@ async function assertHeterogeneousVirtualRangesKeepViewportCovered() {
         return 1200 + ((index % 3) * 80);
       }
       if (index >= 585 && index <= 615) {
-        return kind === "template" ? 130 : 140;
+        return 130;
       }
       return 55 + ((index % 5) * 8);
     };
@@ -1698,7 +1674,7 @@ async function assertHeterogeneousVirtualRangesKeepViewportCovered() {
       kind,
       itemCount,
       getItemHeight,
-      { scrollHeightMode: "virtual-dom", visualScale: kind === "output" ? 0.8 : 1.25 }
+      { scrollHeightMode: "virtual-dom", visualScale: 1.25 }
     );
     try {
       els.inputText.scrollTop = (targetLine - 1) * 18;
@@ -1709,7 +1685,7 @@ async function assertHeterogeneousVirtualRangesKeepViewportCovered() {
       gutterButton.click();
       await settleViewerUi(window, 10);
 
-      const estimateBeforeRangeChange = Number(virtualState.avgItemHeight) || (kind === "template" ? 140 : 200);
+      const estimateBeforeRangeChange = Number(virtualState.avgItemHeight) || 140;
       const requestedTop = 350 * estimateBeforeRangeChange;
       container.dispatchEvent(new window.WheelEvent("wheel", {
         bubbles: true,
@@ -1732,9 +1708,7 @@ async function assertHeterogeneousVirtualRangesKeepViewportCovered() {
           + `scrollTop=${container.scrollTop}, start=${virtualState.start}, end=${virtualState.end}.`
       );
 
-      const firstVisibleIndex = Number(coveringRoots[0].getAttribute(
-        kind === "template" ? "data-template-index" : "data-virtual-item-index"
-      ));
+      const firstVisibleIndex = Number(coveringRoots[0].getAttribute("data-template-index"));
       container.dispatchEvent(new window.Event("scroll"));
       await settleViewerUi(window, 6);
       const nextVisible = Array.from(container.querySelectorAll(rootSelector)).find((node) => {
@@ -1743,24 +1717,17 @@ async function assertHeterogeneousVirtualRangesKeepViewportCovered() {
       });
       assert(nextVisible, `Expected repeated ${kind} scroll processing not to leave a blank viewport.`);
       assert.strictEqual(
-        Number(nextVisible.getAttribute(kind === "template" ? "data-template-index" : "data-virtual-item-index")),
+        Number(nextVisible.getAttribute("data-template-index")),
         firstVisibleIndex,
         `Expected repeated ${kind} scroll processing at the same offset not to oscillate ranges; `
           + `scrollTop=${container.scrollTop}, start=${virtualState.start}, end=${virtualState.end}, `
-          + `first=${firstVisibleIndex}, next=${nextVisible.getAttribute(kind === "template" ? "data-template-index" : "data-virtual-item-index")}.`
+          + `first=${firstVisibleIndex}, next=${nextVisible.getAttribute("data-template-index")}.`
       );
     } finally {
       restoreLayout();
     }
   };
 
-  await runCoverageAssertion({
-    kind: "output",
-    container: els.output,
-    tabButton: els.rightTabOutputBtn,
-    rootSelector: "[data-virtual-item-index]",
-    virtualState: state.outputVirtual
-  });
   await runCoverageAssertion({
     kind: "template",
     container: els.templatePreviewOutput,
@@ -1790,11 +1757,6 @@ async function assertSplitterRefreshesActiveVirtualGeometry() {
     );
   };
 
-  await runAssertion({
-    kind: "output",
-    tabButton: els.rightTabOutputBtn,
-    virtualState: state.outputVirtual
-  });
   await runAssertion({
     kind: "template",
     tabButton: els.rightTabTemplateBtn,
@@ -1838,13 +1800,6 @@ async function assertBlankViewportFallbackUsesLogicalAnchor() {
     }
   };
 
-  await runAssertion({
-    kind: "output",
-    container: els.output,
-    tabButton: els.rightTabOutputBtn,
-    rootSelector: "[data-virtual-item-index]",
-    captureAnchor: () => window.captureOutputViewportAnchor()
-  });
   await runAssertion({
     kind: "template",
     container: els.templatePreviewOutput,
@@ -1918,7 +1873,6 @@ async function assertDescriptionSaveAndClearPreserveTemplateCellAnchor() {
       "Expected Description Save not to change the source selection."
     );
     assert.strictEqual(Number(els.inputText.scrollTop) || 0, sourceScrollTop, "Expected Description Save not to scroll source code.");
-    assert(String(els.output.textContent || "").includes("Shared override"), "Expected Output to update after Description Save.");
     assert(String(els.templatePreviewOutput.textContent || "").includes("Shared override"), "Expected Template to update after Description Save.");
 
     const beforeClearOffset = cell.getBoundingClientRect().top - containerTop;
@@ -1939,80 +1893,7 @@ async function assertDescriptionSaveAndClearPreserveTemplateCellAnchor() {
       "Expected Description Clear not to change the source selection."
     );
     assert.strictEqual(Number(els.inputText.scrollTop) || 0, sourceScrollTop, "Expected Description Clear not to scroll source code.");
-    assert(String(els.output.textContent || "").includes("Shared value"), "Expected Output to restore code Description after Clear.");
     assert(String(els.templatePreviewOutput.textContent || "").includes("Shared value"), "Expected Template to restore code Description after Clear.");
-  } finally {
-    restoreLayout();
-    dom.window.close();
-  }
-}
-
-async function assertDescriptionEditPreservesOutputSelectedItemAnchor() {
-  const clearCount = 700;
-  const targetLine = 600;
-  const source = [
-    'DATA gv_shared TYPE string. "Shared value',
-    ...Array.from({ length: clearCount }, () => "CLEAR gv_shared.")
-  ].join("\n");
-  const dom = await renderFixture(source);
-  const { window } = dom;
-  const { els, state } = window.AbapViewerRuntime;
-  els.rightTabOutputBtn.click();
-  await settleViewerUi(window);
-  const restoreLayout = installVirtualLayoutMock(
-    window,
-    els.output,
-    "output",
-    clearCount + 1,
-    (index) => 160 + ((index % 4) * 25) + (Object.keys(state.descOverrides || {}).length ? 48 : 0),
-    { visualScale: 0.8 }
-  );
-
-  try {
-    els.inputText.scrollTop = (targetLine - 1) * 18;
-    els.inputText.dispatchEvent(new window.Event("scroll"));
-    await settleViewerUi(window);
-    const gutterButton = els.inputGutterContent.querySelector(`button[data-line="${targetLine}"]`);
-    assert(gutterButton && !gutterButton.hidden, "Expected a deep Output gutter target for the anchor test.");
-    gutterButton.click();
-    await settleViewerUi(window, 10);
-
-    let selected = els.output.querySelector(".card.selected");
-    assert(selected, "Expected a selected Output item before Description edit.");
-    const containerTop = els.output.getBoundingClientRect().top;
-    const beforeSaveOffset = selected.getBoundingClientRect().top - containerTop;
-    assert(Math.abs(beforeSaveOffset - 10) <= 1, `Expected Output gutter jump to align before edit, got ${beforeSaveOffset}.`);
-    let editButton = selected.querySelector('button[aria-label="Edit decl description"]');
-    assert(editButton, "Expected the selected Output item to expose Description edit.");
-    editButton.click();
-    assert(!els.editModal.hidden, "Expected Output Description edit modal.");
-    els.editDesc.value = "Shared output override";
-    els.editSaveBtn.click();
-    await settleViewerUi(window, 10);
-
-    selected = els.output.querySelector(".card.selected");
-    assert(selected, "Expected the selected Output item to survive Description Save.");
-    const afterSaveOffset = selected.getBoundingClientRect().top - containerTop;
-    assert(
-      Math.abs(afterSaveOffset - beforeSaveOffset) <= 1,
-      `Expected Description Save to preserve the selected Output item, moved ${afterSaveOffset - beforeSaveOffset}px.`
-    );
-    assert(String(els.output.textContent || "").includes("Shared output override"), "Expected Output Description Save to rerender text.");
-
-    const beforeClearOffset = selected.getBoundingClientRect().top - containerTop;
-    editButton = selected.querySelector('button[aria-label="Edit decl description"]');
-    editButton.click();
-    els.editClearBtn.click();
-    await settleViewerUi(window, 10);
-
-    selected = els.output.querySelector(".card.selected");
-    assert(selected, "Expected the selected Output item to survive Description Clear.");
-    const afterClearOffset = selected.getBoundingClientRect().top - containerTop;
-    assert(
-      Math.abs(afterClearOffset - beforeClearOffset) <= 1,
-      `Expected Description Clear to preserve the selected Output item, moved ${afterClearOffset - beforeClearOffset}px.`
-    );
-    assert(String(els.output.textContent || "").includes("Shared value"), "Expected Output to restore code Description after Clear.");
   } finally {
     restoreLayout();
     dom.window.close();
@@ -2401,7 +2282,7 @@ async function assertTemplateIndexedAndCompositePlaceholdersKeepProvenance() {
   dom.window.close();
 }
 
-async function assertTemplateSemanticFallbacksMatchOutputPaths() {
+async function assertTemplateSemanticFallbacksUseStablePaths() {
   const source = [
     "PERFORM f USING x.",
     "CALL FUNCTION 'F' EXPORTING p = y.",
@@ -2450,11 +2331,10 @@ async function assertTemplateSemanticFallbacksMatchOutputPaths() {
     && conditionRight.__templateCellMeta.declCandidates.length > 0, "Expected the existing condition synthetic target for literal 1 to remain unchanged.");
   const conditionLeftDecl = conditionLeft.__templateCellMeta.declCandidates[0];
   const conditionLeftKey = "CONDITION:Z";
-  assert.strictEqual(window.getDeclOverrideStorageKey(conditionLeftDecl), conditionLeftKey, "Expected Template and Output to keep the existing condition-operand synthetic key.");
+  assert.strictEqual(window.getDeclOverrideStorageKey(conditionLeftDecl), conditionLeftKey, "Expected Template to keep the existing condition-operand synthetic key.");
   const conditionModal = await openTemplateCellDescriptionTab(window, conditionLeft);
   await saveTemplateCellDescription(window, conditionModal, "Z edited");
   assert.strictEqual(String(window.AbapViewerRuntime.state.descOverrides[conditionLeftKey] || ""), "Z edited");
-  assert(String(els.output.textContent || "").includes("Z edited"), "Expected Output to refresh the condition override saved from Template.");
   const refreshedIfTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="IF"]');
   assert(findTemplateCellByText(refreshedIfTable, "Z edited"), "Expected Template to refresh the same condition operand.");
 
@@ -2817,33 +2697,6 @@ async function assertExpandedPerformTraceUsesRootDeclarations() {
   assertTemplateRows(performRoots[0], "CLEAR iv_local.", [["CLEAR", "lv_local"]]);
   assertTemplateRows(performRoots[2], "CLEAR iv_literal.", [["CLEAR", "iv_literal"]]);
 
-  try {
-    Object.defineProperty(els.output, "clientHeight", { configurable: true, value: 100000 });
-  } catch {
-    // Keep the normal virtual viewport when JSDOM does not allow overriding it.
-  }
-  els.rightTabOutputBtn.click();
-  await waitForViewerUi(window);
-
-  const firstIfCard = Array.from(els.output.querySelectorAll(".card"))
-    .find((card) => String(card.dataset.id || "") === String(firstIf.id));
-  assert(firstIfCard, "Expected Output card for the first expanded IF.");
-  const conditionRows = Array.from(firstIfCard.querySelectorAll(".extras table tbody tr"));
-  assert.strictEqual(conditionRows.length, 2, "Expected two IF condition rows in Output.");
-  const getDeclNamesFromCell = (cell) => Array.from(cell?.firstElementChild?.children || [], (line) => (
-    String(line.textContent || "").trim()
-  ));
-  assert.deepStrictEqual(
-    getDeclNamesFromCell(conditionRows[0].cells[5]),
-    ["iv_inner", "iv_outer", "gv_root"],
-    "Expected Output to keep the complete scalar trace chain."
-  );
-  assert.deepStrictEqual(
-    getDeclNamesFromCell(conditionRows[1].cells[5]),
-    ["is_inner-city", "is_outer-city", "gs_root-city"],
-    "Expected Output to keep the complete structure-field trace chain."
-  );
-
   dom.window.close();
 }
 
@@ -2907,54 +2760,40 @@ async function assertGlobalPerformSourceSelection() {
   assert.strictEqual(sameStaticNestedCandidates.length, 3, "Expected the same static nested call to stay distinct per ancestry.");
   assert.strictEqual(new Set(sameStaticNestedCandidates.map((candidate) => candidate.key)).size, 3);
 
-  els.rightTabOutputBtn.click();
-  await settleViewerUi(window);
   const getSourceSelect = (container, formUpper) => container.querySelector(
     `.perform-source-select[data-perform-form="${formUpper}"]`
   );
   const getSourceBadge = (container, formUpper) => container.querySelector(
     `.perform-source-badge[data-perform-form="${formUpper}"]`
   );
-  let outputOuterSelect = getSourceSelect(els.output, "FRM_OUTER");
-  assert(outputOuterSelect, "Expected Output PERFORM header source selector.");
-  assert.strictEqual(getSourceBadge(els.output, "FRM_OUTER")?.textContent, "⇄ 3 nguồn");
-  assert.strictEqual(outputOuterSelect.options.length, 3);
-  assert.strictEqual(outputOuterSelect.options[0].textContent, "Nguồn 1/3 · line 7 · USING gv_first · CHANGING gv_change_first");
-  assert.strictEqual(outputOuterSelect.options[1].textContent, "Nguồn 2/3 · line 8 · USING gv_second · CHANGING gv_change_second");
-
   els.rightTabTemplateBtn.click();
   await settleViewerUi(window);
-  const templateOuterSelect = getSourceSelect(els.templatePreviewOutput, "FRM_OUTER");
+  let templateOuterSelect = getSourceSelect(els.templatePreviewOutput, "FRM_OUTER");
   assert(templateOuterSelect, "Expected Template PERFORM header source selector.");
+  assert.strictEqual(getSourceBadge(els.templatePreviewOutput, "FRM_OUTER")?.textContent, "⇄ 3 nguồn");
+  assert.strictEqual(templateOuterSelect.options.length, 3);
+  assert.strictEqual(templateOuterSelect.options[0].textContent, "Nguồn 1/3 · line 7 · USING gv_first · CHANGING gv_change_first");
+  assert.strictEqual(templateOuterSelect.options[1].textContent, "Nguồn 2/3 · line 8 · USING gv_second · CHANGING gv_change_second");
   assert.strictEqual(templateOuterSelect.value, outerCandidates[0].key);
 
-  state.selectedId = String((state.renderObjects || []).find((obj) => obj && obj.objectType === "PERFORM")?.id || "");
   state.selectedTemplateIndex = "0";
   state.selectedTemplateIndexes = new window.Set(["0", "2"]);
   state.templateSelectionAnchorIndex = "2";
-  els.output.scrollTop = 120;
   els.templatePreviewOutput.scrollTop = 80;
 
-  outputOuterSelect = getSourceSelect(els.output, "FRM_OUTER");
-  outputOuterSelect.value = outerCandidates[1].key;
-  outputOuterSelect.dispatchEvent(new window.Event("change", { bubbles: true }));
+  templateOuterSelect.value = outerCandidates[1].key;
+  templateOuterSelect.dispatchEvent(new window.Event("change", { bubbles: true }));
   await settleViewerUi(window, 10);
 
   assert.strictEqual(registry.selectedKeyByFormUpper.get("FRM_OUTER"), outerCandidates[1].key);
-  assert.strictEqual(getSourceSelect(els.output, "FRM_OUTER")?.value, outerCandidates[1].key);
   assert.strictEqual(getSourceSelect(els.templatePreviewOutput, "FRM_OUTER")?.value, outerCandidates[1].key);
-  assert.strictEqual(state.selectedId, String((state.renderObjects || []).find((obj) => obj && obj.objectType === "PERFORM")?.id || ""));
   assert.strictEqual(state.selectedTemplateIndex, "0");
   assert.deepStrictEqual(Array.from(state.selectedTemplateIndexes).sort(), ["0", "2"], "Expected source switching to preserve multi-selection.");
-  assert(Math.abs(els.output.scrollTop - 120) <= 40, "Expected Output logical viewport anchor to stay near its prior offset.");
   assert(Math.abs(els.templatePreviewOutput.scrollTop - 80) <= 40, "Expected Template logical viewport anchor to stay near its prior offset.");
-  assert(els.output.querySelector(`.card.selected[data-id="${state.selectedId}"]`), "Expected Output selection anchor to survive rebuild.");
   assert(els.templatePreviewOutput.querySelector('.template-block.selected[data-template-index="0"]'), "Expected Template selection anchor to survive rebuild.");
   assert(els.templatePreviewOutput.querySelector('.template-block.selected[data-template-index="2"]'), "Expected secondary Template selection to survive rebuild.");
 
-  Object.defineProperty(els.output, "clientHeight", { configurable: true, value: 100000 });
   Object.defineProperty(els.templatePreviewOutput, "clientHeight", { configurable: true, value: 100000 });
-  runtime.api.renderOutput();
   runtime.api.renderTemplatePreview();
   await settleViewerUi(window, 8);
 
@@ -2999,8 +2838,6 @@ async function assertGlobalPerformSourceSelection() {
       .find((candidate) => String(candidate.querySelector(".template-block-meta")?.textContent || "").includes(idText));
     return block ? block.querySelector("table.template-preview-table") : null;
   };
-  const firstLocalCard = els.output.querySelector(`[data-id="${String(firstLocalAssignment.id)}"]`);
-  assert(firstLocalCard && String(firstLocalCard.textContent || "").includes("gv_second"), "Expected Output FORM params to use call-site 2 globally.");
   assert.deepStrictEqual(getTemplateTableRows(findTemplateTable(firstLocalAssignment)), [
     ["Đích", "Nguồn"],
     ["lv_local", "gv_second"]
@@ -3012,15 +2849,15 @@ async function assertGlobalPerformSourceSelection() {
 
   let activeInnerCandidates = registry.getActiveCandidates("FRM_INNER");
   assert.strictEqual(activeInnerCandidates.length, 2, "Expected nested selector candidates only from the selected parent branch.");
-  let outputInnerSelect = getSourceSelect(els.output, "FRM_INNER");
-  assert(outputInnerSelect);
-  assert.strictEqual(outputInnerSelect.options.length, 2);
-  outputInnerSelect.value = activeInnerCandidates[1].key;
-  outputInnerSelect.dispatchEvent(new window.Event("change", { bubbles: true }));
+  let templateInnerSelect = getSourceSelect(els.templatePreviewOutput, "FRM_INNER");
+  assert(templateInnerSelect);
+  assert.strictEqual(templateInnerSelect.options.length, 2);
+  templateInnerSelect.value = activeInnerCandidates[1].key;
+  templateInnerSelect.dispatchEvent(new window.Event("change", { bubbles: true }));
   await settleViewerUi(window, 10);
   assert.strictEqual(registry.selectedKeyByFormUpper.get("FRM_INNER"), activeInnerCandidates[1].key);
 
-  const currentOuterSelect = getSourceSelect(els.output, "FRM_OUTER");
+  const currentOuterSelect = getSourceSelect(els.templatePreviewOutput, "FRM_OUTER");
   currentOuterSelect.value = outerCandidates[2].key;
   currentOuterSelect.dispatchEvent(new window.Event("change", { bubbles: true }));
   await settleViewerUi(window, 10);
@@ -3037,29 +2874,23 @@ async function assertGlobalPerformSourceSelection() {
   );
   assert(innerClear);
   assert.deepStrictEqual(getBindingNames(innerClear, "iv_inner"), ["iv_outer", "gv_third"]);
-  const innerClearCard = els.output.querySelector(`[data-id="${String(innerClear.id)}"]`);
-  assert(innerClearCard && String(innerClearCard.textContent || "").includes("gv_third"), "Expected nested Output bindings to follow the new parent branch.");
   assert.deepStrictEqual(getTemplateTableRows(findTemplateTable(innerClear)), [["CLEAR", "gv_third"]]);
 
   const literalRoot = (state.renderObjects || []).find((obj) => obj && obj.extras?.performCall?.form === "frm_literal");
   const literalClear = findDescendant(literalRoot, (obj) => String(obj && obj.raw || "").trim() === "CLEAR iv_literal.");
   assert(literalClear);
   assert.deepStrictEqual(getBindingNames(literalClear, "iv_literal"), [], "Expected literal actual to keep local fallback.");
-  const literalCard = els.output.querySelector(`[data-id="${String(literalRoot.id)}"]`);
-  assert(literalCard);
   assert.strictEqual(
-    getSourceSelect(literalCard, "FRM_LITERAL"),
+    getSourceSelect(els.templatePreviewOutput, "FRM_LITERAL"),
     null,
     "Expected a FORM with only one source not to show a redundant selector."
   );
-  assert.strictEqual(getSourceBadge(literalCard, "FRM_LITERAL"), null);
+  assert.strictEqual(getSourceBadge(els.templatePreviewOutput, "FRM_LITERAL"), null);
 
   const externalRoot = (state.renderObjects || []).find((obj) => obj && obj.extras?.performCall?.program === "zother");
   assert(externalRoot);
   assert.strictEqual(Array.isArray(externalRoot.children) ? externalRoot.children.length : 0, 0);
-  const externalCard = els.output.querySelector(`[data-id="${String(externalRoot.id)}"]`);
-  assert(externalCard);
-  assert.strictEqual(getSourceSelect(externalCard, "FRM_EXTERNAL"), null);
+  assert.strictEqual(getSourceSelect(els.templatePreviewOutput, "FRM_EXTERNAL"), null);
 
   const cycleRoot = (state.renderObjects || []).find((obj) => obj && obj.extras?.performCall?.form === "frm_cycle");
   const recursivePerform = findDescendant(cycleRoot, (obj) => obj !== cycleRoot && obj?.extras?.performCall?.form === "frm_cycle");
@@ -3906,7 +3737,6 @@ async function assertMessageAndWriteViewerContracts() {
   let modal = await openTemplateCellDescriptionTab(window, messageCell);
   await saveTemplateCellDescription(window, modal, "Edited message");
   assert.strictEqual(String(state.descOverrides[messageDeclKey] || ""), "Edited message");
-  assert(String(els.output.textContent || "").includes("Edited message"), "MESSAGE save must refresh Output.");
   assert(findTemplateCellByText(els.templatePreviewOutput, "Edited message"), "MESSAGE save must refresh Template.");
 
   const refreshedMessageTable = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="MESSAGE"]'))[0];
@@ -3936,16 +3766,6 @@ async function assertMessageAndWriteViewerContracts() {
   assert.strictEqual(literalWithCell && literalWithCell.__templateCellMeta && literalWithCell.__templateCellMeta.reasonCode, "LITERAL_NO_DECL");
   const literalMaskCell = findTemplateCellByText(writeTables[0], "'==XX'");
   assert.strictEqual(literalMaskCell && literalMaskCell.__templateCellMeta && literalMaskCell.__templateCellMeta.reasonCode, "LITERAL_NO_DECL");
-
-  els.rightTabOutputBtn.click();
-  await settleViewerUi(window);
-  els.output.scrollTop = 2200;
-  els.output.dispatchEvent(new window.Event("scroll"));
-  await settleViewerUi(window, 10);
-  const outputText = String(els.output.textContent || "");
-  assert(outputText.includes("with[1]"), "Output Values must expose each MESSAGE WITH operand.");
-  assert(outputText.includes("format[1].NO-GAP"), "Output Values must expose WRITE formatting rows.");
-  assert(outputText.includes("format[2].CURRENCY"), "Output Values must retain formatting operand provenance.");
 
   dom.window.close();
 }
@@ -4011,6 +3831,65 @@ async function assertDataCatalogGroupsEverySourceDeclaration() {
     "Effective description",
     "Edit"
   ]);
+
+  dom.window.close();
+}
+
+async function assertOutputFeatureRemoved() {
+  const sourceFiles = [
+    "viewer/index.html",
+    "viewer/app/core/01-runtime-state.js",
+    "viewer/app/descriptions/01-normalize-and-desc.js",
+    "viewer/app/template/01-path-resolver.js",
+    "viewer/app/output/01-output-render.js",
+    "viewer/app/05-main.js"
+  ];
+  const removedRuntimeTokens = [
+    "rightTabOutputBtn",
+    'id="output"',
+    "els.output",
+    'rightTab === "output"',
+    "renderOutput",
+    "outputVirtual",
+    "pendingOutputViewportAnchor",
+    "expandAllBtn",
+    "collapseAllBtn",
+    "clearFiltersBtn"
+  ];
+  for (const sourceFile of sourceFiles) {
+    const sourceText = fs.readFileSync(path.resolve(__dirname, "..", sourceFile), "utf8");
+    for (const token of removedRuntimeTokens) {
+      assert(!sourceText.includes(token), `Expected ${sourceFile} not to retain removed Output runtime token ${token}.`);
+    }
+  }
+
+  const dom = await renderFixture('DATA gv_value TYPE string. "Value description');
+  const { window } = dom;
+  const { document } = window;
+  const { els, state, api } = window.AbapViewerRuntime;
+
+  assert.strictEqual(document.querySelector("#rightTabOutputBtn"), null);
+  assert.strictEqual(document.querySelector("#output"), null);
+  assert.strictEqual(document.querySelector("#expandAllBtn"), null);
+  assert.strictEqual(document.querySelector("#collapseAllBtn"), null);
+  assert.strictEqual(document.querySelector("#clearFiltersBtn"), null);
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(els, "rightTabOutputBtn"), false);
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(els, "output"), false);
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(state, "collapsedIds"), false);
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(state, "selectedId"), false);
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(state, "outputVirtual"), false);
+  assert.strictEqual(typeof api.renderOutput, "undefined");
+
+  api.setRightTab("output");
+  await waitForViewerUi(window);
+  assert.strictEqual(state.rightTab, "template");
+  assert.strictEqual(els.templatePreviewPanel.hidden, false);
+  assert.strictEqual(els.declDescPanel.hidden, true);
+
+  els.rightTabDescBtn.click();
+  await waitForViewerUi(window);
+  assert.strictEqual(state.rightTab, "descriptions");
+  assert.strictEqual(els.declDescPanel.hidden, false);
 
   dom.window.close();
 }
@@ -4200,7 +4079,7 @@ async function main() {
     await assertTemplateAppendLiteralKeepsOnlyTargetEditable();
     await assertTemplateIfArrayProvenanceIsPerRenderedLine();
     await assertTemplateIndexedAndCompositePlaceholdersKeepProvenance();
-    await assertTemplateSemanticFallbacksMatchOutputPaths();
+    await assertTemplateSemanticFallbacksUseStablePaths();
     await assertTemplateDirectSchemaPathsStayLocked();
     await assertTemplateFallbackAllowlistCoversExistingItabOperands();
     await assertTemplateResolverWarnsOnceWithCellMetadata();
@@ -4217,6 +4096,9 @@ async function main() {
   if (!focus || focus === "data-catalog") {
     await assertDataCatalogGroupsEverySourceDeclaration();
   }
+  if (!focus || focus === "output-removal") {
+    await assertOutputFeatureRemoved();
+  }
   if (!focus || focus === "data-perform-trace") {
     await assertDataCatalogTracesNestedPerformAndEditsSelectedChain();
     await assertDataCatalogSourceSelectorStaysSynchronized();
@@ -4229,7 +4111,6 @@ async function main() {
     await assertSplitterRefreshesActiveVirtualGeometry();
     await assertBlankViewportFallbackUsesLogicalAnchor();
     await assertDescriptionSaveAndClearPreserveTemplateCellAnchor();
-    await assertDescriptionEditPreservesOutputSelectedItemAnchor();
   }
   if (focus === "scroll-manual-takeover") {
     await assertManualScrollCancelsPendingVirtualAlignment();

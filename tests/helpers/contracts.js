@@ -143,15 +143,6 @@ function normalizeViewerState(window) {
       })
     : [];
 
-  const outputCards = els.output
-    ? Array.from(els.output.querySelectorAll(".card[data-id]")).map((card) => ({
-        id: String(card.getAttribute("data-id") || ""),
-        lineStart: Number(card.getAttribute("data-line-start") || 0) || 0,
-        selected: card.classList.contains("selected"),
-        title: String((card.querySelector(".card-head") && card.querySelector(".card-head").textContent) || "").trim()
-      }))
-    : [];
-
   const templateBlocks = els.templatePreviewOutput
     ? Array.from(els.templatePreviewOutput.querySelectorAll(".template-block[data-template-index]")).map((block) => ({
         index: String(block.getAttribute("data-template-index") || ""),
@@ -179,15 +170,12 @@ function normalizeViewerState(window) {
       selectedText: inputText.slice(selectionStart, selectionEnd)
     },
     selectedState: {
-      selectedId: String(state.selectedId || ""),
       selectedTemplateIndex: String(state.selectedTemplateIndex || ""),
       selectedDeclKey: String(state.selectedDeclKey || "")
     },
-    outputCards,
     templateBlocks,
     descriptionSummary: els.declDescSummary ? String(els.declDescSummary.textContent || "").trim() : "",
     descriptionRows: declRows.slice(0, 20),
-    outputLineTargets: mapEntriesToArray(state.outputVirtual && state.outputVirtual.lineTargetMap),
     templateLineTargets: mapEntriesToArray(state.templateVirtual && state.templateVirtual.lineTargetMap),
     traceDecls: normalizeAny(
       (Array.isArray(data.decls) ? data.decls : []).filter((decl) => String(decl && decl.traceFile ? decl.traceFile : "").trim())

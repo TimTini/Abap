@@ -10,9 +10,6 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
   const els = {
     parseBtn: document.getElementById("parseBtn"),
     themeToggle: document.getElementById("themeToggle"),
-    expandAllBtn: document.getElementById("expandAllBtn"),
-    collapseAllBtn: document.getElementById("collapseAllBtn"),
-    clearFiltersBtn: document.getElementById("clearFiltersBtn"),
     descBtn: document.getElementById("descBtn"),
     settingsBtn: document.getElementById("settingsBtn"),
     inputText: document.getElementById("inputText"),
@@ -20,10 +17,8 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     inputGutterContent: document.getElementById("inputGutterContent"),
     mainLayout: document.getElementById("mainLayout"),
     panelSplitter: document.getElementById("panelSplitter"),
-    output: document.getElementById("output"),
     buildInfo: document.getElementById("buildInfo"),
     rightPanelTitle: document.getElementById("rightPanelTitle"),
-    rightTabOutputBtn: document.getElementById("rightTabOutputBtn"),
     rightTabTemplateBtn: document.getElementById("rightTabTemplateBtn"),
     rightTabDescBtn: document.getElementById("rightTabDescBtn"),
     templatePreviewPanel: document.getElementById("templatePreviewPanel"),
@@ -90,8 +85,6 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     templateConfig: null,
     templateConfigDraft: "",
     templatePreviewCache: null,
-    collapsedIds: new Set(),
-    selectedId: "",
     selectedTemplateIndex: "",
     selectedTemplateIndexes: new Set(),
     templateSelectionAnchorIndex: "",
@@ -103,27 +96,6 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     inputLineOffsets: [],
     settings: null,
     layoutLeftPane: 48,
-    outputVirtual: {
-      roots: [],
-      itemCount: 0,
-      start: 0,
-      end: 0,
-      lastScrollTop: 0,
-      scrollDir: "down",
-      pendingRaf: 0,
-      isAdjustingScroll: false,
-      avgItemHeight: 200,
-      unknownItemHeight: 200,
-      estimateCalibrated: false,
-      adjustmentRaf: 0,
-      adjustmentGeneration: 0,
-      needsScrollSync: false,
-      isRenderTransaction: false,
-      geometryEpoch: 0,
-      idToRootIndex: new Map(),
-      lineTargetMap: new Map(),
-      isInitialized: false
-    },
     templateVirtual: {
       items: [],
       itemCount: 0,
@@ -1109,12 +1081,6 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
 
   function setError(message) {
     els.error.textContent = message ? String(message) : "";
-  }
-
-  function setOutputMessage(message) {
-    els.output.classList.add("muted");
-    els.output.replaceChildren();
-    els.output.textContent = message || "";
   }
 
   function parseDateCandidate(value) {

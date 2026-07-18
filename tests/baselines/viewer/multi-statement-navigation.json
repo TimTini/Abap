@@ -21,11 +21,9 @@
     "selectedText": ""
   },
   "selectedState": {
-    "selectedId": "",
     "selectedTemplateIndex": "",
     "selectedDeclKey": ""
   },
-  "outputCards": [],
   "templateBlocks": [
     {
       "index": "0",
@@ -54,7 +52,6 @@
   ],
   "descriptionSummary": "",
   "descriptionRows": [],
-  "outputLineTargets": [],
   "templateLineTargets": [],
   "traceDecls": []
 }
