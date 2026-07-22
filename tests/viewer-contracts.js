@@ -1333,7 +1333,9 @@ async function assertTemplateRendersEachFormOnceInSourceOrder() {
     "PERFORM frm_once USING gv_second.",
     "PERFORM frm_once USING gv_third.",
     "FORM frm_once USING iv_value TYPE string.",
-    "  CLEAR iv_value.",
+    "  IF iv_value IS INITIAL.",
+    "    CLEAR iv_value.",
+    "  ENDIF.",
     "ENDFORM."
   ].join("\n");
   const dom = await renderFixture(source);
@@ -1349,7 +1351,8 @@ async function assertTemplateRendersEachFormOnceInSourceOrder() {
     "Expected PERFORM calls not to inline-expand FORM children."
   );
   assert.strictEqual(formRoots.length, 1, "Expected the FORM definition to render exactly once.");
-  assert.strictEqual(String(formRoots[0].children?.[0]?.raw || "").trim(), "CLEAR iv_value.");
+  assert.strictEqual(String(formRoots[0].children?.[0]?.raw || "").trim(), "IF iv_value IS INITIAL.");
+  assert.strictEqual(String(formRoots[0].children?.[0]?.children?.[0]?.raw || "").trim(), "CLEAR iv_value.");
 
   els.rightTabTemplateBtn.click();
   await waitForViewerUi(window);
@@ -1357,8 +1360,17 @@ async function assertTemplateRendersEachFormOnceInSourceOrder() {
   const formTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="FORM"]');
   assert(formTable, "Expected a Template block for the FORM definition.");
   const formBlock = formTable.closest(".template-block");
-  const sourceSelect = formBlock?.querySelector('.perform-source-select[data-perform-form="FRM_ONCE"]');
-  assert(sourceSelect, "Expected source selector on FORM header.");
+  const formSourceSelect = formBlock?.querySelector('.perform-source-select[data-perform-form="FRM_ONCE"]');
+  assert(formSourceSelect, "Expected source selector on FORM header.");
+
+  const ifTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="IF"]');
+  const clearTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="CLEAR"]');
+  const ifSourceSelect = ifTable?.closest(".template-block")
+    ?.querySelector('.perform-source-select[data-perform-form="FRM_ONCE"]');
+  const clearSourceSelect = clearTable?.closest(".template-block")
+    ?.querySelector('.perform-source-select[data-perform-form="FRM_ONCE"]');
+  assert(ifSourceSelect, "Expected every child Template block in the FORM to expose its source selector.");
+  assert(clearSourceSelect, "Expected nested Template descendants to expose the same FORM source selector.");
 
   const performTables = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="PERFORM"]'));
   assert.strictEqual(performTables.length, 3);
@@ -1369,14 +1381,22 @@ async function assertTemplateRendersEachFormOnceInSourceOrder() {
 
   const candidates = state.performSourceRegistry.candidatesByFormUpper.get("FRM_ONCE") || [];
   els.templatePreviewOutput.scrollTop = 80;
-  sourceSelect.value = candidates[1].key;
-  sourceSelect.dispatchEvent(new window.Event("change", { bubbles: true }));
+  clearSourceSelect.value = candidates[1].key;
+  clearSourceSelect.dispatchEvent(new window.Event("change", { bubbles: true }));
   await settleViewerUi(window, 8);
   assert(Math.abs(els.templatePreviewOutput.scrollTop - 80) <= 40, "Expected FORM source switching to preserve the Template viewport.");
   const selectedForm = (state.renderObjects || []).find((obj) => obj && obj.objectType === "FORM");
-  const selectedClear = selectedForm?.children?.[0];
+  const selectedClear = selectedForm?.children?.[0]?.children?.[0];
   const selectedTrace = selectedClear?.__abapPerformTraceBinding?.byParamUpper?.get("IV_VALUE") || [];
   assert.deepStrictEqual(Array.from(selectedTrace, (decl) => String(decl && decl.name || "")), ["gv_second"]);
+  const synchronizedSelects = Array.from(
+    els.templatePreviewOutput.querySelectorAll('.perform-source-select[data-perform-form="FRM_ONCE"]')
+  );
+  assert.strictEqual(synchronizedSelects.length, 3, "Expected one synchronized selector on FORM, IF, and CLEAR blocks.");
+  assert(
+    synchronizedSelects.every((select) => select.value === candidates[1].key),
+    "Expected selecting a child block source to update the whole parent/child Template chain."
+  );
 
   dom.window.close();
 }
@@ -3037,17 +3057,21 @@ async function assertPerformSourcesUseSourceOrderAndLazyLargeSelectors() {
   Object.defineProperty(els.templatePreviewOutput, "clientHeight", { configurable: true, value: 100000 });
   runtime.api.renderTemplatePreview();
   await settleViewerUi(window, 8);
-  const visibleSelect = els.templatePreviewOutput.querySelector(
+  const visibleSelects = Array.from(els.templatePreviewOutput.querySelectorAll(
     '.perform-source-select[data-perform-form="FRM_MANY"]'
-  );
-  assert(visibleSelect, "Expected a visible source selector for the large FORM registry.");
+  ));
   assert.strictEqual(
-    visibleSelect.options.length,
-    1,
-    "Expected the single FORM selector to defer option creation for a large source registry."
+    visibleSelects.length,
+    2,
+    "Expected the FORM and its child Template block to expose synchronized source selectors."
   );
-  visibleSelect.dispatchEvent(new window.Event("focus"));
-  assert.strictEqual(visibleSelect.options.length, callCount, "Expected focusing the selector to populate all sources on demand.");
+  assert(
+    visibleSelects.every((select) => select.options.length === 1),
+    "Expected every large source selector instance to defer option creation."
+  );
+  visibleSelects[1].dispatchEvent(new window.Event("focus"));
+  assert.strictEqual(visibleSelects[1].options.length, callCount, "Expected focusing a child selector to populate all sources on demand.");
+  assert.strictEqual(visibleSelects[0].options.length, 1, "Expected lazy options to stay local to each selector instance.");
   largeDom.window.close();
 }
 

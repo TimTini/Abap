@@ -3,6 +3,8 @@
 window.AbapViewerModules = window.AbapViewerModules || {};
 window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
 
+var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
+
   function collectConditionDeclsFromClauses(clauses, addDecl) {
     const list = Array.isArray(clauses) ? clauses : [];
     for (const clause of list) {
@@ -2612,11 +2614,13 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (!registry || typeof registry.getActiveCandidates !== "function") {
       return null;
     }
-    if (!obj || obj.objectType !== "FORM") {
+    if (!obj || typeof obj !== "object") {
       return null;
     }
-    const formName = getFormNameFromNode(obj);
-    const formNameUpper = formName.toUpperCase();
+    const directFormName = obj.objectType === "FORM" ? getFormNameFromNode(obj) : "";
+    const formNameUpper = String(
+      directFormName || obj[PERFORM_SOURCE_FORM_META_KEY_DESC] || ""
+    ).trim().toUpperCase();
     if (!formNameUpper) {
       return null;
     }
@@ -2625,6 +2629,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       return null;
     }
     const selected = registry.getSelectedCandidate(formNameUpper) || candidates[0];
+    const formName = directFormName || selected.formName || formNameUpper;
     return {
       formName,
       formNameUpper,
@@ -2734,14 +2739,16 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const attachPerformBindingMetadata = tools.attachPerformBindingMetadata;
     const clonePerformScopedData = tools.clonePerformScopedData;
 
-    const cloneNode = (sourceNode, parentId, bindingContext) => {
+    const cloneNode = (sourceNode, parentId, bindingContext, sourceFormNameUpper) => {
       if (!sourceNode || typeof sourceNode !== "object") {
         return null;
       }
 
       let nodeBindingContext = bindingContext;
+      let nodeSourceFormNameUpper = String(sourceFormNameUpper || "").trim().toUpperCase();
       if (sourceNode.objectType === "FORM") {
         const formNameUpper = getFormNameFromNode(sourceNode).toUpperCase();
+        nodeSourceFormNameUpper = formNameUpper;
         const selectedCandidate = performSourceRegistry
           && typeof performSourceRegistry.getSelectedCandidate === "function"
           ? performSourceRegistry.getSelectedCandidate(formNameUpper)
@@ -2762,6 +2769,17 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       if (parentId !== undefined) {
         out.parent = parentId;
       }
+      if (nodeSourceFormNameUpper) {
+        try {
+          Object.defineProperty(out, PERFORM_SOURCE_FORM_META_KEY_DESC, {
+            configurable: true,
+            enumerable: false,
+            value: nodeSourceFormNameUpper
+          });
+        } catch {
+          // Source selection is optional UI metadata; keep rendering if attachment fails.
+        }
+      }
       attachPerformBindingMetadata(out, nodeBindingContext);
       if (nodeBindingContext && String(nodeBindingContext.sourceScope || "").trim()) {
         if (out.values && typeof out.values === "object") {
@@ -2778,7 +2796,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       const sourceChildren = Array.isArray(sourceNode.children) ? sourceNode.children : [];
       for (let index = 0; index < sourceChildren.length; index += 1) {
         const child = sourceChildren[index];
-        const clonedChild = cloneNode(child, ownId, nodeBindingContext);
+        const clonedChild = cloneNode(child, ownId, nodeBindingContext, nodeSourceFormNameUpper);
         if (clonedChild) {
           outChildren.push(clonedChild);
         }
@@ -2796,7 +2814,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const output = [];
     for (let index = 0; index < roots.length; index += 1) {
       const root = roots[index];
-      const clonedRoot = cloneNode(root, null, null);
+      const clonedRoot = cloneNode(root, null, null, "");
       if (clonedRoot) {
         output.push(clonedRoot);
       }

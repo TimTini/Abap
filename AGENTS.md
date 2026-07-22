@@ -72,7 +72,8 @@ This file is the local source of truth for future AI/code agents working in this
 - Template `PERFORM -> FORM` source-shaped render:
   - `PERFORM` stays a leaf call statement; do not inline-expand FORM children under each call site.
   - Every local `FORM` renders once in source order, including uncalled FORM definitions.
-  - A FORM with one source binds automatically. A FORM with multiple active sources exposes one selector on the FORM header.
+  - A FORM with one source binds automatically. When multiple active sources exist, every Template block in that FORM subtree exposes the same source selector.
+  - Selecting a source from any block rebuilds and synchronizes the whole FORM Template chain (parent, sibling, and child blocks).
   - Nested source candidates follow the selected parent call chain; registry traversal keeps the recursive-call cycle guard.
   - Treat this as Viewer-side render behavior, not a parser contract change.
 
@@ -154,7 +155,8 @@ This file is the local source of truth for future AI/code agents working in this
   - Parse sample input and verify Template renders PERFORM calls and each FORM definition once in source order.
   - Edit at least one decl desc and confirm save/clear updates both Data + Template preview.
   - Verify a `FORM_PARAM` inside a source-shaped FORM:
-    - The FORM header exposes one source selector only when multiple active call sites exist.
+    - Every Template block in the FORM subtree exposes the same selector only when multiple active call sites exist.
+    - Changing a selector on a child block updates the parent and descendant Template chain.
     - Template `values.*.decl.*` resolves to the selected caller/root chain.
   - Validate Template copy/import/export buttons and clipboard flow.
 
