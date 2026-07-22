@@ -10,13 +10,13 @@ Lưu ý:
 
 ## 1) Rule nằm ở đâu?
 
-### Built-in rules (chuẩn, dùng cho CLI + Viewer)
+### Built-in rules (chuẩn, dùng cho Parser + Viewer)
 - Nguồn sự thật: `configs/*.json`
 - Sau khi sửa/thêm rule: chạy `node scripts/build-viewer-configs.js`
-- Viewer sẽ load từ: `viewer/configs.generated/*.js` (auto-generate, **không sửa tay**)
+- Viewer load `viewer/configs.generated.js` (auto-generate, **không sửa tay**).
 
 ### Chỉnh rule trong Viewer
-- Viewer chỉ dùng **built-in** (`AbapParser.getConfigs()` từ `viewer/configs.generated/*`).
+- Viewer chỉ dùng **built-in** (`AbapParser.getConfigs()` từ `viewer/configs.generated.js`).
 - Muốn thêm/sửa rule: chỉnh `configs/*.json`, chạy `node scripts/build-viewer-configs.js`, rebuild viewer bundles nếu cần theo `AGENTS.md`.
 
 ## 2) Rule config JSON: schema tổng quát

@@ -17,7 +17,7 @@ Workflow:
 - Source rules: `configs/*.json`
 - Regenerate viewer configs after editing rules:
   - `node scripts/build-viewer-configs.js`
-- Viewer consumes the generated files: `viewer/configs.generated/*.js`
+- Viewer consumes the generated bundle: `viewer/configs.generated.js`
 - Guide: `RULES.md`
 - Object model and canonical path guide: `docs/ABAP_OBJECT_MODEL.md`
 

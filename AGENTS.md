@@ -193,7 +193,7 @@ This file is the local source of truth for future AI/code agents working in this
   - `scripts/build-runtime-bundles.js`: build the transitional Viewer bundles from their canonical source files.
   - `scripts/build-inline-viewer.py`: inline-build `viewer/index.inline.html` from split scripts.
   - `scripts/sync-default-sample.js`: sync `examples/deep_form_demo.abap` into `viewer/app/core/01-runtime-state.js` `SAMPLE_ABAP`.
-  - `scripts/build-viewer-configs.js`: regenerate viewer configs when `configs/*.json` changes.
+  - `scripts/build-viewer-configs.js`: regenerate `viewer/configs.generated.js` from `configs/*.json`.
   - `tests/parser-regression.js`: parser regression baseline check.
 
 - Default sample source:

@@ -6,41 +6,61 @@ const path = require("path");
 
 const repoRoot = path.resolve(__dirname, "..");
 const configsDir = path.join(repoRoot, "configs");
-const outDir = path.join(repoRoot, "viewer", "configs.generated");
 const indexHtmlFile = path.join(repoRoot, "viewer", "index.html");
+const configBundleFile = path.join(repoRoot, "viewer", "configs.generated.js");
+const legacyConfigDir = path.join(repoRoot, "viewer", "configs.generated");
 
+const CONFIG_BUNDLE_REL_PATH = "viewer/configs.generated.js";
+const LEGACY_CONFIG_DIR_REL_PATH = "viewer/configs.generated";
 const START_MARKER = "<!-- abap-parser-configs:start -->";
 const END_MARKER = "<!-- abap-parser-configs:end -->";
+const GENERATED_SCRIPT_TAG = '<script src="./configs.generated.js" defer></script>';
 
 function escapeRegExp(text) {
   return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function detectNewline(text) {
+  return text.includes("\r\n") ? "\r\n" : "\n";
+}
+
+function normalizeLf(text) {
+  return String(text).replace(/\r\n?/g, "\n");
+}
+
 function readJsonFiles(dir) {
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  return entries
-    .filter((e) => e.isFile() && e.name.toLowerCase().endsWith(".json"))
-    .map((e) => e.name)
-    .sort((a, b) => a.localeCompare(b));
+  return fs.readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".json"))
+    .map((entry) => entry.name)
+    .sort((left, right) => left.localeCompare(right));
 }
 
 function loadConfig(fileName) {
   const fullPath = path.join(configsDir, fileName);
   const raw = fs.readFileSync(fullPath, "utf8");
   const parsed = JSON.parse(raw);
-
   return {
     _sourceFile: fileName,
     ...parsed
   };
 }
 
-function jsFileNameFromJsonFileName(jsonFileName) {
-  return jsonFileName.replace(/\.json$/i, ".js");
+function loadConfigsFromDisk() {
+  if (!fs.existsSync(configsDir)) {
+    throw new Error(`Missing configs dir: ${configsDir}`);
+  }
+
+  const fileNames = readJsonFiles(configsDir);
+  if (!fileNames.length) {
+    throw new Error(`No .json configs found in: ${configsDir}`);
+  }
+
+  return fileNames.map(loadConfig);
 }
 
-function formatConfigFileJs(config) {
-  const lines = [
+function buildConfigBundleSource(configs) {
+  const serializedConfigs = JSON.stringify(configs, null, 2).replace(/\n/g, "\n  ");
+  return [
     "/* eslint-disable */",
     "/*",
     "  AUTO-GENERATED FILE",
@@ -54,82 +74,175 @@ function formatConfigFileJs(config) {
     "(function () {",
     '  "use strict";',
     "",
-    "  if (!window.AbapParser || typeof window.AbapParser.registerConfig !== \"function\") {",
-    `    console.warn("AbapParser not loaded; config not registered: ${String(config._sourceFile || "")}");`,
+    "  const parser = window.AbapParser;",
+    "  if (!parser || typeof parser.registerConfig !== \"function\") {",
+    '    console.warn("AbapParser not loaded; generated config bundle was skipped.");',
     "    return;",
     "  }",
     "",
-    "  const config = " + JSON.stringify(config, null, 2).replace(/\n/g, "\n  ") + ";",
-    "  window.AbapParser.registerConfig(config);",
+    `  const configs = ${serializedConfigs};`,
+    "  for (let index = 0; index < configs.length; index += 1) {",
+    "    parser.registerConfig(configs[index]);",
+    "  }",
     "})();",
     ""
-  ];
-
-  return lines.join("\n");
+  ].join("\n");
 }
 
-function detectNewline(text) {
-  return text.includes("\r\n") ? "\r\n" : "\n";
-}
-
-function updateViewerIndexHtml(configJsFileNames) {
-  if (!fs.existsSync(indexHtmlFile)) {
-    console.error(`Missing viewer index.html: ${indexHtmlFile}`);
-    process.exit(1);
-  }
-
-  const original = fs.readFileSync(indexHtmlFile, "utf8");
-  const newline = detectNewline(original);
-
-  const scriptLines = configJsFileNames.map((name) => `<script src="./configs.generated/${name}" defer></script>`);
-
+function replaceConfigScriptBlock(indexHtml) {
+  const newline = detectNewline(indexHtml);
   const pattern = new RegExp(
     `^([ \\t]*)${escapeRegExp(START_MARKER)}[\\s\\S]*?^[ \\t]*${escapeRegExp(END_MARKER)}`,
     "m"
   );
-  const match = original.match(pattern);
+  const match = indexHtml.match(pattern);
   if (!match) {
-    console.error("Missing or invalid config markers in viewer/index.html.");
-    console.error(`Expected markers: ${START_MARKER} ... ${END_MARKER}`);
-    process.exit(1);
+    throw new Error(`Missing or invalid config markers in viewer/index.html. Expected ${START_MARKER} ... ${END_MARKER}`);
   }
 
   const indent = match[1] || "";
-  const replacement = [START_MARKER, ...scriptLines, END_MARKER]
+  const replacement = [START_MARKER, GENERATED_SCRIPT_TAG, END_MARKER]
     .map((line) => `${indent}${line}`)
     .join(newline);
+  return indexHtml.replace(pattern, replacement);
+}
 
-  const next = original.replace(pattern, replacement);
-  fs.writeFileSync(indexHtmlFile, next, "utf8");
+function buffersEqual(left, right) {
+  return Buffer.isBuffer(left)
+    && Buffer.isBuffer(right)
+    && left.length === right.length
+    && Buffer.compare(left, right) === 0;
+}
+
+function syncTextFile(filePath, nextText, options) {
+  const nextBuffer = Buffer.from(options.forceLf ? normalizeLf(nextText) : nextText, "utf8");
+  const currentBuffer = fs.existsSync(filePath) ? fs.readFileSync(filePath) : null;
+  if (currentBuffer && buffersEqual(currentBuffer, nextBuffer)) {
+    return { changed: false, stale: false };
+  }
+  if (options.checkOnly) {
+    return { changed: false, stale: true };
+  }
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, nextBuffer);
+  return { changed: true, stale: true };
+}
+
+function syncLegacyDirectory(options) {
+  if (!fs.existsSync(legacyConfigDir)) {
+    return { changed: false, stale: false };
+  }
+  if (options.checkOnly) {
+    return { changed: false, stale: true };
+  }
+  fs.rmSync(legacyConfigDir, { recursive: true, force: true });
+  return { changed: true, stale: true };
+}
+
+function buildExpectedArtifacts() {
+  const configs = loadConfigsFromDisk();
+  const indexHtml = fs.readFileSync(indexHtmlFile, "utf8");
+  return {
+    bundleSource: buildConfigBundleSource(configs),
+    nextIndexHtml: replaceConfigScriptBlock(indexHtml)
+  };
+}
+
+function syncGeneratedArtifacts(options = {}) {
+  const { bundleSource, nextIndexHtml } = buildExpectedArtifacts();
+  const results = [];
+
+  const bundleResult = syncTextFile(configBundleFile, bundleSource, {
+    checkOnly: Boolean(options.checkOnly),
+    forceLf: true
+  });
+  if (bundleResult.changed) {
+    results.push(`updated ${path.relative(repoRoot, configBundleFile)}`);
+  } else if (bundleResult.stale) {
+    results.push(`stale ${path.relative(repoRoot, configBundleFile)}`);
+  }
+
+  const indexResult = syncTextFile(indexHtmlFile, nextIndexHtml, {
+    checkOnly: Boolean(options.checkOnly),
+    forceLf: false
+  });
+  if (indexResult.changed) {
+    results.push(`updated ${path.relative(repoRoot, indexHtmlFile)}`);
+  } else if (indexResult.stale) {
+    results.push(`stale ${path.relative(repoRoot, indexHtmlFile)}`);
+  }
+
+  const legacyResult = syncLegacyDirectory(options);
+  if (legacyResult.changed) {
+    results.push(`removed ${LEGACY_CONFIG_DIR_REL_PATH}`);
+  } else if (legacyResult.stale) {
+    results.push(`stale ${LEGACY_CONFIG_DIR_REL_PATH}`);
+  }
+
+  return {
+    stale: bundleResult.stale || indexResult.stale || legacyResult.stale,
+    changed: bundleResult.changed || indexResult.changed || legacyResult.changed,
+    results
+  };
+}
+
+function parseCliArgs(argv) {
+  const args = new Set(argv);
+  const allowed = new Set(["--check"]);
+  for (const arg of args) {
+    if (!allowed.has(arg)) {
+      throw new Error(`Unsupported argument: ${arg}`);
+    }
+  }
+  return {
+    checkOnly: args.has("--check")
+  };
 }
 
 function main() {
-  if (!fs.existsSync(configsDir)) {
-    console.error(`Missing configs dir: ${configsDir}`);
-    process.exit(1);
+  const options = parseCliArgs(process.argv.slice(2));
+  const outcome = syncGeneratedArtifacts(options);
+
+  if (options.checkOnly) {
+    if (outcome.stale) {
+      console.error("Generated viewer config artifacts are stale:");
+      for (const line of outcome.results) {
+        console.error(`- ${line}`);
+      }
+      process.exit(1);
+    }
+    console.log("Generated viewer config artifacts are up to date.");
+    return;
   }
 
-  const fileNames = readJsonFiles(configsDir);
-  if (!fileNames.length) {
-    console.error(`No .json configs found in: ${configsDir}`);
-    process.exit(1);
+  if (outcome.changed) {
+    for (const line of outcome.results) {
+      console.log(line);
+    }
+    return;
   }
 
-  const configs = fileNames.map(loadConfig);
-  const outFileNames = fileNames.map(jsFileNameFromJsonFileName);
-
-  fs.mkdirSync(outDir, { recursive: true });
-
-  for (const config of configs) {
-    const outName = jsFileNameFromJsonFileName(String(config._sourceFile || ""));
-    const outPath = path.join(outDir, outName);
-    const js = formatConfigFileJs(config);
-    fs.writeFileSync(outPath, js, "utf8");
-  }
-
-  updateViewerIndexHtml(outFileNames);
-
-  console.log(`Generated ${path.relative(repoRoot, outDir)}\\*.js (${configs.length} configs)`);
+  console.log("Generated viewer config artifacts are already up to date.");
 }
 
-main();
+if (require.main === module) {
+  try {
+    main();
+  } catch (error) {
+    console.error(error && error.message ? error.message : error);
+    process.exit(1);
+  }
+}
+
+module.exports = {
+  CONFIG_BUNDLE_REL_PATH,
+  END_MARKER,
+  GENERATED_SCRIPT_TAG,
+  LEGACY_CONFIG_DIR_REL_PATH,
+  START_MARKER,
+  buildConfigBundleSource,
+  buildExpectedArtifacts,
+  loadConfigsFromDisk,
+  replaceConfigScriptBlock,
+  syncGeneratedArtifacts
+};
