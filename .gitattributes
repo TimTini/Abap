@@ -1,0 +1,7 @@
+# Keep source and documentation text consistent across platforms.
+*.js text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.py text eol=lf

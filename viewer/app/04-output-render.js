@@ -421,13 +421,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     });
   }
 
-  function setSelectedTemplateBlock(index, options) {
-    return updateTemplateBlockSelection(index, {
-      ...(options && typeof options === "object" ? options : {}),
-      interactionMode: "replace"
-    });
-  }
-
   function setSelectedDeclRow(declKey) {
     const key = String(declKey || "").trim();
     if (!key || !els.declDescTable) {
@@ -457,61 +450,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return text.split("\n").length;
   }
 
-  function syncInputGutterScroll() {
-    if (!els.inputText || !els.inputGutterContent) {
-      return;
-    }
-
-    const scrollTop = Number(els.inputText.scrollTop || 0) || 0;
-    els.inputGutterContent.style.transform = `translateY(${-scrollTop}px)`;
-  }
-
-  function rebuildInputGutter() {
-    if (!els.inputText || !els.inputGutterContent) {
-      return;
-    }
-
-    const trimmed = String(els.inputText.value || "").trim();
-    const isJsonLike = (trimmed.startsWith("{") || trimmed.startsWith("[")) && trimmed.length > 1;
-    state.inputMode = isJsonLike ? "json" : "abap";
-
-    const lineCount = Math.max(1, countInputLines(els.inputText.value || ""));
-    if (lineCount === state.inputLineCount && state.inputGutterButtonsByLine.size) {
-      syncInputGutterScroll();
-      refreshInputGutterTargets();
-      return;
-    }
-
-    state.inputLineCount = lineCount;
-    state.inputGutterButtonsByLine = new Map();
-
-    const frag = document.createDocumentFragment();
-    for (let line = 1; line <= lineCount; line += 1) {
-      const row = document.createElement("div");
-      row.className = "gutter-line";
-
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "gutter-jump";
-      btn.textContent = "↪";
-      btn.hidden = true;
-      btn.setAttribute("data-line", String(line));
-      row.appendChild(btn);
-
-      const num = document.createElement("span");
-      num.className = "gutter-num";
-      num.textContent = String(line);
-      row.appendChild(num);
-
-      state.inputGutterButtonsByLine.set(line, btn);
-      frag.appendChild(row);
-    }
-
-    els.inputGutterContent.replaceChildren(frag);
-    syncInputGutterScroll();
-    refreshInputGutterTargets();
-  }
-
   function computeInputGutterTargetsForDescriptions() {
     const targets = new Map();
     if (!els.declDescTable) {
@@ -527,25 +465,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         continue;
       }
       targets.set(line, { kind: "descriptions", declKey });
-    }
-
-    return targets;
-  }
-
-  function computeInputGutterTargetsForTemplate() {
-    const targets = new Map();
-    if (!els.templatePreviewOutput) {
-      return targets;
-    }
-
-    const blocks = els.templatePreviewOutput.querySelectorAll(".template-block[data-template-index][data-line-start]");
-    for (const block of Array.from(blocks)) {
-      const line = Number(block.getAttribute("data-line-start")) || 0;
-      const index = String(block.getAttribute("data-template-index") || "");
-      if (!line || !index || targets.has(line)) {
-        continue;
-      }
-      targets.set(line, { kind: "template", index });
     }
 
     return targets;

@@ -46,7 +46,7 @@ The current runtime has three layers even though they are not named explicitly.
 
 ### Layer A: Parse object
 
-The base parser object is the `AbapObject` created in [`shared/abap-parser/01-context.js`](../shared/abap-parser/01-context.js).
+The base parser object is the `AbapObject` created in the canonical [`shared/abap-parser.js`](../shared/abap-parser.js).
 
 Stable base fields:
 - `id`

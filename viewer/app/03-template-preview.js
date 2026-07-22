@@ -1206,10 +1206,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     };
   }
 
-  function getTemplateKeywordRowDecls(row) {
-    return getTemplateKeywordRowProvenance(row).declCandidates;
-  }
-
   function collectTemplateTraceAwareDeclCandidates(decl, ownerContext) {
     if (!decl || typeof decl !== "object") {
       return [];
@@ -2701,11 +2697,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return dedupeTemplateDecls(collectTemplateEditableDeclsFromResolvedValue(value, []));
   }
 
-  function getTemplateEditableDeclFromResolvedValue(value) {
-    const candidates = getTemplateEditableDeclCandidatesFromResolvedValue(value);
-    return candidates.length ? candidates[0] : null;
-  }
-
   function resolveTemplateEditableDeclCandidatesFromToken(contextObj, token) {
     const out = [];
     const candidates = buildTemplateDeclTokenCandidates(token);
@@ -2717,11 +2708,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       }
     }
     return dedupeTemplateDecls(out);
-  }
-
-  function resolveTemplateEditableDeclFromToken(contextObj, token) {
-    const candidates = resolveTemplateEditableDeclCandidatesFromToken(contextObj, token);
-    return candidates.length ? candidates[0] : null;
   }
 
   function createTemplateCellModel() {
@@ -3623,57 +3609,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
   async function copyHtmlWithFallback(html, plainText) {
     const safeHtml = String(html || "");
     const safeText = String(plainText || "");
-
-    if (
-      safeHtml
-      && navigator.clipboard
-      && typeof navigator.clipboard.write === "function"
-      && typeof window.ClipboardItem === "function"
-    ) {
-      const item = new window.ClipboardItem({
-        "text/html": new Blob([safeHtml], { type: "text/html" }),
-        "text/plain": new Blob([safeText], { type: "text/plain" })
-      });
-      await navigator.clipboard.write([item]);
-      return;
-    }
-
-    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
-      await navigator.clipboard.writeText(safeText);
-      return;
-    }
-
-    const temp = document.createElement("div");
-    temp.style.position = "fixed";
-    temp.style.left = "-99999px";
-
-    temp.style.top = "0";
-    temp.setAttribute("contenteditable", "true");
-    temp.innerHTML = safeHtml || safeText.replace(/\n/g, "<br>");
-    document.body.appendChild(temp);
-
-    const selection = window.getSelection();
-    if (!selection) {
-      document.body.removeChild(temp);
-      throw new Error("Clipboard selection is unavailable.");
-    }
-
-    selection.removeAllRanges();
-    const range = document.createRange();
-    range.selectNodeContents(temp);
-    selection.addRange(range);
-    const copied = document.execCommand("copy");
-    selection.removeAllRanges();
-    document.body.removeChild(temp);
-
-    if (!copied) {
-      throw new Error("Copy failed in this browser.");
-    }
-  }
-
-  async function copyHtmlWithFallback(html, plainText) {
-    const safeHtml = String(html || "");
-    const safeText = String(plainText || "");
     const clipboard = typeof navigator !== "undefined" && navigator ? navigator.clipboard : null;
     let lastClipboardError = null;
 
@@ -3832,187 +3767,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return out;
   }
 
-  function renderTemplatePreview() {
-    if (!els.templatePreviewOutput) {
-      return;
-    }
-
-    if (!state.data || !Array.isArray(state.renderObjects)) {
-      setTemplatePreviewMessage("No data loaded.");
-      return;
-    }
-
-    const config = state.templateConfig && typeof state.templateConfig === "object"
-      ? state.templateConfig
-      : getDefaultTemplateConfig();
-
-    const check = validateTemplateConfig(config);
-    if (!check.valid) {
-      setTemplatePreviewMessage("Template config is invalid.");
-      setTemplateConfigError(check.errors.join("\n"));
-      return;
-    }
-
-    const items = getRenderableObjectListForTemplate();
-    if (!items.length) {
-      setTemplatePreviewMessage("No renderable objects.");
-      return;
-    }
-
-    const fragment = document.createDocumentFragment();
-    for (let index = 0; index < items.length; index += 1) {
-      const item = items[index];
-      const obj = item.obj;
-      const depth = Math.max(0, Number(item.depth) || 0);
-      const templateContextObj = buildTemplateContextObject(obj, index + 1);
-      const resolved = resolveTemplateMapForObject(obj, config);
-
-      const blockAttrs = { "data-template-index": String(index), "data-depth": String(depth) };
-      const lineStart = Number(obj && obj.lineStart) || 0;
-      if (lineStart > 0) {
-        blockAttrs["data-line-start"] = String(lineStart);
-      }
-      const block = el("div", { className: "template-block", attrs: blockAttrs });
-      const indentPx = Math.min(120, depth * 12);
-      if (indentPx > 0) {
-        block.style.marginLeft = `${indentPx}px`;
-      } else {
-        block.style.marginLeft = "";
-      }
-      const header = el("div", { className: "template-block-header" });
-
-      const left = el("div");
-      const label = getObjectLabel(obj);
-      const titleText = `${index + 1}. ${String(obj.objectType || "OBJECT")}${label ? ` ${label}` : ""}`;
-      left.appendChild(el("h4", { className: "template-block-title", text: titleText }));
-      const meta = renderMeta(obj);
-      left.appendChild(el("div", { className: "template-block-meta", text: meta || "" }));
-      header.appendChild(left);
-
-      const actions = el("div", { className: "template-block-actions" });
-      const codeBtn = el("button", {
-        className: "secondary",
-        text: "Code",
-        attrs: { type: "button", "data-template-action": "code" }
-      });
-      codeBtn.addEventListener("click", () => {
-        const selectedIndex = String(index);
-        if (typeof setSelectedTemplateBlock === "function") {
-          setSelectedTemplateBlock(selectedIndex);
-        } else {
-          state.selectedTemplateIndex = selectedIndex;
-        }
-        if (lineStart > 0 && typeof selectCodeLines === "function") {
-          const lineEnd = Number(obj && obj.block && obj.block.lineEnd) || lineStart;
-          selectCodeLines(lineStart, lineEnd);
-        }
-      });
-      actions.appendChild(codeBtn);
-
-      const pathsBtn = el("button", {
-        className: "secondary",
-        text: "Paths",
-        attrs: { type: "button", "data-template-action": "paths" }
-      });
-      pathsBtn.addEventListener("click", (ev) => {
-        if (ev && typeof ev.stopPropagation === "function") {
-          ev.stopPropagation();
-        }
-        openTemplatePathDump(templateContextObj, index, obj);
-      });
-      actions.appendChild(pathsBtn);
-
-      const copyBtn = el("button", {
-        className: "secondary",
-        text: "Copy",
-        attrs: { type: "button", "data-template-action": "copy" }
-      });
-      copyBtn.addEventListener("click", async () => {
-        try {
-          const payload = buildTemplateCopyPayloadFromBlock(block);
-          if (!payload.node) {
-            setError("Nothing to copy.");
-            return;
-          }
-          await copyHtmlWithFallback(payload.node.outerHTML, payload.text);
-          setError("");
-        } catch (err) {
-          setError(`Copy failed: ${err && err.message ? err.message : err}`);
-        }
-      });
-      actions.appendChild(copyBtn);
-      header.appendChild(actions);
-      block.appendChild(header);
-      block.addEventListener("click", () => {
-        const selectedIndex = String(index);
-        if (typeof setSelectedTemplateBlock === "function") {
-          setSelectedTemplateBlock(selectedIndex, { scroll: false });
-        } else {
-          state.selectedTemplateIndex = selectedIndex;
-        }
-      });
-
-      if (!resolved.map || typeof resolved.map !== "object") {
-        block.appendChild(el("div", { className: "template-empty", text: "[Missing template]" }));
-        fragment.appendChild(block);
-        continue;
-      }
-
-      const model = buildTemplateGridModel(templateContextObj, resolved.map, resolved.options, {
-      templateKey: resolved.key || "",
-      objectType: String(obj.objectType || "")
-    });
-      if (model.errors.length) {
-        block.appendChild(el("div", { className: "template-error", text: model.errors.join("\n") }));
-      }
-
-      const table = renderTemplateTable(model, isInteractive ? {
-      onCellDblClick: (cellMeta, cellEl) => {
-        const safeMeta = cellMeta && typeof cellMeta === "object"
-          ? cellMeta
-          : {
-              rangeKey: String(cellEl && typeof cellEl.getAttribute === "function" ? (cellEl.getAttribute("data-template-range-key") || "") : ""),
-              templateKey: String(resolved.key || ""),
-              rawText: String(cellEl && cellEl.textContent ? cellEl.textContent : ""),
-              isSinglePlaceholder: false,
-              placeholderToken: "",
-              objectType: String(obj.objectType || "")
-            };
-        try {
-          openCellUnifiedEditor(safeMeta);
-        } catch (err) {
-          if (typeof setError === "function") {
-            setError("Template cell edit failed: " + (err && err.message ? err.message : String(err || "")));
-          }
-        }
-      }
-    } : null);
-      if (table) {
-      const previewTable = table.querySelector(".template-preview-table");
-      if (previewTable) {
-        previewTable.setAttribute("data-template-key", String(resolved.key || ""));
-        previewTable.setAttribute("data-object-type", String(obj.objectType || ""));
-        previewTable.setAttribute("data-template-index", indexText);
-      }
-      block.appendChild(table);
-    } else {
-      block.appendChild(el("div", { className: "template-empty", text: "[Missing template]" }));
-    }
-
-      fragment.appendChild(block);
-    }
-
-    els.templatePreviewOutput.classList.remove("muted");
-    els.templatePreviewOutput.replaceChildren(fragment);
-    state.templatePreviewCache = { count: items.length };
-    if (typeof syncRenderedTemplateSelection === "function") {
-      syncRenderedTemplateSelection();
-    }
-    if (typeof refreshInputGutterTargets === "function") {
-      refreshInputGutterTargets();
-    }
-  }
-
   function syncTemplateEditorFromState() {
     if (!els.templateConfigJson) {
       return;
@@ -4080,39 +3834,6 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     return applyTemplateConfigObject(defaultConfig, { save: true });
-  }
-
-  async function copyAllTemplateBlocks() {
-    if (!els.templatePreviewOutput) {
-      return;
-    }
-    const blocks = Array.from(els.templatePreviewOutput.querySelectorAll(".template-block"));
-    if (!blocks.length) {
-      setError("Nothing to copy.");
-      return;
-    }
-
-    const wrapper = document.createElement("div");
-    const plainLines = [];
-    const tableOnly = isTemplateCopyTableOnlyEnabled();
-    for (const block of blocks) {
-      const payload = buildTemplateCopyPayloadFromBlock(block);
-      if (!payload.node) {
-        continue;
-      }
-      wrapper.appendChild(payload.node);
-      if (tableOnly) {
-        wrapper.appendChild(document.createElement("br"));
-      }
-      plainLines.push(payload.text);
-    }
-
-    if (!wrapper.childNodes.length) {
-      setError("Nothing to copy.");
-      return;
-    }
-
-    await copyHtmlWithFallback(wrapper.innerHTML, plainLines.filter(Boolean).join("\n\n"));
   }
 
   function getTemplateVirtualState() {

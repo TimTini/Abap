@@ -1,3 +1,0 @@
-# ABAP Keyword Documentation (Index)
-
-

@@ -6,19 +6,8 @@ const { JSDOM } = require("jsdom");
 
 const repoRoot = path.resolve(__dirname, "..", "..");
 const viewerIndexPath = path.resolve(repoRoot, "viewer", "index.html");
-const parserPartPaths = [
-  "shared/abap-parser/01-context.js",
-  "shared/abap-parser/02-config.js",
-  "shared/abap-parser/03-statements.js",
-  "shared/abap-parser/04-parse-core.js",
-  "shared/abap-parser/05-extras.js",
-  "shared/abap-parser/06-conditions.js",
-  "shared/abap-parser/07-declarations.js",
-  "shared/abap-parser/08-helpers.js",
-  "shared/abap-parser/09-public-api.js"
-];
 const sourceOverrides = new Map([
-  ["../shared/abap-parser.js", parserPartPaths.map((partPath) => path.resolve(repoRoot, partPath))],
+  ["../shared/abap-parser.js", [path.resolve(repoRoot, "shared/abap-parser.js")]],
   ["./app/01-core.js", [path.resolve(repoRoot, "viewer/app/core/01-runtime-state.js")]],
   ["./app/02-descriptions.js", [path.resolve(repoRoot, "viewer/app/descriptions/01-normalize-and-desc.js")]],
   ["./app/03-template-preview.js", [path.resolve(repoRoot, "viewer/app/template/01-path-resolver.js")]],

@@ -38,9 +38,7 @@ This file is the local source of truth for future AI/code agents working in this
 
 - If `configs/*.json` changed:
   - `node scripts/build-viewer-configs.js`
-- If parser part files changed (`shared/abap-parser/*.js`):
-  - Run `node scripts/build-runtime-bundles.js`.
-  - Keep part order consistent with `scripts/build-runtime-bundles.js`.
+- If the canonical parser changed (`shared/abap-parser.js`):
   - Run `node tests/parser-regression.js`.
 - If `viewer/index.html` or `viewer/app.js` changed:
   - `python scripts/build-inline-viewer.py`
@@ -60,13 +58,13 @@ This file is the local source of truth for future AI/code agents working in this
 
 ## 7) Recent Implementation Decisions (Keep Consistent)
 
-- Split-file runtime loader invariants:
-  - Parser stays split across `shared/abap-parser/*.js` plus generated `shared/abap-parser.js`.
+- Runtime loader invariants:
+  - `shared/abap-parser.js` is the only parser source. Do not recreate parser part files or generate this file from another source.
   - Viewer runtime uses **one plain JS source part per bundle** (`core`, `descriptions`, `template`, `output`) built into legacy bundle entry paths (`viewer/app/01-core.js`, `02-descriptions.js`, `03-template-preview.js`, `04-output-render.js`).
-  - Source parts are built into bundles by `node scripts/build-runtime-bundles.js`.
+  - Viewer source parts are built into bundles by `node scripts/build-runtime-bundles.js`.
   - `viewer/index.html` loads bundles, not individual source parts.
   - Do not reintroduce runtime `eval`, `__AbapSourceParts`, or injected `<script>.textContent` assembly.
-  - Do not add empty placeholder part files; `build-runtime-bundles.js` fails on missing/empty parts.
+  - Do not add empty Viewer source files; `build-runtime-bundles.js` fails on missing/empty parts.
   - Runtime metadata keys shared across modules (e.g., perform-trace keys) must avoid top-level redeclare collisions; prefer unique key names per module context and `var` declarations only when cross-part scope requires it.
 
 - Template `PERFORM -> FORM` source-shaped render:
@@ -107,10 +105,6 @@ This file is the local source of truth for future AI/code agents working in this
 - Template resolver rule for value entries:
   - For paths like `values.expr.decl.finalDesc`, when `decl` belongs to a value-entry object, resolve using value-level `finalDesc` (expression-aware), not plain decl-only `finalDesc`.
   - This prevents loss of expression tails in template output.
-
-- Template shorthand compiler is AI-side/CLI:
-  - Use `node scripts/template-tool.js` to compile shorthand template lines into JSON.
-  - Do not add user-facing shorthand tooling in Viewer UI unless explicitly requested.
 
 - Template path strictness (Viewer Template tab):
   - Keep placeholder paths strict/canonical to real parse schema.
@@ -181,7 +175,7 @@ This file is the local source of truth for future AI/code agents working in this
   - `viewer/app/02-descriptions.js`: built from `viewer/app/descriptions/01-normalize-and-desc.js`.
   - `viewer/app/03-template-preview.js`: built from `viewer/app/template/01-path-resolver.js`.
   - `viewer/app/04-output-render.js`: built from `viewer/app/output/01-output-render.js`.
-  - `shared/abap-parser.js`: built from `shared/abap-parser/*.js`.
+  - `shared/abap-parser.js`: canonical parser source and browser/CommonJS public API.
 
 - Core runtime (`viewer/app/core/01-runtime-state.js`):
   - Runtime state, DOM refs, defaults, localStorage, build info, theme/layout, settings modal, template config helpers.
@@ -195,23 +189,11 @@ This file is the local source of truth for future AI/code agents working in this
 - Template preview (`viewer/app/template/01-path-resolver.js`):
   - Template path resolution, grid/style, preview render, copy/import/export.
 
-- Parser parts (`shared/abap-parser/*`):
-  - `01-context.js`: parse context/bootstrap helpers.
-  - `02-config.js`: parser constants and configuration defaults.
-  - `03-statements.js`: statement boundary/type recognition utilities.
-  - `04-parse-core.js`: main parse flow and object tree assembly.
-  - `05-extras.js`: per-statement `extras` extraction.
-  - `06-conditions.js`: condition clause/token parsing.
-  - `07-declarations.js`: declaration detection + decl binding helpers.
-  - `08-helpers.js`: shared parser utility helpers.
-  - `09-public-api.js`: public parser API surface.
-
 - Build/test scripts:
-  - `scripts/build-runtime-bundles.js`: build runtime bundles from split source parts and migrate legacy string-backed parts to plain JS if needed.
+  - `scripts/build-runtime-bundles.js`: build the transitional Viewer bundles from their canonical source files.
   - `scripts/build-inline-viewer.py`: inline-build `viewer/index.inline.html` from split scripts.
   - `scripts/sync-default-sample.js`: sync `examples/deep_form_demo.abap` into `viewer/app/core/01-runtime-state.js` `SAMPLE_ABAP`.
   - `scripts/build-viewer-configs.js`: regenerate viewer configs when `configs/*.json` changes.
-  - `scripts/template-tool.js`: compile template shorthand lines to JSON (AI/CLI workflow).
   - `tests/parser-regression.js`: parser regression baseline check.
 
 - Default sample source:

@@ -3,7 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const { parseAbapText } = require("../shared/abap-parser");
-const { loadConfigs } = require("../cli/config-loader");
+const { loadConfigs } = require("./helpers/config-loader");
 const {
   listFixtureFiles,
   normalizeParserResult,

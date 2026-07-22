@@ -3,7 +3,6 @@
 File này mô tả:
 - Cách tạo/chỉnh rule parse statement (config JSON)
 - Các field/struct có thể xuất hiện trong JSON/XML output
-- Lưu ý tương thích với Excel VBA (`excel/modAbapTemplateTool.bas`)
 
 Lưu ý:
 - `RULES.md` tập trung vào rule config và parse/output cơ bản.
@@ -251,7 +250,6 @@ Viewer không còn **Export XML**. `finalDesc` vẫn dùng cho template placehol
 - `finalDesc` ưu tiên user desc (nếu có), fallback code desc, rồi technical id.
 - Normalize theo template rules; riêng user desc nếu bật `Skip normalization` khi edit thì giữ nguyên text user nhập.
 
-Excel VBA (`excel/modAbapTemplateTool.bas`) vẫn đọc XML cũ nếu bạn đã export trước đó; không còn tạo XML mới từ Viewer.
 ## 9) Quy trình thêm rule mới (khuyến nghị)
 
 1) Tạo/sửa file `configs/<your-rule>.json`.

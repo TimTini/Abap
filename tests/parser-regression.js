@@ -4,7 +4,7 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 const { parseAbapText } = require("./helpers/source-parser");
-const { loadConfigs } = require("../cli/config-loader");
+const { loadConfigs } = require("./helpers/config-loader");
 
 const configs = loadConfigs(path.resolve(__dirname, "..", "configs"));
 const configsDir = path.resolve(__dirname, "..", "configs");

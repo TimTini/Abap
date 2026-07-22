@@ -26,3 +26,9 @@ node_modules/
 .omx/metrics.json
 .omx/project-memory.json
 .omx/notepad.md
+
+# Generated local test and browser state
+.playwright-mcp/
+test-results/
+__pycache__/
+*.py[cod]

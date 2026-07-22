@@ -12,8 +12,5 @@
   },
   "devDependencies": {
     "jsdom": "^24.1.3"
-  },
-  "dependencies": {
-    "playwright": "^1.59.1"
   }
 }

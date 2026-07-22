@@ -3,25 +3,10 @@
 
 const fs = require("fs");
 const path = require("path");
-const vm = require("vm");
 
 const repoRoot = path.resolve(__dirname, "..");
 
 const GROUPS = [
-  {
-    bundle: "shared/abap-parser.js",
-    parts: [
-      "shared/abap-parser/01-context.js",
-      "shared/abap-parser/02-config.js",
-      "shared/abap-parser/03-statements.js",
-      "shared/abap-parser/04-parse-core.js",
-      "shared/abap-parser/05-extras.js",
-      "shared/abap-parser/06-conditions.js",
-      "shared/abap-parser/07-declarations.js",
-      "shared/abap-parser/08-helpers.js",
-      "shared/abap-parser/09-public-api.js"
-    ]
-  },
   {
     bundle: "viewer/app/01-core.js",
     parts: [
@@ -66,51 +51,6 @@ function normalizeSource(text) {
   return normalized.trimEnd() ? `${normalized.trimEnd()}\n` : "";
 }
 
-function isLegacySourcePart(text) {
-  const source = normalizeNewlines(text);
-  return source.includes("__AbapSourceParts") && source.includes("bucket[partKey]");
-}
-
-function extractLegacyPartSource(absPartPath, bundleRelPath, partRelPath) {
-  const source = readText(absPartPath);
-  const sandbox = {
-    console,
-    setTimeout,
-    clearTimeout
-  };
-  sandbox.globalThis = sandbox;
-  sandbox.self = sandbox;
-  sandbox.window = sandbox;
-  const context = vm.createContext(sandbox);
-  const script = new vm.Script(source, { filename: absPartPath });
-  script.runInContext(context);
-
-  const registry = context.__AbapSourceParts;
-  const extracted = registry
-    && registry[bundleRelPath]
-    && registry[bundleRelPath][partRelPath];
-
-  if (typeof extracted !== "string") {
-    throw new Error(`Failed to extract runtime source from ${partRelPath}`);
-  }
-
-  return normalizeSource(extracted);
-}
-
-function syncSourcePart(bundleRelPath, partRelPath) {
-  const absPartPath = path.resolve(repoRoot, partRelPath);
-  const current = readText(absPartPath);
-  const next = isLegacySourcePart(current)
-    ? extractLegacyPartSource(absPartPath, bundleRelPath, partRelPath)
-    : normalizeSource(current);
-
-  if (normalizeNewlines(current) !== next) {
-    writeText(absPartPath, next);
-    return true;
-  }
-  return false;
-}
-
 function buildBundle(group) {
   const chunks = [];
   for (const partRelPath of group.parts) {
@@ -140,28 +80,12 @@ function buildBundle(group) {
 }
 
 function main() {
-  const migratedParts = [];
   const rebuiltBundles = [];
 
   for (const group of GROUPS) {
-    for (const partRelPath of group.parts) {
-      if (syncSourcePart(group.bundle, partRelPath)) {
-        migratedParts.push(partRelPath);
-      }
-    }
-
     if (buildBundle(group)) {
       rebuiltBundles.push(group.bundle);
     }
-  }
-
-  if (migratedParts.length) {
-    console.log(`Migrated ${migratedParts.length} source parts:`);
-    for (const relPath of migratedParts) {
-      console.log(`  - ${relPath}`);
-    }
-  } else {
-    console.log("Source parts already plain JS.");
   }
 
   if (rebuiltBundles.length) {

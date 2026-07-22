@@ -13,13 +13,6 @@ Workflow:
   - **Template Form**: drag-drop builder for template config (saved in browser localStorage)
   - **Export config** / **Import config**: template JSON file round-trip
 
-## Excel (VBA, legacy)
-- VBA module: `excel/modAbapTemplateTool.bas`
-- Historical workflow used Viewer **Export XML** (`<abapflowObjects>`). XML export was removed from the Viewer; keep using previously exported XML files or migrate templates via Viewer template JSON + manual Excel updates.
-- Runtime test (requires Excel Desktop + VBA project access enabled):
-  - `powershell -ExecutionPolicy Bypass -File scripts/run-vba-runtime-tests.ps1`
-  - Optional skip on machines without Excel: `powershell -ExecutionPolicy Bypass -File scripts/run-vba-runtime-tests.ps1 -SkipIfExcelMissing`
-
 ## Add / change statement rules (single source of truth)
 - Source rules: `configs/*.json`
 - Regenerate viewer configs after editing rules:
@@ -28,17 +21,8 @@ Workflow:
 - Guide: `RULES.md`
 - Object model and canonical path guide: `docs/ABAP_OBJECT_MODEL.md`
 
-## CLI (optional)
-- Parse ABAP file to JSON:
-  - `node cli/parse.js <file.abap>`
-- Compile template tool lines (for AI/agent workflows):
-  - `node scripts/template-tool.js --template ASSIGNMENT --input template.tool.txt --output template.json`
-  - stdin/stdout usage: `node scripts/template-tool.js --template ASSIGNMENT < template.tool.txt > template.json`
-  - Merge into existing config: `node scripts/template-tool.js --base abap-template-config.json --template ASSIGNMENT --input template.tool.txt --output merged.json`
-
 ## AI / Agent notes
 - Local agent guide: `AGENTS.md`
-- **Basic Design (tiếng Việt):** `docs/design/basic-design.md`
 - Purpose: keep parser/output behavior consistent across different AI agents and avoid regressions.
 - Template placeholders must use canonical schema paths.
   - Do not rely on runtime typo correction for template paths.
