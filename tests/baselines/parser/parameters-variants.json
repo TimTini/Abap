@@ -1,0 +1,497 @@
+{
+  "file": "parameters-variants.abap",
+  "objects": [
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "parameters-variants.abap",
+      "keywords": {
+        "default": {
+          "label": "default",
+          "text": "DEFAULT"
+        },
+        "obligatory": {
+          "label": "obligatory",
+          "text": "OBLIGATORY"
+        },
+        "stmt": {
+          "label": "stmt",
+          "text": "PARAMETERS"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        }
+      },
+      "lineStart": 1,
+      "objectType": "PARAMETERS",
+      "raw": "PARAMETERS p_user TYPE syuname DEFAULT sy-uname OBLIGATORY.",
+      "segmentIndex": 0,
+      "values": {
+        "default": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "SYSTEM",
+            "name": "SY-UNAME",
+            "file": "",
+            "lineStart": 0,
+            "raw": "",
+            "comment": "",
+            "scopeLabel": "SYSTEM",
+            "scopeType": "SYSTEM",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "SY-UNAME",
+          "label": "default-value",
+          "name": "default",
+          "userDesc": "",
+          "value": "sy-uname"
+        },
+        "name": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "PARAMETERS",
+            "name": "p_user",
+            "file": "parameters-variants.abap",
+            "lineStart": 1,
+            "raw": "PARAMETERS p_user TYPE syuname DEFAULT sy-uname OBLIGATORY.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "p_user",
+          "label": "param-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "p_user"
+        },
+        "type": {
+          "codeDesc": "",
+          "label": "type-name",
+          "name": "type",
+          "userDesc": "",
+          "value": "syuname"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "parameters-variants.abap",
+      "keywords": {
+        "as-checkbox": {
+          "label": "as-checkbox",
+          "text": "AS CHECKBOX"
+        },
+        "default": {
+          "label": "default",
+          "text": "DEFAULT"
+        },
+        "stmt": {
+          "label": "stmt",
+          "text": "PARAMETERS"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        }
+      },
+      "lineStart": 2,
+      "objectType": "PARAMETERS",
+      "raw": "PARAMETERS p_flag TYPE abap_bool DEFAULT abap_true AS CHECKBOX.",
+      "segmentIndex": 0,
+      "values": {
+        "default": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "SYSTEM",
+            "name": "ABAP_TRUE",
+            "file": "",
+            "lineStart": 0,
+            "raw": "",
+            "comment": "",
+            "scopeLabel": "SYSTEM",
+            "scopeType": "SYSTEM",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "abap_true",
+          "label": "default-value",
+          "name": "default",
+          "userDesc": "",
+          "value": "abap_true"
+        },
+        "name": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "PARAMETERS",
+            "name": "p_flag",
+            "file": "parameters-variants.abap",
+            "lineStart": 2,
+            "raw": "PARAMETERS p_flag TYPE abap_bool DEFAULT abap_true AS CHECKBOX.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "p_flag",
+          "label": "param-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "p_flag"
+        },
+        "type": {
+          "codeDesc": "",
+          "label": "type-name",
+          "name": "type",
+          "userDesc": "",
+          "value": "abap_bool"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "parameters-variants.abap",
+      "keywords": {
+        "group": {
+          "label": "group",
+          "text": "GROUP"
+        },
+        "memory-id": {
+          "label": "memory-id",
+          "text": "MEMORY ID"
+        },
+        "no-display": {
+          "label": "no-display",
+          "text": "NO-DISPLAY"
+        },
+        "stmt": {
+          "label": "stmt",
+          "text": "PARAMETERS"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        }
+      },
+      "lineStart": 3,
+      "objectType": "PARAMETERS",
+      "raw": "PARAMETERS p_mem TYPE string MEMORY ID memid GROUP grp1 NO-DISPLAY.",
+      "segmentIndex": 0,
+      "values": {
+        "group": {
+          "codeDesc": "",
+          "label": "group-name",
+          "name": "group",
+          "userDesc": "",
+          "value": "grp1"
+        },
+        "memoryId": {
+          "codeDesc": "",
+          "label": "memory-id",
+          "name": "memoryId",
+          "userDesc": "",
+          "value": "memid"
+        },
+        "name": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "PARAMETERS",
+            "name": "p_mem",
+            "file": "parameters-variants.abap",
+            "lineStart": 3,
+            "raw": "PARAMETERS p_mem TYPE string MEMORY ID memid GROUP grp1 NO-DISPLAY.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "p_mem",
+          "label": "param-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "p_mem"
+        },
+        "type": {
+          "codeDesc": "",
+          "label": "type-name",
+          "name": "type",
+          "userDesc": "",
+          "value": "string"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "parameters-variants.abap",
+      "keywords": {
+        "decimals": {
+          "label": "decimals",
+          "text": "DECIMALS"
+        },
+        "length": {
+          "label": "length",
+          "text": "LENGTH"
+        },
+        "stmt": {
+          "label": "stmt",
+          "text": "PARAMETERS"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        }
+      },
+      "lineStart": 6,
+      "objectType": "PARAMETERS",
+      "raw": "PARAMETERS p_len TYPE i LENGTH 10 DECIMALS 2.",
+      "segmentIndex": 0,
+      "values": {
+        "decimals": {
+          "codeDesc": "",
+          "label": "decimals",
+          "name": "decimals",
+          "userDesc": "",
+          "value": "2"
+        },
+        "length": {
+          "codeDesc": "",
+          "label": "length",
+          "name": "length",
+          "userDesc": "",
+          "value": "10"
+        },
+        "name": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "PARAMETERS",
+            "name": "p_len",
+            "file": "parameters-variants.abap",
+            "lineStart": 6,
+            "raw": "PARAMETERS p_len TYPE i LENGTH 10 DECIMALS 2.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "p_len",
+          "label": "param-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "p_len"
+        },
+        "type": {
+          "codeDesc": "",
+          "label": "type-name",
+          "name": "type",
+          "userDesc": "",
+          "value": "i"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "parameters-variants.abap",
+      "keywords": {
+        "lower-case": {
+          "label": "lower-case",
+          "text": "LOWER CASE"
+        },
+        "stmt": {
+          "label": "stmt",
+          "text": "PARAMETERS"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        }
+      },
+      "lineStart": 7,
+      "objectType": "PARAMETERS",
+      "raw": "PARAMETERS p_code TYPE string LOWER CASE.",
+      "segmentIndex": 0,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "PARAMETERS",
+            "name": "p_code",
+            "file": "parameters-variants.abap",
+            "lineStart": 7,
+            "raw": "PARAMETERS p_code TYPE string LOWER CASE.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "p_code",
+          "label": "param-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "p_code"
+        },
+        "type": {
+          "codeDesc": "",
+          "label": "type-name",
+          "name": "type",
+          "userDesc": "",
+          "value": "string"
+        }
+      }
+    }
+  ],
+  "decls": [
+    {
+      "objectType": "PARAMETERS",
+      "name": "p_user",
+      "file": "parameters-variants.abap",
+      "lineStart": 1,
+      "raw": "PARAMETERS p_user TYPE syuname DEFAULT sy-uname OBLIGATORY.",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "PARAMETERS",
+      "name": "p_flag",
+      "file": "parameters-variants.abap",
+      "lineStart": 2,
+      "raw": "PARAMETERS p_flag TYPE abap_bool DEFAULT abap_true AS CHECKBOX.",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "PARAMETERS",
+      "name": "p_mem",
+      "file": "parameters-variants.abap",
+      "lineStart": 3,
+      "raw": "PARAMETERS p_mem TYPE string MEMORY ID memid GROUP grp1 NO-DISPLAY.",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "PARAMETERS",
+      "name": "p_len",
+      "file": "parameters-variants.abap",
+      "lineStart": 6,
+      "raw": "PARAMETERS p_len TYPE i LENGTH 10 DECIMALS 2.",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "PARAMETERS",
+      "name": "p_code",
+      "file": "parameters-variants.abap",
+      "lineStart": 7,
+      "raw": "PARAMETERS p_code TYPE string LOWER CASE.",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    }
+  ]
+}

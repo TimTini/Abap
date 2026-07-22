@@ -1,0 +1,1117 @@
+{
+  "file": "extras-dynamic-bindings.abap",
+  "objects": [
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "extras-dynamic-bindings.abap",
+      "keywords": {
+        "stmt": {
+          "label": "stmt",
+          "text": "DATA"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        },
+        "value": {
+          "label": "value",
+          "text": "VALUE"
+        }
+      },
+      "lineStart": 1,
+      "objectType": "DATA",
+      "raw": "DATA lv_dest TYPE rfcdest VALUE 'NONE'.",
+      "segmentIndex": 0,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "lv_dest",
+            "file": "extras-dynamic-bindings.abap",
+            "lineStart": 1,
+            "raw": "DATA lv_dest TYPE rfcdest VALUE 'NONE'.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "lv_dest",
+          "label": "var-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "lv_dest"
+        },
+        "type": {
+          "codeDesc": "",
+          "label": "type-name",
+          "name": "type",
+          "userDesc": "",
+          "value": "rfcdest"
+        },
+        "value": {
+          "codeDesc": "",
+          "label": "value",
+          "name": "value",
+          "userDesc": "",
+          "value": "'NONE'"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "extras-dynamic-bindings.abap",
+      "keywords": {
+        "stmt": {
+          "label": "stmt",
+          "text": "DATA"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        },
+        "value": {
+          "label": "value",
+          "text": "VALUE"
+        }
+      },
+      "lineStart": 2,
+      "objectType": "DATA",
+      "raw": "DATA lv_a TYPE i VALUE 1.",
+      "segmentIndex": 0,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "lv_a",
+            "file": "extras-dynamic-bindings.abap",
+            "lineStart": 2,
+            "raw": "DATA lv_a TYPE i VALUE 1.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "lv_a",
+          "label": "var-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "lv_a"
+        },
+        "type": {
+          "codeDesc": "",
+          "label": "type-name",
+          "name": "type",
+          "userDesc": "",
+          "value": "i"
+        },
+        "value": {
+          "codeDesc": "",
+          "label": "value",
+          "name": "value",
+          "userDesc": "",
+          "value": "1"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "extras-dynamic-bindings.abap",
+      "keywords": {
+        "stmt": {
+          "label": "stmt",
+          "text": "DATA"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        },
+        "value": {
+          "label": "value",
+          "text": "VALUE"
+        }
+      },
+      "lineStart": 3,
+      "objectType": "DATA",
+      "raw": "DATA lv_b TYPE string VALUE 'X'.",
+      "segmentIndex": 0,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "lv_b",
+            "file": "extras-dynamic-bindings.abap",
+            "lineStart": 3,
+            "raw": "DATA lv_b TYPE string VALUE 'X'.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "lv_b",
+          "label": "var-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "lv_b"
+        },
+        "type": {
+          "codeDesc": "",
+          "label": "type-name",
+          "name": "type",
+          "userDesc": "",
+          "value": "string"
+        },
+        "value": {
+          "codeDesc": "",
+          "label": "value",
+          "name": "value",
+          "userDesc": "",
+          "value": "'X'"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "extras-dynamic-bindings.abap",
+      "keywords": {
+        "stmt": {
+          "label": "stmt",
+          "text": "DATA"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        },
+        "value": {
+          "label": "value",
+          "text": "VALUE"
+        }
+      },
+      "lineStart": 4,
+      "objectType": "DATA",
+      "raw": "DATA lv_c TYPE i VALUE 0.",
+      "segmentIndex": 0,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "lv_c",
+            "file": "extras-dynamic-bindings.abap",
+            "lineStart": 4,
+            "raw": "DATA lv_c TYPE i VALUE 0.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "lv_c",
+          "label": "var-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "lv_c"
+        },
+        "type": {
+          "codeDesc": "",
+          "label": "type-name",
+          "name": "type",
+          "userDesc": "",
+          "value": "i"
+        },
+        "value": {
+          "codeDesc": "",
+          "label": "value",
+          "name": "value",
+          "userDesc": "",
+          "value": "0"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "extras-dynamic-bindings.abap",
+      "keywords": {
+        "of": {
+          "label": "of",
+          "text": "OF"
+        },
+        "stmt": {
+          "label": "stmt",
+          "text": "DATA"
+        },
+        "type": {
+          "label": "type",
+          "text": "TYPE"
+        }
+      },
+      "lineStart": 5,
+      "objectType": "DATA",
+      "raw": "DATA lt_tab TYPE STANDARD TABLE OF string WITH EMPTY KEY.",
+      "segmentIndex": 0,
+      "values": {
+        "name": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "lt_tab",
+            "file": "extras-dynamic-bindings.abap",
+            "lineStart": 5,
+            "raw": "DATA lt_tab TYPE STANDARD TABLE OF string WITH EMPTY KEY.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "lt_tab",
+          "label": "var-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "lt_tab"
+        },
+        "type": {
+          "codeDesc": "",
+          "label": "type-name",
+          "name": "type",
+          "userDesc": "",
+          "value": "STANDARD"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": {
+        "callFunction": {
+          "changing": [],
+          "destination": "lv_dest",
+          "exceptions": [
+            {
+              "name": "OTHERS",
+              "originDecls": [],
+              "value": "1"
+            }
+          ],
+          "exporting": [
+            {
+              "name": "iv_a",
+              "originDecls": [
+                {
+                  "objectType": "DATA",
+                  "name": "lv_a",
+                  "file": "extras-dynamic-bindings.abap",
+                  "lineStart": 2,
+                  "raw": "DATA lv_a TYPE i VALUE 1.",
+                  "comment": "",
+                  "scopeLabel": "GLOBAL",
+                  "scopeType": "GLOBAL",
+                  "scopeName": "",
+                  "structName": "",
+                  "structObjectType": "",
+                  "structLineStart": 0,
+                  "fieldPath": "",
+                  "traceFile": "",
+                  "traceLineStart": 0,
+                  "synthetic": false
+                }
+              ],
+              "value": "lv_a",
+              "valueDecl": {
+                "objectType": "DATA",
+                "name": "lv_a",
+                "file": "extras-dynamic-bindings.abap",
+                "lineStart": 2,
+                "raw": "DATA lv_a TYPE i VALUE 1.",
+                "comment": "",
+                "scopeLabel": "GLOBAL",
+                "scopeType": "GLOBAL",
+                "scopeName": "",
+                "structName": "",
+                "structObjectType": "",
+                "structLineStart": 0,
+                "fieldPath": "",
+                "traceFile": "",
+                "traceLineStart": 0,
+                "synthetic": false
+              },
+              "valueRef": "lv_a"
+            },
+            {
+              "name": "iv_b",
+              "originDecls": [
+                {
+                  "objectType": "DATA",
+                  "name": "lv_b",
+                  "file": "extras-dynamic-bindings.abap",
+                  "lineStart": 3,
+                  "raw": "DATA lv_b TYPE string VALUE 'X'.",
+                  "comment": "",
+                  "scopeLabel": "GLOBAL",
+                  "scopeType": "GLOBAL",
+                  "scopeName": "",
+                  "structName": "",
+                  "structObjectType": "",
+                  "structLineStart": 0,
+                  "fieldPath": "",
+                  "traceFile": "",
+                  "traceLineStart": 0,
+                  "synthetic": false
+                }
+              ],
+              "value": "lv_b",
+              "valueDecl": {
+                "objectType": "DATA",
+                "name": "lv_b",
+                "file": "extras-dynamic-bindings.abap",
+                "lineStart": 3,
+                "raw": "DATA lv_b TYPE string VALUE 'X'.",
+                "comment": "",
+                "scopeLabel": "GLOBAL",
+                "scopeType": "GLOBAL",
+                "scopeName": "",
+                "structName": "",
+                "structObjectType": "",
+                "structLineStart": 0,
+                "fieldPath": "",
+                "traceFile": "",
+                "traceLineStart": 0,
+                "synthetic": false
+              },
+              "valueRef": "lv_b"
+            }
+          ],
+          "importing": [
+            {
+              "name": "ev_c",
+              "originDecls": [
+                {
+                  "objectType": "DATA",
+                  "name": "lv_c",
+                  "file": "extras-dynamic-bindings.abap",
+                  "lineStart": 4,
+                  "raw": "DATA lv_c TYPE i VALUE 0.",
+                  "comment": "",
+                  "scopeLabel": "GLOBAL",
+                  "scopeType": "GLOBAL",
+                  "scopeName": "",
+                  "structName": "",
+                  "structObjectType": "",
+                  "structLineStart": 0,
+                  "fieldPath": "",
+                  "traceFile": "",
+                  "traceLineStart": 0,
+                  "synthetic": false
+                }
+              ],
+              "value": "lv_c",
+              "valueDecl": {
+                "objectType": "DATA",
+                "name": "lv_c",
+                "file": "extras-dynamic-bindings.abap",
+                "lineStart": 4,
+                "raw": "DATA lv_c TYPE i VALUE 0.",
+                "comment": "",
+                "scopeLabel": "GLOBAL",
+                "scopeType": "GLOBAL",
+                "scopeName": "",
+                "structName": "",
+                "structObjectType": "",
+                "structLineStart": 0,
+                "fieldPath": "",
+                "traceFile": "",
+                "traceLineStart": 0,
+                "synthetic": false
+              },
+              "valueRef": "lv_c"
+            }
+          ],
+          "name": "'Z_DEMO_FM'",
+          "tables": [
+            {
+              "name": "et_tab",
+              "originDecls": [
+                {
+                  "objectType": "DATA",
+                  "name": "lt_tab",
+                  "file": "extras-dynamic-bindings.abap",
+                  "lineStart": 5,
+                  "raw": "DATA lt_tab TYPE STANDARD TABLE OF string WITH EMPTY KEY.",
+                  "comment": "",
+                  "scopeLabel": "GLOBAL",
+                  "scopeType": "GLOBAL",
+                  "scopeName": "",
+                  "structName": "",
+                  "structObjectType": "",
+                  "structLineStart": 0,
+                  "fieldPath": "",
+                  "traceFile": "",
+                  "traceLineStart": 0,
+                  "synthetic": false
+                }
+              ],
+              "value": "lt_tab",
+              "valueDecl": {
+                "objectType": "DATA",
+                "name": "lt_tab",
+                "file": "extras-dynamic-bindings.abap",
+                "lineStart": 5,
+                "raw": "DATA lt_tab TYPE STANDARD TABLE OF string WITH EMPTY KEY.",
+                "comment": "",
+                "scopeLabel": "GLOBAL",
+                "scopeType": "GLOBAL",
+                "scopeName": "",
+                "structName": "",
+                "structObjectType": "",
+                "structLineStart": 0,
+                "fieldPath": "",
+                "traceFile": "",
+                "traceLineStart": 0,
+                "synthetic": false
+              },
+              "valueRef": "lt_tab"
+            }
+          ]
+        }
+      },
+      "file": "extras-dynamic-bindings.abap",
+      "keywords": {
+        "call-function": {
+          "label": "call-function",
+          "text": "CALL FUNCTION"
+        },
+        "destination": {
+          "label": "destination",
+          "text": "DESTINATION"
+        },
+        "exceptions": {
+          "label": "exceptions",
+          "text": "EXCEPTIONS"
+        },
+        "exporting": {
+          "label": "exporting",
+          "text": "EXPORTING"
+        },
+        "importing": {
+          "label": "importing",
+          "text": "IMPORTING"
+        },
+        "tables": {
+          "label": "tables",
+          "text": "TABLES"
+        }
+      },
+      "lineStart": 7,
+      "objectType": "CALL_FUNCTION",
+      "raw": "CALL FUNCTION 'Z_DEMO_FM' DESTINATION lv_dest EXPORTING iv_a = lv_a iv_b = lv_b IMPORTING ev_c = lv_c TABLES et_tab = lt_tab EXCEPTIONS OTHERS = 1.",
+      "segmentIndex": 0,
+      "values": {
+        "destination": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "lv_dest",
+            "file": "extras-dynamic-bindings.abap",
+            "lineStart": 1,
+            "raw": "DATA lv_dest TYPE rfcdest VALUE 'NONE'.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "lv_dest",
+          "label": "destination",
+          "name": "destination",
+          "userDesc": "",
+          "value": "lv_dest"
+        },
+        "exceptionsRaw": {
+          "codeDesc": "",
+          "label": "exceptions",
+          "name": "exceptionsRaw",
+          "userDesc": "",
+          "value": "OTHERS = 1"
+        },
+        "exportingRaw": {
+          "codeDesc": "",
+          "label": "exporting",
+          "name": "exportingRaw",
+          "userDesc": "",
+          "value": "iv_a = lv_a iv_b = lv_b"
+        },
+        "importingRaw": {
+          "codeDesc": "",
+          "label": "importing",
+          "name": "importingRaw",
+          "userDesc": "",
+          "value": "ev_c = lv_c"
+        },
+        "name": {
+          "codeDesc": "",
+          "label": "function-name",
+          "name": "name",
+          "userDesc": "",
+          "value": "'Z_DEMO_FM'"
+        },
+        "tablesRaw": {
+          "codeDesc": "",
+          "label": "tables",
+          "name": "tablesRaw",
+          "userDesc": "",
+          "value": "et_tab = lt_tab"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": {
+        "performCall": {
+          "changing": [
+            {
+              "originDecls": [
+                {
+                  "objectType": "DATA",
+                  "name": "lv_c",
+                  "file": "extras-dynamic-bindings.abap",
+                  "lineStart": 4,
+                  "raw": "DATA lv_c TYPE i VALUE 0.",
+                  "comment": "",
+                  "scopeLabel": "GLOBAL",
+                  "scopeType": "GLOBAL",
+                  "scopeName": "",
+                  "structName": "",
+                  "structObjectType": "",
+                  "structLineStart": 0,
+                  "fieldPath": "",
+                  "traceFile": "",
+                  "traceLineStart": 0,
+                  "synthetic": false
+                }
+              ],
+              "value": "lv_c",
+              "valueDecl": {
+                "objectType": "DATA",
+                "name": "lv_c",
+                "file": "extras-dynamic-bindings.abap",
+                "lineStart": 4,
+                "raw": "DATA lv_c TYPE i VALUE 0.",
+                "comment": "",
+                "scopeLabel": "GLOBAL",
+                "scopeType": "GLOBAL",
+                "scopeName": "",
+                "structName": "",
+                "structObjectType": "",
+                "structLineStart": 0,
+                "fieldPath": "",
+                "traceFile": "",
+                "traceLineStart": 0,
+                "synthetic": false
+              },
+              "valueRef": "lv_c"
+            }
+          ],
+          "form": "do_something",
+          "ifCondition": "lv_a > 0",
+          "ifConditions": [
+            {
+              "comparisonOperator": ">",
+              "leftOperand": "lv_a",
+              "leftOperandDecl": {
+                "objectType": "DATA",
+                "name": "lv_a",
+                "file": "extras-dynamic-bindings.abap",
+                "lineStart": 2,
+                "raw": "DATA lv_a TYPE i VALUE 1.",
+                "comment": "",
+                "scopeLabel": "GLOBAL",
+                "scopeType": "GLOBAL",
+                "scopeName": "",
+                "structName": "",
+                "structObjectType": "",
+                "structLineStart": 0,
+                "fieldPath": "",
+                "traceFile": "",
+                "traceLineStart": 0,
+                "synthetic": false
+              },
+              "leftOperandRef": "lv_a",
+              "logicalConnector": "",
+              "rightOperand": "0",
+              "rightOperandDecl": {
+                "objectType": "CONDITION_VALUE",
+                "name": "0",
+                "file": "",
+                "lineStart": 0,
+                "raw": "0",
+                "comment": "",
+                "scopeLabel": "CONDITION",
+                "scopeType": "SYSTEM",
+                "scopeName": "",
+                "structName": "",
+                "structObjectType": "",
+                "structLineStart": 0,
+                "fieldPath": "",
+                "traceFile": "",
+                "traceLineStart": 0,
+                "synthetic": false
+              }
+            }
+          ],
+          "program": "sy-repid",
+          "tables": [
+            {
+              "originDecls": [
+                {
+                  "objectType": "DATA",
+                  "name": "lt_tab",
+                  "file": "extras-dynamic-bindings.abap",
+                  "lineStart": 5,
+                  "raw": "DATA lt_tab TYPE STANDARD TABLE OF string WITH EMPTY KEY.",
+                  "comment": "",
+                  "scopeLabel": "GLOBAL",
+                  "scopeType": "GLOBAL",
+                  "scopeName": "",
+                  "structName": "",
+                  "structObjectType": "",
+                  "structLineStart": 0,
+                  "fieldPath": "",
+                  "traceFile": "",
+                  "traceLineStart": 0,
+                  "synthetic": false
+                }
+              ],
+              "value": "lt_tab",
+              "valueDecl": {
+                "objectType": "DATA",
+                "name": "lt_tab",
+                "file": "extras-dynamic-bindings.abap",
+                "lineStart": 5,
+                "raw": "DATA lt_tab TYPE STANDARD TABLE OF string WITH EMPTY KEY.",
+                "comment": "",
+                "scopeLabel": "GLOBAL",
+                "scopeType": "GLOBAL",
+                "scopeName": "",
+                "structName": "",
+                "structObjectType": "",
+                "structLineStart": 0,
+                "fieldPath": "",
+                "traceFile": "",
+                "traceLineStart": 0,
+                "synthetic": false
+              },
+              "valueRef": "lt_tab"
+            }
+          ],
+          "using": [
+            {
+              "originDecls": [
+                {
+                  "objectType": "DATA",
+                  "name": "lv_a",
+                  "file": "extras-dynamic-bindings.abap",
+                  "lineStart": 2,
+                  "raw": "DATA lv_a TYPE i VALUE 1.",
+                  "comment": "",
+                  "scopeLabel": "GLOBAL",
+                  "scopeType": "GLOBAL",
+                  "scopeName": "",
+                  "structName": "",
+                  "structObjectType": "",
+                  "structLineStart": 0,
+                  "fieldPath": "",
+                  "traceFile": "",
+                  "traceLineStart": 0,
+                  "synthetic": false
+                }
+              ],
+              "value": "lv_a",
+              "valueDecl": {
+                "objectType": "DATA",
+                "name": "lv_a",
+                "file": "extras-dynamic-bindings.abap",
+                "lineStart": 2,
+                "raw": "DATA lv_a TYPE i VALUE 1.",
+                "comment": "",
+                "scopeLabel": "GLOBAL",
+                "scopeType": "GLOBAL",
+                "scopeName": "",
+                "structName": "",
+                "structObjectType": "",
+                "structLineStart": 0,
+                "fieldPath": "",
+                "traceFile": "",
+                "traceLineStart": 0,
+                "synthetic": false
+              },
+              "valueRef": "lv_a"
+            },
+            {
+              "originDecls": [
+                {
+                  "objectType": "DATA",
+                  "name": "lv_b",
+                  "file": "extras-dynamic-bindings.abap",
+                  "lineStart": 3,
+                  "raw": "DATA lv_b TYPE string VALUE 'X'.",
+                  "comment": "",
+                  "scopeLabel": "GLOBAL",
+                  "scopeType": "GLOBAL",
+                  "scopeName": "",
+                  "structName": "",
+                  "structObjectType": "",
+                  "structLineStart": 0,
+                  "fieldPath": "",
+                  "traceFile": "",
+                  "traceLineStart": 0,
+                  "synthetic": false
+                }
+              ],
+              "value": "lv_b",
+              "valueDecl": {
+                "objectType": "DATA",
+                "name": "lv_b",
+                "file": "extras-dynamic-bindings.abap",
+                "lineStart": 3,
+                "raw": "DATA lv_b TYPE string VALUE 'X'.",
+                "comment": "",
+                "scopeLabel": "GLOBAL",
+                "scopeType": "GLOBAL",
+                "scopeName": "",
+                "structName": "",
+                "structObjectType": "",
+                "structLineStart": 0,
+                "fieldPath": "",
+                "traceFile": "",
+                "traceLineStart": 0,
+                "synthetic": false
+              },
+              "valueRef": "lv_b"
+            }
+          ]
+        }
+      },
+      "file": "extras-dynamic-bindings.abap",
+      "keywords": {
+        "changing": {
+          "label": "changing",
+          "text": "CHANGING"
+        },
+        "if": {
+          "label": "if",
+          "text": "IF"
+        },
+        "in-program": {
+          "label": "in-program",
+          "text": "IN PROGRAM"
+        },
+        "stmt": {
+          "label": "stmt",
+          "text": "PERFORM"
+        },
+        "tables": {
+          "label": "tables",
+          "text": "TABLES"
+        },
+        "using": {
+          "label": "using",
+          "text": "USING"
+        }
+      },
+      "lineStart": 19,
+      "objectType": "PERFORM",
+      "raw": "PERFORM do_something IN PROGRAM sy-repid USING lv_a lv_b CHANGING lv_c TABLES lt_tab IF lv_a > 0.",
+      "segmentIndex": 0,
+      "values": {
+        "changingRaw": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "lv_c",
+            "file": "extras-dynamic-bindings.abap",
+            "lineStart": 4,
+            "raw": "DATA lv_c TYPE i VALUE 0.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "lv_c",
+          "label": "changing",
+          "name": "changingRaw",
+          "userDesc": "",
+          "value": "lv_c"
+        },
+        "form": {
+          "codeDesc": "",
+          "label": "form-name",
+          "name": "form",
+          "userDesc": "",
+          "value": "do_something"
+        },
+        "ifCondition": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "lv_a",
+            "file": "extras-dynamic-bindings.abap",
+            "lineStart": 2,
+            "raw": "DATA lv_a TYPE i VALUE 1.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "lv_a",
+          "label": "if",
+          "name": "ifCondition",
+          "userDesc": "",
+          "value": "lv_a > 0"
+        },
+        "program": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "SYSTEM",
+            "name": "SY-REPID",
+            "file": "",
+            "lineStart": 0,
+            "raw": "",
+            "comment": "",
+            "scopeLabel": "SYSTEM",
+            "scopeType": "SYSTEM",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "SY-REPID",
+          "label": "program",
+          "name": "program",
+          "userDesc": "",
+          "value": "sy-repid"
+        },
+        "tablesRaw": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "lt_tab",
+            "file": "extras-dynamic-bindings.abap",
+            "lineStart": 5,
+            "raw": "DATA lt_tab TYPE STANDARD TABLE OF string WITH EMPTY KEY.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "lt_tab",
+          "label": "tables",
+          "name": "tablesRaw",
+          "userDesc": "",
+          "value": "lt_tab"
+        },
+        "usingRaw": {
+          "codeDesc": "",
+          "decl": {
+            "objectType": "DATA",
+            "name": "lv_a",
+            "file": "extras-dynamic-bindings.abap",
+            "lineStart": 2,
+            "raw": "DATA lv_a TYPE i VALUE 1.",
+            "comment": "",
+            "scopeLabel": "GLOBAL",
+            "scopeType": "GLOBAL",
+            "scopeName": "",
+            "structName": "",
+            "structObjectType": "",
+            "structLineStart": 0,
+            "fieldPath": "",
+            "traceFile": "",
+            "traceLineStart": 0,
+            "synthetic": false
+          },
+          "declRef": "lv_a",
+          "label": "using",
+          "name": "usingRaw",
+          "userDesc": "",
+          "value": "lv_a lv_b"
+        }
+      }
+    }
+  ],
+  "decls": [
+    {
+      "objectType": "DATA",
+      "name": "lv_dest",
+      "file": "extras-dynamic-bindings.abap",
+      "lineStart": 1,
+      "raw": "DATA lv_dest TYPE rfcdest VALUE 'NONE'.",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "DATA",
+      "name": "lv_a",
+      "file": "extras-dynamic-bindings.abap",
+      "lineStart": 2,
+      "raw": "DATA lv_a TYPE i VALUE 1.",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "DATA",
+      "name": "lv_b",
+      "file": "extras-dynamic-bindings.abap",
+      "lineStart": 3,
+      "raw": "DATA lv_b TYPE string VALUE 'X'.",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "DATA",
+      "name": "lv_c",
+      "file": "extras-dynamic-bindings.abap",
+      "lineStart": 4,
+      "raw": "DATA lv_c TYPE i VALUE 0.",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "DATA",
+      "name": "lt_tab",
+      "file": "extras-dynamic-bindings.abap",
+      "lineStart": 5,
+      "raw": "DATA lt_tab TYPE STANDARD TABLE OF string WITH EMPTY KEY.",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    }
+  ]
+}

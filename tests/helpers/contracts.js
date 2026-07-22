@@ -3,6 +3,16 @@
 const fs = require("fs");
 const path = require("path");
 
+function listFilesByExtension(dirPath, extension) {
+  if (!fs.existsSync(dirPath)) {
+    return [];
+  }
+  const suffix = String(extension || "").toLowerCase();
+  return fs.readdirSync(dirPath)
+    .filter((name) => name.toLowerCase().endsWith(suffix))
+    .sort();
+}
+
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
@@ -13,12 +23,59 @@ function writeJson(filePath, value) {
 }
 
 function listFixtureFiles(dirPath) {
-  if (!fs.existsSync(dirPath)) {
+  return listFilesByExtension(dirPath, ".abap");
+}
+
+function assertJsonArtifactsMatchFixtures(artifactDir, fixtureFiles, artifactLabel, options) {
+  const settings = options && typeof options === "object" ? options : {};
+  const optional = settings.optional === true;
+  if (!fs.existsSync(artifactDir)) {
+    if (optional) {
+      return;
+    }
+    throw new Error(`Missing ${artifactLabel} directory: ${artifactDir}`);
+  }
+
+  const expected = new Set(
+    (Array.isArray(fixtureFiles) ? fixtureFiles : []).map((fileName) => fileName.replace(/\.abap$/i, ".json"))
+  );
+  const actual = listFilesByExtension(artifactDir, ".json");
+  const extra = actual.filter((fileName) => !expected.has(fileName));
+  const missing = Array.from(expected).filter((fileName) => !actual.includes(fileName));
+
+  if (!missing.length && !extra.length) {
+    return;
+  }
+
+  const parts = [];
+  if (missing.length) {
+    parts.push(`missing [${missing.join(", ")}]`);
+  }
+  if (extra.length) {
+    parts.push(`extra [${extra.join(", ")}]`);
+  }
+  throw new Error(`${artifactLabel} set mismatch for ${artifactDir}: ${parts.join("; ")}.`);
+}
+
+function loadAllowedPaths(allowedPath) {
+  if (!fs.existsSync(allowedPath)) {
     return [];
   }
-  return fs.readdirSync(dirPath)
-    .filter((name) => name.toLowerCase().endsWith(".abap"))
-    .sort();
+  const manifest = readJson(allowedPath);
+  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
+    throw new Error(`Invalid allowed-delta manifest object: ${allowedPath}`);
+  }
+  const keys = Object.keys(manifest).sort();
+  if (keys.length !== 1 || keys[0] !== "allowedPaths") {
+    throw new Error(`Unexpected allowed-delta manifest shape: ${allowedPath}`);
+  }
+  if (!Array.isArray(manifest.allowedPaths)) {
+    throw new Error(`allowedPaths must be an array in ${allowedPath}`);
+  }
+  if (manifest.allowedPaths.length) {
+    throw new Error(`Non-empty allowedPaths are no longer permitted: ${allowedPath}`);
+  }
+  return [];
 }
 
 function toPlainJson(value) {
@@ -227,9 +284,11 @@ function filterDiffsByAllowedPaths(diffs, allowedPaths) {
 }
 
 module.exports = {
+  assertJsonArtifactsMatchFixtures,
   diffJson,
   filterDiffsByAllowedPaths,
   listFixtureFiles,
+  loadAllowedPaths,
   normalizeParserResult,
   normalizeViewerState,
   readJson,

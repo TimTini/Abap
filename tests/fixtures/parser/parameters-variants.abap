@@ -1,0 +1,7 @@
+PARAMETERS p_user TYPE syuname DEFAULT sy-uname OBLIGATORY.
+PARAMETERS p_flag TYPE abap_bool DEFAULT abap_true AS CHECKBOX.
+PARAMETERS p_mem TYPE string MEMORY ID memid GROUP grp1 NO-DISPLAY.
+
+PARAMETERS:
+  p_len TYPE i LENGTH 10 DECIMALS 2,
+  p_code TYPE string LOWER CASE.

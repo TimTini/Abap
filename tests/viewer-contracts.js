@@ -4,9 +4,11 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 const {
+  assertJsonArtifactsMatchFixtures,
   diffJson,
   filterDiffsByAllowedPaths,
   listFixtureFiles,
+  loadAllowedPaths,
   normalizeViewerState,
   readJson
 } = require("./helpers/contracts");
@@ -3460,7 +3462,6 @@ async function assertViewerFixture(fileName) {
   const baselinePath = path.join(baselineDir, fileName.replace(/\.abap$/i, ".json"));
   const allowedPath = path.join(allowedDir, fileName.replace(/\.abap$/i, ".json"));
   assert(fs.existsSync(baselinePath), `Missing viewer baseline for ${fileName}. Run npm run build:baselines.`);
-  assert(fs.existsSync(allowedPath), `Missing viewer allowed-delta manifest for ${fileName}.`);
 
   const source = fs.readFileSync(fixturePath, "utf8");
   const dom = await renderFixture(source);
@@ -3470,8 +3471,7 @@ async function assertViewerFixture(fileName) {
   const state = runtime.state;
   const actual = normalizeViewerState(window);
   const expected = readJson(baselinePath);
-  const allowed = readJson(allowedPath);
-  const diffs = filterDiffsByAllowedPaths(diffJson(expected, actual), allowed.allowedPaths);
+  const diffs = filterDiffsByAllowedPaths(diffJson(expected, actual), loadAllowedPaths(allowedPath));
 
   assert.deepStrictEqual(diffs, [], `${fileName}: viewer contract mismatch.\n${JSON.stringify(diffs.slice(0, 20), null, 2)}`);
 
@@ -4102,8 +4102,11 @@ async function assertDataCatalogSourceSelectorStaysSynchronized() {
 
 async function main() {
   const focus = String(process.argv[2] || "").trim();
+  const fixtureFiles = listFixtureFiles(fixturesDir);
+  assertJsonArtifactsMatchFixtures(baselineDir, fixtureFiles, "viewer baseline");
+  assertJsonArtifactsMatchFixtures(allowedDir, fixtureFiles, "viewer allowed-delta", { optional: true });
   if (!focus || focus === "fixtures") {
-    for (const fileName of listFixtureFiles(fixturesDir)) {
+    for (const fileName of fixtureFiles) {
       await assertViewerFixture(fileName);
     }
   }

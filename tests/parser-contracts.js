@@ -6,9 +6,11 @@ const path = require("path");
 const { parseAbapText } = require("../shared/abap-parser");
 const { loadConfigs } = require("./helpers/config-loader");
 const {
+  assertJsonArtifactsMatchFixtures,
   diffJson,
   filterDiffsByAllowedPaths,
   listFixtureFiles,
+  loadAllowedPaths,
   normalizeParserResult,
   readJson
 } = require("./helpers/contracts");
@@ -52,18 +54,20 @@ function assertParserFixture(fileName) {
   const baselinePath = path.join(baselineDir, fileName.replace(/\.abap$/i, ".json"));
   const allowedPath = path.join(allowedDir, fileName.replace(/\.abap$/i, ".json"));
   assert(fs.existsSync(baselinePath), `Missing parser baseline for ${fileName}. Run npm run build:baselines.`);
-  assert(fs.existsSync(allowedPath), `Missing parser allowed-delta manifest for ${fileName}.`);
 
   const source = fs.readFileSync(fixturePath, "utf8");
   const actual = normalizeParserResult(parseAbapText(source, configs, fileName));
   const expected = readJson(baselinePath);
-  const allowed = readJson(allowedPath);
-  const diffs = filterDiffsByAllowedPaths(diffJson(expected, actual), allowed.allowedPaths);
+  const diffs = filterDiffsByAllowedPaths(diffJson(expected, actual), loadAllowedPaths(allowedPath));
 
   assert.deepStrictEqual(diffs, [], `${fileName}: parser contract mismatch.\n${JSON.stringify(diffs.slice(0, 20), null, 2)}`);
 }
 
-for (const fileName of listFixtureFiles(fixturesDir)) {
+const fixtureFiles = listFixtureFiles(fixturesDir);
+assertJsonArtifactsMatchFixtures(baselineDir, fixtureFiles, "parser baseline");
+assertJsonArtifactsMatchFixtures(allowedDir, fixtureFiles, "parser allowed-delta", { optional: true });
+
+for (const fileName of fixtureFiles) {
   assertParserFixture(fileName);
 }
 
