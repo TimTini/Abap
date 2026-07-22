@@ -42,7 +42,7 @@ Workflow:
   - Remaining object types are generated with a generic, schema-safe template shape.
 - Minimum check before finishing changes:
   - `node tests/parser-regression.js`
-  - If viewer changed: `node scripts/build-runtime-bundles.js` then `python scripts/build-inline-viewer.py`
+  - If viewer changed: `node scripts/build-viewer-configs.js` then `python scripts/build-inline-viewer.py`
 
 ## Examples
 - Full coverage sample: `examples/full.abap`

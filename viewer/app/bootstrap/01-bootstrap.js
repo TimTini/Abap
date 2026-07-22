@@ -1,8 +1,8 @@
 "use strict";
-(function registerOutputService(global) {
+(function registerBootstrapService(global) {
   const runtime = global.AbapViewerRuntime;
   if (!runtime || typeof runtime.registerService !== "function") {
-    throw new Error("ABAP Viewer service registry missing before output loads.");
+    throw new Error("ABAP Viewer service registry missing before bootstrap loads.");
   }
   const state = runtime.state;
   const els = runtime.els;
@@ -61,6 +61,61 @@
   const renderSettingsModalUi = runtime.requireServiceMethod("runtimeState", "renderSettingsModalUi");
   const openSettingsModal = runtime.requireServiceMethod("runtimeState", "openSettingsModal");
   const closeSettingsModal = runtime.requireServiceMethod("runtimeState", "closeSettingsModal");
+  const isValueLikeEntryObject = runtime.requireServiceMethod("output", "isValueLikeEntryObject");
+  const isAssignmentLikeEntryObject = runtime.requireServiceMethod("output", "isAssignmentLikeEntryObject");
+  const isConditionClauseLikeObject = runtime.requireServiceMethod("output", "isConditionClauseLikeObject");
+  const attachPathSyntheticDeclAliases = runtime.requireServiceMethod("output", "attachPathSyntheticDeclAliases");
+  const normalizeEntryObjectForPath = runtime.requireServiceMethod("output", "normalizeEntryObjectForPath");
+  const walkObjects = runtime.requireServiceMethod("output", "walkObjects");
+  const computeLineOffsets = runtime.requireServiceMethod("output", "computeLineOffsets");
+  const getSelectionRangeForLines = runtime.requireServiceMethod("output", "getSelectionRangeForLines");
+  const selectCodeLines = runtime.requireServiceMethod("output", "selectCodeLines");
+  const getContainerScrollScale = runtime.requireServiceMethod("output", "getContainerScrollScale");
+  const scrollElementInContainer = runtime.requireServiceMethod("output", "scrollElementInContainer");
+  const getSelectedTemplateIndexSet = runtime.requireServiceMethod("output", "getSelectedTemplateIndexSet");
+  const getSortedSelectedTemplateIndexes = runtime.requireServiceMethod("output", "getSortedSelectedTemplateIndexes");
+  const updateTemplateCopySelectedButton = runtime.requireServiceMethod("output", "updateTemplateCopySelectedButton");
+  const syncRenderedTemplateSelection = runtime.requireServiceMethod("output", "syncRenderedTemplateSelection");
+  const clearTemplateBlockSelection = runtime.requireServiceMethod("output", "clearTemplateBlockSelection");
+  const pruneTemplateBlockSelection = runtime.requireServiceMethod("output", "pruneTemplateBlockSelection");
+  const chooseNearestSelectedTemplateIndex = runtime.requireServiceMethod("output", "chooseNearestSelectedTemplateIndex");
+  const updateTemplateBlockSelection = runtime.requireServiceMethod("output", "updateTemplateBlockSelection");
+  const selectTemplateBlockFromInteraction = runtime.requireServiceMethod("output", "selectTemplateBlockFromInteraction");
+  const setSelectedDeclRow = runtime.requireServiceMethod("output", "setSelectedDeclRow");
+  const countInputLines = runtime.requireServiceMethod("output", "countInputLines");
+  const computeInputGutterTargetsForDescriptions = runtime.requireServiceMethod("output", "computeInputGutterTargetsForDescriptions");
+  const refreshInputGutterTargets = runtime.requireServiceMethod("output", "refreshInputGutterTargets");
+  const onInputGutterClick = runtime.requireServiceMethod("output", "onInputGutterClick");
+  const openJsonModal = runtime.requireServiceMethod("output", "openJsonModal");
+  const openTextModal = runtime.requireServiceMethod("output", "openTextModal");
+  const closeJsonModal = runtime.requireServiceMethod("output", "closeJsonModal");
+  const copyJsonToClipboard = runtime.requireServiceMethod("output", "copyJsonToClipboard");
+  const stringifyDecl = runtime.requireServiceMethod("output", "stringifyDecl");
+  const getDeclTechName = runtime.requireServiceMethod("output", "getDeclTechName");
+  const stripAngleBrackets = runtime.requireServiceMethod("output", "stripAngleBrackets");
+  const stripDeclCategoryPrefix = runtime.requireServiceMethod("output", "stripDeclCategoryPrefix");
+  const isStructFieldDecl = runtime.requireServiceMethod("output", "isStructFieldDecl");
+  const getDeclDisplayName = runtime.requireServiceMethod("output", "getDeclDisplayName");
+  const buildDeclTitle = runtime.requireServiceMethod("output", "buildDeclTitle");
+  const el = runtime.requireServiceMethod("output", "el");
+  const renderMeta = runtime.requireServiceMethod("output", "renderMeta");
+  const getObjectLabel = runtime.requireServiceMethod("output", "getObjectLabel");
+  const normalizeParsedJson = runtime.requireServiceMethod("output", "normalizeParsedJson");
+  const getTemplateVirtualStateForGutter = runtime.requireServiceMethod("output", "getTemplateVirtualStateForGutter");
+  const ensureVirtualControlState = runtime.requireServiceMethod("output", "ensureVirtualControlState");
+  const getInputGutterVirtualState = runtime.requireServiceMethod("output", "getInputGutterVirtualState");
+  const cancelVirtualScrollAdjustment = runtime.requireServiceMethod("output", "cancelVirtualScrollAdjustment");
+  const beginVirtualScrollAdjustment = runtime.requireServiceMethod("output", "beginVirtualScrollAdjustment");
+  const queueVirtualScrollSync = runtime.requireServiceMethod("output", "queueVirtualScrollSync");
+  const finishVirtualScrollAdjustment = runtime.requireServiceMethod("output", "finishVirtualScrollAdjustment");
+  const alignVirtualTargetAfterRender = runtime.requireServiceMethod("output", "alignVirtualTargetAfterRender");
+  const setSelectedTemplateBlock = runtime.requireServiceMethod("output", "setSelectedTemplateBlock");
+  const measureInputLineMetrics = runtime.requireServiceMethod("output", "measureInputLineMetrics");
+  const scheduleInputGutterVirtualRender = runtime.requireServiceMethod("output", "scheduleInputGutterVirtualRender");
+  const renderInputGutterWindow = runtime.requireServiceMethod("output", "renderInputGutterWindow");
+  const syncInputGutterScroll = runtime.requireServiceMethod("output", "syncInputGutterScroll");
+  const rebuildInputGutter = runtime.requireServiceMethod("output", "rebuildInputGutter");
+  const computeInputGutterTargetsForTemplate = runtime.requireServiceMethod("output", "computeInputGutterTargetsForTemplate");
   const collectConditionDeclsFromClauses = runtime.requireServiceMethod("descriptions", "collectConditionDeclsFromClauses");
   const getDeclCodeDesc = runtime.requireServiceMethod("descriptions", "getDeclCodeDesc");
   const renderDeclDescCellLines = runtime.requireServiceMethod("descriptions", "renderDeclDescCellLines");
@@ -404,1221 +459,398 @@
   const augmentSyntheticStructFieldDecls = runtime.requireServiceMethod("parserController", "augmentSyntheticStructFieldDecls");
   const clearParsedResultAfterFailure = runtime.requireServiceMethod("parserController", "clearParsedResultAfterFailure");
   const parseFromTextarea = runtime.requireServiceMethod("parserController", "parseFromTextarea");
-  const start = runtime.requireServiceMethod("bootstrap", "start");
-  const isVirtualScrollKeyMain = runtime.requireServiceMethod("bootstrap", "isVirtualScrollKeyMain");
-  const isEditableVirtualScrollTargetMain = runtime.requireServiceMethod("bootstrap", "isEditableVirtualScrollTargetMain");
-  const addVirtualUserIntentListenersMain = runtime.requireServiceMethod("bootstrap", "addVirtualUserIntentListenersMain");
-  const scheduleVirtualGeometryRefreshMain = runtime.requireServiceMethod("bootstrap", "scheduleVirtualGeometryRefreshMain");
-  const init = runtime.requireServiceMethod("bootstrap", "init");
-function isValueLikeEntryObject(value) {
-    if (!isPlainObjectRecord(value)) {
+let virtualGeometryRefreshFrameMain = 0;
+
+function start() {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init, { once: true });
+  } else {
+    init();
+  }
+}
+
+
+  function isVirtualScrollKeyMain(ev) {
+    if (!ev) {
       return false;
     }
-    if (isDeclLikeObject(value) || isAbapStatementObject(value)) {
+    return [
+      "ArrowUp",
+      "ArrowDown",
+      "PageUp",
+      "PageDown",
+      "Home",
+      "End",
+      " ",
+      "Space",
+      "Spacebar"
+    ].includes(String(ev.key || ""));
+  }
+
+
+
+  function isEditableVirtualScrollTargetMain(target) {
+    if (!(target instanceof Element)) {
       return false;
     }
-    return (
-      hasValueLevelDescFields(value)
-      || Object.prototype.hasOwnProperty.call(value, "declRef")
-      || Object.prototype.hasOwnProperty.call(value, "value")
-      || Object.prototype.hasOwnProperty.call(value, "name")
-      || Object.prototype.hasOwnProperty.call(value, "label")
-    );
-  }
-
-  function isAssignmentLikeEntryObject(value) {
-    if (!isPlainObjectRecord(value)) {
-      return false;
-    }
-    if (isDeclLikeObject(value) || isAbapStatementObject(value)) {
-      return false;
-    }
-    const hasValueSignals = (
-      Object.prototype.hasOwnProperty.call(value, "value")
-      || Object.prototype.hasOwnProperty.call(value, "valueRef")
-      || Object.prototype.hasOwnProperty.call(value, "valueDecl")
-      || Object.prototype.hasOwnProperty.call(value, "originDecls")
-    );
-    if (!hasValueSignals) {
-      return false;
-    }
-    return (
-      Object.prototype.hasOwnProperty.call(value, "name")
-      || Object.prototype.hasOwnProperty.call(value, "value")
-      || Object.prototype.hasOwnProperty.call(value, "valueRef")
-    );
-  }
-
-  function isConditionClauseLikeObject(value) {
-    if (!isPlainObjectRecord(value)) {
-      return false;
-    }
-    return (
-      Object.prototype.hasOwnProperty.call(value, "leftOperand")
-      || Object.prototype.hasOwnProperty.call(value, "rightOperand")
-      || Object.prototype.hasOwnProperty.call(value, "comparisonOperator")
-    );
-  }
-
-  function attachPathSyntheticDeclAliases(value, ownerContext) {
-    if (!value || typeof value !== "object") {
-      return value;
-    }
-    const objectIndex = Number(ownerContext && ownerContext.__abapTemplateObjectIndex) || 0;
-    if (objectIndex <= 0 || typeof attachTemplateSyntheticDeclAliases !== "function") {
-      return value;
-    }
-    for (const key of ["decl", "valueDecl", "leftOperandDecl", "rightOperandDecl"]) {
-      if (value[key] && typeof value[key] === "object") {
-        attachTemplateSyntheticDeclAliases(value[key], objectIndex);
-      }
-    }
-    return value;
-  }
-
-  function normalizeEntryObjectForPath(value, keyHint, pathParts, ownerContext) {
-    if (!isPlainObjectRecord(value)) {
-      return value;
-    }
-    if (isDeclLikeObject(value) || isAbapStatementObject(value)) {
-      return value;
-    }
-
-    const pathKey = buildPathKeyFromParts(pathParts);
-    const pathLower = pathKey.toLowerCase();
-    const inValuesPath = pathLower.includes("/values/");
-    const inExtrasPath = pathLower.includes("/extras/");
-    const keyHintLower = String(keyHint || "").trim().toLowerCase();
-    const extrasItemLike = keyHintLower === "item";
-    const source = getDeclSourceContextFromObject(ownerContext);
-
-    let next = value;
-
-    if (inValuesPath && isValueLikeEntryObject(next)) {
-      next = ensureEntryDeclWithSynthetic(next, {
-        pathKey,
-        file: source.file,
-        lineStart: source.lineStart,
-        raw: source.raw,
-        role: "path:value"
-      });
-    }
-
-    if (inExtrasPath && extrasItemLike) {
-      if (isConditionClauseLikeObject(next)) {
-        next = ensureConditionClauseDeclsWithSynthetic(next, {
-          pathKey,
-          file: source.file,
-          lineStart: source.lineStart,
-          raw: source.raw
-        });
-      }
-
-      if (isAssignmentLikeEntryObject(next)) {
-        next = ensureValueDeclWithSynthetic(next, {
-          pathKey,
-          file: source.file,
-          lineStart: source.lineStart,
-          raw: source.raw,
-          role: "path:extras:value",
-          nameHint: String(keyHint || "value")
-        });
-      }
-
-      if (isValueLikeEntryObject(next)) {
-        next = ensureEntryDeclWithSynthetic(next, {
-          pathKey,
-          file: source.file,
-          lineStart: source.lineStart,
-          raw: source.raw,
-          role: "path:extras"
-        });
-      }
-    }
-
-    return attachPathSyntheticDeclAliases(next, ownerContext);
-  }
-
-  function walkObjects(roots, visit) {
-    const stack = Array.isArray(roots) ? roots.slice().reverse() : [];
-    while (stack.length) {
-      const node = stack.pop();
-      if (!node) {
-        continue;
-      }
-      visit(node);
-      const children = Array.isArray(node.children) ? node.children : [];
-      for (let i = children.length - 1; i >= 0; i -= 1) {
-        stack.push(children[i]);
-      }
-    }
-  }
-
-  function computeLineOffsets(text) {
-    const value = String(text || "");
-    const offsets = [0];
-    for (let i = 0; i < value.length; i += 1) {
-      if (value[i] === "\n") {
-        offsets.push(i + 1);
-      }
-    }
-    return offsets;
-  }
-
-  function getSelectionRangeForLines(text, lineStart, lineEnd) {
-    const value = String(text || "");
-    const offsets = state.inputLineOffsets.length ? state.inputLineOffsets : computeLineOffsets(value);
-    const start = Math.max(1, Number(lineStart) || 1);
-    const end = Math.max(start, Number(lineEnd) || start);
-    const startLineIndex = start - 1;
-    const endLineIndex = end - 1;
-    const startOffset = offsets[startLineIndex] ?? 0;
-    const endOffset = offsets[endLineIndex + 1] ?? value.length;
-    return { start: startOffset, end: Math.max(startOffset, endOffset) };
-  }
-
-  function selectCodeLines(lineStart, lineEnd) {
-    if (typeof navigateInputRange === "function") {
-      return navigateInputRange({
-        lineStart,
-        lineEnd,
-        segmentIndex: null,
-        anchorRatio: 0.28
-      });
-    }
-    const text = els.inputText.value || "";
-    state.inputLineOffsets = computeLineOffsets(text);
-    const range = getSelectionRangeForLines(text, lineStart, lineEnd);
-    els.inputText.focus();
-    els.inputText.setSelectionRange(range.start, range.end);
-    syncInputGutterScroll();
-  }
-
-  function getContainerScrollScale(container) {
-    if (!container || typeof container.getBoundingClientRect !== "function") {
-      return 1;
-    }
-    const rect = container.getBoundingClientRect();
-    const layoutHeight = Math.max(0, Number(container.offsetHeight) || Number(container.clientHeight) || 0);
-    const scale = layoutHeight > 0 ? (Number(rect && rect.height) || 0) / layoutHeight : 1;
-    return Number.isFinite(scale) && scale >= 0.5 && scale <= 2 ? scale : 1;
-  }
-
-  function scrollElementInContainer(container, element, options) {
-    if (!container || !element || typeof container.scrollTop !== "number") {
-      return;
-    }
-
-    const opts = options && typeof options === "object" ? options : {};
-    const mode = String(opts.mode || "nearest").toLowerCase();
-    const padTop = Math.max(0, Number(opts.padTop) || 0);
-    const padBottom = Math.max(0, Number(opts.padBottom) || 0);
-    const behavior = opts.behavior === "smooth" ? "smooth" : "auto";
-
-    const containerRect = container.getBoundingClientRect();
-    const elementRect = element.getBoundingClientRect();
-    if (!containerRect || !elementRect || !Number.isFinite(containerRect.top) || !Number.isFinite(elementRect.top)) {
-      return;
-    }
-
-    const currentTop = Number(container.scrollTop || 0) || 0;
-    const scrollScale = getContainerScrollScale(container);
-    let nextTop = currentTop;
-
-    if (mode === "start") {
-      nextTop = currentTop + ((elementRect.top - containerRect.top - padTop) / scrollScale);
-    } else if (mode === "center") {
-      nextTop = currentTop
-        + ((elementRect.top + (elementRect.height / 2)
-          - (containerRect.top + (containerRect.height / 2))) / scrollScale);
-    } else {
-      const topLimit = containerRect.top + padTop;
-      const bottomLimit = containerRect.bottom - padBottom;
-      if (elementRect.top < topLimit) {
-        nextTop = currentTop + ((elementRect.top - topLimit) / scrollScale);
-      } else if (elementRect.bottom > bottomLimit) {
-        nextTop = currentTop + ((elementRect.bottom - bottomLimit) / scrollScale);
-      } else {
-        return;
-      }
-    }
-
-    const maxTop = Math.max(0, Number(container.scrollHeight || 0) - Number(container.clientHeight || 0));
-    const clampedTop = Math.max(0, Math.min(maxTop, Math.round(nextTop)));
-    if (Math.abs(clampedTop - currentTop) < 1) {
-      return;
-    }
-
-    if (typeof container.scrollTo === "function") {
-      container.scrollTo({ top: clampedTop, behavior });
-    } else {
-      container.scrollTop = clampedTop;
-    }
-  }
-
-  function getSelectedTemplateIndexSet() {
-    if (!(state.selectedTemplateIndexes instanceof Set)) {
-      state.selectedTemplateIndexes = new Set(Array.isArray(state.selectedTemplateIndexes)
-        ? state.selectedTemplateIndexes.map(String)
-        : []);
-    }
-    return state.selectedTemplateIndexes;
-  }
-
-  function getSortedSelectedTemplateIndexes() {
-    return Array.from(getSelectedTemplateIndexSet())
-      .map((value) => String(value || "").trim())
-      .filter((value) => /^\d+$/.test(value))
-      .sort((left, right) => Number(left) - Number(right));
-  }
-
-  function updateTemplateCopySelectedButton() {
-    if (!els.templateCopySelectedBtn) {
-      return;
-    }
-    const count = getSelectedTemplateIndexSet().size;
-    els.templateCopySelectedBtn.textContent = `Copy Selected (${count})`;
-    els.templateCopySelectedBtn.disabled = count === 0;
-  }
-
-  function syncRenderedTemplateSelection() {
-    if (!els.templatePreviewOutput) {
-      updateTemplateCopySelectedButton();
-      return;
-    }
-    const selectedIndexes = getSelectedTemplateIndexSet();
-    for (const block of Array.from(els.templatePreviewOutput.querySelectorAll(".template-block[data-template-index]"))) {
-      const indexText = String(block.getAttribute("data-template-index") || "");
-      const selected = selectedIndexes.has(indexText);
-      block.classList.toggle("selected", selected);
-      block.setAttribute("aria-selected", selected ? "true" : "false");
-    }
-    updateTemplateCopySelectedButton();
-  }
-
-  function clearTemplateBlockSelection() {
-    getSelectedTemplateIndexSet().clear();
-    state.selectedTemplateIndex = "";
-    state.templateSelectionAnchorIndex = "";
-    syncRenderedTemplateSelection();
-  }
-
-  function pruneTemplateBlockSelection(itemCount) {
-    const total = Math.max(0, Number(itemCount) || 0);
-    const selectedIndexes = getSelectedTemplateIndexSet();
-    const primary = String(state.selectedTemplateIndex || "").trim();
-    if (!selectedIndexes.size && /^\d+$/.test(primary) && Number(primary) < total) {
-      selectedIndexes.add(primary);
-    }
-    for (const indexText of Array.from(selectedIndexes)) {
-      if (!/^\d+$/.test(indexText) || Number(indexText) < 0 || Number(indexText) >= total) {
-        selectedIndexes.delete(indexText);
-      }
-    }
-    if (!selectedIndexes.has(primary)) {
-      state.selectedTemplateIndex = getSortedSelectedTemplateIndexes()[0] || "";
-    }
-    const anchor = String(state.templateSelectionAnchorIndex || "").trim();
-    if (!/^\d+$/.test(anchor) || Number(anchor) < 0 || Number(anchor) >= total) {
-      state.templateSelectionAnchorIndex = "";
-    }
-    syncRenderedTemplateSelection();
-  }
-
-  function chooseNearestSelectedTemplateIndex(targetIndex) {
-    const target = Number(targetIndex);
-    const indexes = getSortedSelectedTemplateIndexes();
-    indexes.sort((left, right) => {
-      const leftDistance = Math.abs(Number(left) - target);
-      const rightDistance = Math.abs(Number(right) - target);
-      return leftDistance === rightDistance ? Number(left) - Number(right) : leftDistance - rightDistance;
-    });
-    return indexes[0] || "";
-  }
-
-  function updateTemplateBlockSelection(index, options) {
-    if (!els.templatePreviewOutput) {
-      return false;
-    }
-    const opts = options && typeof options === "object" ? options : {};
-    const normalized = String(index === undefined || index === null ? "" : index).trim();
-    if (!/^\d+$/.test(normalized)) {
-      return false;
-    }
-    const targetIndex = Number(normalized);
-    const selectedIndexes = getSelectedTemplateIndexSet();
-    const event = opts.event && typeof opts.event === "object" ? opts.event : null;
-    const useInteractionModifiers = opts.interactionMode === "event";
-    const additive = useInteractionModifiers && Boolean(event && (event.ctrlKey || event.metaKey));
-    const ranged = useInteractionModifiers && Boolean(event && event.shiftKey);
-
-    if (ranged) {
-      const primary = String(state.selectedTemplateIndex || "").trim();
-      const anchorText = /^\d+$/.test(String(state.templateSelectionAnchorIndex || ""))
-        ? String(state.templateSelectionAnchorIndex)
-        : (/^\d+$/.test(primary) ? primary : normalized);
-      const anchorIndex = Number(anchorText);
-      if (!additive) {
-        selectedIndexes.clear();
-      }
-      const start = Math.min(anchorIndex, targetIndex);
-      const end = Math.max(anchorIndex, targetIndex);
-      for (let current = start; current <= end; current += 1) {
-        selectedIndexes.add(String(current));
-      }
-      state.selectedTemplateIndex = normalized;
-      state.templateSelectionAnchorIndex = anchorText;
-    } else if (additive) {
-      if (selectedIndexes.has(normalized)) {
-        selectedIndexes.delete(normalized);
-        if (state.selectedTemplateIndex === normalized) {
-          state.selectedTemplateIndex = chooseNearestSelectedTemplateIndex(targetIndex);
-        }
-      } else {
-        selectedIndexes.add(normalized);
-        state.selectedTemplateIndex = normalized;
-      }
-      state.templateSelectionAnchorIndex = normalized;
-    } else {
-      selectedIndexes.clear();
-      selectedIndexes.add(normalized);
-      state.selectedTemplateIndex = normalized;
-      state.templateSelectionAnchorIndex = normalized;
-    }
-
-    const shouldEnsure = opts.ensure !== false;
-    let next = els.templatePreviewOutput.querySelector(
-      `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`
-    );
-    if (!next && shouldEnsure && typeof ensureTemplateWindowContainsIndex === "function") {
-      ensureTemplateWindowContainsIndex(targetIndex);
-      next = els.templatePreviewOutput.querySelector(
-        `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`
-      );
-    }
-    syncRenderedTemplateSelection();
-
-    if (next && opts.scroll !== false) {
-      const scrollMode = String(opts.scrollMode || "start").toLowerCase();
-      const virtual = typeof getTemplateVirtualStateForGutter === "function"
-        ? getTemplateVirtualStateForGutter()
-        : null;
-      if (scrollMode === "start" && virtual && virtual.isInitialized && typeof alignVirtualTargetAfterRender === "function") {
-        alignVirtualTargetAfterRender(
-          els.templatePreviewOutput,
-          virtual,
-          `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`,
-          next
-        );
-      } else {
-        scrollElementInContainer(els.templatePreviewOutput, next, { mode: scrollMode, padTop: 10, padBottom: 10 });
-      }
-    }
-    return true;
-  }
-
-  function selectTemplateBlockFromInteraction(index, event) {
-    return updateTemplateBlockSelection(index, {
-      interactionMode: "event",
-      event,
-      scroll: false,
-      ensure: false
-    });
-  }
-
-  function setSelectedDeclRow(declKey) {
-    const key = String(declKey || "").trim();
-    if (!key || !els.declDescTable) {
-      return;
-    }
-
-    if (state.selectedDeclKey) {
-      const prev = els.declDescTable.querySelector(`tr[data-decl-key="${escapeSelectorValue(state.selectedDeclKey)}"]`);
-      if (prev) {
-        prev.classList.remove("desc-selected");
-      }
-    }
-
-    state.selectedDeclKey = key;
-    const next = els.declDescTable.querySelector(`tr[data-decl-key="${escapeSelectorValue(key)}"]`);
-    if (next) {
-      next.classList.add("desc-selected");
-      scrollElementInContainer(els.declDescPanel, next, { mode: "nearest", padTop: 8, padBottom: 8 });
-    }
-  }
-
-  function countInputLines(value) {
-    const text = String(value || "");
-    if (!text) {
-      return 1;
-    }
-    return text.split("\n").length;
-  }
-
-  function computeInputGutterTargetsForDescriptions() {
-    const targets = new Map();
-    if (!els.declDescTable) {
-      return targets;
-    }
-
-
-    const rows = els.declDescTable.querySelectorAll("tr[data-decl-key][data-line-start]");
-    for (const row of Array.from(rows)) {
-      const line = Number(row.getAttribute("data-line-start")) || 0;
-      const declKey = String(row.getAttribute("data-decl-key") || "");
-      if (!line || !declKey || targets.has(line)) {
-        continue;
-      }
-      targets.set(line, { kind: "descriptions", declKey });
-    }
-
-    return targets;
-  }
-
-  function refreshInputGutterTargets() {
-    if (!els.inputGutterContent || !state.inputGutterButtonsByLine.size) {
-      return;
-    }
-
-    if (state.inputMode !== "abap") {
-      state.inputGutterTargetsByLine = new Map();
-      for (const btn of state.inputGutterButtonsByLine.values()) {
-        btn.hidden = true;
-      }
-      return;
-    }
-
-    let targets = new Map();
-    if (state.rightTab === "descriptions") {
-      targets = computeInputGutterTargetsForDescriptions();
-    } else if (state.rightTab === "template") {
-      targets = computeInputGutterTargetsForTemplate();
-    }
-
-    state.inputGutterTargetsByLine = targets;
-    const title = state.rightTab === "descriptions"
-      ? "Jump to Data"
-      : (state.rightTab === "template" ? "Jump to Template" : "");
-    for (const [line, btn] of state.inputGutterButtonsByLine.entries()) {
-      const target = targets.get(line);
-      btn.hidden = !target;
-      if (target) {
-        btn.title = title;
-        btn.setAttribute("aria-label", title);
-      }
-    }
-  }
-
-  function onInputGutterClick(ev) {
-    const target = ev && ev.target && typeof ev.target.closest === "function"
-      ? ev.target.closest("button.gutter-jump")
-      : null;
-    if (!target) {
-      return;
-    }
-
-    const line = Number(target.getAttribute("data-line")) || 0;
-    if (!line) {
-      return;
-    }
-
-    const jumpTarget = state.inputGutterTargetsByLine.get(line);
-    if (!jumpTarget) {
-      return;
-    }
-
-    if (state.rightTab === "template" && jumpTarget.kind === "template") {
-      setSelectedTemplateBlock(jumpTarget.index, { scroll: true, scrollMode: "start" });
-      return;
-    }
-
-    if (state.rightTab === "descriptions" && jumpTarget.kind === "descriptions") {
-      setSelectedDeclRow(jumpTarget.declKey);
-    }
-  }
-
-  function openJsonModal(value) {
-    openTextModal("Object JSON", safeJson(value, true));
-  }
-
-  function openTextModal(title, text) {
-    if (!els.editModal.hidden) {
-      closeEditModal();
-    }
-
-    if (els.jsonTitle) {
-      els.jsonTitle.textContent = title ? String(title) : "";
-    }
-
-    els.jsonPre.textContent = text ? String(text) : "";
-    els.jsonModal.hidden = false;
-  }
-
-  function closeJsonModal() {
-    els.jsonModal.hidden = true;
-    if (els.jsonTitle) {
-      els.jsonTitle.textContent = "Object JSON";
-    }
-    els.jsonPre.textContent = "";
-  }
-
-  async function copyJsonToClipboard() {
-    const text = els.jsonPre.textContent || "";
-    if (!text) {
-      return;
-    }
-
-    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
-      await navigator.clipboard.writeText(text);
-      return;
-    }
-
-    const selection = window.getSelection();
-    if (!selection) {
-      return;
-    }
-    selection.removeAllRanges();
-    const range = document.createRange();
-    range.selectNodeContents(els.jsonPre);
-    selection.addRange(range);
-    document.execCommand("copy");
-    selection.removeAllRanges();
-  }
-
-  function stringifyDecl(decl) {
-    if (!decl || typeof decl !== "object") {
-      return "";
-    }
-
-    const techName = getDeclTechName(decl);
-    const displayName = getDeclDisplayName(decl);
-
-    const parts = [];
-    if (decl.objectType) {
-      parts.push(String(decl.objectType));
-    }
-    if (decl.scopeLabel) {
-      parts.push(`[${String(decl.scopeLabel)}]`);
-    }
-    if (displayName) {
-      parts.push(displayName);
-    }
-    if (techName && displayName && techName !== displayName) {
-      parts.push(`(${techName})`);
-    }
-    if (decl.file) {
-      parts.push(String(decl.file));
-    }
-    if (decl.lineStart) {
-      parts.push(`#${decl.lineStart}`);
-    }
-    return parts.join(" ");
-  }
-
-  function getDeclTechName(decl) {
-    if (!decl || typeof decl !== "object") {
-      return "";
-    }
-    return decl.name ? String(decl.name) : "";
-  }
-
-  function stripAngleBrackets(text) {
-    const trimmed = String(text || "").trim();
-    if (trimmed.startsWith("<") && trimmed.endsWith(">") && trimmed.length > 2) {
-      return trimmed.slice(1, -1);
-    }
-    return trimmed;
-  }
-
-  function stripDeclCategoryPrefix(text) {
-    const raw = String(text || "").trim();
-    if (!raw) {
-      return "";
-    }
-
-    const match = raw.match(
-      /^\s*(HẰNG|HANG|STRUCT|TABLE|RANGETABLE|BIẾN|BIEN|CỜ|CO|FIELDSYMBOL)\b\s*[:\-\[\]]*\s*/i
-    );
-    if (!match) {
-      return raw;
-    }
-
-    let rest = raw.slice(match[0].length).trim();
-    // If the prefix included an opening "[" (e.g. "BIẾN:[") then strip ONE trailing "]" (e.g. "...]")
-    // so "BIẾN:[desc]" -> "desc" instead of "desc]".
-    if (match[0].includes("[") && rest.endsWith("]")) {
-      rest = rest.slice(0, -1).trim();
-    }
-    return rest;
-  }
-
-  function isStructFieldDecl(decl) {
-    if (!decl || typeof decl !== "object") {
-      return false;
-    }
-    if (decl.objectType === "STRUCT_FIELD") {
+    if (target.closest("input, textarea, select")) {
       return true;
     }
-    return Boolean(decl.structName && decl.fieldPath);
+    if (target.isContentEditable) {
+      return true;
+    }
+    const editableAncestor = target.closest("[contenteditable]");
+    return Boolean(
+      editableAncestor
+      && String(editableAncestor.getAttribute("contenteditable") || "").toLowerCase() !== "false"
+    );
   }
 
-  function getDeclDisplayName(decl) {
-    const techName = getDeclTechName(decl);
-    if (!techName) {
-      return "";
-    }
 
-    if (isStructFieldDecl(decl)) {
-      return techName;
-    }
 
-    const desc = getEffectiveDeclDesc(decl);
-    const descTrimmed = String(desc || "").trim();
-    if (!descTrimmed) {
-      return techName;
-    }
-
-    const settings = state.settings || DEFAULT_SETTINGS;
-    if (settings.normalizeDeclDesc) {
-      return descTrimmed;
-    }
-
-    const bare = stripAngleBrackets(techName);
-    if (bare.length < 3) {
-      return techName;
-    }
-
-    const code = bare.slice(1, 3).toUpperCase();
-    const templates = settings.nameTemplatesByCode || DEFAULT_SETTINGS.nameTemplatesByCode;
-    const template = templates && Object.prototype.hasOwnProperty.call(templates, code) ? String(templates[code] || "") : "";
-    if (!template.trim()) {
-      return techName;
-    }
-
-    const strippedKnownPrefix = stripDeclCategoryPrefix(descTrimmed);
-    const normalizedDesc = stripDeclTemplateAffixes(strippedKnownPrefix, template);
-    const displayName = template.replace(/\{\{desc\}\}/g, normalizedDesc).trim();
-    return displayName || techName;
-  }
-
-  function buildDeclTitle(decl) {
-    if (!decl || typeof decl !== "object") {
-      return "";
-    }
-
-    const lines = [];
-    lines.push(stringifyDecl(decl));
-
-    const desc = getEffectiveDeclDesc(decl);
-    if (desc) {
-      lines.push(`Desc: ${desc}`);
-    }
-
-    if (decl.raw) {
-      lines.push(String(decl.raw));
-    }
-
-    return lines.filter(Boolean).join("\n");
-  }
-
-  function el(tag, options) {
-    const node = document.createElement(tag);
-    if (options && options.className) {
-      node.className = options.className;
-    }
-    if (options && options.text !== undefined) {
-      node.textContent = options.text;
-    }
-    if (options && options.attrs) {
-      for (const [key, value] of Object.entries(options.attrs)) {
-        node.setAttribute(key, String(value));
-      }
-    }
-    return node;
-  }
-
-  function renderMeta(obj) {
-    const parts = [];
-    if (obj.file) {
-      parts.push(String(obj.file));
-    }
-    if (obj.lineStart) {
-      parts.push(`line ${obj.lineStart}`);
-    }
-    if (obj.block && obj.block.lineEnd) {
-      parts.push(`end ${obj.block.lineEnd}`);
-    }
-    if (obj.id !== undefined && obj.id !== null) {
-      parts.push(`#${obj.id}`);
-    }
-    return parts.join(" • ");
-  }
-
-  function getObjectLabel(obj) {
-    for (const key of ["name", "target", "form"]) {
-      const value = getFirstValueFromValues(obj.values, key);
-      if (value) {
-        return value;
-      }
-    }
-
-    if (obj.extras && obj.extras.callFunction && obj.extras.callFunction.name) {
-      return String(obj.extras.callFunction.name);
-    }
-    if (obj.extras && obj.extras.callMethod && obj.extras.callMethod.target) {
-      return String(obj.extras.callMethod.target);
-    }
-    if (obj.extras && obj.extras.performCall && obj.extras.performCall.form) {
-      return String(obj.extras.performCall.form);
-    }
-    if (obj.extras && obj.extras.form && obj.extras.form.name) {
-      return String(obj.extras.form.name);
-    }
-    if (obj.extras && obj.extras.methodSignature && obj.extras.methodSignature.name) {
-      return String(obj.extras.methodSignature.name);
-    }
-
-    return "";
-  }
-
-  function normalizeParsedJson(json) {
-    if (Array.isArray(json)) {
-      return { file: "", objects: json, decls: [] };
-    }
-    if (json && typeof json === "object" && Array.isArray(json.objects)) {
-      return {
-        file: String(json.file || ""),
-        objects: json.objects,
-        decls: Array.isArray(json.decls) ? json.decls : []
-      };
-    }
-    return null;
-  }
-
-  function getTemplateVirtualStateForGutter() {
-    if (!state.templateVirtual || typeof state.templateVirtual !== "object") {
-      state.templateVirtual = {
-        items: [],
-        itemCount: 0,
-        start: 0,
-        end: 0,
-        lastScrollTop: 0,
-        scrollDir: "down",
-        pendingRaf: 0,
-        isAdjustingScroll: false,
-        avgItemHeight: 140,
-        unknownItemHeight: 140,
-        estimateCalibrated: false,
-        adjustmentRaf: 0,
-        adjustmentGeneration: 0,
-        needsScrollSync: false,
-        isRenderTransaction: false,
-        geometryEpoch: 0,
-        lineTargetMap: new Map(),
-        isInitialized: false
-      };
-    }
-    if (!(state.templateVirtual.lineTargetMap instanceof Map)) {
-      state.templateVirtual.lineTargetMap = new Map();
-    }
-    ensureVirtualControlState(state.templateVirtual, 140);
-    return state.templateVirtual;
-  }
-
-  function ensureVirtualControlState(virtual, defaultEstimate) {
-    const fallback = Math.max(1, Number(defaultEstimate) || 1);
-    if (!Number.isFinite(Number(virtual.unknownItemHeight)) || Number(virtual.unknownItemHeight) <= 0) {
-      virtual.unknownItemHeight = fallback;
-    }
-    if (typeof virtual.estimateCalibrated !== "boolean") {
-      virtual.estimateCalibrated = false;
-    }
-    if (!Number.isFinite(Number(virtual.adjustmentRaf))) {
-      virtual.adjustmentRaf = 0;
-    }
-    if (!Number.isFinite(Number(virtual.adjustmentGeneration))) {
-      virtual.adjustmentGeneration = 0;
-    }
-    if (typeof virtual.needsScrollSync !== "boolean") {
-      virtual.needsScrollSync = false;
-    }
-    if (typeof virtual.isRenderTransaction !== "boolean") {
-      virtual.isRenderTransaction = false;
-    }
-    if (!Number.isFinite(Number(virtual.geometryEpoch))) {
-      virtual.geometryEpoch = 0;
-    }
-  }
-
-  function getInputGutterVirtualState() {
-    if (!state.inputGutterVirtual || typeof state.inputGutterVirtual !== "object") {
-      state.inputGutterVirtual = {
-        lineCount: 0,
-        startLine: 1,
-        endLine: 1,
-        lineHeightPx: 18,
-        topPadPx: 0,
-        bottomPadPx: 0,
-        pendingRaf: 0,
-        lastScrollTop: 0,
-        overscanLines: 6,
-        isInitialized: false
-      };
-    }
-    return state.inputGutterVirtual;
-  }
-
-  function cancelVirtualScrollAdjustment(virtual) {
-    if (!virtual || typeof virtual !== "object") {
+  function addVirtualUserIntentListenersMain(container, handler) {
+    if (!container || typeof handler !== "function") {
       return;
     }
-    ensureVirtualControlState(virtual, 140);
-    virtual.adjustmentGeneration = (Number(virtual.adjustmentGeneration) || 0) + 1;
-    if (virtual.adjustmentRaf) {
-      cancelAnimationFrame(virtual.adjustmentRaf);
-      virtual.adjustmentRaf = 0;
+    const passiveCapture = { passive: true, capture: true };
+    for (const eventName of ["wheel", "pointerdown", "touchstart"]) {
+      container.addEventListener(eventName, handler, passiveCapture);
     }
-    virtual.isAdjustingScroll = false;
-  }
-
-  function beginVirtualScrollAdjustment(virtual) {
-    if (!virtual || typeof virtual !== "object") {
-      return 0;
-    }
-    cancelVirtualScrollAdjustment(virtual);
-    if (virtual.pendingRaf) {
-      cancelAnimationFrame(virtual.pendingRaf);
-      virtual.pendingRaf = 0;
-    }
-    virtual.needsScrollSync = false;
-    virtual.isAdjustingScroll = true;
-    return Number(virtual.adjustmentGeneration) || 0;
-  }
-
-  function queueVirtualScrollSync(container, virtual) {
-    if (!virtual || typeof virtual !== "object") {
-      return;
-    }
-    virtual.needsScrollSync = true;
-    if (virtual.isAdjustingScroll || virtual.isRenderTransaction) {
-      return;
-    }
-    if (container === els.templatePreviewOutput && typeof scheduleTemplateVirtualScroll === "function") {
-      scheduleTemplateVirtualScroll();
-    }
-  }
-
-  function finishVirtualScrollAdjustment(container, virtual, generation) {
-    if (!virtual || Number(virtual.adjustmentGeneration) !== Number(generation)) {
-      return;
-    }
-    virtual.adjustmentRaf = 0;
-    virtual.lastScrollTop = Number(container && container.scrollTop) || 0;
-    virtual.isAdjustingScroll = false;
-    if (virtual.needsScrollSync) {
-      queueVirtualScrollSync(container, virtual);
-    }
-  }
-
-  function alignVirtualTargetAfterRender(container, virtual, selector, initialNode) {
-    if (!container || !virtual) {
-      return;
-    }
-    const generation = beginVirtualScrollAdjustment(virtual);
-
-    const align = () => {
-      if (Number(virtual.adjustmentGeneration) !== generation || !virtual.isAdjustingScroll) {
-        return true;
-      }
-      const node = selector ? container.querySelector(selector) : initialNode;
-      if (!node) {
-        return true;
-      }
-      const offsetError = node.getBoundingClientRect().top - container.getBoundingClientRect().top - 10;
-      if (Math.abs(offsetError) <= 1) {
-        return true;
-      }
-      scrollElementInContainer(container, node, { mode: "start", padTop: 10, padBottom: 10 });
-      return false;
-    };
-
-    const scheduleAdjustmentFrame = (callback) => {
-      virtual.adjustmentRaf = requestAnimationFrame(() => {
-        virtual.adjustmentRaf = 0;
-        if (Number(virtual.adjustmentGeneration) !== generation || !virtual.isAdjustingScroll) {
-          return;
-        }
-        callback();
-      });
-    };
-
-    align();
-    const settle = (remainingFrames) => {
-      const isSettled = align();
-      if (!isSettled && remainingFrames > 0) {
-        scheduleAdjustmentFrame(() => settle(remainingFrames - 1));
+    container.addEventListener("keydown", (ev) => {
+      if (!isVirtualScrollKeyMain(ev) || isEditableVirtualScrollTargetMain(ev.target)) {
         return;
       }
-      scheduleAdjustmentFrame(() => finishVirtualScrollAdjustment(container, virtual, generation));
-    };
-    scheduleAdjustmentFrame(() => settle(4));
+      handler(ev);
+    }, { capture: true });
   }
 
-  function setSelectedTemplateBlock(index, options) {
-    return updateTemplateBlockSelection(index, {
-      ...(options && typeof options === "object" ? options : {}),
-      interactionMode: "replace"
+
+
+  function scheduleVirtualGeometryRefreshMain() {
+    if (virtualGeometryRefreshFrameMain || typeof requestAnimationFrame !== "function") {
+      return;
+    }
+    virtualGeometryRefreshFrameMain = requestAnimationFrame(() => {
+      virtualGeometryRefreshFrameMain = 0;
+      if (!state.data || !Array.isArray(state.renderObjects) || !state.renderObjects.length) {
+        return;
+      }
+      if (
+        state.rightTab === "template"
+        && els.templatePreviewPanel
+        && !els.templatePreviewPanel.hidden
+        && typeof renderTemplatePreview === "function"
+      ) {
+        renderTemplatePreview();
+      }
     });
   }
 
-  function measureInputLineMetrics() {
-    const fallback = {
-      lineCount: Math.max(1, Number(state.inputLineCount) || 1),
-      nominalPitch: 18,
-      effectivePitch: 18,
-      paddingTop: 0,
-      paddingBottom: 0
-    };
-    if (!els.inputText) {
-      return fallback;
+
+
+  function init() {
+    renderBuildInfo();
+    state.descOverrides = loadDescOverrides();
+    state.descOverridesLegacy = loadLegacyDescOverrides();
+    state.settings = loadSettings();
+    state.templateConfig = loadTemplateConfig();
+    if (!state.templateConfig || typeof state.templateConfig !== "object" || Array.isArray(state.templateConfig)) {
+      state.templateConfig = getDefaultTemplateConfig();
+    }
+    const templateLegacyFieldsChanged = normalizeTemplateConfigLegacyFieldsInPlace(state.templateConfig);
+    const templateDefaultsAdded = mergeMissingDefaultTemplatesInPlace(state.templateConfig);
+    const templateConfigChanged = templateLegacyFieldsChanged || templateDefaultsAdded;
+    if (templateConfigChanged) {
+      try {
+        localStorage.setItem(
+          TEMPLATE_CONFIG_STORAGE_KEY_V1,
+          JSON.stringify(state.templateConfig)
+        );
+      } catch {
+        // ignore
+      }
+    }
+    state.templatePreviewCache = null;
+    applyTheme(loadTheme(), { save: false });
+    initLayoutSplitter();
+
+    if (els.templateKeyMode) {
+      els.templateKeyMode.textContent = "AUTO: objectType -> DEFAULT";
+    }
+    syncTemplateEditorFromState();
+    setTemplateConfigError("");
+
+    if (els.inputText && !els.inputText.value.trim()) {
+      els.inputText.value = SAMPLE_ABAP;
     }
 
-    const lineCount = Math.max(1, Number(state.inputLineCount) || countInputLines(els.inputText.value || ""));
-    let nominalPitch = 18;
-    let paddingTop = 0;
-    let paddingBottom = 0;
-    try {
-      const style = window.getComputedStyle(els.inputText);
-      nominalPitch = Number.parseFloat(style && style.lineHeight ? style.lineHeight : "18") || 18;
-      paddingTop = Number.parseFloat(style && style.paddingTop ? style.paddingTop : "0") || 0;
-      paddingBottom = Number.parseFloat(style && style.paddingBottom ? style.paddingBottom : "0") || 0;
-    } catch {
-      // ignore
-    }
-    nominalPitch = Math.max(12, nominalPitch);
+    rebuildInputGutter();
+    initInputGotoLineControls();
+    initTemplateGuiFilterControls();
 
-    let effectivePitch = nominalPitch;
-    const scrollHeight = Math.max(0, Number(els.inputText.scrollHeight) || 0);
-    const clientHeight = Math.max(0, Number(els.inputText.clientHeight) || 0);
-    const contentHeight = scrollHeight - paddingTop - paddingBottom;
-    const measuredPitch = lineCount > 0 ? (contentHeight / lineCount) : 0;
-    const minPitch = nominalPitch * 0.9;
-    const maxPitch = nominalPitch * 1.1;
-    if (
-      lineCount > 1
-      && scrollHeight > (clientHeight + 1)
-      && Number.isFinite(measuredPitch)
-      && measuredPitch >= minPitch
-      && measuredPitch <= maxPitch
-    ) {
-      effectivePitch = measuredPitch;
+    if (els.inputText) {
+      els.inputText.addEventListener("input", rebuildInputGutter);
+      els.inputText.addEventListener("scroll", syncInputGutterScroll);
+    }
+    if (typeof window !== "undefined") {
+      if (typeof syncInputGutterScroll === "function") {
+        window.addEventListener("resize", syncInputGutterScroll, { passive: true });
+      }
+      window.addEventListener("resize", scheduleVirtualGeometryRefreshMain, { passive: true });
+      window.addEventListener("abap-viewer-layout-resize", scheduleVirtualGeometryRefreshMain);
+      if (window.visualViewport && typeof window.visualViewport.addEventListener === "function") {
+        if (typeof syncInputGutterScroll === "function") {
+          window.visualViewport.addEventListener("resize", syncInputGutterScroll, { passive: true });
+        }
+        window.visualViewport.addEventListener("resize", scheduleVirtualGeometryRefreshMain, { passive: true });
+      }
+    }
+    if (els.templatePreviewOutput && typeof handleTemplateVirtualScroll === "function") {
+      els.templatePreviewOutput.addEventListener("scroll", handleTemplateVirtualScroll, { passive: true });
+    }
+    if (els.templatePreviewOutput && typeof handleTemplateVirtualUserIntent === "function") {
+      addVirtualUserIntentListenersMain(els.templatePreviewOutput, handleTemplateVirtualUserIntent);
+    }
+    if (els.templatePreviewOutput) {
+      els.templatePreviewOutput.addEventListener("click", interceptTemplateCodeButtonClick, true);
     }
 
-    return {
-      lineCount,
-      nominalPitch,
-      effectivePitch,
-      paddingTop,
-      paddingBottom
-    };
-  }
-
-  function scheduleInputGutterVirtualRender() {
-    const virtual = getInputGutterVirtualState();
-    if (virtual.pendingRaf) {
-      return;
+    if (els.inputGutter) {
+      els.inputGutter.addEventListener("click", onInputGutterClick);
+      els.inputGutter.addEventListener("wheel", (ev) => {
+        if (!els.inputText) {
+          return;
+        }
+        els.inputText.scrollTop += ev.deltaY;
+        syncInputGutterScroll();
+        ev.preventDefault();
+      }, { passive: false });
     }
-    virtual.pendingRaf = requestAnimationFrame(() => {
-      virtual.pendingRaf = 0;
-      renderInputGutterWindow({ force: false });
+
+    if (els.themeToggle) {
+      els.themeToggle.addEventListener("change", () => {
+        applyTheme(els.themeToggle.checked ? "dark" : "light");
+      });
+    }
+
+    els.parseBtn.addEventListener("click", () => parseFromTextarea("input.abap"));
+
+    els.descBtn.addEventListener("click", () => {
+      setRightTab("descriptions");
     });
-  }
 
-  function renderInputGutterWindow(options) {
-    if (!els.inputText || !els.inputGutterContent) {
-      return;
-    }
-    const opts = options && typeof options === "object" ? options : {};
-    let force = opts.force === true;
-    const virtual = getInputGutterVirtualState();
-    const lineCount = Math.max(1, Number(state.inputLineCount) || 1);
-    const scrollTop = Number(els.inputText.scrollTop || 0) || 0;
-    const lineMetrics = measureInputLineMetrics();
-    const lineHeight = Math.max(12, Number(lineMetrics.effectivePitch) || 18);
-    if (Math.abs((Number(virtual.lineHeightPx) || 0) - lineHeight) > 0.0001) {
-      force = true;
-    }
-    if (els.inputGutter && els.inputGutter.style) {
-      els.inputGutter.style.setProperty("--input-line-pitch", `${lineHeight}px`);
-    }
-    const visibleLines = Math.max(1, Math.ceil((Number(els.inputText.clientHeight) || 0) / lineHeight));
-    const overscanLines = Math.max(6, Math.ceil(visibleLines * 0.75));
-    const firstVisibleLine = Math.max(1, Math.floor(scrollTop / lineHeight) + 1);
-    const startLine = Math.max(1, firstVisibleLine - overscanLines);
-    const endLine = Math.min(lineCount, startLine + visibleLines + (overscanLines * 2) - 1);
-
-    const hasRangeChange = force
-      || !virtual.isInitialized
-      || startLine !== virtual.startLine
-      || endLine !== virtual.endLine
-      || lineCount !== virtual.lineCount;
-
-    virtual.lineCount = lineCount;
-    virtual.startLine = startLine;
-    virtual.endLine = endLine;
-    virtual.lineHeightPx = lineHeight;
-    virtual.overscanLines = overscanLines;
-    virtual.topPadPx = Math.max(0, (startLine - 1) * lineHeight);
-    virtual.bottomPadPx = Math.max(0, (lineCount - endLine) * lineHeight);
-    virtual.lastScrollTop = scrollTop;
-    virtual.isInitialized = true;
-
-    if (!hasRangeChange) {
-      els.inputGutterContent.style.transform = `translateY(${-scrollTop}px)`;
-      return;
+    if (els.rightTabTemplateBtn) {
+      els.rightTabTemplateBtn.addEventListener("click", () => setRightTab("template"));
     }
 
-    state.inputGutterButtonsByLine = new Map();
-    const frag = document.createDocumentFragment();
-
-    const topSpacer = document.createElement("div");
-    topSpacer.className = "gutter-spacer";
-    topSpacer.style.height = `${virtual.topPadPx}px`;
-    topSpacer.setAttribute("aria-hidden", "true");
-    frag.appendChild(topSpacer);
-
-    for (let line = startLine; line <= endLine; line += 1) {
-      const row = document.createElement("div");
-      row.className = "gutter-line";
-      row.style.height = `${lineHeight}px`;
-
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "gutter-jump";
-      btn.textContent = "↪";
-      btn.hidden = true;
-      btn.setAttribute("data-line", String(line));
-      row.appendChild(btn);
-
-      const num = document.createElement("span");
-      num.className = "gutter-num";
-      num.textContent = String(line);
-      row.appendChild(num);
-
-      state.inputGutterButtonsByLine.set(line, btn);
-      frag.appendChild(row);
+    if (els.rightTabDescBtn) {
+      els.rightTabDescBtn.addEventListener("click", () => setRightTab("descriptions"));
     }
 
-    const bottomSpacer = document.createElement("div");
-    bottomSpacer.className = "gutter-spacer";
-    bottomSpacer.style.height = `${virtual.bottomPadPx}px`;
-    bottomSpacer.setAttribute("aria-hidden", "true");
-    frag.appendChild(bottomSpacer);
-
-    els.inputGutterContent.replaceChildren(frag);
-    els.inputGutterContent.style.transform = `translateY(${-scrollTop}px)`;
-    refreshInputGutterTargets();
-  }
-
-  function syncInputGutterScroll() {
-    scheduleInputGutterVirtualRender();
-  }
-
-  function rebuildInputGutter() {
-    if (!els.inputText || !els.inputGutterContent) {
-      return;
+    if (els.templateCopySelectedBtn) {
+      els.templateCopySelectedBtn.addEventListener("click", (ev) => {
+        if (ev && typeof ev.stopPropagation === "function") {
+          ev.stopPropagation();
+        }
+        copySelectedTemplateBlocks()
+          .then(() => setError(""))
+          .catch((err) => setError(`Copy failed: ${err && err.message ? err.message : err}`));
+      });
     }
 
-    const trimmed = String(els.inputText.value || "").trim();
-    const isJsonLike = (trimmed.startsWith("{") || trimmed.startsWith("[")) && trimmed.length > 1;
-    state.inputMode = isJsonLike ? "json" : "abap";
-    state.inputLineCount = Math.max(1, countInputLines(els.inputText.value || ""));
+    if (els.templateCopyAllBtn) {
+      els.templateCopyAllBtn.addEventListener("click", () => {
+        copyAllTemplateBlocks()
+          .then(() => setError(""))
+          .catch((err) => setError(`Copy failed: ${err && err.message ? err.message : err}`));
+      });
+    }
 
-    const virtual = getInputGutterVirtualState();
-    virtual.lineHeightPx = measureInputLineMetrics().effectivePitch;
-    renderInputGutterWindow({ force: true });
-  }
+    if (els.templateResetBtn) {
+      els.templateResetBtn.addEventListener("click", resetTemplateConfig);
+    }
 
-  function computeInputGutterTargetsForTemplate() {
-    const targets = new Map();
-    const virtual = getTemplateVirtualStateForGutter();
-    if (virtual.lineTargetMap instanceof Map && virtual.lineTargetMap.size) {
-      for (const [line, target] of virtual.lineTargetMap.entries()) {
-        targets.set(line, target);
+    if (els.templateExportBtn) {
+      els.templateExportBtn.addEventListener("click", openViewerConfigExportModal);
+    }
+
+    if (els.templateImportBtn && els.templateImportInput) {
+      els.templateImportBtn.addEventListener("click", () => {
+        els.templateImportInput.click();
+      });
+    }
+
+    if (els.templateImportInput) {
+      els.templateImportInput.addEventListener("change", async (ev) => {
+        const file = ev && ev.target && ev.target.files ? ev.target.files[0] : null;
+        if (!file) {
+          return;
+        }
+        await importViewerConfigFromFile(file);
+        els.templateImportInput.value = "";
+      });
+    }
+
+    if (els.templateApplyBtn) {
+      els.templateApplyBtn.addEventListener("click", openTemplateConfigModal);
+    }
+
+    const templateFilterModalBtn = document.getElementById("templateFilterModalBtn");
+    if (templateFilterModalBtn) {
+      templateFilterModalBtn.addEventListener("click", openTemplateFilterModal);
+    }
+
+    if (els.declDescJsonBtn) {
+      els.declDescJsonBtn.addEventListener("click", () => {
+        openJsonModal({
+          storageKey: DESC_STORAGE_KEY_V2,
+          overrides: state.descOverrides,
+          legacyStorageKey: DESC_STORAGE_KEY_LEGACY_V1,
+          legacyOverrides: state.descOverridesLegacy,
+          registry: window.AbapVarDescriptions || {}
+        });
+      });
+    }
+
+    if (els.declDescSearch) {
+      els.declDescSearch.addEventListener("input", renderDeclDescPanelUi);
+    }
+
+    if (els.declDescMissingOnly) {
+      els.declDescMissingOnly.addEventListener("change", renderDeclDescPanelUi);
+    }
+
+    if (els.settingsBtn) {
+      els.settingsBtn.addEventListener("click", openSettingsModal);
+    }
+
+    if (els.settingsCloseBtn) {
+      els.settingsCloseBtn.addEventListener("click", closeSettingsModal);
+    }
+    if (els.settingsSaveBtn) {
+      els.settingsSaveBtn.addEventListener("click", () => {
+        applySettingsFromModal();
+        closeSettingsModal();
+      });
+    }
+    if (els.settingsResetBtn) {
+      els.settingsResetBtn.addEventListener("click", resetSettingsToDefault);
+    }
+    if (els.settingsModal) {
+      els.settingsModal.addEventListener("click", (ev) => {
+        if (ev.target === els.settingsModal) {
+          closeSettingsModal();
+        }
+      });
+    }
+    els.jsonCloseBtn.addEventListener("click", closeJsonModal);
+    els.jsonModal.addEventListener("click", (ev) => {
+      if (ev.target === els.jsonModal) {
+        closeJsonModal();
       }
-      return targets;
-    }
+    });
+    els.jsonCopyBtn.addEventListener("click", () => {
+      copyJsonToClipboard().catch((err) => setError(err && err.message ? err.message : err));
+    });
 
-    if (!els.templatePreviewOutput) {
-      return targets;
-    }
-
-    const blocks = els.templatePreviewOutput.querySelectorAll(".template-block[data-template-index][data-line-start]");
-    for (const block of Array.from(blocks)) {
-      const line = Number(block.getAttribute("data-line-start")) || 0;
-      const index = String(block.getAttribute("data-template-index") || "");
-      if (!line || !index || targets.has(line)) {
-        continue;
+    els.editCancelBtn.addEventListener("click", closeEditModal);
+    els.editModal.addEventListener("click", (ev) => {
+      if (ev.target === els.editModal) {
+        closeEditModal();
       }
-      targets.set(line, { kind: "template", index });
+    });
+    els.editSaveBtn.addEventListener("click", () => {
+      applyEditModal("save");
+      closeEditModal();
+    });
+    els.editClearBtn.addEventListener("click", () => {
+      applyEditModal("clear");
+      closeEditModal();
+    });
+
+    const onEditKeydown = (ev) => {
+      if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
+        ev.preventDefault();
+        applyEditModal("save");
+        closeEditModal();
+      }
+    };
+
+    els.editDesc.addEventListener("keydown", onEditKeydown);
+    if (els.editStructDesc) {
+      els.editStructDesc.addEventListener("keydown", onEditKeydown);
     }
-    return targets;
+    if (els.editItemDesc) {
+      els.editItemDesc.addEventListener("keydown", onEditKeydown);
+    }
+
+    window.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Escape") {
+        return;
+      }
+
+      if (isTemplateDynamicModalOpen()) {
+        closeTemplateDynamicModal();
+        return;
+      }
+
+      if (!els.editModal.hidden) {
+        closeEditModal();
+        return;
+      }
+
+      if (!els.jsonModal.hidden) {
+        closeJsonModal();
+        return;
+      }
+
+      if (els.settingsModal && !els.settingsModal.hidden) {
+        closeSettingsModal();
+        return;
+      }
+    });
+
+    setRightTab(state.rightTab);
+    parseFromTextarea("sample.abap");
   }
-  runtime.registerService("output", {
-    isValueLikeEntryObject,
-    isAssignmentLikeEntryObject,
-    isConditionClauseLikeObject,
-    attachPathSyntheticDeclAliases,
-    normalizeEntryObjectForPath,
-    walkObjects,
-    computeLineOffsets,
-    getSelectionRangeForLines,
-    selectCodeLines,
-    getContainerScrollScale,
-    scrollElementInContainer,
-    getSelectedTemplateIndexSet,
-    getSortedSelectedTemplateIndexes,
-    updateTemplateCopySelectedButton,
-    syncRenderedTemplateSelection,
-    clearTemplateBlockSelection,
-    pruneTemplateBlockSelection,
-    chooseNearestSelectedTemplateIndex,
-    updateTemplateBlockSelection,
-    selectTemplateBlockFromInteraction,
-    setSelectedDeclRow,
-    countInputLines,
-    computeInputGutterTargetsForDescriptions,
-    refreshInputGutterTargets,
-    onInputGutterClick,
-    openJsonModal,
-    openTextModal,
-    closeJsonModal,
-    copyJsonToClipboard,
-    stringifyDecl,
-    getDeclTechName,
-    stripAngleBrackets,
-    stripDeclCategoryPrefix,
-    isStructFieldDecl,
-    getDeclDisplayName,
-    buildDeclTitle,
-    el,
-    renderMeta,
-    getObjectLabel,
-    normalizeParsedJson,
-    getTemplateVirtualStateForGutter,
-    ensureVirtualControlState,
-    getInputGutterVirtualState,
-    cancelVirtualScrollAdjustment,
-    beginVirtualScrollAdjustment,
-    queueVirtualScrollSync,
-    finishVirtualScrollAdjustment,
-    alignVirtualTargetAfterRender,
-    setSelectedTemplateBlock,
-    measureInputLineMetrics,
-    scheduleInputGutterVirtualRender,
-    renderInputGutterWindow,
-    syncInputGutterScroll,
-    rebuildInputGutter,
-    computeInputGutterTargetsForTemplate
+  const output = runtime.getService("output");
+  const descriptions = runtime.getService("descriptions");
+  const performSources = runtime.getService("performSources");
+  const template = runtime.getService("template");
+  const uiNavigation = runtime.getService("uiNavigation");
+  const parserController = runtime.getService("parserController");
+  runtime.api = {
+    applyTemplateConfigFromEditor: template.applyTemplateConfigFromEditor,
+    buildPerformCallPathRegistry: performSources.buildPerformCallPathRegistry,
+    buildTemplateCollectionCopyPayload: template.buildTemplateCollectionCopyPayload,
+    buildViewerConfigBundle: template.buildViewerConfigBundle,
+    clearTemplateBlockSelection: output.clearTemplateBlockSelection,
+    ensureTemplateWindowContainsIndex: template.ensureTemplateWindowContainsIndex,
+    findDeclSegmentIndex: uiNavigation.findDeclSegmentIndex,
+    getEffectiveDeclDesc: descriptions.getEffectiveDeclDesc,
+    getFinalDeclDesc: descriptions.getFinalDeclDesc,
+    getSegmentRangesForLineText: uiNavigation.getSegmentRangesForLineText,
+    getSelectedTemplateIndexes: output.getSelectedTemplateIndexes,
+    getViewerConfigExportFileName: template.getViewerConfigExportFileName,
+    goToInputLine: uiNavigation.goToInputLine,
+    importViewerConfigObject: template.importViewerConfigObject,
+    init: init,
+    jumpInputToCodeRange: uiNavigation.jumpInputToCodeRange,
+    parseFromTextarea: parserController.parseFromTextarea,
+    renderDeclDescPanelUi: descriptions.renderDeclDescPanelUi,
+    renderTemplatePreview: template.renderTemplatePreview,
+    resolveValueLevelFinalDesc: descriptions.resolveValueLevelFinalDesc,
+    selectPerformSourceCandidate: performSources.selectPerformSourceCandidate,
+    selectTemplateBlockFromInteraction: output.selectTemplateBlockFromInteraction,
+    setRightTab: uiNavigation.setRightTab
+  };
+
+  runtime.registerService("bootstrap", {
+    start,
+    isVirtualScrollKeyMain,
+    isEditableVirtualScrollTargetMain,
+    addVirtualUserIntentListenersMain,
+    scheduleVirtualGeometryRefreshMain,
+    init
   });
 })(window);

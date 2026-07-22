@@ -10,25 +10,76 @@ const {
   loadConfigsFromDisk,
   replaceConfigScriptBlock
 } = require("../scripts/build-viewer-configs.js");
+const { buildNextRuntimeText } = require("../scripts/sync-default-sample.js");
+const {
+  assertSelfContainedInlineHtml,
+  buildInlineViewerHtmlFromSources,
+  loadViewerDom
+} = require("./helpers/viewer-harness");
 
 const repoRoot = path.resolve(__dirname, "..");
 const configBundleRelPath = CONFIG_BUNDLE_REL_PATH;
 const legacyConfigDirPath = path.resolve(repoRoot, LEGACY_CONFIG_DIR_REL_PATH);
+const indexHtmlPath = path.resolve(repoRoot, "viewer", "index.html");
+const inlineHtmlPath = path.resolve(repoRoot, "viewer", "index.inline.html");
+const runtimeStatePath = path.resolve(repoRoot, "viewer", "app", "core", "01-runtime-state.js");
+const samplePath = path.resolve(repoRoot, "examples", "deep_form_demo.abap");
 
-const runtimeBundles = [
-  "shared/abap-parser.js",
-  configBundleRelPath,
-  "viewer/app/01-core.js",
-  "viewer/app/02-descriptions.js",
-  "viewer/app/03-template-preview.js",
-  "viewer/app/04-output-render.js"
+const expectedScriptSrcs = [
+  "../shared/abap-parser.js",
+  "./configs.generated.js",
+  "./variable-descriptions.js",
+  "./app/core/00-service-registry.js",
+  "./app/core/01-runtime-state.js",
+  "./app/output/01-output-render.js",
+  "./app/descriptions/01-normalize-and-desc.js",
+  "./app/perform/01-perform-sources.js",
+  "./app/template/01-path-resolver.js",
+  "./app/ui/01-navigation.js",
+  "./app/parser/01-parser-controller.js",
+  "./app/bootstrap/01-bootstrap.js",
+  "./app.js"
 ];
 
-const forbiddenPatterns = [
-  { pattern: /\b__AbapSourceParts\b/, message: "should not depend on runtime source registries" },
-  { pattern: /\beval\s*\(/, message: "should not use eval" },
-  { pattern: /createElement\(\s*["']script["']\s*\)/, message: "should not inject runtime scripts" },
-  { pattern: /script\.textContent\s*=/, message: "should not build executable scripts from textContent" }
+const expectedStylesheetHrefs = [
+  "./styles/viewer.css"
+];
+
+const expectedServices = [
+  "runtimeState",
+  "output",
+  "descriptions",
+  "performSources",
+  "template",
+  "uiNavigation",
+  "parserController",
+  "bootstrap"
+];
+
+const expectedApiKeys = [
+  "applyTemplateConfigFromEditor",
+  "buildPerformCallPathRegistry",
+  "buildTemplateCollectionCopyPayload",
+  "buildViewerConfigBundle",
+  "clearTemplateBlockSelection",
+  "ensureTemplateWindowContainsIndex",
+  "findDeclSegmentIndex",
+  "getEffectiveDeclDesc",
+  "getFinalDeclDesc",
+  "getSegmentRangesForLineText",
+  "getSelectedTemplateIndexes",
+  "getViewerConfigExportFileName",
+  "goToInputLine",
+  "importViewerConfigObject",
+  "init",
+  "jumpInputToCodeRange",
+  "parseFromTextarea",
+  "renderDeclDescPanelUi",
+  "renderTemplatePreview",
+  "resolveValueLevelFinalDesc",
+  "selectPerformSourceCandidate",
+  "selectTemplateBlockFromInteraction",
+  "setRightTab"
 ];
 
 function readRepoFile(relPath) {
@@ -64,76 +115,116 @@ function assertNoRemoteUrls(html, label) {
   assert.deepStrictEqual(remoteRefs, [], `${label} must stay offline-only. Found remote refs: ${remoteRefs.join(", ")}`);
 }
 
-for (const relPath of runtimeBundles) {
-  assert(fs.existsSync(path.resolve(repoRoot, relPath)), `Missing runtime bundle: ${relPath}`);
-  const text = readRepoFile(relPath);
-  for (const rule of forbiddenPatterns) {
-    assert(!rule.pattern.test(text), `${relPath} ${rule.message}.`);
+function collectTagAttributeValues(html, tagName, attrName) {
+  const values = [];
+  const regex = new RegExp(`<${tagName}\\b[^>]*\\b${attrName}=["']([^"']+)["'][^>]*>`, "gi");
+  let match = regex.exec(html);
+  while (match) {
+    values.push(String(match[1] || "").trim());
+    match = regex.exec(html);
   }
+  return values;
 }
 
-assert(!fs.existsSync(legacyConfigDirPath), "Legacy viewer/configs.generated directory should be removed after consolidating config bundle.");
+async function main() {
+  const removedLegacyFiles = [
+    "viewer/app/01-core.js",
+    "viewer/app/02-descriptions.js",
+    "viewer/app/03-template-preview.js",
+    "viewer/app/04-output-render.js",
+    "viewer/app/05-main.js",
+    "scripts/build-runtime-bundles.js"
+  ];
 
-const indexHtml = readRepoFile("viewer/index.html");
-assert.throws(
-  () => assertNoRemoteUrls('<img src="https://example.invalid/pixel.png">', "synthetic HTML"),
-  /offline-only/,
-  "Offline guard must reject remote src/href attributes on any element."
-);
-assert.throws(
-  () => assertNoRemoteUrls('<style>.x{background:url(//example.invalid/x.png)}</style>', "synthetic CSS"),
-  /offline-only/,
-  "Offline guard must reject remote CSS url() references."
-);
-assertNoRemoteUrls(indexHtml, "viewer/index.html");
-assert.strictEqual(
-  indexHtml,
-  replaceConfigScriptBlock(indexHtml),
-  "viewer/index.html is stale. Run node scripts/build-viewer-configs.js."
-);
+  const sourceFiles = [
+    "shared/abap-parser.js",
+    configBundleRelPath,
+    "viewer/app/core/00-service-registry.js",
+    "viewer/app/core/01-runtime-state.js",
+    "viewer/app/output/01-output-render.js",
+    "viewer/app/descriptions/01-normalize-and-desc.js",
+    "viewer/app/perform/01-perform-sources.js",
+    "viewer/app/template/01-path-resolver.js",
+    "viewer/app/ui/01-navigation.js",
+    "viewer/app/parser/01-parser-controller.js",
+    "viewer/app/bootstrap/01-bootstrap.js",
+    "viewer/app.js"
+  ];
 
-const expectedConfigBundle = buildConfigBundleSource(loadConfigsFromDisk());
-assert.strictEqual(
-  readRepoFile(configBundleRelPath),
-  expectedConfigBundle,
-  "viewer/configs.generated.js is stale. Run node scripts/build-viewer-configs.js."
-);
+  for (const relPath of removedLegacyFiles) {
+    assert(!fs.existsSync(path.resolve(repoRoot, relPath)), `${relPath} should be removed after switching to direct source loading.`);
+  }
 
-assert(
-  !/shared\/abap-parser\/0\d-[^"]+\.js/.test(indexHtml),
-  "viewer/index.html should load the parser bundle, not individual parser source parts."
-);
+  for (const relPath of sourceFiles) {
+    const text = readRepoFile(relPath);
+    assert(!/\b__AbapSourceParts\b/.test(text), `${relPath} should not depend on runtime source registries.`);
+    assert(!/\bAbapViewerModules\b/.test(text), `${relPath} should not depend on legacy AbapViewerModules globals.`);
+    assert(!/\beval\s*\(/.test(text), `${relPath} should not use eval.`);
+  }
 
-assert(
-  !/app\/(?:core|descriptions|template|output)\/0\d-[^"]+\.js/.test(indexHtml),
-  "viewer/index.html should load viewer runtime bundles, not individual source parts."
-);
+  assert(!fs.existsSync(legacyConfigDirPath), "Legacy viewer/configs.generated directory should be removed after consolidating config bundle.");
 
-assert(
-  !/configs\.generated\//.test(indexHtml),
-  "viewer/index.html should not reference legacy per-config generated wrapper files."
-);
-
-assert(
-  /<script src="\.\.\/shared\/abap-parser\.js" defer><\/script>/.test(indexHtml),
-  "viewer/index.html must load the parser runtime bundle."
-);
-
-assert(
-  /<script src="\.\/configs\.generated\.js" defer><\/script>/.test(indexHtml),
-  "viewer/index.html must load the consolidated config runtime bundle."
-);
-
-for (const relPath of [
-  "./app/01-core.js",
-  "./app/02-descriptions.js",
-  "./app/03-template-preview.js",
-  "./app/04-output-render.js"
-]) {
-  assert(
-    indexHtml.includes(`<script src="${relPath}" defer></script>`),
-    `viewer/index.html must load ${relPath}.`
+  const indexHtml = fs.readFileSync(indexHtmlPath, "utf8");
+  assertNoRemoteUrls(indexHtml, "viewer/index.html");
+  assert.strictEqual(
+    indexHtml,
+    replaceConfigScriptBlock(indexHtml),
+    "viewer/index.html is stale. Run node scripts/build-viewer-configs.js."
   );
+  assert.strictEqual(collectTagAttributeValues(indexHtml, "link", "href").join("|"), expectedStylesheetHrefs.join("|"));
+  assert.deepStrictEqual(collectTagAttributeValues(indexHtml, "script", "src"), expectedScriptSrcs);
+  assert(!/app\/0[1-5]-/.test(indexHtml), "viewer/index.html should not reference legacy runtime bundles.");
+  assert(!/configs\.generated\//.test(indexHtml), "viewer/index.html should not reference legacy per-config wrapper files.");
+  assert(!/<style\b/i.test(indexHtml), "viewer/index.html should load external CSS, not inline the app stylesheet.");
+
+  const expectedConfigBundle = buildConfigBundleSource(loadConfigsFromDisk());
+  assert.strictEqual(
+    readRepoFile(configBundleRelPath),
+    expectedConfigBundle,
+    "viewer/configs.generated.js is stale. Run node scripts/build-viewer-configs.js."
+  );
+
+  assert(fs.existsSync(inlineHtmlPath), "viewer/index.inline.html must exist.");
+  const inlineHtml = fs.readFileSync(inlineHtmlPath, "utf8");
+  assertNoRemoteUrls(inlineHtml, "viewer/index.inline.html");
+  assertSelfContainedInlineHtml(inlineHtml);
+  assert.strictEqual(
+    inlineHtml,
+    buildInlineViewerHtmlFromSources(),
+    "viewer/index.inline.html is stale. Rebuild with the known Python runtime."
+  );
+  assert.throws(
+    () => assertSelfContainedInlineHtml('<style>.x{background:url(sprite.svg)}</style>'),
+    /CSS url\(\) assets/,
+    "Inline offline contract must reject local CSS url() assets."
+  );
+  assert.doesNotThrow(
+    () => assertSelfContainedInlineHtml('<style>.x{background:url(data:image/png;base64,AA==)}.y{mask:url(#shape)}</style>'),
+    "Inline offline contract should allow data: and fragment-only CSS url() values."
+  );
+
+  const runtimeText = fs.readFileSync(runtimeStatePath, "utf8");
+  const sampleText = fs.readFileSync(samplePath, "utf8");
+  assert.strictEqual(
+    runtimeText,
+    buildNextRuntimeText(runtimeText, sampleText),
+    "viewer/app/core/01-runtime-state.js SAMPLE_ABAP is stale. Run node scripts/sync-default-sample.js."
+  );
+
+  const dom = await loadViewerDom();
+  try {
+    const runtime = dom.window.AbapViewerRuntime || {};
+    assert.deepStrictEqual(Array.from(runtime.serviceOrder || []), expectedServices);
+    assert.deepStrictEqual(Array.from(Object.keys(runtime.services || {})), expectedServices);
+    assert.deepStrictEqual(Array.from(Object.keys(runtime.api || {})).sort(), expectedApiKeys.slice().sort());
+  } finally {
+    dom.window.close();
+  }
+
+  console.log("runtime-bundle-contracts: ok");
 }
 
-console.log("Runtime bundle contracts passed.");
+main().catch((err) => {
+  console.error(err && err.stack ? err.stack : err);
+  process.exit(1);
+});

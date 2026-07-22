@@ -1,8 +1,8 @@
 "use strict";
-(function registerOutputService(global) {
+(function registerPerformSourcesService(global) {
   const runtime = global.AbapViewerRuntime;
   if (!runtime || typeof runtime.registerService !== "function") {
-    throw new Error("ABAP Viewer service registry missing before output loads.");
+    throw new Error("ABAP Viewer service registry missing before performSources loads.");
   }
   const state = runtime.state;
   const els = runtime.els;
@@ -61,6 +61,61 @@
   const renderSettingsModalUi = runtime.requireServiceMethod("runtimeState", "renderSettingsModalUi");
   const openSettingsModal = runtime.requireServiceMethod("runtimeState", "openSettingsModal");
   const closeSettingsModal = runtime.requireServiceMethod("runtimeState", "closeSettingsModal");
+  const isValueLikeEntryObject = runtime.requireServiceMethod("output", "isValueLikeEntryObject");
+  const isAssignmentLikeEntryObject = runtime.requireServiceMethod("output", "isAssignmentLikeEntryObject");
+  const isConditionClauseLikeObject = runtime.requireServiceMethod("output", "isConditionClauseLikeObject");
+  const attachPathSyntheticDeclAliases = runtime.requireServiceMethod("output", "attachPathSyntheticDeclAliases");
+  const normalizeEntryObjectForPath = runtime.requireServiceMethod("output", "normalizeEntryObjectForPath");
+  const walkObjects = runtime.requireServiceMethod("output", "walkObjects");
+  const computeLineOffsets = runtime.requireServiceMethod("output", "computeLineOffsets");
+  const getSelectionRangeForLines = runtime.requireServiceMethod("output", "getSelectionRangeForLines");
+  const selectCodeLines = runtime.requireServiceMethod("output", "selectCodeLines");
+  const getContainerScrollScale = runtime.requireServiceMethod("output", "getContainerScrollScale");
+  const scrollElementInContainer = runtime.requireServiceMethod("output", "scrollElementInContainer");
+  const getSelectedTemplateIndexSet = runtime.requireServiceMethod("output", "getSelectedTemplateIndexSet");
+  const getSortedSelectedTemplateIndexes = runtime.requireServiceMethod("output", "getSortedSelectedTemplateIndexes");
+  const updateTemplateCopySelectedButton = runtime.requireServiceMethod("output", "updateTemplateCopySelectedButton");
+  const syncRenderedTemplateSelection = runtime.requireServiceMethod("output", "syncRenderedTemplateSelection");
+  const clearTemplateBlockSelection = runtime.requireServiceMethod("output", "clearTemplateBlockSelection");
+  const pruneTemplateBlockSelection = runtime.requireServiceMethod("output", "pruneTemplateBlockSelection");
+  const chooseNearestSelectedTemplateIndex = runtime.requireServiceMethod("output", "chooseNearestSelectedTemplateIndex");
+  const updateTemplateBlockSelection = runtime.requireServiceMethod("output", "updateTemplateBlockSelection");
+  const selectTemplateBlockFromInteraction = runtime.requireServiceMethod("output", "selectTemplateBlockFromInteraction");
+  const setSelectedDeclRow = runtime.requireServiceMethod("output", "setSelectedDeclRow");
+  const countInputLines = runtime.requireServiceMethod("output", "countInputLines");
+  const computeInputGutterTargetsForDescriptions = runtime.requireServiceMethod("output", "computeInputGutterTargetsForDescriptions");
+  const refreshInputGutterTargets = runtime.requireServiceMethod("output", "refreshInputGutterTargets");
+  const onInputGutterClick = runtime.requireServiceMethod("output", "onInputGutterClick");
+  const openJsonModal = runtime.requireServiceMethod("output", "openJsonModal");
+  const openTextModal = runtime.requireServiceMethod("output", "openTextModal");
+  const closeJsonModal = runtime.requireServiceMethod("output", "closeJsonModal");
+  const copyJsonToClipboard = runtime.requireServiceMethod("output", "copyJsonToClipboard");
+  const stringifyDecl = runtime.requireServiceMethod("output", "stringifyDecl");
+  const getDeclTechName = runtime.requireServiceMethod("output", "getDeclTechName");
+  const stripAngleBrackets = runtime.requireServiceMethod("output", "stripAngleBrackets");
+  const stripDeclCategoryPrefix = runtime.requireServiceMethod("output", "stripDeclCategoryPrefix");
+  const isStructFieldDecl = runtime.requireServiceMethod("output", "isStructFieldDecl");
+  const getDeclDisplayName = runtime.requireServiceMethod("output", "getDeclDisplayName");
+  const buildDeclTitle = runtime.requireServiceMethod("output", "buildDeclTitle");
+  const el = runtime.requireServiceMethod("output", "el");
+  const renderMeta = runtime.requireServiceMethod("output", "renderMeta");
+  const getObjectLabel = runtime.requireServiceMethod("output", "getObjectLabel");
+  const normalizeParsedJson = runtime.requireServiceMethod("output", "normalizeParsedJson");
+  const getTemplateVirtualStateForGutter = runtime.requireServiceMethod("output", "getTemplateVirtualStateForGutter");
+  const ensureVirtualControlState = runtime.requireServiceMethod("output", "ensureVirtualControlState");
+  const getInputGutterVirtualState = runtime.requireServiceMethod("output", "getInputGutterVirtualState");
+  const cancelVirtualScrollAdjustment = runtime.requireServiceMethod("output", "cancelVirtualScrollAdjustment");
+  const beginVirtualScrollAdjustment = runtime.requireServiceMethod("output", "beginVirtualScrollAdjustment");
+  const queueVirtualScrollSync = runtime.requireServiceMethod("output", "queueVirtualScrollSync");
+  const finishVirtualScrollAdjustment = runtime.requireServiceMethod("output", "finishVirtualScrollAdjustment");
+  const alignVirtualTargetAfterRender = runtime.requireServiceMethod("output", "alignVirtualTargetAfterRender");
+  const setSelectedTemplateBlock = runtime.requireServiceMethod("output", "setSelectedTemplateBlock");
+  const measureInputLineMetrics = runtime.requireServiceMethod("output", "measureInputLineMetrics");
+  const scheduleInputGutterVirtualRender = runtime.requireServiceMethod("output", "scheduleInputGutterVirtualRender");
+  const renderInputGutterWindow = runtime.requireServiceMethod("output", "renderInputGutterWindow");
+  const syncInputGutterScroll = runtime.requireServiceMethod("output", "syncInputGutterScroll");
+  const rebuildInputGutter = runtime.requireServiceMethod("output", "rebuildInputGutter");
+  const computeInputGutterTargetsForTemplate = runtime.requireServiceMethod("output", "computeInputGutterTargetsForTemplate");
   const collectConditionDeclsFromClauses = runtime.requireServiceMethod("descriptions", "collectConditionDeclsFromClauses");
   const getDeclCodeDesc = runtime.requireServiceMethod("descriptions", "getDeclCodeDesc");
   const renderDeclDescCellLines = runtime.requireServiceMethod("descriptions", "renderDeclDescCellLines");
@@ -140,20 +195,6 @@
   const buildValueLevelDeclReplacementMap = runtime.requireServiceMethod("descriptions", "buildValueLevelDeclReplacementMap");
   const replaceIdentifiersOutsideLiterals = runtime.requireServiceMethod("descriptions", "replaceIdentifiersOutsideLiterals");
   const resolveValueLevelFinalDesc = runtime.requireServiceMethod("descriptions", "resolveValueLevelFinalDesc");
-  const getFormNameFromNode = runtime.requireServiceMethod("performSources", "getFormNameFromNode");
-  const getPerformFormNameFromNode = runtime.requireServiceMethod("performSources", "getPerformFormNameFromNode");
-  const getPerformProgramFromNode = runtime.requireServiceMethod("performSources", "getPerformProgramFromNode");
-  const buildFormsByNameUpperFromRoots = runtime.requireServiceMethod("performSources", "buildFormsByNameUpperFromRoots");
-  const createPerformBindingTools = runtime.requireServiceMethod("performSources", "createPerformBindingTools");
-  const getPerformActualEntryText = runtime.requireServiceMethod("performSources", "getPerformActualEntryText");
-  const buildPerformActualSummary = runtime.requireServiceMethod("performSources", "buildPerformActualSummary");
-  const hashPerformSourceScope = runtime.requireServiceMethod("performSources", "hashPerformSourceScope");
-  const buildPerformSourceScope = runtime.requireServiceMethod("performSources", "buildPerformSourceScope");
-  const buildPerformCallPathRegistry = runtime.requireServiceMethod("performSources", "buildPerformCallPathRegistry");
-  const getPerformSourceControlModel = runtime.requireServiceMethod("performSources", "getPerformSourceControlModel");
-  const selectPerformSourceCandidate = runtime.requireServiceMethod("performSources", "selectPerformSourceCandidate");
-  const createPerformSourceControl = runtime.requireServiceMethod("performSources", "createPerformSourceControl");
-  const buildRenderableObjects = runtime.requireServiceMethod("performSources", "buildRenderableObjects");
   const toInlineCssText = runtime.requireServiceMethod("template", "toInlineCssText");
   const normalizeTemplateColorValue = runtime.requireServiceMethod("template", "normalizeTemplateColorValue");
   const normalizeTemplateBorderValue = runtime.requireServiceMethod("template", "normalizeTemplateBorderValue");
@@ -410,1215 +451,870 @@
   const addVirtualUserIntentListenersMain = runtime.requireServiceMethod("bootstrap", "addVirtualUserIntentListenersMain");
   const scheduleVirtualGeometryRefreshMain = runtime.requireServiceMethod("bootstrap", "scheduleVirtualGeometryRefreshMain");
   const init = runtime.requireServiceMethod("bootstrap", "init");
-function isValueLikeEntryObject(value) {
-    if (!isPlainObjectRecord(value)) {
-      return false;
+var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
+
+
+  function getFormNameFromNode(node) {
+    if (!node || typeof node !== "object") {
+      return "";
     }
-    if (isDeclLikeObject(value) || isAbapStatementObject(value)) {
-      return false;
-    }
-    return (
-      hasValueLevelDescFields(value)
-      || Object.prototype.hasOwnProperty.call(value, "declRef")
-      || Object.prototype.hasOwnProperty.call(value, "value")
-      || Object.prototype.hasOwnProperty.call(value, "name")
-      || Object.prototype.hasOwnProperty.call(value, "label")
-    );
+    const valueName = getFirstValueFromValues(node.values, "name");
+    const extrasName = node.extras && node.extras.form && node.extras.form.name
+      ? String(node.extras.form.name)
+      : "";
+    return String(valueName || extrasName || "").trim();
   }
 
-  function isAssignmentLikeEntryObject(value) {
-    if (!isPlainObjectRecord(value)) {
-      return false;
+
+
+  function getPerformFormNameFromNode(node) {
+    if (!node || typeof node !== "object") {
+      return "";
     }
-    if (isDeclLikeObject(value) || isAbapStatementObject(value)) {
-      return false;
-    }
-    const hasValueSignals = (
-      Object.prototype.hasOwnProperty.call(value, "value")
-      || Object.prototype.hasOwnProperty.call(value, "valueRef")
-      || Object.prototype.hasOwnProperty.call(value, "valueDecl")
-      || Object.prototype.hasOwnProperty.call(value, "originDecls")
-    );
-    if (!hasValueSignals) {
-      return false;
-    }
-    return (
-      Object.prototype.hasOwnProperty.call(value, "name")
-      || Object.prototype.hasOwnProperty.call(value, "value")
-      || Object.prototype.hasOwnProperty.call(value, "valueRef")
-    );
+    const extrasName = node.extras && node.extras.performCall && node.extras.performCall.form
+      ? String(node.extras.performCall.form)
+      : "";
+    const valueName = getFirstValueFromValues(node.values, "form");
+    return String(extrasName || valueName || "").trim();
   }
 
-  function isConditionClauseLikeObject(value) {
-    if (!isPlainObjectRecord(value)) {
-      return false;
+
+
+  function getPerformProgramFromNode(node) {
+    if (!node || typeof node !== "object") {
+      return "";
     }
-    return (
-      Object.prototype.hasOwnProperty.call(value, "leftOperand")
-      || Object.prototype.hasOwnProperty.call(value, "rightOperand")
-      || Object.prototype.hasOwnProperty.call(value, "comparisonOperator")
-    );
+    const extrasProgram = node.extras && node.extras.performCall && node.extras.performCall.program
+      ? String(node.extras.performCall.program)
+      : "";
+    const valueProgram = getFirstValueFromValues(node.values, "program");
+    return String(extrasProgram || valueProgram || "").trim();
   }
 
-  function attachPathSyntheticDeclAliases(value, ownerContext) {
-    if (!value || typeof value !== "object") {
-      return value;
-    }
-    const objectIndex = Number(ownerContext && ownerContext.__abapTemplateObjectIndex) || 0;
-    if (objectIndex <= 0 || typeof attachTemplateSyntheticDeclAliases !== "function") {
-      return value;
-    }
-    for (const key of ["decl", "valueDecl", "leftOperandDecl", "rightOperandDecl"]) {
-      if (value[key] && typeof value[key] === "object") {
-        attachTemplateSyntheticDeclAliases(value[key], objectIndex);
-      }
-    }
-    return value;
-  }
 
-  function normalizeEntryObjectForPath(value, keyHint, pathParts, ownerContext) {
-    if (!isPlainObjectRecord(value)) {
-      return value;
-    }
-    if (isDeclLikeObject(value) || isAbapStatementObject(value)) {
-      return value;
-    }
 
-    const pathKey = buildPathKeyFromParts(pathParts);
-    const pathLower = pathKey.toLowerCase();
-    const inValuesPath = pathLower.includes("/values/");
-    const inExtrasPath = pathLower.includes("/extras/");
-    const keyHintLower = String(keyHint || "").trim().toLowerCase();
-    const extrasItemLike = keyHintLower === "item";
-    const source = getDeclSourceContextFromObject(ownerContext);
-
-    let next = value;
-
-    if (inValuesPath && isValueLikeEntryObject(next)) {
-      next = ensureEntryDeclWithSynthetic(next, {
-        pathKey,
-        file: source.file,
-        lineStart: source.lineStart,
-        raw: source.raw,
-        role: "path:value"
-      });
-    }
-
-    if (inExtrasPath && extrasItemLike) {
-      if (isConditionClauseLikeObject(next)) {
-        next = ensureConditionClauseDeclsWithSynthetic(next, {
-          pathKey,
-          file: source.file,
-          lineStart: source.lineStart,
-          raw: source.raw
-        });
-      }
-
-      if (isAssignmentLikeEntryObject(next)) {
-        next = ensureValueDeclWithSynthetic(next, {
-          pathKey,
-          file: source.file,
-          lineStart: source.lineStart,
-          raw: source.raw,
-          role: "path:extras:value",
-          nameHint: String(keyHint || "value")
-        });
-      }
-
-      if (isValueLikeEntryObject(next)) {
-        next = ensureEntryDeclWithSynthetic(next, {
-          pathKey,
-          file: source.file,
-          lineStart: source.lineStart,
-          raw: source.raw,
-          role: "path:extras"
-        });
-      }
-    }
-
-    return attachPathSyntheticDeclAliases(next, ownerContext);
-  }
-
-  function walkObjects(roots, visit) {
-    const stack = Array.isArray(roots) ? roots.slice().reverse() : [];
-    while (stack.length) {
-      const node = stack.pop();
-      if (!node) {
-        continue;
-      }
-      visit(node);
-      const children = Array.isArray(node.children) ? node.children : [];
-      for (let i = children.length - 1; i >= 0; i -= 1) {
-        stack.push(children[i]);
-      }
-    }
-  }
-
-  function computeLineOffsets(text) {
-    const value = String(text || "");
-    const offsets = [0];
-    for (let i = 0; i < value.length; i += 1) {
-      if (value[i] === "\n") {
-        offsets.push(i + 1);
-      }
-    }
-    return offsets;
-  }
-
-  function getSelectionRangeForLines(text, lineStart, lineEnd) {
-    const value = String(text || "");
-    const offsets = state.inputLineOffsets.length ? state.inputLineOffsets : computeLineOffsets(value);
-    const start = Math.max(1, Number(lineStart) || 1);
-    const end = Math.max(start, Number(lineEnd) || start);
-    const startLineIndex = start - 1;
-    const endLineIndex = end - 1;
-    const startOffset = offsets[startLineIndex] ?? 0;
-    const endOffset = offsets[endLineIndex + 1] ?? value.length;
-    return { start: startOffset, end: Math.max(startOffset, endOffset) };
-  }
-
-  function selectCodeLines(lineStart, lineEnd) {
-    if (typeof navigateInputRange === "function") {
-      return navigateInputRange({
-        lineStart,
-        lineEnd,
-        segmentIndex: null,
-        anchorRatio: 0.28
-      });
-    }
-    const text = els.inputText.value || "";
-    state.inputLineOffsets = computeLineOffsets(text);
-    const range = getSelectionRangeForLines(text, lineStart, lineEnd);
-    els.inputText.focus();
-    els.inputText.setSelectionRange(range.start, range.end);
-    syncInputGutterScroll();
-  }
-
-  function getContainerScrollScale(container) {
-    if (!container || typeof container.getBoundingClientRect !== "function") {
-      return 1;
-    }
-    const rect = container.getBoundingClientRect();
-    const layoutHeight = Math.max(0, Number(container.offsetHeight) || Number(container.clientHeight) || 0);
-    const scale = layoutHeight > 0 ? (Number(rect && rect.height) || 0) / layoutHeight : 1;
-    return Number.isFinite(scale) && scale >= 0.5 && scale <= 2 ? scale : 1;
-  }
-
-  function scrollElementInContainer(container, element, options) {
-    if (!container || !element || typeof container.scrollTop !== "number") {
-      return;
-    }
-
-    const opts = options && typeof options === "object" ? options : {};
-    const mode = String(opts.mode || "nearest").toLowerCase();
-    const padTop = Math.max(0, Number(opts.padTop) || 0);
-    const padBottom = Math.max(0, Number(opts.padBottom) || 0);
-    const behavior = opts.behavior === "smooth" ? "smooth" : "auto";
-
-    const containerRect = container.getBoundingClientRect();
-    const elementRect = element.getBoundingClientRect();
-    if (!containerRect || !elementRect || !Number.isFinite(containerRect.top) || !Number.isFinite(elementRect.top)) {
-      return;
-    }
-
-    const currentTop = Number(container.scrollTop || 0) || 0;
-    const scrollScale = getContainerScrollScale(container);
-    let nextTop = currentTop;
-
-    if (mode === "start") {
-      nextTop = currentTop + ((elementRect.top - containerRect.top - padTop) / scrollScale);
-    } else if (mode === "center") {
-      nextTop = currentTop
-        + ((elementRect.top + (elementRect.height / 2)
-          - (containerRect.top + (containerRect.height / 2))) / scrollScale);
-    } else {
-      const topLimit = containerRect.top + padTop;
-      const bottomLimit = containerRect.bottom - padBottom;
-      if (elementRect.top < topLimit) {
-        nextTop = currentTop + ((elementRect.top - topLimit) / scrollScale);
-      } else if (elementRect.bottom > bottomLimit) {
-        nextTop = currentTop + ((elementRect.bottom - bottomLimit) / scrollScale);
-      } else {
+  function buildFormsByNameUpperFromRoots(rawRoots) {
+    const map = new Map();
+    walkObjects(rawRoots, (obj) => {
+      if (!obj || obj.objectType !== "FORM") {
         return;
       }
-    }
-
-    const maxTop = Math.max(0, Number(container.scrollHeight || 0) - Number(container.clientHeight || 0));
-    const clampedTop = Math.max(0, Math.min(maxTop, Math.round(nextTop)));
-    if (Math.abs(clampedTop - currentTop) < 1) {
-      return;
-    }
-
-    if (typeof container.scrollTo === "function") {
-      container.scrollTo({ top: clampedTop, behavior });
-    } else {
-      container.scrollTop = clampedTop;
-    }
-  }
-
-  function getSelectedTemplateIndexSet() {
-    if (!(state.selectedTemplateIndexes instanceof Set)) {
-      state.selectedTemplateIndexes = new Set(Array.isArray(state.selectedTemplateIndexes)
-        ? state.selectedTemplateIndexes.map(String)
-        : []);
-    }
-    return state.selectedTemplateIndexes;
-  }
-
-  function getSortedSelectedTemplateIndexes() {
-    return Array.from(getSelectedTemplateIndexSet())
-      .map((value) => String(value || "").trim())
-      .filter((value) => /^\d+$/.test(value))
-      .sort((left, right) => Number(left) - Number(right));
-  }
-
-  function updateTemplateCopySelectedButton() {
-    if (!els.templateCopySelectedBtn) {
-      return;
-    }
-    const count = getSelectedTemplateIndexSet().size;
-    els.templateCopySelectedBtn.textContent = `Copy Selected (${count})`;
-    els.templateCopySelectedBtn.disabled = count === 0;
-  }
-
-  function syncRenderedTemplateSelection() {
-    if (!els.templatePreviewOutput) {
-      updateTemplateCopySelectedButton();
-      return;
-    }
-    const selectedIndexes = getSelectedTemplateIndexSet();
-    for (const block of Array.from(els.templatePreviewOutput.querySelectorAll(".template-block[data-template-index]"))) {
-      const indexText = String(block.getAttribute("data-template-index") || "");
-      const selected = selectedIndexes.has(indexText);
-      block.classList.toggle("selected", selected);
-      block.setAttribute("aria-selected", selected ? "true" : "false");
-    }
-    updateTemplateCopySelectedButton();
-  }
-
-  function clearTemplateBlockSelection() {
-    getSelectedTemplateIndexSet().clear();
-    state.selectedTemplateIndex = "";
-    state.templateSelectionAnchorIndex = "";
-    syncRenderedTemplateSelection();
-  }
-
-  function pruneTemplateBlockSelection(itemCount) {
-    const total = Math.max(0, Number(itemCount) || 0);
-    const selectedIndexes = getSelectedTemplateIndexSet();
-    const primary = String(state.selectedTemplateIndex || "").trim();
-    if (!selectedIndexes.size && /^\d+$/.test(primary) && Number(primary) < total) {
-      selectedIndexes.add(primary);
-    }
-    for (const indexText of Array.from(selectedIndexes)) {
-      if (!/^\d+$/.test(indexText) || Number(indexText) < 0 || Number(indexText) >= total) {
-        selectedIndexes.delete(indexText);
+      const name = getFormNameFromNode(obj);
+      if (!name) {
+        return;
       }
-    }
-    if (!selectedIndexes.has(primary)) {
-      state.selectedTemplateIndex = getSortedSelectedTemplateIndexes()[0] || "";
-    }
-    const anchor = String(state.templateSelectionAnchorIndex || "").trim();
-    if (!/^\d+$/.test(anchor) || Number(anchor) < 0 || Number(anchor) >= total) {
-      state.templateSelectionAnchorIndex = "";
-    }
-    syncRenderedTemplateSelection();
-  }
-
-  function chooseNearestSelectedTemplateIndex(targetIndex) {
-    const target = Number(targetIndex);
-    const indexes = getSortedSelectedTemplateIndexes();
-    indexes.sort((left, right) => {
-      const leftDistance = Math.abs(Number(left) - target);
-      const rightDistance = Math.abs(Number(right) - target);
-      return leftDistance === rightDistance ? Number(left) - Number(right) : leftDistance - rightDistance;
+      const upper = name.toUpperCase();
+      if (!map.has(upper)) {
+        map.set(upper, obj);
+      }
     });
-    return indexes[0] || "";
+    return map;
   }
 
-  function updateTemplateBlockSelection(index, options) {
-    if (!els.templatePreviewOutput) {
-      return false;
-    }
-    const opts = options && typeof options === "object" ? options : {};
-    const normalized = String(index === undefined || index === null ? "" : index).trim();
-    if (!/^\d+$/.test(normalized)) {
-      return false;
-    }
-    const targetIndex = Number(normalized);
-    const selectedIndexes = getSelectedTemplateIndexSet();
-    const event = opts.event && typeof opts.event === "object" ? opts.event : null;
-    const useInteractionModifiers = opts.interactionMode === "event";
-    const additive = useInteractionModifiers && Boolean(event && (event.ctrlKey || event.metaKey));
-    const ranged = useInteractionModifiers && Boolean(event && event.shiftKey);
 
-    if (ranged) {
-      const primary = String(state.selectedTemplateIndex || "").trim();
-      const anchorText = /^\d+$/.test(String(state.templateSelectionAnchorIndex || ""))
-        ? String(state.templateSelectionAnchorIndex)
-        : (/^\d+$/.test(primary) ? primary : normalized);
-      const anchorIndex = Number(anchorText);
-      if (!additive) {
-        selectedIndexes.clear();
+
+  function createPerformBindingTools() {
+    var PERFORM_TRACE_META_KEY_DESC = "__abapPerformTraceBinding";
+
+    const getDeclIdentityKey = (decl) => {
+      if (!decl || typeof decl !== "object") {
+        return "";
       }
-      const start = Math.min(anchorIndex, targetIndex);
-      const end = Math.max(anchorIndex, targetIndex);
-      for (let current = start; current <= end; current += 1) {
-        selectedIndexes.add(String(current));
-      }
-      state.selectedTemplateIndex = normalized;
-      state.templateSelectionAnchorIndex = anchorText;
-    } else if (additive) {
-      if (selectedIndexes.has(normalized)) {
-        selectedIndexes.delete(normalized);
-        if (state.selectedTemplateIndex === normalized) {
-          state.selectedTemplateIndex = chooseNearestSelectedTemplateIndex(targetIndex);
+      return [
+        decl.objectType || "",
+        decl.scopeLabel || "",
+        decl.name || "",
+        decl.file || "",
+        decl.lineStart || ""
+      ].join("|");
+    };
+
+    const dedupeDeclList = (list) => {
+      const out = [];
+      const seen = new Set();
+      for (const decl of Array.isArray(list) ? list : []) {
+        if (!decl || typeof decl !== "object") {
+          continue;
         }
-      } else {
-        selectedIndexes.add(normalized);
-        state.selectedTemplateIndex = normalized;
+        const key = getDeclIdentityKey(decl);
+        if (!key || seen.has(key)) {
+          continue;
+        }
+        seen.add(key);
+        out.push(decl);
       }
-      state.templateSelectionAnchorIndex = normalized;
-    } else {
-      selectedIndexes.clear();
-      selectedIndexes.add(normalized);
-      state.selectedTemplateIndex = normalized;
-      state.templateSelectionAnchorIndex = normalized;
-    }
+      return out;
+    };
 
-    const shouldEnsure = opts.ensure !== false;
-    let next = els.templatePreviewOutput.querySelector(
-      `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`
-    );
-    if (!next && shouldEnsure && typeof ensureTemplateWindowContainsIndex === "function") {
-      ensureTemplateWindowContainsIndex(targetIndex);
-      next = els.templatePreviewOutput.querySelector(
-        `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`
-      );
-    }
-    syncRenderedTemplateSelection();
+    const isPerformTraceSyntheticStructFieldDecl = (decl) => {
+      if (!decl || typeof decl !== "object") {
+        return false;
+      }
+      return String(decl.objectType || "").toUpperCase() === "STRUCT_FIELD"
+        && String(decl.structObjectType || "").toUpperCase() === "FORM_PARAM"
+        && String(decl.structName || "").trim() !== ""
+        && String(decl.fieldPath || "").trim() !== "";
+    };
 
-    if (next && opts.scroll !== false) {
-      const scrollMode = String(opts.scrollMode || "start").toLowerCase();
-      const virtual = typeof getTemplateVirtualStateForGutter === "function"
-        ? getTemplateVirtualStateForGutter()
+    const getPerformTraceParamUpper = (decl) => {
+      if (!decl || typeof decl !== "object") {
+        return "";
+      }
+      const objectType = String(decl.objectType || "").toUpperCase();
+      if (objectType === "FORM_PARAM") {
+        return String(decl.name || "").trim().toUpperCase();
+      }
+      if (isPerformTraceSyntheticStructFieldDecl(decl)) {
+        return String(decl.structName || "").trim().toUpperCase();
+      }
+      return "";
+    };
+
+    const buildPerformTraceSyntheticStructFieldDecl = (baseDecl, valueDecl, actualEntry) => {
+      if (!baseDecl || typeof baseDecl !== "object") {
+        return null;
+      }
+      if (!valueDecl || typeof valueDecl !== "object" || String(valueDecl.objectType || "").toUpperCase() !== "STRUCT_FIELD") {
+        return baseDecl;
+      }
+
+      const localFieldPath = String(valueDecl.fieldPath || "").trim();
+      if (!localFieldPath) {
+        return baseDecl;
+      }
+
+      let rootBaseDecl = baseDecl;
+      let rootStructName = String(baseDecl.name || "").trim();
+      let prefixFieldPath = "";
+      if (String(baseDecl.objectType || "").toUpperCase() === "STRUCT_FIELD") {
+        rootStructName = String(baseDecl.structName || rootStructName).trim();
+        prefixFieldPath = String(baseDecl.fieldPath || "").trim();
+        rootBaseDecl = {
+          ...baseDecl,
+          id: baseDecl.structId || baseDecl.id || null,
+          objectType: String(baseDecl.structObjectType || "STRUCT"),
+          name: rootStructName,
+          lineStart: Number(baseDecl.structLineStart || baseDecl.lineStart) || null,
+          raw: String(baseDecl.structRaw || baseDecl.raw || ""),
+          comment: String(baseDecl.structComment || baseDecl.comment || "")
+        };
+      }
+
+      if (!rootStructName || !String(rootBaseDecl.scopeLabel || "").trim()) {
+        return baseDecl;
+      }
+
+      const combinedFieldPath = prefixFieldPath ? (prefixFieldPath + "-" + localFieldPath) : localFieldPath;
+      const candidate = {
+        fullRef: rootStructName + "-" + combinedFieldPath,
+        structName: rootStructName,
+        fieldPath: combinedFieldPath
+      };
+      const traceContext = actualEntry && typeof actualEntry === "object"
+        ? { file: actualEntry.file, lineStart: actualEntry.lineStart }
+        : { file: rootBaseDecl.file, lineStart: rootBaseDecl.lineStart };
+      if (typeof createSyntheticStructFieldDecl === "function") {
+        const syntheticDecl = createSyntheticStructFieldDecl(rootBaseDecl, candidate, traceContext);
+        if (syntheticDecl && typeof syntheticDecl === "object") {
+          return syntheticDecl;
+        }
+      }
+
+      return {
+        id: rootBaseDecl.id || null,
+        objectType: "STRUCT_FIELD",
+        name: candidate.fullRef,
+        file: String(traceContext.file || rootBaseDecl.file || ""),
+        lineStart: Number(traceContext.lineStart || rootBaseDecl.lineStart) || null,
+        raw: String(rootBaseDecl.raw || ""),
+        comment: "",
+        scopeId: Number(rootBaseDecl.scopeId || 0) || 0,
+        scopeLabel: String(rootBaseDecl.scopeLabel || ""),
+        scopeType: String(rootBaseDecl.scopeType || ""),
+        scopeName: String(rootBaseDecl.scopeName || ""),
+        structId: rootBaseDecl.id || null,
+        structName: rootStructName,
+        structObjectType: String(rootBaseDecl.objectType || "STRUCT"),
+        structLineStart: Number(rootBaseDecl.lineStart || 0) || null,
+        structRaw: String(rootBaseDecl.raw || ""),
+        structComment: String(rootBaseDecl.comment || ""),
+        traceFile: String(traceContext.file || ""),
+        traceLineStart: Number(traceContext.lineStart || 0) || null,
+        fieldPath: combinedFieldPath,
+        synthetic: true
+      };
+    };
+
+    const resolveActualTraceDecls = (actualEntry, currentBindingContext) => {
+      if (!actualEntry || typeof actualEntry !== "object") {
+        return [];
+      }
+
+      const out = [];
+      const pushDecl = (decl) => {
+        if (decl && typeof decl === "object") {
+          out.push(decl);
+        }
+      };
+      const pushList = (decls) => {
+        for (const decl of Array.isArray(decls) ? decls : []) {
+          pushDecl(decl);
+        }
+      };
+
+      const valueDecl = actualEntry.valueDecl && typeof actualEntry.valueDecl === "object"
+        ? actualEntry.valueDecl
         : null;
-      if (scrollMode === "start" && virtual && virtual.isInitialized && typeof alignVirtualTargetAfterRender === "function") {
-        alignVirtualTargetAfterRender(
-          els.templatePreviewOutput,
-          virtual,
-          `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`,
-          next
-        );
-      } else {
-        scrollElementInContainer(els.templatePreviewOutput, next, { mode: scrollMode, padTop: 10, padBottom: 10 });
+      if (!valueDecl) {
+        pushList(actualEntry.originDecls);
+        return dedupeDeclList(out);
       }
+
+      pushDecl(valueDecl);
+
+      const paramUpper = getPerformTraceParamUpper(valueDecl);
+      if (!paramUpper) {
+        pushList(actualEntry.originDecls);
+        return dedupeDeclList(out);
+      }
+
+      const byParamUpper = currentBindingContext && currentBindingContext.byParamUpper instanceof Map
+        ? currentBindingContext.byParamUpper
+        : null;
+      const externalDecls = byParamUpper ? byParamUpper.get(paramUpper) : null;
+      const tracedDecls = Array.isArray(externalDecls) && externalDecls.length
+        ? externalDecls
+        : actualEntry.originDecls;
+
+      if (String(valueDecl.objectType || "").toUpperCase() === "STRUCT_FIELD") {
+        pushList(tracedDecls.map((decl) => buildPerformTraceSyntheticStructFieldDecl(decl, valueDecl, actualEntry)).filter(Boolean));
+      } else {
+        pushList(tracedDecls);
+      }
+
+      return dedupeDeclList(out);
+    };
+
+    const buildPerformBindingContext = (performNode, resolvedForm, currentBindingContext) => {
+      if (!performNode || !resolvedForm) {
+        return null;
+      }
+
+      const call = performNode.extras && performNode.extras.performCall && typeof performNode.extras.performCall === "object"
+        ? performNode.extras.performCall
+        : null;
+      const formExtras = resolvedForm.extras && resolvedForm.extras.form && typeof resolvedForm.extras.form === "object"
+        ? resolvedForm.extras.form
+        : null;
+      const params = formExtras && Array.isArray(formExtras.params) ? formExtras.params : [];
+      if (!call || !params.length) {
+        return null;
+      }
+
+      const formalParamsBySection = {
+        USING: [],
+        CHANGING: [],
+        TABLES: []
+      };
+      for (const param of params) {
+        if (!param || !param.name) {
+          continue;
+        }
+        const section = String(param.section || "").trim().toUpperCase();
+        if (!Object.prototype.hasOwnProperty.call(formalParamsBySection, section)) {
+          continue;
+        }
+        formalParamsBySection[section].push(param);
+      }
+
+      const byParamUpper = new Map();
+      const bindingsBySection = {
+        USING: [],
+        CHANGING: [],
+        TABLES: []
+      };
+      for (const section of ["USING", "CHANGING", "TABLES"]) {
+        const formalParams = formalParamsBySection[section] || [];
+        const actualArgs = Array.isArray(call[section.toLowerCase()]) ? call[section.toLowerCase()] : [];
+        for (let index = 0; index < formalParams.length; index += 1) {
+          const formalParam = formalParams[index];
+          const actualArg = actualArgs[index] || null;
+          if (!formalParam || !formalParam.name) {
+            continue;
+          }
+          const paramUpper = String(formalParam.name || "").trim().toUpperCase();
+          if (!paramUpper) {
+            continue;
+          }
+          const traceDecls = actualArg
+            ? resolveActualTraceDecls(actualArg, currentBindingContext)
+            : [];
+          bindingsBySection[section].push({
+            formalName: String(formalParam.name || ""),
+            formalParam,
+            actualArg,
+            traceDecls
+          });
+          if (traceDecls.length) {
+            byParamUpper.set(paramUpper, traceDecls);
+          }
+        }
+      }
+
+      return {
+        byParamUpper,
+        bySection: bindingsBySection
+      };
+    };
+
+    const attachPerformBindingMetadata = (node, bindingContext) => {
+      if (!node || typeof node !== "object" || !bindingContext || !bindingContext.byParamUpper) {
+        return;
+      }
+      try {
+        Object.defineProperty(node, PERFORM_TRACE_META_KEY_DESC, {
+          value: bindingContext,
+          enumerable: false,
+          configurable: true
+        });
+        if (String(bindingContext.sourceScope || "").trim()) {
+          Object.defineProperty(node, "__abapPerformChainScope", {
+            value: String(bindingContext.sourceScope || "").trim(),
+            enumerable: false,
+            configurable: true
+          });
+        }
+      } catch {
+        // ignore metadata errors; rendering should keep working without trace metadata.
+      }
+    };
+
+    const clonePerformScopedData = (value, bindingContext, seen) => {
+      if (!value || typeof value !== "object") {
+        return value;
+      }
+      const visited = seen instanceof WeakMap ? seen : new WeakMap();
+      if (visited.has(value)) {
+        return visited.get(value);
+      }
+      if (getPerformFormalParamKey(value)) {
+        return cloneDeclWithPerformChainOverride(value, bindingContext, value);
+      }
+      if (Array.isArray(value)) {
+        const output = [];
+        visited.set(value, output);
+        for (const item of value) {
+          output.push(clonePerformScopedData(item, bindingContext, visited));
+        }
+        return output;
+      }
+      const output = {};
+      visited.set(value, output);
+      for (const key of Object.keys(value)) {
+        output[key] = clonePerformScopedData(value[key], bindingContext, visited);
+      }
+      return output;
+    };
+
+    return {
+      attachPerformBindingMetadata,
+      buildPerformBindingContext,
+      clonePerformScopedData
+    };
+  }
+
+
+
+  function getPerformActualEntryText(entry) {
+    if (!entry || typeof entry !== "object") {
+      return "";
+    }
+    return String(entry.value || entry.name || entry.declRef || "").trim();
+  }
+
+
+
+  function buildPerformActualSummary(performNode) {
+    const call = performNode && performNode.extras && performNode.extras.performCall
+      && typeof performNode.extras.performCall === "object"
+      ? performNode.extras.performCall
+      : null;
+    if (!call) {
+      return "không có đối số";
+    }
+
+    const parts = [];
+    for (const section of ["using", "changing", "tables"]) {
+      const values = (Array.isArray(call[section]) ? call[section] : [])
+        .map((entry) => getPerformActualEntryText(entry))
+        .filter(Boolean);
+      if (values.length) {
+        parts.push(`${section.toUpperCase()} ${values.join(" ")}`);
+      }
+    }
+    return parts.length ? parts.join(" · ") : "không có đối số";
+  }
+
+
+
+  function hashPerformSourceScope(value) {
+    const text = String(value || "");
+    let hash = 2166136261;
+    for (let index = 0; index < text.length; index += 1) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(36).toUpperCase();
+  }
+
+
+
+  function buildPerformSourceScope(performNode, formNameUpper, pathToken, ancestry) {
+    const normalizedRaw = String(performNode && performNode.raw || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toUpperCase();
+    const fingerprint = [
+      String(formNameUpper || "").trim().toUpperCase(),
+      String(performNode && performNode.file || "").trim().toUpperCase(),
+      Number(performNode && performNode.lineStart) || 0,
+      normalizedRaw,
+      String(pathToken || ""),
+      (Array.isArray(ancestry) ? ancestry : []).join(">")
+    ].join("|");
+    return `${String(formNameUpper || "FORM").trim().toUpperCase()}-${hashPerformSourceScope(fingerprint)}`;
+  }
+
+
+
+  function buildPerformCallPathRegistry(rawRoots) {
+    const roots = Array.isArray(rawRoots) ? rawRoots : [];
+    const formsByNameUpper = buildFormsByNameUpperFromRoots(roots);
+    const candidatesByFormUpper = new Map();
+    const candidateByKey = new Map();
+    const selectedKeyByFormUpper = new Map();
+    const formOrder = [];
+    const tools = createPerformBindingTools();
+    let sourceOrder = 0;
+
+    const registry = {
+      rawRoots: roots,
+      formsByNameUpper,
+      candidatesByFormUpper,
+      candidateByKey,
+      selectedKeyByFormUpper,
+      formOrder,
+      getActiveCandidates(formNameUpper) {
+        const upper = String(formNameUpper || "").trim().toUpperCase();
+        const candidates = candidatesByFormUpper.get(upper) || [];
+        return candidates.filter((candidate) => {
+          for (const ancestorKey of candidate.ancestry) {
+            const ancestor = candidateByKey.get(ancestorKey);
+            if (!ancestor) {
+              return false;
+            }
+            if (selectedKeyByFormUpper.get(ancestor.formNameUpper) !== ancestor.key) {
+              return false;
+            }
+          }
+          return true;
+        });
+      },
+      getSelectedCandidate(formNameUpper) {
+        const upper = String(formNameUpper || "").trim().toUpperCase();
+        const selectedKey = selectedKeyByFormUpper.get(upper);
+        return selectedKey ? candidateByKey.get(selectedKey) || null : null;
+      },
+      ensureSelections() {
+        for (const formNameUpper of formOrder) {
+          const activeCandidates = this.getActiveCandidates(formNameUpper);
+          const selectedKey = selectedKeyByFormUpper.get(formNameUpper);
+          if (activeCandidates.some((candidate) => candidate.key === selectedKey)) {
+            continue;
+          }
+          if (activeCandidates.length) {
+            selectedKeyByFormUpper.set(formNameUpper, activeCandidates[0].key);
+          } else {
+            selectedKeyByFormUpper.delete(formNameUpper);
+          }
+        }
+      },
+      selectCandidate(formNameUpper, candidateKey) {
+        const upper = String(formNameUpper || "").trim().toUpperCase();
+        const nextKey = String(candidateKey || "").trim();
+        const activeCandidates = this.getActiveCandidates(upper);
+        if (!activeCandidates.some((candidate) => candidate.key === nextKey)) {
+          return false;
+        }
+        const previousKey = selectedKeyByFormUpper.get(upper) || "";
+        if (previousKey === nextKey) {
+          return false;
+        }
+
+        const descendantForms = new Set();
+        for (const candidates of candidatesByFormUpper.values()) {
+          for (const candidate of candidates) {
+            if (candidate.ancestry.includes(previousKey) || candidate.ancestry.includes(nextKey)) {
+              descendantForms.add(candidate.formNameUpper);
+            }
+          }
+        }
+        selectedKeyByFormUpper.set(upper, nextKey);
+        for (const descendantForm of descendantForms) {
+          if (descendantForm !== upper) {
+            selectedKeyByFormUpper.delete(descendantForm);
+          }
+        }
+        this.ensureSelections();
+        return true;
+      }
+    };
+
+    const registerCandidate = (performNode, resolvedForm, formName, formNameUpper, pathToken, ancestry, bindingContext) => {
+      sourceOrder += 1;
+      const key = `PERFORM_SOURCE:${formNameUpper}:${pathToken}`;
+      const sourceScope = buildPerformSourceScope(performNode, formNameUpper, pathToken, ancestry);
+      if (bindingContext && typeof bindingContext === "object") {
+        bindingContext.sourceScope = sourceScope;
+      }
+      const candidate = {
+        key,
+        sourceScope,
+        formId: resolvedForm.id === undefined || resolvedForm.id === null ? "" : String(resolvedForm.id),
+        formName,
+        formNameUpper,
+        performId: performNode.id === undefined || performNode.id === null ? "" : String(performNode.id),
+        lineStart: Number(performNode.lineStart) || 0,
+        ancestry: ancestry.slice(),
+        parentCandidateKey: ancestry.length ? ancestry[ancestry.length - 1] : "",
+        actualSummary: buildPerformActualSummary(performNode),
+        bindingContext,
+        sourceOrder
+      };
+      if (!candidatesByFormUpper.has(formNameUpper)) {
+        candidatesByFormUpper.set(formNameUpper, []);
+        formOrder.push(formNameUpper);
+      }
+      candidatesByFormUpper.get(formNameUpper).push(candidate);
+      candidateByKey.set(key, candidate);
+      return candidate;
+    };
+
+    const visitNode = (sourceNode, pathToken, formCallStack, bindingContext, ancestry) => {
+      if (!sourceNode || typeof sourceNode !== "object") {
+        return;
+      }
+
+      let callCandidate = null;
+      let resolvedForm = null;
+      let nextBindingContext = bindingContext;
+      let nextFormCallStack = formCallStack;
+      if (sourceNode.objectType === "PERFORM") {
+        const formName = getPerformFormNameFromNode(sourceNode);
+        const programName = getPerformProgramFromNode(sourceNode);
+        const formNameUpper = formName ? formName.toUpperCase() : "";
+        resolvedForm = !programName && formNameUpper ? formsByNameUpper.get(formNameUpper) : null;
+        const isRecursiveCall = Boolean(formNameUpper) && formCallStack.includes(formNameUpper);
+        if (resolvedForm && !isRecursiveCall) {
+          nextBindingContext = tools.buildPerformBindingContext(sourceNode, resolvedForm, bindingContext);
+          callCandidate = registerCandidate(
+            sourceNode,
+            resolvedForm,
+            formName,
+            formNameUpper,
+            pathToken,
+            ancestry,
+            nextBindingContext
+          );
+          nextFormCallStack = [...formCallStack, formNameUpper];
+        }
+      }
+
+      const sourceChildren = Array.isArray(sourceNode.children) ? sourceNode.children : [];
+      for (let index = 0; index < sourceChildren.length; index += 1) {
+        visitNode(sourceChildren[index], `${pathToken}.C${index}`, formCallStack, bindingContext, ancestry);
+      }
+
+      if (!callCandidate || !resolvedForm) {
+        return;
+      }
+      const formChildren = Array.isArray(resolvedForm.children) ? resolvedForm.children : [];
+      const nextAncestry = [...ancestry, callCandidate.key];
+      for (let index = 0; index < formChildren.length; index += 1) {
+        visitNode(
+          formChildren[index],
+          `${pathToken}.FORM:${callCandidate.formNameUpper}.C${index}`,
+          nextFormCallStack,
+          nextBindingContext,
+          nextAncestry
+        );
+      }
+    };
+
+    for (let index = 0; index < roots.length; index += 1) {
+      const root = roots[index];
+      if (!root || root.objectType === "FORM") {
+        continue;
+      }
+      visitNode(root, `ROOT${index}`, [], null, []);
+    }
+    const compareCandidatesBySource = (left, right) => {
+      const leftLine = Number(left && left.lineStart) > 0 ? Number(left.lineStart) : Number.MAX_SAFE_INTEGER;
+      const rightLine = Number(right && right.lineStart) > 0 ? Number(right.lineStart) : Number.MAX_SAFE_INTEGER;
+      return (leftLine - rightLine) || ((Number(left && left.sourceOrder) || 0) - (Number(right && right.sourceOrder) || 0));
+    };
+    for (const candidates of candidatesByFormUpper.values()) {
+      candidates.sort(compareCandidatesBySource);
+    }
+    registry.ensureSelections();
+    return registry;
+  }
+
+
+
+  function getPerformSourceControlModel(obj) {
+    const registry = state.performSourceRegistry;
+    if (!registry || typeof registry.getActiveCandidates !== "function") {
+      return null;
+    }
+    if (!obj || typeof obj !== "object") {
+      return null;
+    }
+    const directFormName = obj.objectType === "FORM" ? getFormNameFromNode(obj) : "";
+    const formNameUpper = String(
+      directFormName || obj[PERFORM_SOURCE_FORM_META_KEY_DESC] || ""
+    ).trim().toUpperCase();
+    if (!formNameUpper) {
+      return null;
+    }
+    const candidates = registry.getActiveCandidates(formNameUpper);
+    if (candidates.length < 2) {
+      return null;
+    }
+    const selected = registry.getSelectedCandidate(formNameUpper) || candidates[0];
+    const formName = directFormName || selected.formName || formNameUpper;
+    return {
+      formName,
+      formNameUpper,
+      candidates,
+      selectedKey: selected.key
+    };
+  }
+
+
+
+  function selectPerformSourceCandidate(formNameUpper, candidateKey, options) {
+    const registry = state.performSourceRegistry;
+    if (!registry || typeof registry.selectCandidate !== "function") {
+      return false;
+    }
+    const templateAnchor = typeof captureTemplateViewportAnchor === "function"
+      ? captureTemplateViewportAnchor()
+      : null;
+    if (!registry.selectCandidate(formNameUpper, candidateKey)) {
+      return false;
+    }
+
+    state.pendingTemplateViewportAnchor = templateAnchor;
+    state.templatePreviewCache = null;
+    state.renderObjects = buildRenderableObjects(registry.rawRoots, {
+      ...RENDER_TREE_OPTIONS,
+      performSourceRegistry: registry
+    });
+    renderActiveRightPanel();
+    if (typeof refreshInputGutterTargets === "function") {
+      refreshInputGutterTargets();
     }
     return true;
   }
 
-  function selectTemplateBlockFromInteraction(index, event) {
-    return updateTemplateBlockSelection(index, {
-      interactionMode: "event",
-      event,
-      scroll: false,
-      ensure: false
+
+
+  function createPerformSourceControl(obj) {
+    const model = getPerformSourceControlModel(obj);
+    if (!model) {
+      return null;
+    }
+    const attrs = { "data-perform-form": model.formNameUpper };
+    const control = el("div", { className: "perform-source-control", attrs });
+    control.addEventListener("click", (ev) => ev.stopPropagation());
+    control.appendChild(el("span", {
+      className: "perform-source-badge",
+      text: `⇄ ${model.candidates.length} nguồn`,
+      attrs
+    }));
+
+    const select = el("select", {
+      className: "perform-source-select",
+      attrs: {
+        ...attrs,
+        "aria-label": `Nguồn mô tả FORM ${model.formName}`
+      }
     });
-  }
-
-  function setSelectedDeclRow(declKey) {
-    const key = String(declKey || "").trim();
-    if (!key || !els.declDescTable) {
-      return;
-    }
-
-    if (state.selectedDeclKey) {
-      const prev = els.declDescTable.querySelector(`tr[data-decl-key="${escapeSelectorValue(state.selectedDeclKey)}"]`);
-      if (prev) {
-        prev.classList.remove("desc-selected");
-      }
-    }
-
-    state.selectedDeclKey = key;
-    const next = els.declDescTable.querySelector(`tr[data-decl-key="${escapeSelectorValue(key)}"]`);
-    if (next) {
-      next.classList.add("desc-selected");
-      scrollElementInContainer(els.declDescPanel, next, { mode: "nearest", padTop: 8, padBottom: 8 });
-    }
-  }
-
-  function countInputLines(value) {
-    const text = String(value || "");
-    if (!text) {
-      return 1;
-    }
-    return text.split("\n").length;
-  }
-
-  function computeInputGutterTargetsForDescriptions() {
-    const targets = new Map();
-    if (!els.declDescTable) {
-      return targets;
-    }
-
-
-    const rows = els.declDescTable.querySelectorAll("tr[data-decl-key][data-line-start]");
-    for (const row of Array.from(rows)) {
-      const line = Number(row.getAttribute("data-line-start")) || 0;
-      const declKey = String(row.getAttribute("data-decl-key") || "");
-      if (!line || !declKey || targets.has(line)) {
-        continue;
-      }
-      targets.set(line, { kind: "descriptions", declKey });
-    }
-
-    return targets;
-  }
-
-  function refreshInputGutterTargets() {
-    if (!els.inputGutterContent || !state.inputGutterButtonsByLine.size) {
-      return;
-    }
-
-    if (state.inputMode !== "abap") {
-      state.inputGutterTargetsByLine = new Map();
-      for (const btn of state.inputGutterButtonsByLine.values()) {
-        btn.hidden = true;
-      }
-      return;
-    }
-
-    let targets = new Map();
-    if (state.rightTab === "descriptions") {
-      targets = computeInputGutterTargetsForDescriptions();
-    } else if (state.rightTab === "template") {
-      targets = computeInputGutterTargetsForTemplate();
-    }
-
-    state.inputGutterTargetsByLine = targets;
-    const title = state.rightTab === "descriptions"
-      ? "Jump to Data"
-      : (state.rightTab === "template" ? "Jump to Template" : "");
-    for (const [line, btn] of state.inputGutterButtonsByLine.entries()) {
-      const target = targets.get(line);
-      btn.hidden = !target;
-      if (target) {
-        btn.title = title;
-        btn.setAttribute("aria-label", title);
-      }
-    }
-  }
-
-  function onInputGutterClick(ev) {
-    const target = ev && ev.target && typeof ev.target.closest === "function"
-      ? ev.target.closest("button.gutter-jump")
-      : null;
-    if (!target) {
-      return;
-    }
-
-    const line = Number(target.getAttribute("data-line")) || 0;
-    if (!line) {
-      return;
-    }
-
-    const jumpTarget = state.inputGutterTargetsByLine.get(line);
-    if (!jumpTarget) {
-      return;
-    }
-
-    if (state.rightTab === "template" && jumpTarget.kind === "template") {
-      setSelectedTemplateBlock(jumpTarget.index, { scroll: true, scrollMode: "start" });
-      return;
-    }
-
-    if (state.rightTab === "descriptions" && jumpTarget.kind === "descriptions") {
-      setSelectedDeclRow(jumpTarget.declKey);
-    }
-  }
-
-  function openJsonModal(value) {
-    openTextModal("Object JSON", safeJson(value, true));
-  }
-
-  function openTextModal(title, text) {
-    if (!els.editModal.hidden) {
-      closeEditModal();
-    }
-
-    if (els.jsonTitle) {
-      els.jsonTitle.textContent = title ? String(title) : "";
-    }
-
-    els.jsonPre.textContent = text ? String(text) : "";
-    els.jsonModal.hidden = false;
-  }
-
-  function closeJsonModal() {
-    els.jsonModal.hidden = true;
-    if (els.jsonTitle) {
-      els.jsonTitle.textContent = "Object JSON";
-    }
-    els.jsonPre.textContent = "";
-  }
-
-  async function copyJsonToClipboard() {
-    const text = els.jsonPre.textContent || "";
-    if (!text) {
-      return;
-    }
-
-    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
-      await navigator.clipboard.writeText(text);
-      return;
-    }
-
-    const selection = window.getSelection();
-    if (!selection) {
-      return;
-    }
-    selection.removeAllRanges();
-    const range = document.createRange();
-    range.selectNodeContents(els.jsonPre);
-    selection.addRange(range);
-    document.execCommand("copy");
-    selection.removeAllRanges();
-  }
-
-  function stringifyDecl(decl) {
-    if (!decl || typeof decl !== "object") {
-      return "";
-    }
-
-    const techName = getDeclTechName(decl);
-    const displayName = getDeclDisplayName(decl);
-
-    const parts = [];
-    if (decl.objectType) {
-      parts.push(String(decl.objectType));
-    }
-    if (decl.scopeLabel) {
-      parts.push(`[${String(decl.scopeLabel)}]`);
-    }
-    if (displayName) {
-      parts.push(displayName);
-    }
-    if (techName && displayName && techName !== displayName) {
-      parts.push(`(${techName})`);
-    }
-    if (decl.file) {
-      parts.push(String(decl.file));
-    }
-    if (decl.lineStart) {
-      parts.push(`#${decl.lineStart}`);
-    }
-    return parts.join(" ");
-  }
-
-  function getDeclTechName(decl) {
-    if (!decl || typeof decl !== "object") {
-      return "";
-    }
-    return decl.name ? String(decl.name) : "";
-  }
-
-  function stripAngleBrackets(text) {
-    const trimmed = String(text || "").trim();
-    if (trimmed.startsWith("<") && trimmed.endsWith(">") && trimmed.length > 2) {
-      return trimmed.slice(1, -1);
-    }
-    return trimmed;
-  }
-
-  function stripDeclCategoryPrefix(text) {
-    const raw = String(text || "").trim();
-    if (!raw) {
-      return "";
-    }
-
-    const match = raw.match(
-      /^\s*(HẰNG|HANG|STRUCT|TABLE|RANGETABLE|BIẾN|BIEN|CỜ|CO|FIELDSYMBOL)\b\s*[:\-\[\]]*\s*/i
-    );
-    if (!match) {
-      return raw;
-    }
-
-    let rest = raw.slice(match[0].length).trim();
-    // If the prefix included an opening "[" (e.g. "BIẾN:[") then strip ONE trailing "]" (e.g. "...]")
-    // so "BIẾN:[desc]" -> "desc" instead of "desc]".
-    if (match[0].includes("[") && rest.endsWith("]")) {
-      rest = rest.slice(0, -1).trim();
-    }
-    return rest;
-  }
-
-  function isStructFieldDecl(decl) {
-    if (!decl || typeof decl !== "object") {
-      return false;
-    }
-    if (decl.objectType === "STRUCT_FIELD") {
-      return true;
-    }
-    return Boolean(decl.structName && decl.fieldPath);
-  }
-
-  function getDeclDisplayName(decl) {
-    const techName = getDeclTechName(decl);
-    if (!techName) {
-      return "";
-    }
-
-    if (isStructFieldDecl(decl)) {
-      return techName;
-    }
-
-    const desc = getEffectiveDeclDesc(decl);
-    const descTrimmed = String(desc || "").trim();
-    if (!descTrimmed) {
-      return techName;
-    }
-
-    const settings = state.settings || DEFAULT_SETTINGS;
-    if (settings.normalizeDeclDesc) {
-      return descTrimmed;
-    }
-
-    const bare = stripAngleBrackets(techName);
-    if (bare.length < 3) {
-      return techName;
-    }
-
-    const code = bare.slice(1, 3).toUpperCase();
-    const templates = settings.nameTemplatesByCode || DEFAULT_SETTINGS.nameTemplatesByCode;
-    const template = templates && Object.prototype.hasOwnProperty.call(templates, code) ? String(templates[code] || "") : "";
-    if (!template.trim()) {
-      return techName;
-    }
-
-    const strippedKnownPrefix = stripDeclCategoryPrefix(descTrimmed);
-    const normalizedDesc = stripDeclTemplateAffixes(strippedKnownPrefix, template);
-    const displayName = template.replace(/\{\{desc\}\}/g, normalizedDesc).trim();
-    return displayName || techName;
-  }
-
-  function buildDeclTitle(decl) {
-    if (!decl || typeof decl !== "object") {
-      return "";
-    }
-
-    const lines = [];
-    lines.push(stringifyDecl(decl));
-
-    const desc = getEffectiveDeclDesc(decl);
-    if (desc) {
-      lines.push(`Desc: ${desc}`);
-    }
-
-    if (decl.raw) {
-      lines.push(String(decl.raw));
-    }
-
-    return lines.filter(Boolean).join("\n");
-  }
-
-  function el(tag, options) {
-    const node = document.createElement(tag);
-    if (options && options.className) {
-      node.className = options.className;
-    }
-    if (options && options.text !== undefined) {
-      node.textContent = options.text;
-    }
-    if (options && options.attrs) {
-      for (const [key, value] of Object.entries(options.attrs)) {
-        node.setAttribute(key, String(value));
-      }
-    }
-    return node;
-  }
-
-  function renderMeta(obj) {
-    const parts = [];
-    if (obj.file) {
-      parts.push(String(obj.file));
-    }
-    if (obj.lineStart) {
-      parts.push(`line ${obj.lineStart}`);
-    }
-    if (obj.block && obj.block.lineEnd) {
-      parts.push(`end ${obj.block.lineEnd}`);
-    }
-    if (obj.id !== undefined && obj.id !== null) {
-      parts.push(`#${obj.id}`);
-    }
-    return parts.join(" • ");
-  }
-
-  function getObjectLabel(obj) {
-    for (const key of ["name", "target", "form"]) {
-      const value = getFirstValueFromValues(obj.values, key);
-      if (value) {
-        return value;
-      }
-    }
-
-    if (obj.extras && obj.extras.callFunction && obj.extras.callFunction.name) {
-      return String(obj.extras.callFunction.name);
-    }
-    if (obj.extras && obj.extras.callMethod && obj.extras.callMethod.target) {
-      return String(obj.extras.callMethod.target);
-    }
-    if (obj.extras && obj.extras.performCall && obj.extras.performCall.form) {
-      return String(obj.extras.performCall.form);
-    }
-    if (obj.extras && obj.extras.form && obj.extras.form.name) {
-      return String(obj.extras.form.name);
-    }
-    if (obj.extras && obj.extras.methodSignature && obj.extras.methodSignature.name) {
-      return String(obj.extras.methodSignature.name);
-    }
-
-    return "";
-  }
-
-  function normalizeParsedJson(json) {
-    if (Array.isArray(json)) {
-      return { file: "", objects: json, decls: [] };
-    }
-    if (json && typeof json === "object" && Array.isArray(json.objects)) {
-      return {
-        file: String(json.file || ""),
-        objects: json.objects,
-        decls: Array.isArray(json.decls) ? json.decls : []
-      };
-    }
-    return null;
-  }
-
-  function getTemplateVirtualStateForGutter() {
-    if (!state.templateVirtual || typeof state.templateVirtual !== "object") {
-      state.templateVirtual = {
-        items: [],
-        itemCount: 0,
-        start: 0,
-        end: 0,
-        lastScrollTop: 0,
-        scrollDir: "down",
-        pendingRaf: 0,
-        isAdjustingScroll: false,
-        avgItemHeight: 140,
-        unknownItemHeight: 140,
-        estimateCalibrated: false,
-        adjustmentRaf: 0,
-        adjustmentGeneration: 0,
-        needsScrollSync: false,
-        isRenderTransaction: false,
-        geometryEpoch: 0,
-        lineTargetMap: new Map(),
-        isInitialized: false
-      };
-    }
-    if (!(state.templateVirtual.lineTargetMap instanceof Map)) {
-      state.templateVirtual.lineTargetMap = new Map();
-    }
-    ensureVirtualControlState(state.templateVirtual, 140);
-    return state.templateVirtual;
-  }
-
-  function ensureVirtualControlState(virtual, defaultEstimate) {
-    const fallback = Math.max(1, Number(defaultEstimate) || 1);
-    if (!Number.isFinite(Number(virtual.unknownItemHeight)) || Number(virtual.unknownItemHeight) <= 0) {
-      virtual.unknownItemHeight = fallback;
-    }
-    if (typeof virtual.estimateCalibrated !== "boolean") {
-      virtual.estimateCalibrated = false;
-    }
-    if (!Number.isFinite(Number(virtual.adjustmentRaf))) {
-      virtual.adjustmentRaf = 0;
-    }
-    if (!Number.isFinite(Number(virtual.adjustmentGeneration))) {
-      virtual.adjustmentGeneration = 0;
-    }
-    if (typeof virtual.needsScrollSync !== "boolean") {
-      virtual.needsScrollSync = false;
-    }
-    if (typeof virtual.isRenderTransaction !== "boolean") {
-      virtual.isRenderTransaction = false;
-    }
-    if (!Number.isFinite(Number(virtual.geometryEpoch))) {
-      virtual.geometryEpoch = 0;
-    }
-  }
-
-  function getInputGutterVirtualState() {
-    if (!state.inputGutterVirtual || typeof state.inputGutterVirtual !== "object") {
-      state.inputGutterVirtual = {
-        lineCount: 0,
-        startLine: 1,
-        endLine: 1,
-        lineHeightPx: 18,
-        topPadPx: 0,
-        bottomPadPx: 0,
-        pendingRaf: 0,
-        lastScrollTop: 0,
-        overscanLines: 6,
-        isInitialized: false
-      };
-    }
-    return state.inputGutterVirtual;
-  }
-
-  function cancelVirtualScrollAdjustment(virtual) {
-    if (!virtual || typeof virtual !== "object") {
-      return;
-    }
-    ensureVirtualControlState(virtual, 140);
-    virtual.adjustmentGeneration = (Number(virtual.adjustmentGeneration) || 0) + 1;
-    if (virtual.adjustmentRaf) {
-      cancelAnimationFrame(virtual.adjustmentRaf);
-      virtual.adjustmentRaf = 0;
-    }
-    virtual.isAdjustingScroll = false;
-  }
-
-  function beginVirtualScrollAdjustment(virtual) {
-    if (!virtual || typeof virtual !== "object") {
-      return 0;
-    }
-    cancelVirtualScrollAdjustment(virtual);
-    if (virtual.pendingRaf) {
-      cancelAnimationFrame(virtual.pendingRaf);
-      virtual.pendingRaf = 0;
-    }
-    virtual.needsScrollSync = false;
-    virtual.isAdjustingScroll = true;
-    return Number(virtual.adjustmentGeneration) || 0;
-  }
-
-  function queueVirtualScrollSync(container, virtual) {
-    if (!virtual || typeof virtual !== "object") {
-      return;
-    }
-    virtual.needsScrollSync = true;
-    if (virtual.isAdjustingScroll || virtual.isRenderTransaction) {
-      return;
-    }
-    if (container === els.templatePreviewOutput && typeof scheduleTemplateVirtualScroll === "function") {
-      scheduleTemplateVirtualScroll();
-    }
-  }
-
-  function finishVirtualScrollAdjustment(container, virtual, generation) {
-    if (!virtual || Number(virtual.adjustmentGeneration) !== Number(generation)) {
-      return;
-    }
-    virtual.adjustmentRaf = 0;
-    virtual.lastScrollTop = Number(container && container.scrollTop) || 0;
-    virtual.isAdjustingScroll = false;
-    if (virtual.needsScrollSync) {
-      queueVirtualScrollSync(container, virtual);
-    }
-  }
-
-  function alignVirtualTargetAfterRender(container, virtual, selector, initialNode) {
-    if (!container || !virtual) {
-      return;
-    }
-    const generation = beginVirtualScrollAdjustment(virtual);
-
-    const align = () => {
-      if (Number(virtual.adjustmentGeneration) !== generation || !virtual.isAdjustingScroll) {
-        return true;
-      }
-      const node = selector ? container.querySelector(selector) : initialNode;
-      if (!node) {
-        return true;
-      }
-      const offsetError = node.getBoundingClientRect().top - container.getBoundingClientRect().top - 10;
-      if (Math.abs(offsetError) <= 1) {
-        return true;
-      }
-      scrollElementInContainer(container, node, { mode: "start", padTop: 10, padBottom: 10 });
-      return false;
-    };
-
-    const scheduleAdjustmentFrame = (callback) => {
-      virtual.adjustmentRaf = requestAnimationFrame(() => {
-        virtual.adjustmentRaf = 0;
-        if (Number(virtual.adjustmentGeneration) !== generation || !virtual.isAdjustingScroll) {
-          return;
-        }
-        callback();
+    const appendSourceOption = (candidate, index) => {
+      const lineLabel = candidate.lineStart > 0 ? String(candidate.lineStart) : "?";
+      const option = el("option", {
+        text: `Nguồn ${index + 1}/${model.candidates.length} · line ${lineLabel} · ${candidate.actualSummary}`,
+        attrs: { value: candidate.key }
       });
+      select.appendChild(option);
     };
-
-    align();
-    const settle = (remainingFrames) => {
-      const isSettled = align();
-      if (!isSettled && remainingFrames > 0) {
-        scheduleAdjustmentFrame(() => settle(remainingFrames - 1));
+    let optionsPopulated = false;
+    const populateSourceOptions = () => {
+      if (optionsPopulated) {
         return;
       }
-      scheduleAdjustmentFrame(() => finishVirtualScrollAdjustment(container, virtual, generation));
+      optionsPopulated = true;
+      select.replaceChildren();
+      for (let index = 0; index < model.candidates.length; index += 1) {
+        appendSourceOption(model.candidates[index], index);
+      }
+      select.value = model.selectedKey;
+      delete select.dataset.optionsDeferred;
     };
-    scheduleAdjustmentFrame(() => settle(4));
-  }
-
-  function setSelectedTemplateBlock(index, options) {
-    return updateTemplateBlockSelection(index, {
-      ...(options && typeof options === "object" ? options : {}),
-      interactionMode: "replace"
+    const eagerOptionLimit = 50;
+    if (model.candidates.length <= eagerOptionLimit) {
+      populateSourceOptions();
+    } else {
+      const selectedIndex = Math.max(0, model.candidates.findIndex((candidate) => candidate.key === model.selectedKey));
+      appendSourceOption(model.candidates[selectedIndex], selectedIndex);
+      select.value = model.selectedKey;
+      select.dataset.optionsDeferred = "true";
+      select.addEventListener("focus", populateSourceOptions);
+      select.addEventListener("pointerdown", populateSourceOptions);
+    }
+    select.disabled = model.candidates.length < 2;
+    select.addEventListener("change", (ev) => {
+      ev.stopPropagation();
+      selectPerformSourceCandidate(model.formNameUpper, select.value);
     });
+    control.appendChild(select);
+    return control;
   }
 
-  function measureInputLineMetrics() {
-    const fallback = {
-      lineCount: Math.max(1, Number(state.inputLineCount) || 1),
-      nominalPitch: 18,
-      effectivePitch: 18,
-      paddingTop: 0,
-      paddingBottom: 0
-    };
-    if (!els.inputText) {
-      return fallback;
+
+
+  function buildRenderableObjects(rawRoots, options) {
+    const roots = Array.isArray(rawRoots) ? rawRoots : [];
+    if (!roots.length) {
+      return [];
     }
 
-    const lineCount = Math.max(1, Number(state.inputLineCount) || countInputLines(els.inputText.value || ""));
-    let nominalPitch = 18;
-    let paddingTop = 0;
-    let paddingBottom = 0;
-    try {
-      const style = window.getComputedStyle(els.inputText);
-      nominalPitch = Number.parseFloat(style && style.lineHeight ? style.lineHeight : "18") || 18;
-      paddingTop = Number.parseFloat(style && style.paddingTop ? style.paddingTop : "0") || 0;
-      paddingBottom = Number.parseFloat(style && style.paddingBottom ? style.paddingBottom : "0") || 0;
-    } catch {
-      // ignore
-    }
-    nominalPitch = Math.max(12, nominalPitch);
-
-    let effectivePitch = nominalPitch;
-    const scrollHeight = Math.max(0, Number(els.inputText.scrollHeight) || 0);
-    const clientHeight = Math.max(0, Number(els.inputText.clientHeight) || 0);
-    const contentHeight = scrollHeight - paddingTop - paddingBottom;
-    const measuredPitch = lineCount > 0 ? (contentHeight / lineCount) : 0;
-    const minPitch = nominalPitch * 0.9;
-    const maxPitch = nominalPitch * 1.1;
-    if (
-      lineCount > 1
-      && scrollHeight > (clientHeight + 1)
-      && Number.isFinite(measuredPitch)
-      && measuredPitch >= minPitch
-      && measuredPitch <= maxPitch
-    ) {
-      effectivePitch = measuredPitch;
-    }
-
-    return {
-      lineCount,
-      nominalPitch,
-      effectivePitch,
-      paddingTop,
-      paddingBottom
-    };
-  }
-
-  function scheduleInputGutterVirtualRender() {
-    const virtual = getInputGutterVirtualState();
-    if (virtual.pendingRaf) {
-      return;
-    }
-    virtual.pendingRaf = requestAnimationFrame(() => {
-      virtual.pendingRaf = 0;
-      renderInputGutterWindow({ force: false });
-    });
-  }
-
-  function renderInputGutterWindow(options) {
-    if (!els.inputText || !els.inputGutterContent) {
-      return;
-    }
     const opts = options && typeof options === "object" ? options : {};
-    let force = opts.force === true;
-    const virtual = getInputGutterVirtualState();
-    const lineCount = Math.max(1, Number(state.inputLineCount) || 1);
-    const scrollTop = Number(els.inputText.scrollTop || 0) || 0;
-    const lineMetrics = measureInputLineMetrics();
-    const lineHeight = Math.max(12, Number(lineMetrics.effectivePitch) || 18);
-    if (Math.abs((Number(virtual.lineHeightPx) || 0) - lineHeight) > 0.0001) {
-      force = true;
-    }
-    if (els.inputGutter && els.inputGutter.style) {
-      els.inputGutter.style.setProperty("--input-line-pitch", `${lineHeight}px`);
-    }
-    const visibleLines = Math.max(1, Math.ceil((Number(els.inputText.clientHeight) || 0) / lineHeight));
-    const overscanLines = Math.max(6, Math.ceil(visibleLines * 0.75));
-    const firstVisibleLine = Math.max(1, Math.floor(scrollTop / lineHeight) + 1);
-    const startLine = Math.max(1, firstVisibleLine - overscanLines);
-    const endLine = Math.min(lineCount, startLine + visibleLines + (overscanLines * 2) - 1);
+    const performSourceRegistry = opts.performSourceRegistry && typeof opts.performSourceRegistry === "object"
+      ? opts.performSourceRegistry
+      : null;
+    const tools = createPerformBindingTools();
+    const attachPerformBindingMetadata = tools.attachPerformBindingMetadata;
+    const clonePerformScopedData = tools.clonePerformScopedData;
 
-    const hasRangeChange = force
-      || !virtual.isInitialized
-      || startLine !== virtual.startLine
-      || endLine !== virtual.endLine
-      || lineCount !== virtual.lineCount;
-
-    virtual.lineCount = lineCount;
-    virtual.startLine = startLine;
-    virtual.endLine = endLine;
-    virtual.lineHeightPx = lineHeight;
-    virtual.overscanLines = overscanLines;
-    virtual.topPadPx = Math.max(0, (startLine - 1) * lineHeight);
-    virtual.bottomPadPx = Math.max(0, (lineCount - endLine) * lineHeight);
-    virtual.lastScrollTop = scrollTop;
-    virtual.isInitialized = true;
-
-    if (!hasRangeChange) {
-      els.inputGutterContent.style.transform = `translateY(${-scrollTop}px)`;
-      return;
-    }
-
-    state.inputGutterButtonsByLine = new Map();
-    const frag = document.createDocumentFragment();
-
-    const topSpacer = document.createElement("div");
-    topSpacer.className = "gutter-spacer";
-    topSpacer.style.height = `${virtual.topPadPx}px`;
-    topSpacer.setAttribute("aria-hidden", "true");
-    frag.appendChild(topSpacer);
-
-    for (let line = startLine; line <= endLine; line += 1) {
-      const row = document.createElement("div");
-      row.className = "gutter-line";
-      row.style.height = `${lineHeight}px`;
-
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "gutter-jump";
-      btn.textContent = "↪";
-      btn.hidden = true;
-      btn.setAttribute("data-line", String(line));
-      row.appendChild(btn);
-
-      const num = document.createElement("span");
-      num.className = "gutter-num";
-      num.textContent = String(line);
-      row.appendChild(num);
-
-      state.inputGutterButtonsByLine.set(line, btn);
-      frag.appendChild(row);
-    }
-
-    const bottomSpacer = document.createElement("div");
-    bottomSpacer.className = "gutter-spacer";
-    bottomSpacer.style.height = `${virtual.bottomPadPx}px`;
-    bottomSpacer.setAttribute("aria-hidden", "true");
-    frag.appendChild(bottomSpacer);
-
-    els.inputGutterContent.replaceChildren(frag);
-    els.inputGutterContent.style.transform = `translateY(${-scrollTop}px)`;
-    refreshInputGutterTargets();
-  }
-
-  function syncInputGutterScroll() {
-    scheduleInputGutterVirtualRender();
-  }
-
-  function rebuildInputGutter() {
-    if (!els.inputText || !els.inputGutterContent) {
-      return;
-    }
-
-    const trimmed = String(els.inputText.value || "").trim();
-    const isJsonLike = (trimmed.startsWith("{") || trimmed.startsWith("[")) && trimmed.length > 1;
-    state.inputMode = isJsonLike ? "json" : "abap";
-    state.inputLineCount = Math.max(1, countInputLines(els.inputText.value || ""));
-
-    const virtual = getInputGutterVirtualState();
-    virtual.lineHeightPx = measureInputLineMetrics().effectivePitch;
-    renderInputGutterWindow({ force: true });
-  }
-
-  function computeInputGutterTargetsForTemplate() {
-    const targets = new Map();
-    const virtual = getTemplateVirtualStateForGutter();
-    if (virtual.lineTargetMap instanceof Map && virtual.lineTargetMap.size) {
-      for (const [line, target] of virtual.lineTargetMap.entries()) {
-        targets.set(line, target);
+    const cloneNode = (sourceNode, parentId, bindingContext, sourceFormNameUpper) => {
+      if (!sourceNode || typeof sourceNode !== "object") {
+        return null;
       }
-      return targets;
-    }
 
-    if (!els.templatePreviewOutput) {
-      return targets;
-    }
-
-    const blocks = els.templatePreviewOutput.querySelectorAll(".template-block[data-template-index][data-line-start]");
-    for (const block of Array.from(blocks)) {
-      const line = Number(block.getAttribute("data-line-start")) || 0;
-      const index = String(block.getAttribute("data-template-index") || "");
-      if (!line || !index || targets.has(line)) {
-        continue;
+      let nodeBindingContext = bindingContext;
+      let nodeSourceFormNameUpper = String(sourceFormNameUpper || "").trim().toUpperCase();
+      if (sourceNode.objectType === "FORM") {
+        const formNameUpper = getFormNameFromNode(sourceNode).toUpperCase();
+        nodeSourceFormNameUpper = formNameUpper;
+        const selectedCandidate = performSourceRegistry
+          && typeof performSourceRegistry.getSelectedCandidate === "function"
+          ? performSourceRegistry.getSelectedCandidate(formNameUpper)
+          : null;
+        nodeBindingContext = selectedCandidate && selectedCandidate.bindingContext
+          ? selectedCandidate.bindingContext
+          : null;
       }
-      targets.set(line, { kind: "template", index });
+
+      const out = {};
+      for (const key of Object.keys(sourceNode)) {
+        if (key === "children") {
+          continue;
+        }
+        out[key] = sourceNode[key];
+      }
+
+      if (parentId !== undefined) {
+        out.parent = parentId;
+      }
+      if (nodeSourceFormNameUpper) {
+        try {
+          Object.defineProperty(out, PERFORM_SOURCE_FORM_META_KEY_DESC, {
+            configurable: true,
+            enumerable: false,
+            value: nodeSourceFormNameUpper
+          });
+        } catch {
+          // Source selection is optional UI metadata; keep rendering if attachment fails.
+        }
+      }
+      attachPerformBindingMetadata(out, nodeBindingContext);
+      if (nodeBindingContext && String(nodeBindingContext.sourceScope || "").trim()) {
+        if (out.values && typeof out.values === "object") {
+          out.values = clonePerformScopedData(out.values, nodeBindingContext);
+        }
+        if (out.extras && typeof out.extras === "object") {
+          out.extras = clonePerformScopedData(out.extras, nodeBindingContext);
+        }
+      }
+
+      const ownId = out.id !== null && out.id !== undefined && String(out.id).trim() ? out.id : undefined;
+      const outChildren = [];
+
+      const sourceChildren = Array.isArray(sourceNode.children) ? sourceNode.children : [];
+      for (let index = 0; index < sourceChildren.length; index += 1) {
+        const child = sourceChildren[index];
+        const clonedChild = cloneNode(child, ownId, nodeBindingContext, nodeSourceFormNameUpper);
+        if (clonedChild) {
+          outChildren.push(clonedChild);
+        }
+      }
+
+      if (outChildren.length) {
+        out.children = outChildren;
+      } else if (Array.isArray(sourceNode.children)) {
+        out.children = [];
+      }
+
+      return out;
+    };
+
+    const output = [];
+    for (let index = 0; index < roots.length; index += 1) {
+      const root = roots[index];
+      const clonedRoot = cloneNode(root, null, null, "");
+      if (clonedRoot) {
+        output.push(clonedRoot);
+      }
     }
-    return targets;
+
+    let templateObjectIndex = 0;
+    walkObjects(output, (obj) => {
+      templateObjectIndex += 1;
+      Object.defineProperty(obj, "__abapTemplateObjectIndex", {
+        configurable: true,
+        enumerable: false,
+        value: templateObjectIndex
+      });
+    });
+
+    return output;
   }
-  runtime.registerService("output", {
-    isValueLikeEntryObject,
-    isAssignmentLikeEntryObject,
-    isConditionClauseLikeObject,
-    attachPathSyntheticDeclAliases,
-    normalizeEntryObjectForPath,
-    walkObjects,
-    computeLineOffsets,
-    getSelectionRangeForLines,
-    selectCodeLines,
-    getContainerScrollScale,
-    scrollElementInContainer,
-    getSelectedTemplateIndexSet,
-    getSortedSelectedTemplateIndexes,
-    updateTemplateCopySelectedButton,
-    syncRenderedTemplateSelection,
-    clearTemplateBlockSelection,
-    pruneTemplateBlockSelection,
-    chooseNearestSelectedTemplateIndex,
-    updateTemplateBlockSelection,
-    selectTemplateBlockFromInteraction,
-    setSelectedDeclRow,
-    countInputLines,
-    computeInputGutterTargetsForDescriptions,
-    refreshInputGutterTargets,
-    onInputGutterClick,
-    openJsonModal,
-    openTextModal,
-    closeJsonModal,
-    copyJsonToClipboard,
-    stringifyDecl,
-    getDeclTechName,
-    stripAngleBrackets,
-    stripDeclCategoryPrefix,
-    isStructFieldDecl,
-    getDeclDisplayName,
-    buildDeclTitle,
-    el,
-    renderMeta,
-    getObjectLabel,
-    normalizeParsedJson,
-    getTemplateVirtualStateForGutter,
-    ensureVirtualControlState,
-    getInputGutterVirtualState,
-    cancelVirtualScrollAdjustment,
-    beginVirtualScrollAdjustment,
-    queueVirtualScrollSync,
-    finishVirtualScrollAdjustment,
-    alignVirtualTargetAfterRender,
-    setSelectedTemplateBlock,
-    measureInputLineMetrics,
-    scheduleInputGutterVirtualRender,
-    renderInputGutterWindow,
-    syncInputGutterScroll,
-    rebuildInputGutter,
-    computeInputGutterTargetsForTemplate
+  runtime.registerService("performSources", {
+    getFormNameFromNode,
+    getPerformFormNameFromNode,
+    getPerformProgramFromNode,
+    buildFormsByNameUpperFromRoots,
+    createPerformBindingTools,
+    getPerformActualEntryText,
+    buildPerformActualSummary,
+    hashPerformSourceScope,
+    buildPerformSourceScope,
+    buildPerformCallPathRegistry,
+    getPerformSourceControlModel,
+    selectPerformSourceCandidate,
+    createPerformSourceControl,
+    buildRenderableObjects
   });
 })(window);

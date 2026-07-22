@@ -1,11 +1,14 @@
 "use strict";
 
-window.AbapViewerModules = window.AbapViewerModules || {};
-window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
-window.AbapViewerRuntime = window.AbapViewerRuntime || {};
-window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
+(function registerRuntimeStateService(global) {
+  const runtime = global.AbapViewerRuntime;
+  if (!runtime || typeof runtime.registerService !== "function") {
+    throw new Error("ABAP Viewer service registry missing before runtimeState loads.");
+  }
+  const closeJsonModal = runtime.requireServiceMethod("output", "closeJsonModal");
+  const closeEditModal = runtime.requireServiceMethod("descriptions", "closeEditModal");
 
-  const els = {
+const els = {
     parseBtn: document.getElementById("parseBtn"),
     themeToggle: document.getElementById("themeToggle"),
     descBtn: document.getElementById("descBtn"),
@@ -893,7 +896,7 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     "             24 ls_audit-message.",
     "  ENDLOOP.",
     "ENDFORM."
-  ].join("\n");
+].join("\n");
 
   function createTemplateBaseStyle(background) {
     return {
@@ -1868,13 +1871,7 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
     els.settingsModal.hidden = true;
   }
 
-window.AbapViewerModules.factories = window.AbapViewerModules.factories || {};
-window.AbapViewerModules.factories["01-core"] = function registerCore(runtime) {
-  const targetRuntime = runtime || (window.AbapViewerRuntime = window.AbapViewerRuntime || {});
-  targetRuntime.api = targetRuntime.api || {};
-  targetRuntime.els = els;
-  targetRuntime.state = state;
-  targetRuntime.constants = {
+  const runtimeConstants = {
     DESC_STORAGE_KEY_V2,
     DESC_STORAGE_KEY_LEGACY_V1,
     SETTINGS_STORAGE_KEY_V1,
@@ -1892,6 +1889,59 @@ window.AbapViewerModules.factories["01-core"] = function registerCore(runtime) {
     TEMPLATE_DEFAULT_CONFIG_V1,
     SAMPLE_ABAP
   };
-  window.AbapViewerModules.parts["01-core"] = true;
-};
-window.AbapViewerModules.factories["01-core"](window.AbapViewerRuntime);
+  runtime.els = els;
+  runtime.state = state;
+  runtime.constants = runtimeConstants;
+  runtime.registerService("runtimeState", {
+    createTemplateBaseStyle,
+    createKeywordDescriptionTemplate,
+    createAppendLinesOfTemplate,
+    createConditionRowTemplate,
+    setError,
+    parseDateCandidate,
+    formatDateTime,
+    getMetaContent,
+    renderBuildInfo,
+    normalizeId,
+    flattenEntryMap,
+    getKeywordEntries,
+    getValueEntries,
+    getFirstValueFromValues,
+    loadStorageObject,
+    loadDescOverrides,
+    loadLegacyDescOverrides,
+    saveDescOverrides,
+    loadStorageArray,
+    normalizeSettings,
+    loadSettings,
+    saveSettings,
+    setTemplateConfigError,
+    setTemplatePreviewMessage,
+    cloneJsonValue,
+    getDefaultTemplateConfig,
+    templateDefinitionsEqual,
+    mergeMissingDefaultTemplatesInPlace,
+    normalizeTemplateAliasToken,
+    parseCellRef,
+    parseRangeKey,
+    isTemplateOptionConfigKey,
+    validateTemplateConfig,
+    loadTemplateConfig,
+    saveTemplateConfig,
+    normalizeTheme,
+    loadTheme,
+    applyTheme,
+    clampNumber,
+    normalizeLayoutSplit,
+    loadLayoutSplit,
+    saveLayoutSplit,
+    updateSplitterAria,
+    applyLayoutSplit,
+    isCompactLayout,
+    setLayoutResizing,
+    initLayoutSplitter,
+    renderSettingsModalUi,
+    openSettingsModal,
+    closeSettingsModal
+  });
+})(window);

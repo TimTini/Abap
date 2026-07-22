@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import re
-import subprocess
 import sys
 from pathlib import Path
 
@@ -22,156 +21,154 @@ ATTR_RE = re.compile(
     """
 )
 
+LINK_TAG_RE = re.compile(r"(?is)<link\b[^>]*>")
+SCRIPT_BLOCK_RE = re.compile(r"(?is)<script\b[^>]*>.*?</script>")
+SCRIPT_OPEN_RE = re.compile(r"(?is)<script\b[^>]*>")
+REMOTE_URL_RE = re.compile(r"^(?:https?:)?//", re.IGNORECASE)
+SRC_OR_HREF_RE = re.compile(r"\b(?:src|href)\s*=\s*[\"']([^\"']+)[\"']", re.IGNORECASE)
+CSS_URL_RE = re.compile(r"\burl\(\s*([\"']?)([^\"')]+)\1\s*\)", re.IGNORECASE)
+
 
 def _read_text(path: Path) -> str:
-    return path.read_text(encoding="utf-8")
+    text = path.read_bytes().decode("utf-8")
+    return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
-def _write_text(path: Path, text: str) -> None:
+def _write_text_if_changed(path: Path, text: str, *, check_only: bool) -> bool:
+    current = path.read_bytes().decode("utf-8") if path.exists() else None
+    if current == text:
+        return False
+    if check_only:
+        raise RuntimeError(f"Inline viewer is stale: {path}")
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    path.write_bytes(text.encode("utf-8"))
+    return True
 
 
 def _parse_attrs(open_tag: str) -> dict[str, str]:
     attrs: dict[str, str] = {}
-    for m in ATTR_RE.finditer(open_tag):
-        key = (m.group("key") or "").strip().lower()
-        val = m.group("dq")
-        if val is None:
-            val = m.group("sq")
-        if val is None:
-            val = m.group("bare")
+    for match in ATTR_RE.finditer(open_tag):
+        key = (match.group("key") or "").strip().lower()
+        value = match.group("dq")
+        if value is None:
+            value = match.group("sq")
+        if value is None:
+            value = match.group("bare")
         if key:
-            attrs[key] = val or ""
+            attrs[key] = value or ""
     return attrs
 
 
 def _is_remote_url(url: str) -> bool:
-    u = url.strip().lower()
-    return u.startswith("http://") or u.startswith("https://") or u.startswith("//")
+    return bool(REMOTE_URL_RE.match(str(url or "").strip()))
+
+
+def _resolve_local_asset(base_dir: Path, rel_path: str, kind: str) -> Path:
+    href = str(rel_path or "").strip()
+    if not href:
+        raise RuntimeError(f"Missing {kind} path.")
+    if _is_remote_url(href):
+        raise RuntimeError(f"Remote {kind} is forbidden for offline viewer: {href}")
+    asset_path = (base_dir / href).resolve()
+    if not asset_path.exists():
+        raise RuntimeError(f"Missing {kind}: {href}")
+    return asset_path
 
 
 def _escape_inline_script(js: str) -> str:
-    # Prevent accidentally terminating the <script> tag.
     return js.replace("</script>", "<\\/script>")
 
 
-LINK_TAG_RE = re.compile(r"(?is)<link\b[^>]*>")
-SCRIPT_BLOCK_RE = re.compile(r"(?is)<script\b[^>]*>.*?</script>")
-SCRIPT_OPEN_RE = re.compile(r"(?is)<script\b[^>]*>")
-
-
-def inline_stylesheet_links(html: str, base_dir: Path, warnings: list[str]) -> tuple[str, int]:
-    replaced = 0
-
-    def repl(m: re.Match[str]) -> str:
-        nonlocal replaced
-        tag = m.group(0)
+def inline_stylesheet_links(html: str, base_dir: Path) -> str:
+    def repl(match: re.Match[str]) -> str:
+        tag = match.group(0)
         attrs = _parse_attrs(tag)
         rel = (attrs.get("rel") or "").strip().lower()
         href = (attrs.get("href") or "").strip()
-
         if rel != "stylesheet" or not href:
             return tag
-        if _is_remote_url(href):
-            warnings.append(f"Skip remote stylesheet: {href}")
-            return tag
 
-        css_path = (base_dir / href).resolve()
-        if not css_path.exists():
-            warnings.append(f"Missing stylesheet: {href}")
-            return tag
+        css_path = _resolve_local_asset(base_dir, href, "stylesheet")
+        css = _read_text(css_path).rstrip()
+        return "\n".join([
+            "<style>",
+            f"/* inlined from: {href} */",
+            css,
+            "</style>",
+        ])
 
-        css = _read_text(css_path)
-        replaced += 1
-        return "\n".join(
-            [
-                "<style>",
-                f"/* inlined from: {href} */",
-                css.rstrip(),
-                "</style>",
-            ]
-        )
-
-    return LINK_TAG_RE.sub(repl, html), replaced
+    return LINK_TAG_RE.sub(repl, html)
 
 
-def inline_script_src(html: str, base_dir: Path, warnings: list[str]) -> tuple[str, int]:
-    replaced = 0
-
-    def repl(m: re.Match[str]) -> str:
-        nonlocal replaced
-        block = m.group(0)
-
-        open_m = SCRIPT_OPEN_RE.match(block)
-        if not open_m:
+def inline_script_src(html: str, base_dir: Path) -> str:
+    def repl(match: re.Match[str]) -> str:
+        block = match.group(0)
+        open_match = SCRIPT_OPEN_RE.match(block)
+        if not open_match:
             return block
 
-        open_tag = open_m.group(0)
-        attrs = _parse_attrs(open_tag)
+        attrs = _parse_attrs(open_match.group(0))
         src = (attrs.get("src") or "").strip()
         if not src:
             return block
-        if _is_remote_url(src):
-            warnings.append(f"Skip remote script: {src}")
-            return block
 
-        script_path = (base_dir / src).resolve()
-        if not script_path.exists():
-            warnings.append(f"Missing script: {src}")
-            return block
+        script_path = _resolve_local_asset(base_dir, src, "script")
+        js = _escape_inline_script(_read_text(script_path).rstrip())
+        return "\n".join([
+            "<script>",
+            f"// inlined from: {src}",
+            js,
+            "</script>",
+        ])
 
-        js = _read_text(script_path)
-        js = _escape_inline_script(js)
-        replaced += 1
-        return "\n".join(
-            [
-                "<script>",
-                f"// inlined from: {src}",
-                js.rstrip(),
-                "</script>",
-            ]
+    return SCRIPT_BLOCK_RE.sub(repl, html)
+
+
+def collect_remote_asset_urls(html: str) -> list[str]:
+    found: list[str] = []
+    for match in SRC_OR_HREF_RE.finditer(html):
+        url = (match.group(1) or "").strip()
+        if _is_remote_url(url):
+            found.append(url)
+    for match in CSS_URL_RE.finditer(html):
+        url = (match.group(2) or "").strip()
+        if _is_remote_url(url):
+            found.append(url)
+    return found
+
+
+def collect_disallowed_css_urls(html: str) -> list[str]:
+    found: list[str] = []
+    for match in CSS_URL_RE.finditer(html):
+        url = (match.group(2) or "").strip()
+        if not url:
+            continue
+        if url.startswith("#") or url.lower().startswith("data:"):
+            continue
+        found.append(url)
+    return found
+
+
+def assert_self_contained_inline_html(html: str) -> None:
+    remote = collect_remote_asset_urls(html)
+    if remote:
+        raise RuntimeError(f"Inline viewer must stay offline-only. Remote refs: {', '.join(remote)}")
+    if re.search(r"<script\b[^>]*\bsrc=", html, re.IGNORECASE):
+        raise RuntimeError("Inline viewer must not retain <script src=...> tags.")
+    if re.search(r"<link\b[^>]*rel=[\"']stylesheet[\"'][^>]*href=", html, re.IGNORECASE):
+        raise RuntimeError("Inline viewer must not retain stylesheet link tags.")
+    disallowed_css_urls = collect_disallowed_css_urls(html)
+    if disallowed_css_urls:
+        raise RuntimeError(
+            "Inline viewer must not retain CSS url() assets: " + ", ".join(disallowed_css_urls)
         )
 
-    return SCRIPT_BLOCK_RE.sub(repl, html), replaced
 
-
-def main() -> int:
-    repo_root = Path(__file__).resolve().parent.parent
-    default_in = repo_root / "viewer" / "index.html"
-    default_out = repo_root / "viewer" / "index.inline.html"
-    runtime_builder = repo_root / "scripts" / "build-runtime-bundles.js"
-
-    parser = argparse.ArgumentParser(description="Inline viewer HTML into a single file (offline).")
-    parser.add_argument("--input", type=Path, default=default_in, help="Path to viewer index.html")
-    parser.add_argument("--output", type=Path, default=default_out, help="Output HTML file path")
-    args = parser.parse_args()
-
-    input_path: Path = args.input
-    output_path: Path = args.output
-
-    if not input_path.exists():
-        print(f"Input not found: {input_path}", file=sys.stderr)
-        return 2
-
-    if runtime_builder.exists():
-        try:
-            subprocess.run(
-                ["node", str(runtime_builder)],
-                cwd=repo_root,
-                check=True,
-                text=True
-            )
-        except subprocess.CalledProcessError as exc:
-            print(f"Runtime bundle build failed with exit code {exc.returncode}", file=sys.stderr)
-            return exc.returncode or 1
-
-    base_dir = input_path.resolve().parent
+def build_inline_html(input_path: Path, repo_root: Path) -> str:
     html = _read_text(input_path)
-
-    warnings: list[str] = []
-    html, css_count = inline_stylesheet_links(html, base_dir, warnings)
-    html, js_count = inline_script_src(html, base_dir, warnings)
+    base_dir = input_path.resolve().parent
+    inlined = inline_script_src(inline_stylesheet_links(html, base_dir), base_dir)
+    assert_self_contained_inline_html(inlined)
 
     try:
         source_label = input_path.resolve().relative_to(repo_root.resolve()).as_posix()
@@ -189,15 +186,44 @@ def main() -> int:
             "",
         ]
     )
+    return banner + inlined
 
-    _write_text(output_path, banner + html)
 
-    print(f"Generated: {output_path} (inlined {js_count} scripts, {css_count} stylesheets)")
-    for w in warnings:
-        print(f"WARNING: {w}", file=sys.stderr)
+def parse_cli_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Inline viewer HTML into a single self-contained offline file.")
+    repo_root = Path(__file__).resolve().parent.parent
+    parser.add_argument("--input", type=Path, default=repo_root / "viewer" / "index.html")
+    parser.add_argument("--output", type=Path, default=repo_root / "viewer" / "index.inline.html")
+    parser.add_argument("--check", action="store_true", help="Fail if output is stale instead of rewriting it.")
+    return parser.parse_args(argv)
 
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_cli_args(sys.argv[1:] if argv is None else argv)
+    repo_root = Path(__file__).resolve().parent.parent
+    input_path = args.input.resolve()
+    output_path = args.output.resolve()
+
+    if not input_path.exists():
+        raise RuntimeError(f"Input not found: {input_path}")
+
+    inline_html = build_inline_html(input_path, repo_root)
+    changed = _write_text_if_changed(output_path, inline_html, check_only=bool(args.check))
+
+    if args.check:
+        print("Inline viewer is up to date.")
+        return 0
+
+    if changed:
+        print(f"Generated: {output_path}")
+    else:
+        print("Inline viewer already up to date.")
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except RuntimeError as error:
+        print(str(error), file=sys.stderr)
+        raise SystemExit(1)

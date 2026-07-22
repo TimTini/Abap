@@ -43,7 +43,7 @@ This file is the local source of truth for future AI/code agents working in this
 - If `viewer/index.html` or `viewer/app.js` changed:
   - `python scripts/build-inline-viewer.py`
 - If viewer part files changed (`viewer/app/core/*.js`, `viewer/app/output/*.js`, `viewer/app/descriptions/*.js`, `viewer/app/template/*.js`):
-  - Run `node scripts/build-runtime-bundles.js`.
+  - Run `node scripts/build-viewer-configs.js`.
   - Run `python scripts/build-inline-viewer.py`.
 - Always run:
   - `node tests/parser-regression.js`
@@ -60,11 +60,9 @@ This file is the local source of truth for future AI/code agents working in this
 
 - Runtime loader invariants:
   - `shared/abap-parser.js` is the only parser source. Do not recreate parser part files or generate this file from another source.
-  - Viewer runtime uses **one plain JS source part per bundle** (`core`, `descriptions`, `template`, `output`) built into legacy bundle entry paths (`viewer/app/01-core.js`, `02-descriptions.js`, `03-template-preview.js`, `04-output-render.js`).
-  - Viewer source parts are built into bundles by `node scripts/build-runtime-bundles.js`.
-  - `viewer/index.html` loads bundles, not individual source parts.
+  - `viewer/index.html` loads canonical Viewer source files directly.
+  - Viewer runtime is organized as service IIFEs registered through `viewer/app/core/00-service-registry.js`.
   - Do not reintroduce runtime `eval`, `__AbapSourceParts`, or injected `<script>.textContent` assembly.
-  - Do not add empty Viewer source files; `build-runtime-bundles.js` fails on missing/empty parts.
   - Runtime metadata keys shared across modules (e.g., perform-trace keys) must avoid top-level redeclare collisions; prefer unique key names per module context and `var` declarations only when cross-part scope requires it.
 
 - Template `PERFORM -> FORM` source-shaped render:
@@ -155,8 +153,8 @@ This file is the local source of truth for future AI/code agents working in this
   - Validate Template copy/import/export buttons and clipboard flow.
 
 - Fast debug checklist for module-load/runtime errors:
-  - If `Viewer modules missing: ...`, check script order and wrapper/part pairing in `viewer/index.html`.
-  - If `Identifier ... has already been declared`, check split-part top-level declarations for collisions in injected runtime source.
+  - If `Viewer services missing: ...`, check direct script order in `viewer/index.html`.
+  - If `Identifier ... has already been declared`, check top-level declarations across canonical source files.
   - Rebuild inline artifact: `python scripts/build-inline-viewer.py`.
   - Run checks:
     - `node tests/parser-regression.js`
@@ -170,11 +168,16 @@ This file is the local source of truth for future AI/code agents working in this
   - `viewer/app.js`: module bootstrap + required-wrapper presence checks.
   - `viewer/index.inline.html`: generated artifact from `scripts/build-inline-viewer.py` (do not hand-edit logic).
 
-- Generated runtime bundles (legacy entry points, do not hand-edit):
-  - `viewer/app/01-core.js`: built from `viewer/app/core/01-runtime-state.js`.
-  - `viewer/app/02-descriptions.js`: built from `viewer/app/descriptions/01-normalize-and-desc.js`.
-  - `viewer/app/03-template-preview.js`: built from `viewer/app/template/01-path-resolver.js`.
-  - `viewer/app/04-output-render.js`: built from `viewer/app/output/01-output-render.js`.
+- Runtime entry sources:
+  - `viewer/app/core/00-service-registry.js`: service registry bootstrap.
+  - `viewer/app/core/01-runtime-state.js`: runtime state, DOM refs, localStorage, theme/layout, settings helpers.
+  - `viewer/app/output/01-output-render.js`: shared output/gutter/render helpers.
+  - `viewer/app/descriptions/01-normalize-and-desc.js`: description logic and Data panel rendering.
+  - `viewer/app/perform/01-perform-sources.js`: PERFORM source registry, selection, FORM subtree binding.
+  - `viewer/app/template/01-path-resolver.js`: template resolver, preview, template UI, import/export helpers.
+  - `viewer/app/ui/01-navigation.js`: right-panel switching and code navigation helpers.
+  - `viewer/app/parser/01-parser-controller.js`: parse flow and synthetic decl augmentation.
+  - `viewer/app/bootstrap/01-bootstrap.js`: API wiring and init/start.
   - `shared/abap-parser.js`: canonical parser source and browser/CommonJS public API.
 
 - Core runtime (`viewer/app/core/01-runtime-state.js`):
@@ -190,7 +193,6 @@ This file is the local source of truth for future AI/code agents working in this
   - Template path resolution, grid/style, preview render, copy/import/export.
 
 - Build/test scripts:
-  - `scripts/build-runtime-bundles.js`: build the transitional Viewer bundles from their canonical source files.
   - `scripts/build-inline-viewer.py`: inline-build `viewer/index.inline.html` from split scripts.
   - `scripts/sync-default-sample.js`: sync `examples/deep_form_demo.abap` into `viewer/app/core/01-runtime-state.js` `SAMPLE_ABAP`.
   - `scripts/build-viewer-configs.js`: regenerate `viewer/configs.generated.js` from `configs/*.json`.
@@ -199,4 +201,4 @@ This file is the local source of truth for future AI/code agents working in this
 - Default sample source:
   - Edit `examples/deep_form_demo.abap` first.
   - Then run `node scripts/sync-default-sample.js`.
-  - If viewer parts changed, rebuild bundles and inline viewer afterward with `node scripts/build-runtime-bundles.js` then `python scripts/build-inline-viewer.py`.
+  - If viewer parts changed, rebuild config bundle if needed and inline viewer afterward with `node scripts/build-viewer-configs.js` then `python scripts/build-inline-viewer.py`.

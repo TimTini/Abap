@@ -70,6 +70,14 @@ function cloneTestJson(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function getDeclOverrideStorageKeyFromRuntime(window, decl) {
+  const runtime = window && window.AbapViewerRuntime ? window.AbapViewerRuntime : null;
+  const descriptions = runtime && runtime.services ? runtime.services.descriptions : null;
+  return descriptions && typeof descriptions.getDeclOverrideStorageKey === "function"
+    ? descriptions.getDeclOverrideStorageKey(decl)
+    : "";
+}
+
 function findVisibleConfigExportModal(window) {
   return Array.from(window.document.querySelectorAll(".modal"))
     .find((modal) => !modal.hidden && String(modal.textContent || "").includes("Export Viewer Config"));
@@ -474,8 +482,8 @@ async function assertGroupedConfigRoundTripsStateStorageAndDom() {
   );
   window.localStorage.setItem(VIEWER_CONFIG_STORAGE_KEYS.hiddenObjectTypes, "[]");
   window.localStorage.setItem(VIEWER_CONFIG_STORAGE_KEYS.formEditorPct, "35");
-  window.applyTheme("dark");
-  window.applyLayoutSplit(35);
+  window.AbapViewerRuntime.services.runtimeState.applyTheme("dark");
+  window.AbapViewerRuntime.services.runtimeState.applyLayoutSplit(35);
 
   let confirmationText = "";
   window.confirm = (message) => {
@@ -551,8 +559,8 @@ async function assertGroupedConfigRoundTripsStateStorageAndDom() {
   const preservedTemplate = cloneTestJson(state.templateConfig);
   const preservedSettings = cloneTestJson(state.settings);
   const preservedOverrides = cloneTestJson(state.descOverrides);
-  window.applyTheme("dark");
-  window.applyLayoutSplit(42);
+  window.AbapViewerRuntime.services.runtimeState.applyTheme("dark");
+  window.AbapViewerRuntime.services.runtimeState.applyLayoutSplit(42);
   const appearanceOnly = {
     kind: "abap-viewer-config",
     version: 1,
@@ -682,9 +690,14 @@ async function assertGroupedConfigImportValidatesAndRollsBack() {
     VIEWER_CONFIG_STORAGE_KEYS.legacyDescriptionOverrides,
     JSON.stringify(originalLegacyOverrides)
   );
-  const originalRenderActiveRightPanel = window.renderActiveRightPanel;
+  const uiNavigation = window.AbapViewerRuntime && window.AbapViewerRuntime.services
+    ? window.AbapViewerRuntime.services.uiNavigation
+    : null;
+  const originalRenderActiveRightPanel = uiNavigation && typeof uiNavigation.renderActiveRightPanel === "function"
+    ? uiNavigation.renderActiveRightPanel
+    : null;
   let renderFailureInjected = false;
-  window.renderActiveRightPanel = function failFirstImportedOverrideRender() {
+  uiNavigation.renderActiveRightPanel = function failFirstImportedOverrideRender() {
     if (!renderFailureInjected) {
       renderFailureInjected = true;
       throw new Error("injected render failure");
@@ -699,7 +712,7 @@ async function assertGroupedConfigImportValidatesAndRollsBack() {
       sections: { descriptionOverrides: { replacement: "Replacement" } }
     }), false);
   } finally {
-    window.renderActiveRightPanel = originalRenderActiveRightPanel;
+    uiNavigation.renderActiveRightPanel = originalRenderActiveRightPanel;
   }
   assert.strictEqual(renderFailureInjected, true);
   assert.deepStrictEqual(cloneTestJson(state.descOverrides), originalOverrides);
@@ -1096,7 +1109,7 @@ async function assertTemplateRowDescriptionEditsLocalLoopDecl() {
   const tableDecl = (state.data && Array.isArray(state.data.decls) ? state.data.decls : [])
     .find((decl) => String(decl && decl.name || "") === "lt_abc");
   assert(tableDecl, "Expected the parser result to contain the local table declaration.");
-  const tableDeclKey = window.getDeclOverrideStorageKey(tableDecl);
+  const tableDeclKey = getDeclOverrideStorageKeyFromRuntime(window, tableDecl);
 
   await saveTemplateCellDescription(window, modal, "Updated list");
   const storedOverride = state.descOverrides[tableDeclKey];
@@ -1172,13 +1185,13 @@ async function assertTemplateRowDescriptionKeepsNestedPerformTrace() {
   let modal = await openTemplateCellDescriptionTab(window, rootTwoCell);
   assert(
     !modal.querySelector("select"),
-    `Expected a single PERFORM call chain not to show Description Target select. Keys: ${cellCandidates.map((decl) => window.getDeclOverrideStorageKey(decl)).join(", ")}`
+    `Expected a single PERFORM call chain not to show Description Target select. Keys: ${cellCandidates.map((decl) => getDeclOverrideStorageKeyFromRuntime(window, decl)).join(", ")}`
   );
   assert(String(modal.textContent || "").includes("gv_root_two"), "Expected Description tab to show the root decl label.");
 
   await saveTemplateCellDescription(window, modal, "Root two edited");
   const rootTwoDecl = cellCandidates.find((decl) => String(decl && decl.name || "").toLowerCase() === "gv_root_two");
-  const rootTwoKey = window.getDeclOverrideStorageKey(rootTwoDecl);
+  const rootTwoKey = getDeclOverrideStorageKeyFromRuntime(window, rootTwoDecl);
   assert(rootTwoKey, "Expected a storage key for gv_root_two.");
   const storedRoot = state.descOverrides[rootTwoKey];
   assert.strictEqual(
@@ -1188,13 +1201,13 @@ async function assertTemplateRowDescriptionKeepsNestedPerformTrace() {
   );
   for (const decl of cellCandidates) {
     assert.strictEqual(
-      window.getDeclOverrideStorageKey(decl),
+      getDeclOverrideStorageKeyFromRuntime(window, decl),
       rootTwoKey,
       "Expected every cloned declaration in the PERFORM chain to share the scoped override key."
     );
   }
   const globalFormParam = (state.data.decls || []).find((decl) => String(decl && decl.name || "").toLowerCase() === "iv_outer_two");
-  const globalFormParamKey = window.getDeclOverrideStorageKey(globalFormParam);
+  const globalFormParamKey = getDeclOverrideStorageKeyFromRuntime(window, globalFormParam);
   assert.strictEqual(
     Object.prototype.hasOwnProperty.call(state.descOverrides || {}, globalFormParamKey),
     false,
@@ -1264,7 +1277,7 @@ async function assertTemplatePerformSourceEditDoesNotBleedAcrossSources() {
   let clearCell = findClearChainCell("gs_request");
   assert(clearCell, "Expected expanded CLEAR cell with gs_request + iv_request chain under source 3.");
   const sourceThreeDecls = clearCell.__templateCellMeta.declCandidates;
-  const sourceThreeKeys = new Set(sourceThreeDecls.map((decl) => window.getDeclOverrideStorageKey(decl)));
+  const sourceThreeKeys = new Set(sourceThreeDecls.map((decl) => getDeclOverrideStorageKeyFromRuntime(window, decl)));
   assert.strictEqual(sourceThreeKeys.size, 1, "Expected every declaration in one PERFORM chain to share one scoped key.");
   const sourceThreeKey = Array.from(sourceThreeKeys)[0];
   assert.match(sourceThreeKey, /^PERFORM_CHAIN:/, "Expected a source-scoped PERFORM override key.");
@@ -1278,7 +1291,7 @@ async function assertTemplatePerformSourceEditDoesNotBleedAcrossSources() {
   const formalDecl = (state.data.decls || []).find((decl) => String(decl && decl.name || "").toLowerCase() === "iv_request");
   assert.strictEqual(String(state.descOverrides[sourceThreeKey] || ""), "Source 3 only", "Expected source 3 scoped override.");
   for (const globalDecl of [requestDecl, previewDecl, formalDecl]) {
-    const globalKey = window.getDeclOverrideStorageKey(globalDecl);
+    const globalKey = getDeclOverrideStorageKeyFromRuntime(window, globalDecl);
     assert.strictEqual(
       Object.prototype.hasOwnProperty.call(state.descOverrides || {}, globalKey),
       false,
@@ -1292,7 +1305,7 @@ async function assertTemplatePerformSourceEditDoesNotBleedAcrossSources() {
   );
   await waitForViewerUi(window);
   clearCell = findClearChainCell("gs_request");
-  const sourceOneKey = window.getDeclOverrideStorageKey(clearCell.__templateCellMeta.declCandidates[0]);
+  const sourceOneKey = getDeclOverrideStorageKeyFromRuntime(window, clearCell.__templateCellMeta.declCandidates[0]);
   assert.notStrictEqual(sourceOneKey, sourceThreeKey, "Expected source 1 and source 3 to stay separate despite the same root declaration.");
   assert(!String(clearCell.textContent || "").includes("Source 3 only"), "Expected source 1 description to stay unchanged.");
 
@@ -1308,7 +1321,7 @@ async function assertTemplatePerformSourceEditDoesNotBleedAcrossSources() {
   const returnedSourceThreeDecl = clearCell.__templateCellMeta.declCandidates[0];
   assert(
     String(clearCell.textContent || "").includes("Source 3 only"),
-    `Expected source 3 override to return after source switching. Text=${String(clearCell.textContent || "")} Key=${window.getDeclOverrideStorageKey(returnedSourceThreeDecl)} Effective=${window.AbapViewerRuntime.api.getEffectiveDeclDesc(returnedSourceThreeDecl)}`
+    `Expected source 3 override to return after source switching. Text=${String(clearCell.textContent || "")} Key=${getDeclOverrideStorageKeyFromRuntime(window, returnedSourceThreeDecl)} Effective=${window.AbapViewerRuntime.api.getEffectiveDeclDesc(returnedSourceThreeDecl)}`
   );
 
   els.parseBtn.click();
@@ -1499,8 +1512,9 @@ async function assertLegacyPathAliasUsesSourceShapedTemplateIndex() {
   const { els, state } = runtime;
   const legacySourceKey = "PATH:OBJECTS/OBJECT[2]/VALUES/WHAT/DECL:A";
 
-  const templateItems = typeof window.getRenderableObjectListForTemplate === "function"
-    ? window.getRenderableObjectListForTemplate()
+  const templateService = runtime && runtime.services ? runtime.services.template : null;
+  const templateItems = templateService && typeof templateService.getRenderableObjectListForTemplate === "function"
+    ? templateService.getRenderableObjectListForTemplate()
     : [];
   const appendIndex = templateItems.findIndex((item) => item && item.obj && item.obj.objectType === "APPEND");
   assert.strictEqual(appendIndex, 1, "Expected APPEND to stay before the later FORM definition in Template order.");
@@ -1559,8 +1573,8 @@ async function assertInputPitchAndCodeNavigationUseNativeTextareaMetrics() {
     "Expected each gutter row to use the same fractional pitch as the textarea."
   );
 
-  assert.strictEqual(typeof window.jumpInputToCodeRange, "function", "Expected shared source navigation to remain available.");
-  window.jumpInputToCodeRange(targetLine, targetLine, null);
+  assert.strictEqual(typeof window.AbapViewerRuntime.api.jumpInputToCodeRange, "function", "Expected shared source navigation to remain available.");
+  window.AbapViewerRuntime.api.jumpInputToCodeRange(targetLine, targetLine, null);
   await settleViewerUi(window);
   const expectedTop = ((targetLine - 1) * expectedPitch) - (540 * 0.28);
   assert(
@@ -1830,7 +1844,7 @@ async function assertSplitterRefreshesActiveVirtualGeometry() {
     tabButton.click();
     await settleViewerUi(window);
     const epochBefore = Number(virtualState.geometryEpoch) || 0;
-    window.applyLayoutSplit((Number(state.layoutLeftPane) || 48) + 2, { save: false });
+    window.AbapViewerRuntime.services.runtimeState.applyLayoutSplit((Number(state.layoutLeftPane) || 48) + 2, { save: false });
     await settleViewerUi(window, 6);
     assert(
       (Number(virtualState.geometryEpoch) || 0) > epochBefore,
@@ -1886,7 +1900,7 @@ async function assertBlankViewportFallbackUsesLogicalAnchor() {
     container: els.templatePreviewOutput,
     tabButton: els.rightTabTemplateBtn,
     rootSelector: ".template-block[data-template-index]",
-    captureAnchor: () => window.captureTemplateViewportAnchor()
+    captureAnchor: () => window.AbapViewerRuntime.services.template.captureTemplateViewportAnchor()
   });
 
   dom.window.close();
@@ -2006,7 +2020,7 @@ async function assertTemplateAppendDeclaredOperandsPreferRealDeclarations() {
   const realDecl = (Array.isArray(state.data && state.data.decls) ? state.data.decls : [])
     .find((decl) => String(decl && decl.name || "") === "a");
   assert(realDecl, "Expected the parser declaration for a.");
-  const realKey = window.getDeclOverrideStorageKey(realDecl);
+  const realKey = getDeclOverrideStorageKeyFromRuntime(window, realDecl);
   const modal = await openTemplateCellDescriptionTab(window, sourceCell);
   await saveTemplateCellDescription(window, modal, "Real A edited");
   assert.strictEqual(String(state.descOverrides[realKey] || ""), "Real A edited", "Expected a declared APPEND source to retain its real declaration key.");
@@ -2386,7 +2400,7 @@ async function assertTemplateSemanticFallbacksUseStablePaths() {
   assert(performDecl, "Expected an unbound PERFORM parameter target.");
   assert.strictEqual(performValueCell.__templateCellMeta.reasonCode, "");
   assert.strictEqual(
-    window.getDeclOverrideStorageKey(performDecl),
+    getDeclOverrideStorageKeyFromRuntime(window, performDecl),
     "PATH:OBJECT:1/EXTRAS/PERFORMCALL/USING/ITEM[1]/VALUEDECL:X"
   );
 
@@ -2398,7 +2412,7 @@ async function assertTemplateSemanticFallbacksUseStablePaths() {
   const callDecl = callValueCell && callValueCell.__templateCellMeta && callValueCell.__templateCellMeta.declCandidates[0];
   assert(callDecl, "Expected an unbound CALL parameter target.");
   assert.strictEqual(
-    window.getDeclOverrideStorageKey(callDecl),
+    getDeclOverrideStorageKeyFromRuntime(window, callDecl),
     "PATH:OBJECT:2/EXTRAS/CALLFUNCTION/EXPORTING/ITEM[1]/VALUEDECL:Y"
   );
 
@@ -2412,7 +2426,7 @@ async function assertTemplateSemanticFallbacksUseStablePaths() {
     && conditionRight.__templateCellMeta.declCandidates.length > 0, "Expected the existing condition synthetic target for literal 1 to remain unchanged.");
   const conditionLeftDecl = conditionLeft.__templateCellMeta.declCandidates[0];
   const conditionLeftKey = "CONDITION:Z";
-  assert.strictEqual(window.getDeclOverrideStorageKey(conditionLeftDecl), conditionLeftKey, "Expected Template to keep the existing condition-operand synthetic key.");
+  assert.strictEqual(getDeclOverrideStorageKeyFromRuntime(window, conditionLeftDecl), conditionLeftKey, "Expected Template to keep the existing condition-operand synthetic key.");
   const conditionModal = await openTemplateCellDescriptionTab(window, conditionLeft);
   await saveTemplateCellDescription(window, conditionModal, "Z edited");
   assert.strictEqual(String(window.AbapViewerRuntime.state.descOverrides[conditionLeftKey] || ""), "Z edited");
@@ -2465,7 +2479,7 @@ async function assertTemplateDirectSchemaPathsStayLocked() {
   const intoCell = findTemplateCellByText(selectTable, "out");
   const intoDecl = intoCell && intoCell.__templateCellMeta && intoCell.__templateCellMeta.declCandidates[0];
   assert(intoDecl, "Expected SELECT destination out to remain editable.");
-  assert.strictEqual(window.getDeclOverrideStorageKey(intoDecl), "PATH:OBJECT:1/VALUES/INTOTABLE/DECL:OUT");
+  assert.strictEqual(getDeclOverrideStorageKeyFromRuntime(window, intoDecl), "PATH:OBJECT:1/VALUES/INTOTABLE/DECL:OUT");
 
   dom.window.close();
 }
@@ -2568,7 +2582,7 @@ async function assertTemplateFallbackAllowlistCoversExistingItabOperands() {
       const cell = findTemplateCellByText(table, cellText);
       const decl = cell && cell.__templateCellMeta && cell.__templateCellMeta.declCandidates[0];
       assert(decl, `Expected ${testCase.objectType} operand ${cellText} to be editable.`);
-      assert.strictEqual(window.getDeclOverrideStorageKey(decl), expectedKey);
+      assert.strictEqual(getDeclOverrideStorageKeyFromRuntime(window, decl), expectedKey);
     }
     dom.window.close();
   }
@@ -2588,10 +2602,13 @@ async function assertTemplateResolverWarnsOnceWithCellMetadata() {
     A1: { text: "{values.what.value}" }
   };
 
-  const originalNormalize = window.normalizeEntryObjectForPath;
+  const outputService = runtime && runtime.services ? runtime.services.output : null;
+  const originalNormalize = outputService && typeof outputService.normalizeEntryObjectForPath === "function"
+    ? outputService.normalizeEntryObjectForPath
+    : null;
   const originalWarn = window.console.warn;
   const provenanceWarnings = [];
-  window.normalizeEntryObjectForPath = () => {
+  outputService.normalizeEntryObjectForPath = () => {
     throw new Error("forced provenance failure");
   };
   window.console.warn = (message, details) => {
@@ -2622,7 +2639,7 @@ async function assertTemplateResolverWarnsOnceWithCellMetadata() {
     assert(String(modal.textContent || "").includes("Resolver phát sinh lỗi"), "Expected a clear resolver-error Description reason.");
     assert(modal.querySelector("textarea.template-config-json").disabled, "Expected a resolver-error cell to stay non-editable.");
   } finally {
-    window.normalizeEntryObjectForPath = originalNormalize;
+    outputService.normalizeEntryObjectForPath = originalNormalize;
     window.console.warn = originalWarn;
     dom.window.close();
   }
@@ -3108,13 +3125,13 @@ async function assertStructFieldFinalDescNormalizesParentOnly() {
   const nestedItemDecl = findDecl("lds_order-address-city");
 
   assert(parentDecl && itemDecl && nestedItemDecl, "Expected parent, direct item, and nested item declarations.");
-  assert.strictEqual(typeof window.getDeclOverrideStorageKey, "function");
+  assert.strictEqual(typeof window.AbapViewerRuntime.services.descriptions.getDeclOverrideStorageKey, "function");
 
   state.settings.nameTemplatesByCode.DS = "PARENT[{{desc}}]";
   state.settings.structDescTemplate = "{{struct}}-{{item}}";
-  state.descOverrides[window.getDeclOverrideStorageKey(parentDecl)] = "Đơn hàng";
-  state.descOverrides[window.getDeclOverrideStorageKey(itemDecl)] = "Mặt hàng";
-  state.descOverrides[window.getDeclOverrideStorageKey(nestedItemDecl)] = "Địa chỉ-Thành phố";
+  state.descOverrides[getDeclOverrideStorageKeyFromRuntime(window, parentDecl)] = "Đơn hàng";
+  state.descOverrides[getDeclOverrideStorageKeyFromRuntime(window, itemDecl)] = "Mặt hàng";
+  state.descOverrides[getDeclOverrideStorageKeyFromRuntime(window, nestedItemDecl)] = "Địa chỉ-Thành phố";
 
   assert.strictEqual(getFinalDeclDesc(parentDecl), "PARENT[Đơn hàng]");
   assert.strictEqual(
@@ -3218,7 +3235,7 @@ async function assertConstantInitializersAndEmptyTableBodiesShapeFinalDesc() {
   assert(constantAssignment && constantAssignment.values && constantAssignment.values.expr);
   assert.strictEqual(resolveValueLevelFinalDesc(constantAssignment.values.expr), "20 + 1");
 
-  state.descOverrides[window.getDeclOverrideStorageKey(constantDecl)] = "Manual maximum";
+  state.descOverrides[getDeclOverrideStorageKeyFromRuntime(window, constantDecl)] = "Manual maximum";
   assert.strictEqual(
     resolveValueLevelFinalDesc(constantAssignment.values.expr),
     "Manual maximum + 1",
@@ -3824,7 +3841,7 @@ async function assertMessageAndWriteViewerContracts() {
   const messageCandidates = messageCell.__templateCellMeta && messageCell.__templateCellMeta.declCandidates;
   assert(Array.isArray(messageCandidates) && messageCandidates.length > 0);
   assert.strictEqual(String(messageCandidates[0].name || ""), "lv_message");
-  const messageDeclKey = window.getDeclOverrideStorageKey(messageCandidates[0]);
+  const messageDeclKey = getDeclOverrideStorageKeyFromRuntime(window, messageCandidates[0]);
   let modal = await openTemplateCellDescriptionTab(window, messageCell);
   await saveTemplateCellDescription(window, modal, "Edited message");
   assert.strictEqual(String(state.descOverrides[messageDeclKey] || ""), "Edited message");
@@ -3904,7 +3921,7 @@ async function assertDataCatalogGroupsEverySourceDeclaration() {
         && !["SYSTEM", "CONDITION", "PATH_DECL"].includes(objectType)
         && !["SYSTEM", "PATH"].includes(scopeType);
     })
-    .map((decl) => window.getDeclOverrideStorageKey(decl))
+    .map((decl) => getDeclOverrideStorageKeyFromRuntime(window, decl))
     .filter(Boolean));
   const renderedKeys = new Set(Array.from(els.declDescTable.querySelectorAll("tbody tr[data-source-decl-key]"))
     .map((row) => String(row.getAttribute("data-source-decl-key") || ""))
@@ -3929,11 +3946,15 @@ async function assertDataCatalogGroupsEverySourceDeclaration() {
 async function assertOutputFeatureRemoved() {
   const sourceFiles = [
     "viewer/index.html",
+    "viewer/app/core/00-service-registry.js",
     "viewer/app/core/01-runtime-state.js",
     "viewer/app/descriptions/01-normalize-and-desc.js",
+    "viewer/app/perform/01-perform-sources.js",
     "viewer/app/template/01-path-resolver.js",
     "viewer/app/output/01-output-render.js",
-    "viewer/app/05-main.js"
+    "viewer/app/ui/01-navigation.js",
+    "viewer/app/parser/01-parser-controller.js",
+    "viewer/app/bootstrap/01-bootstrap.js"
   ];
   const removedRuntimeTokens = [
     "rightTabOutputBtn",
