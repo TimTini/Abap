@@ -2060,7 +2060,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return map;
   }
 
-  function createPerformExpansionTools() {
+  function createPerformBindingTools() {
     var PERFORM_TRACE_META_KEY_DESC = "__abapPerformTraceBinding";
 
     const getDeclIdentityKey = (decl) => {
@@ -2431,7 +2431,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const candidateByKey = new Map();
     const selectedKeyByFormUpper = new Map();
     const formOrder = [];
-    const tools = createPerformExpansionTools();
+    const tools = createPerformBindingTools();
     let sourceOrder = 0;
 
     const registry = {
@@ -2612,10 +2612,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (!registry || typeof registry.getActiveCandidates !== "function") {
       return null;
     }
-    if (!obj || obj.objectType !== "PERFORM" || getPerformProgramFromNode(obj)) {
+    if (!obj || obj.objectType !== "FORM") {
       return null;
     }
-    const formName = getPerformFormNameFromNode(obj);
+    const formName = getFormNameFromNode(obj);
     const formNameUpper = formName.toUpperCase();
     if (!formNameUpper) {
       return null;
@@ -2726,31 +2726,29 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       return [];
     }
 
-    const opts = {
-      expandPerformForms: true,
-      hideFormRoots: true,
-      maxExpandDepth: Number.POSITIVE_INFINITY,
-      ...(options && typeof options === "object" ? options : {})
-    };
-    const maxExpandDepth = Math.max(0, Number(opts.maxExpandDepth) || 0);
+    const opts = options && typeof options === "object" ? options : {};
     const performSourceRegistry = opts.performSourceRegistry && typeof opts.performSourceRegistry === "object"
       ? opts.performSourceRegistry
       : null;
-    const formsByNameUpper = performSourceRegistry && performSourceRegistry.formsByNameUpper instanceof Map
-      ? performSourceRegistry.formsByNameUpper
-      : (opts.expandPerformForms ? buildFormsByNameUpperFromRoots(roots) : new Map());
-    const tools = createPerformExpansionTools();
+    const tools = createPerformBindingTools();
     const attachPerformBindingMetadata = tools.attachPerformBindingMetadata;
-    const buildPerformBindingContext = tools.buildPerformBindingContext;
     const clonePerformScopedData = tools.clonePerformScopedData;
 
-    const cloneNode = (sourceNode, parentId, expandDepth, pathToken, forceSyntheticId, formCallStack, bindingContext) => {
+    const cloneNode = (sourceNode, parentId, bindingContext) => {
       if (!sourceNode || typeof sourceNode !== "object") {
         return null;
       }
 
-      if (opts.hideFormRoots && sourceNode.objectType === "FORM" && !forceSyntheticId) {
-        return null;
+      let nodeBindingContext = bindingContext;
+      if (sourceNode.objectType === "FORM") {
+        const formNameUpper = getFormNameFromNode(sourceNode).toUpperCase();
+        const selectedCandidate = performSourceRegistry
+          && typeof performSourceRegistry.getSelectedCandidate === "function"
+          ? performSourceRegistry.getSelectedCandidate(formNameUpper)
+          : null;
+        nodeBindingContext = selectedCandidate && selectedCandidate.bindingContext
+          ? selectedCandidate.bindingContext
+          : null;
       }
 
       const out = {};
@@ -2761,20 +2759,16 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         out[key] = sourceNode[key];
       }
 
-      if (forceSyntheticId) {
-        out.id = `PERFORM_EXPANDED:${pathToken}`;
-      }
-
       if (parentId !== undefined) {
         out.parent = parentId;
       }
-      attachPerformBindingMetadata(out, bindingContext);
-      if (bindingContext && String(bindingContext.sourceScope || "").trim()) {
+      attachPerformBindingMetadata(out, nodeBindingContext);
+      if (nodeBindingContext && String(nodeBindingContext.sourceScope || "").trim()) {
         if (out.values && typeof out.values === "object") {
-          out.values = clonePerformScopedData(out.values, bindingContext);
+          out.values = clonePerformScopedData(out.values, nodeBindingContext);
         }
         if (out.extras && typeof out.extras === "object") {
-          out.extras = clonePerformScopedData(out.extras, bindingContext);
+          out.extras = clonePerformScopedData(out.extras, nodeBindingContext);
         }
       }
 
@@ -2784,52 +2778,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       const sourceChildren = Array.isArray(sourceNode.children) ? sourceNode.children : [];
       for (let index = 0; index < sourceChildren.length; index += 1) {
         const child = sourceChildren[index];
-        const childPath = `${pathToken}.C${index}`;
-        const clonedChild = cloneNode(child, ownId, expandDepth, childPath, forceSyntheticId, formCallStack, bindingContext);
+        const clonedChild = cloneNode(child, ownId, nodeBindingContext);
         if (clonedChild) {
           outChildren.push(clonedChild);
-        }
-      }
-
-      if (
-        opts.expandPerformForms &&
-        sourceNode.objectType === "PERFORM" &&
-        expandDepth < maxExpandDepth
-      ) {
-        const formName = getPerformFormNameFromNode(sourceNode);
-        const programName = getPerformProgramFromNode(sourceNode);
-        const formNameUpper = formName ? formName.toUpperCase() : "";
-        const resolvedForm = !programName && formNameUpper ? formsByNameUpper.get(formNameUpper) : null;
-        const isRecursiveCall = Boolean(formNameUpper) && Array.isArray(formCallStack) && formCallStack.includes(formNameUpper);
-
-        if (resolvedForm && !isRecursiveCall) {
-          const selectedCandidate = performSourceRegistry
-            && typeof performSourceRegistry.getSelectedCandidate === "function"
-            ? performSourceRegistry.getSelectedCandidate(formNameUpper)
-            : null;
-          const nextBindingContext = selectedCandidate
-            ? selectedCandidate.bindingContext
-            : buildPerformBindingContext(sourceNode, resolvedForm, bindingContext);
-          const nextFormCallStack = formNameUpper
-            ? [...(Array.isArray(formCallStack) ? formCallStack : []), formNameUpper]
-            : (Array.isArray(formCallStack) ? formCallStack.slice() : []);
-          const formChildren = Array.isArray(resolvedForm.children) ? resolvedForm.children : [];
-          for (let index = 0; index < formChildren.length; index += 1) {
-            const formChild = formChildren[index];
-            const expandedPath = `${pathToken}.FORM:${formNameUpper}.C${index}`;
-            const clonedExpandedChild = cloneNode(
-              formChild,
-              ownId,
-              expandDepth + 1,
-              expandedPath,
-              true,
-              nextFormCallStack,
-              nextBindingContext
-            );
-            if (clonedExpandedChild) {
-              outChildren.push(clonedExpandedChild);
-            }
-          }
         }
       }
 
@@ -2845,7 +2796,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const output = [];
     for (let index = 0; index < roots.length; index += 1) {
       const root = roots[index];
-      const clonedRoot = cloneNode(root, null, 0, `ROOT${index}`, false, [], null);
+      const clonedRoot = cloneNode(root, null, null);
       if (clonedRoot) {
         output.push(clonedRoot);
       }

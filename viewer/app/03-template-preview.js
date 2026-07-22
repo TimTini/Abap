@@ -705,7 +705,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return "MISSING_PROVENANCE";
   }
 
-  function getExpandedPerformBindingContextForTemplate(obj) {
+  function getPerformSourceBindingContextForTemplate(obj) {
     if (!obj || typeof obj !== "object") {
       return null;
     }
@@ -719,7 +719,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return bindingContext;
   }
 
-  function isExpandedPerformTemplateTraceableDecl(decl) {
+  function isPerformSourceTemplateTraceableDecl(decl) {
     if (!decl || typeof decl !== "object") {
       return false;
     }
@@ -733,7 +733,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       && String(decl.fieldPath || "").trim() !== "";
   }
 
-  function getExpandedPerformTemplateParamUpper(decl) {
+  function getPerformSourceTemplateParamUpper(decl) {
     if (!decl || typeof decl !== "object") {
       return "";
     }
@@ -747,7 +747,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return "";
   }
 
-  function buildExpandedPerformTemplateTraceDecl(baseDecl, localDecl, ownerContext) {
+  function buildPerformSourceTemplateTraceDecl(baseDecl, localDecl, ownerContext) {
     if (!baseDecl || typeof baseDecl !== "object") {
       return null;
     }
@@ -822,15 +822,15 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     };
   }
 
-  function resolveExpandedPerformTemplateTraceDecls(ownerContext, decl) {
-    if (!isExpandedPerformTemplateTraceableDecl(decl)) {
+  function resolvePerformSourceTemplateTraceDecls(ownerContext, decl) {
+    if (!isPerformSourceTemplateTraceableDecl(decl)) {
       return [];
     }
-    const bindingContext = getExpandedPerformBindingContextForTemplate(ownerContext);
+    const bindingContext = getPerformSourceBindingContextForTemplate(ownerContext);
     if (!bindingContext) {
       return [];
     }
-    const paramUpper = getExpandedPerformTemplateParamUpper(decl);
+    const paramUpper = getPerformSourceTemplateParamUpper(decl);
     if (!paramUpper) {
       return [];
     }
@@ -840,7 +840,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
     const localDeclType = String(decl.objectType || "").toUpperCase();
     const remappedTraceDecls = localDeclType === "STRUCT_FIELD"
-      ? traceDecls.map((traceDecl) => buildExpandedPerformTemplateTraceDecl(traceDecl, decl, ownerContext)).filter(Boolean)
+      ? traceDecls.map((traceDecl) => buildPerformSourceTemplateTraceDecl(traceDecl, decl, ownerContext)).filter(Boolean)
       : traceDecls;
     const scopedTraceDecls = typeof cloneDeclWithPerformChainOverride === "function"
       ? remappedTraceDecls.map((traceDecl) => cloneDeclWithPerformChainOverride(traceDecl, ownerContext, decl))
@@ -848,14 +848,14 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return dedupeTemplateDecls(scopedTraceDecls);
   }
 
-  function selectExpandedPerformTemplateRootDecl(traceDecls) {
+  function selectPerformSourceTemplateRootDecl(traceDecls) {
     const list = Array.isArray(traceDecls) ? traceDecls : [];
     for (let index = list.length - 1; index >= 0; index -= 1) {
       const decl = list[index];
       if (!decl || typeof decl !== "object") {
         continue;
       }
-      if (!isExpandedPerformTemplateTraceableDecl(decl)) {
+      if (!isPerformSourceTemplateTraceableDecl(decl)) {
         return decl;
       }
     }
@@ -884,10 +884,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     );
   }
 
-  function remapTemplateDeclForExpandedPerform(value, ownerContext) {
-    if (isDeclLikeObject(value) && isExpandedPerformTemplateTraceableDecl(value)) {
-      const directTraceDecls = resolveExpandedPerformTemplateTraceDecls(ownerContext, value);
-      return selectExpandedPerformTemplateRootDecl(directTraceDecls) || value;
+  function remapTemplateDeclForPerformSource(value, ownerContext) {
+    if (isDeclLikeObject(value) && isPerformSourceTemplateTraceableDecl(value)) {
+      const directTraceDecls = resolvePerformSourceTemplateTraceDecls(ownerContext, value);
+      return selectPerformSourceTemplateRootDecl(directTraceDecls) || value;
     }
 
     if (!isTemplateValueEntryLikeObject(value)) {
@@ -895,16 +895,16 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     const localDecl = value.decl;
-    if (!isDeclLikeObject(localDecl) || !isExpandedPerformTemplateTraceableDecl(localDecl)) {
+    if (!isDeclLikeObject(localDecl) || !isPerformSourceTemplateTraceableDecl(localDecl)) {
       return value;
     }
 
-    const externalTraceDecls = resolveExpandedPerformTemplateTraceDecls(ownerContext, localDecl);
+    const externalTraceDecls = resolvePerformSourceTemplateTraceDecls(ownerContext, localDecl);
     if (!externalTraceDecls.length) {
       return value;
     }
 
-    const rootTraceDecl = selectExpandedPerformTemplateRootDecl(externalTraceDecls);
+    const rootTraceDecl = selectPerformSourceTemplateRootDecl(externalTraceDecls);
     if (!rootTraceDecl) {
       return value;
     }
@@ -1214,8 +1214,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (!decl || typeof decl !== "object") {
       return [];
     }
-    const traceDecls = resolveExpandedPerformTemplateTraceDecls(ownerContext, decl);
-    const rootDecl = selectExpandedPerformTemplateRootDecl(traceDecls) || decl;
+    const traceDecls = resolvePerformSourceTemplateTraceDecls(ownerContext, decl);
+    const rootDecl = selectPerformSourceTemplateRootDecl(traceDecls) || decl;
     const scopedLocalDecl = typeof cloneDeclWithPerformChainOverride === "function"
       ? cloneDeclWithPerformChainOverride(decl, ownerContext, decl)
       : decl;
@@ -1238,10 +1238,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       declRef: String(entry.valueRef || entry.declRef || ""),
       decl: valueDecl
     };
-    let traceAwareEntry = remapTemplateDeclForExpandedPerform(valueEntry, ownerContext);
+    let traceAwareEntry = remapTemplateDeclForPerformSource(valueEntry, ownerContext);
 
-    if (traceAwareEntry && isExpandedPerformTemplateTraceableDecl(traceAwareEntry.decl)) {
-      const rootFromOrigins = selectExpandedPerformTemplateRootDecl(entry.originDecls);
+    if (traceAwareEntry && isPerformSourceTemplateTraceableDecl(traceAwareEntry.decl)) {
+      const rootFromOrigins = selectPerformSourceTemplateRootDecl(entry.originDecls);
       if (rootFromOrigins) {
         traceAwareEntry = {
           ...traceAwareEntry,
@@ -1304,7 +1304,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       if (!localDecl || typeof localDecl !== "object") {
         return createTemplateExpandedRow(rawOperand, []);
       }
-      const rootDecl = remapTemplateDeclForExpandedPerform(localDecl, ownerContext);
+      const rootDecl = remapTemplateDeclForPerformSource(localDecl, ownerContext);
       const traceAwareClause = rootDecl === localDecl ? clause : { ...clause, [declKey]: rootDecl };
       const text = String(resolveConditionOperandFinalDesc(traceAwareClause, declKey, rootDecl) || rawOperand).trim();
       return createTemplateExpandedRow(text, collectTemplateTraceAwareDeclCandidates(localDecl, ownerContext));
@@ -1785,7 +1785,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         ? ensureTemplateCanonicalValueEntry(sourceObj, valueEntry, objectIndexOneBased)
         : null;
       const traceAwareValueEntry = canonicalValueEntry
-        ? remapTemplateDeclForExpandedPerform(canonicalValueEntry, ownerContext || sourceObj)
+        ? remapTemplateDeclForPerformSource(canonicalValueEntry, ownerContext || sourceObj)
         : null;
       const declCandidates = traceAwareValueEntry
         ? getTemplateEditableDeclCandidatesFromResolvedValue(traceAwareValueEntry)
@@ -2302,7 +2302,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       }
       const remappedForTrace = isTemplateOriginDeclPath(pathParts)
         ? normalized
-        : remapTemplateDeclForExpandedPerform(normalized, nextOwnerContext);
+        : remapTemplateDeclForPerformSource(normalized, nextOwnerContext);
 
       const out = {};
       for (const key of Object.keys(remappedForTrace)) {

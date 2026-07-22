@@ -9,9 +9,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.07.18-r61">
-  <meta name="abap-viewer-updated-at" content="2026-07-18 15:28:36">
-  <meta name="abap-viewer-updated-note" content="Output tab and its dedicated renderer were removed; Template and Data remain synchronized.">
+  <meta name="abap-viewer-version" content="v2026.07.22-r62">
+  <meta name="abap-viewer-updated-at" content="2026-07-22 23:53:36">
+  <meta name="abap-viewer-updated-note" content="Template renders each FORM once in source order and selects the PERFORM call source at the FORM header.">
   <title>ABAP Parser Viewer</title>
   <style>
     :root {
@@ -9204,9 +9204,9 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
   const LAYOUT_SPLIT_MAX = 72;
   const MOBILE_LAYOUT_QUERY = "(max-width: 980px)";
   const RENDER_TREE_OPTIONS = Object.freeze({
-    expandPerformForms: true,
-    hideFormRoots: true,
-    maxExpandDepth: Number.POSITIVE_INFINITY
+    expandPerformForms: false,
+    hideFormRoots: false,
+    maxExpandDepth: 0
   });
 
   const DECL_TYPE_OPTIONS = [
@@ -13027,7 +13027,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return map;
   }
 
-  function createPerformExpansionTools() {
+  function createPerformBindingTools() {
     var PERFORM_TRACE_META_KEY_DESC = "__abapPerformTraceBinding";
 
     const getDeclIdentityKey = (decl) => {
@@ -13398,7 +13398,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const candidateByKey = new Map();
     const selectedKeyByFormUpper = new Map();
     const formOrder = [];
-    const tools = createPerformExpansionTools();
+    const tools = createPerformBindingTools();
     let sourceOrder = 0;
 
     const registry = {
@@ -13579,10 +13579,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (!registry || typeof registry.getActiveCandidates !== "function") {
       return null;
     }
-    if (!obj || obj.objectType !== "PERFORM" || getPerformProgramFromNode(obj)) {
+    if (!obj || obj.objectType !== "FORM") {
       return null;
     }
-    const formName = getPerformFormNameFromNode(obj);
+    const formName = getFormNameFromNode(obj);
     const formNameUpper = formName.toUpperCase();
     if (!formNameUpper) {
       return null;
@@ -13693,31 +13693,29 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       return [];
     }
 
-    const opts = {
-      expandPerformForms: true,
-      hideFormRoots: true,
-      maxExpandDepth: Number.POSITIVE_INFINITY,
-      ...(options && typeof options === "object" ? options : {})
-    };
-    const maxExpandDepth = Math.max(0, Number(opts.maxExpandDepth) || 0);
+    const opts = options && typeof options === "object" ? options : {};
     const performSourceRegistry = opts.performSourceRegistry && typeof opts.performSourceRegistry === "object"
       ? opts.performSourceRegistry
       : null;
-    const formsByNameUpper = performSourceRegistry && performSourceRegistry.formsByNameUpper instanceof Map
-      ? performSourceRegistry.formsByNameUpper
-      : (opts.expandPerformForms ? buildFormsByNameUpperFromRoots(roots) : new Map());
-    const tools = createPerformExpansionTools();
+    const tools = createPerformBindingTools();
     const attachPerformBindingMetadata = tools.attachPerformBindingMetadata;
-    const buildPerformBindingContext = tools.buildPerformBindingContext;
     const clonePerformScopedData = tools.clonePerformScopedData;
 
-    const cloneNode = (sourceNode, parentId, expandDepth, pathToken, forceSyntheticId, formCallStack, bindingContext) => {
+    const cloneNode = (sourceNode, parentId, bindingContext) => {
       if (!sourceNode || typeof sourceNode !== "object") {
         return null;
       }
 
-      if (opts.hideFormRoots && sourceNode.objectType === "FORM" && !forceSyntheticId) {
-        return null;
+      let nodeBindingContext = bindingContext;
+      if (sourceNode.objectType === "FORM") {
+        const formNameUpper = getFormNameFromNode(sourceNode).toUpperCase();
+        const selectedCandidate = performSourceRegistry
+          && typeof performSourceRegistry.getSelectedCandidate === "function"
+          ? performSourceRegistry.getSelectedCandidate(formNameUpper)
+          : null;
+        nodeBindingContext = selectedCandidate && selectedCandidate.bindingContext
+          ? selectedCandidate.bindingContext
+          : null;
       }
 
       const out = {};
@@ -13728,20 +13726,16 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         out[key] = sourceNode[key];
       }
 
-      if (forceSyntheticId) {
-        out.id = `PERFORM_EXPANDED:${pathToken}`;
-      }
-
       if (parentId !== undefined) {
         out.parent = parentId;
       }
-      attachPerformBindingMetadata(out, bindingContext);
-      if (bindingContext && String(bindingContext.sourceScope || "").trim()) {
+      attachPerformBindingMetadata(out, nodeBindingContext);
+      if (nodeBindingContext && String(nodeBindingContext.sourceScope || "").trim()) {
         if (out.values && typeof out.values === "object") {
-          out.values = clonePerformScopedData(out.values, bindingContext);
+          out.values = clonePerformScopedData(out.values, nodeBindingContext);
         }
         if (out.extras && typeof out.extras === "object") {
-          out.extras = clonePerformScopedData(out.extras, bindingContext);
+          out.extras = clonePerformScopedData(out.extras, nodeBindingContext);
         }
       }
 
@@ -13751,52 +13745,9 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       const sourceChildren = Array.isArray(sourceNode.children) ? sourceNode.children : [];
       for (let index = 0; index < sourceChildren.length; index += 1) {
         const child = sourceChildren[index];
-        const childPath = `${pathToken}.C${index}`;
-        const clonedChild = cloneNode(child, ownId, expandDepth, childPath, forceSyntheticId, formCallStack, bindingContext);
+        const clonedChild = cloneNode(child, ownId, nodeBindingContext);
         if (clonedChild) {
           outChildren.push(clonedChild);
-        }
-      }
-
-      if (
-        opts.expandPerformForms &&
-        sourceNode.objectType === "PERFORM" &&
-        expandDepth < maxExpandDepth
-      ) {
-        const formName = getPerformFormNameFromNode(sourceNode);
-        const programName = getPerformProgramFromNode(sourceNode);
-        const formNameUpper = formName ? formName.toUpperCase() : "";
-        const resolvedForm = !programName && formNameUpper ? formsByNameUpper.get(formNameUpper) : null;
-        const isRecursiveCall = Boolean(formNameUpper) && Array.isArray(formCallStack) && formCallStack.includes(formNameUpper);
-
-        if (resolvedForm && !isRecursiveCall) {
-          const selectedCandidate = performSourceRegistry
-            && typeof performSourceRegistry.getSelectedCandidate === "function"
-            ? performSourceRegistry.getSelectedCandidate(formNameUpper)
-            : null;
-          const nextBindingContext = selectedCandidate
-            ? selectedCandidate.bindingContext
-            : buildPerformBindingContext(sourceNode, resolvedForm, bindingContext);
-          const nextFormCallStack = formNameUpper
-            ? [...(Array.isArray(formCallStack) ? formCallStack : []), formNameUpper]
-            : (Array.isArray(formCallStack) ? formCallStack.slice() : []);
-          const formChildren = Array.isArray(resolvedForm.children) ? resolvedForm.children : [];
-          for (let index = 0; index < formChildren.length; index += 1) {
-            const formChild = formChildren[index];
-            const expandedPath = `${pathToken}.FORM:${formNameUpper}.C${index}`;
-            const clonedExpandedChild = cloneNode(
-              formChild,
-              ownId,
-              expandDepth + 1,
-              expandedPath,
-              true,
-              nextFormCallStack,
-              nextBindingContext
-            );
-            if (clonedExpandedChild) {
-              outChildren.push(clonedExpandedChild);
-            }
-          }
         }
       }
 
@@ -13812,7 +13763,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     const output = [];
     for (let index = 0; index < roots.length; index += 1) {
       const root = roots[index];
-      const clonedRoot = cloneNode(root, null, 0, `ROOT${index}`, false, [], null);
+      const clonedRoot = cloneNode(root, null, null);
       if (clonedRoot) {
         output.push(clonedRoot);
       }
@@ -14725,7 +14676,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return "MISSING_PROVENANCE";
   }
 
-  function getExpandedPerformBindingContextForTemplate(obj) {
+  function getPerformSourceBindingContextForTemplate(obj) {
     if (!obj || typeof obj !== "object") {
       return null;
     }
@@ -14739,7 +14690,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return bindingContext;
   }
 
-  function isExpandedPerformTemplateTraceableDecl(decl) {
+  function isPerformSourceTemplateTraceableDecl(decl) {
     if (!decl || typeof decl !== "object") {
       return false;
     }
@@ -14753,7 +14704,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       && String(decl.fieldPath || "").trim() !== "";
   }
 
-  function getExpandedPerformTemplateParamUpper(decl) {
+  function getPerformSourceTemplateParamUpper(decl) {
     if (!decl || typeof decl !== "object") {
       return "";
     }
@@ -14767,7 +14718,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return "";
   }
 
-  function buildExpandedPerformTemplateTraceDecl(baseDecl, localDecl, ownerContext) {
+  function buildPerformSourceTemplateTraceDecl(baseDecl, localDecl, ownerContext) {
     if (!baseDecl || typeof baseDecl !== "object") {
       return null;
     }
@@ -14842,15 +14793,15 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     };
   }
 
-  function resolveExpandedPerformTemplateTraceDecls(ownerContext, decl) {
-    if (!isExpandedPerformTemplateTraceableDecl(decl)) {
+  function resolvePerformSourceTemplateTraceDecls(ownerContext, decl) {
+    if (!isPerformSourceTemplateTraceableDecl(decl)) {
       return [];
     }
-    const bindingContext = getExpandedPerformBindingContextForTemplate(ownerContext);
+    const bindingContext = getPerformSourceBindingContextForTemplate(ownerContext);
     if (!bindingContext) {
       return [];
     }
-    const paramUpper = getExpandedPerformTemplateParamUpper(decl);
+    const paramUpper = getPerformSourceTemplateParamUpper(decl);
     if (!paramUpper) {
       return [];
     }
@@ -14860,7 +14811,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
     const localDeclType = String(decl.objectType || "").toUpperCase();
     const remappedTraceDecls = localDeclType === "STRUCT_FIELD"
-      ? traceDecls.map((traceDecl) => buildExpandedPerformTemplateTraceDecl(traceDecl, decl, ownerContext)).filter(Boolean)
+      ? traceDecls.map((traceDecl) => buildPerformSourceTemplateTraceDecl(traceDecl, decl, ownerContext)).filter(Boolean)
       : traceDecls;
     const scopedTraceDecls = typeof cloneDeclWithPerformChainOverride === "function"
       ? remappedTraceDecls.map((traceDecl) => cloneDeclWithPerformChainOverride(traceDecl, ownerContext, decl))
@@ -14868,14 +14819,14 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     return dedupeTemplateDecls(scopedTraceDecls);
   }
 
-  function selectExpandedPerformTemplateRootDecl(traceDecls) {
+  function selectPerformSourceTemplateRootDecl(traceDecls) {
     const list = Array.isArray(traceDecls) ? traceDecls : [];
     for (let index = list.length - 1; index >= 0; index -= 1) {
       const decl = list[index];
       if (!decl || typeof decl !== "object") {
         continue;
       }
-      if (!isExpandedPerformTemplateTraceableDecl(decl)) {
+      if (!isPerformSourceTemplateTraceableDecl(decl)) {
         return decl;
       }
     }
@@ -14904,10 +14855,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     );
   }
 
-  function remapTemplateDeclForExpandedPerform(value, ownerContext) {
-    if (isDeclLikeObject(value) && isExpandedPerformTemplateTraceableDecl(value)) {
-      const directTraceDecls = resolveExpandedPerformTemplateTraceDecls(ownerContext, value);
-      return selectExpandedPerformTemplateRootDecl(directTraceDecls) || value;
+  function remapTemplateDeclForPerformSource(value, ownerContext) {
+    if (isDeclLikeObject(value) && isPerformSourceTemplateTraceableDecl(value)) {
+      const directTraceDecls = resolvePerformSourceTemplateTraceDecls(ownerContext, value);
+      return selectPerformSourceTemplateRootDecl(directTraceDecls) || value;
     }
 
     if (!isTemplateValueEntryLikeObject(value)) {
@@ -14915,16 +14866,16 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     }
 
     const localDecl = value.decl;
-    if (!isDeclLikeObject(localDecl) || !isExpandedPerformTemplateTraceableDecl(localDecl)) {
+    if (!isDeclLikeObject(localDecl) || !isPerformSourceTemplateTraceableDecl(localDecl)) {
       return value;
     }
 
-    const externalTraceDecls = resolveExpandedPerformTemplateTraceDecls(ownerContext, localDecl);
+    const externalTraceDecls = resolvePerformSourceTemplateTraceDecls(ownerContext, localDecl);
     if (!externalTraceDecls.length) {
       return value;
     }
 
-    const rootTraceDecl = selectExpandedPerformTemplateRootDecl(externalTraceDecls);
+    const rootTraceDecl = selectPerformSourceTemplateRootDecl(externalTraceDecls);
     if (!rootTraceDecl) {
       return value;
     }
@@ -15234,8 +15185,8 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
     if (!decl || typeof decl !== "object") {
       return [];
     }
-    const traceDecls = resolveExpandedPerformTemplateTraceDecls(ownerContext, decl);
-    const rootDecl = selectExpandedPerformTemplateRootDecl(traceDecls) || decl;
+    const traceDecls = resolvePerformSourceTemplateTraceDecls(ownerContext, decl);
+    const rootDecl = selectPerformSourceTemplateRootDecl(traceDecls) || decl;
     const scopedLocalDecl = typeof cloneDeclWithPerformChainOverride === "function"
       ? cloneDeclWithPerformChainOverride(decl, ownerContext, decl)
       : decl;
@@ -15258,10 +15209,10 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       declRef: String(entry.valueRef || entry.declRef || ""),
       decl: valueDecl
     };
-    let traceAwareEntry = remapTemplateDeclForExpandedPerform(valueEntry, ownerContext);
+    let traceAwareEntry = remapTemplateDeclForPerformSource(valueEntry, ownerContext);
 
-    if (traceAwareEntry && isExpandedPerformTemplateTraceableDecl(traceAwareEntry.decl)) {
-      const rootFromOrigins = selectExpandedPerformTemplateRootDecl(entry.originDecls);
+    if (traceAwareEntry && isPerformSourceTemplateTraceableDecl(traceAwareEntry.decl)) {
+      const rootFromOrigins = selectPerformSourceTemplateRootDecl(entry.originDecls);
       if (rootFromOrigins) {
         traceAwareEntry = {
           ...traceAwareEntry,
@@ -15324,7 +15275,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       if (!localDecl || typeof localDecl !== "object") {
         return createTemplateExpandedRow(rawOperand, []);
       }
-      const rootDecl = remapTemplateDeclForExpandedPerform(localDecl, ownerContext);
+      const rootDecl = remapTemplateDeclForPerformSource(localDecl, ownerContext);
       const traceAwareClause = rootDecl === localDecl ? clause : { ...clause, [declKey]: rootDecl };
       const text = String(resolveConditionOperandFinalDesc(traceAwareClause, declKey, rootDecl) || rawOperand).trim();
       return createTemplateExpandedRow(text, collectTemplateTraceAwareDeclCandidates(localDecl, ownerContext));
@@ -15805,7 +15756,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
         ? ensureTemplateCanonicalValueEntry(sourceObj, valueEntry, objectIndexOneBased)
         : null;
       const traceAwareValueEntry = canonicalValueEntry
-        ? remapTemplateDeclForExpandedPerform(canonicalValueEntry, ownerContext || sourceObj)
+        ? remapTemplateDeclForPerformSource(canonicalValueEntry, ownerContext || sourceObj)
         : null;
       const declCandidates = traceAwareValueEntry
         ? getTemplateEditableDeclCandidatesFromResolvedValue(traceAwareValueEntry)
@@ -16322,7 +16273,7 @@ window.AbapViewerModules.parts = window.AbapViewerModules.parts || {};
       }
       const remappedForTrace = isTemplateOriginDeclPath(pathParts)
         ? normalized
-        : remapTemplateDeclForExpandedPerform(normalized, nextOwnerContext);
+        : remapTemplateDeclForPerformSource(normalized, nextOwnerContext);
 
       const out = {};
       for (const key of Object.keys(remappedForTrace)) {

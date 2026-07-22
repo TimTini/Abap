@@ -69,17 +69,18 @@ This file is the local source of truth for future AI/code agents working in this
   - Do not add empty placeholder part files; `build-runtime-bundles.js` fails on missing/empty parts.
   - Runtime metadata keys shared across modules (e.g., perform-trace keys) must avoid top-level redeclare collisions; prefer unique key names per module context and `var` declarations only when cross-part scope requires it.
 
-- `PERFORM -> FORM` expansion in Viewer/Export:
-  - Expansion is recursive.
-  - Stop expanding when a FORM would repeat in the current call chain (cycle guard), e.g. `A -> B -> C -> A`.
-  - Treat this as Viewer-side/render/export behavior, not parser contract changes.
+- Template `PERFORM -> FORM` source-shaped render:
+  - `PERFORM` stays a leaf call statement; do not inline-expand FORM children under each call site.
+  - Every local `FORM` renders once in source order, including uncalled FORM definitions.
+  - A FORM with one source binds automatically. A FORM with multiple active sources exposes one selector on the FORM header.
+  - Nested source candidates follow the selected parent call chain; registry traversal keeps the recursive-call cycle guard.
+  - Treat this as Viewer-side render behavior, not a parser contract change.
 
-- Expanded `PERFORM` param trace chain behavior:
-  - Expanded nodes carry non-enumerable runtime binding metadata (`__abapPerformTraceBinding`) mapping local `FORM_PARAM` -> traced caller/root decl chain.
+- Selected `PERFORM` param trace chain behavior:
+  - Rendered FORM nodes carry non-enumerable runtime binding metadata (`__abapPerformTraceBinding`) mapping local `FORM_PARAM` -> traced caller/root decl chain.
   - Binding resolution uses section order (`USING`/`CHANGING`/`TABLES`) and recursively propagates through nested `PERFORM` calls.
-  - Output keeps local `FORM_PARAM` visible and appends traced caller/root decls (also for condition operands where applicable).
-  - Template context remaps `values.*.decl` from local `FORM_PARAM` to first external traced decl (caller-first) for expanded nodes only.
-  - Keep full chain in `originDecls`; keep behavior unchanged for non-expanded nodes or unresolved `PERFORM ... IN PROGRAM ...`.
+  - Template context remaps `values.*.decl` from local `FORM_PARAM` to the first external traced decl (caller-first) in the selected FORM subtree.
+  - Keep the full chain in `originDecls`; FORM definitions without a source use local params, and unresolved `PERFORM ... IN PROGRAM ...` stays unbound.
 
 - Name normalization behavior for decl descriptions:
   - Prefix-template matching is based on `1-char prefix + CODE` technical ids (example: `LDS_*`, `GCN_*`).
@@ -150,11 +151,11 @@ This file is the local source of truth for future AI/code agents working in this
 
 - UI smoke checklist after Viewer changes:
   - Hard reload (`Ctrl+F5`) to avoid stale split-wrapper script cache.
-  - Parse sample input and verify Output tree renders.
-  - Edit at least one decl desc and confirm save/clear updates both Output + Template preview.
-  - Verify a `FORM_PARAM` inside expanded `PERFORM`:
-    - Output keeps local decl and appends caller/root trace.
-    - Template `values.*.decl.*` resolves to caller/root for expanded nodes.
+  - Parse sample input and verify Template renders PERFORM calls and each FORM definition once in source order.
+  - Edit at least one decl desc and confirm save/clear updates both Data + Template preview.
+  - Verify a `FORM_PARAM` inside a source-shaped FORM:
+    - The FORM header exposes one source selector only when multiple active call sites exist.
+    - Template `values.*.decl.*` resolves to the selected caller/root chain.
   - Validate Template copy/import/export buttons and clipboard flow.
 
 - Fast debug checklist for module-load/runtime errors:
@@ -184,7 +185,7 @@ This file is the local source of truth for future AI/code agents working in this
   - Runtime state, DOM refs, defaults, localStorage, build info, theme/layout, settings modal, template config helpers.
 
 - Description/normalization (`viewer/app/descriptions/01-normalize-and-desc.js`):
-  - Decl-desc normalization, edit modal flows, value-level `finalDesc`, decl panel rendering, `PERFORM` expansion + binding metadata.
+  - Decl-desc normalization, edit modal flows, value-level `finalDesc`, decl panel rendering, `PERFORM` source selection + FORM binding metadata.
 
 - Output render (`viewer/app/output/01-output-render.js`):
   - Output tree/cards, search index, gutter sync, shared render helpers, path-entry normalization (`normalizeEntryObjectForPath`).

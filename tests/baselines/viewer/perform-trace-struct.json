@@ -4,7 +4,7 @@
   "dataSummary": {
     "objectCount": 10,
     "declCount": 8,
-    "renderObjectCount": 9,
+    "renderObjectCount": 10,
     "firstObjectTypes": [
       "TYPES",
       "TYPES",
@@ -14,7 +14,8 @@
       "PARAMETERS",
       "ASSIGNMENT",
       "ASSIGNMENT",
-      "PERFORM"
+      "PERFORM",
+      "FORM"
     ]
   },
   "input": {
@@ -86,12 +87,18 @@
     },
     {
       "index": "9",
+      "lineStart": 16,
+      "selected": false,
+      "textPreview": "FORM |  |  |  |  | "
+    },
+    {
+      "index": "10",
       "lineStart": 17,
       "selected": false,
       "textPreview": "Điều kiện trái |  |  |  |  | "
     },
     {
-      "index": "10",
+      "index": "11",
       "lineStart": 18,
       "selected": false,
       "textPreview": "Đích |  |  |  |  | "

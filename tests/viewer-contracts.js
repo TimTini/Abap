@@ -895,7 +895,7 @@ async function assertPerformAndCallMultiValueRows() {
     ["CHANGING", "cv_text"]
   ]);
   for (const row of Array.from(performTable.querySelectorAll("tr"))) {
-    assert.strictEqual(row.querySelectorAll("td").length, 40, "Expected every expanded PERFORM row to keep 20 + 20 cells.");
+    assert.strictEqual(row.querySelectorAll("td").length, 40, "Expected every PERFORM row to keep 20 + 20 cells.");
   }
 
   const callFunctionTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="CALL_FUNCTION"]');
@@ -931,7 +931,7 @@ async function assertPerformAndCallMultiValueRows() {
   dom.window.close();
 }
 
-async function assertExpandedPerformMultiValueRowsUseRootDescriptions() {
+async function assertFormSourceMultiValueRowsUseRootDescriptions() {
   const source = [
     "DATA gv_root_one TYPE string. \"Root one",
     "DATA gv_root_two TYPE string. \"Root two",
@@ -946,16 +946,18 @@ async function assertExpandedPerformMultiValueRowsUseRootDescriptions() {
   const dom = await renderFixture(source);
   const { window } = dom;
   const { els, state } = window.AbapViewerRuntime;
-  const rootPerform = (state.renderObjects || []).find((obj) => obj && obj.objectType === "PERFORM");
-  assert(rootPerform, "Expected root PERFORM object.");
-  const nestedPerform = (rootPerform.children || []).find((obj) => (
+  const outerForm = (state.renderObjects || []).find((obj) => (
+    obj && obj.objectType === "FORM" && obj.extras?.form?.name === "frm_outer"
+  ));
+  assert(outerForm, "Expected source-shaped outer FORM object.");
+  const nestedPerform = (outerForm.children || []).find((obj) => (
     obj
     && obj.objectType === "PERFORM"
     && obj.extras
     && obj.extras.performCall
     && obj.extras.performCall.form === "frm_inner"
   ));
-  assert(nestedPerform, "Expected nested PERFORM object expanded from frm_outer.");
+  assert(nestedPerform, "Expected nested PERFORM object inside frm_outer.");
 
   els.rightTabTemplateBtn.click();
   await waitForViewerUi(window);
@@ -1082,7 +1084,7 @@ async function assertTemplateRowDescriptionEditsLocalLoopDecl() {
   await waitForViewerUi(window);
 
   let loopTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="LOOP_AT_ITAB"]');
-  assert(loopTable, "Expected the expanded FORM to render its LOOP template.");
+  assert(loopTable, "Expected the source-shaped FORM to render its LOOP template.");
   let modal = await openTemplateCellDescriptionTab(window, findTemplateCellByText(loopTable, "Table local"));
   const modalText = String(modal.textContent || "");
   assert(!modalText.includes("Khong tim thay decl cho o nay."), "Expected the LOOP table row to retain its declaration target.");
@@ -1322,6 +1324,63 @@ async function assertTemplatePerformSourceEditDoesNotBleedAcrossSources() {
   dom.window.close();
 }
 
+async function assertTemplateRendersEachFormOnceInSourceOrder() {
+  const source = [
+    "DATA gv_first TYPE string.",
+    "DATA gv_second TYPE string.",
+    "DATA gv_third TYPE string.",
+    "PERFORM frm_once USING gv_first.",
+    "PERFORM frm_once USING gv_second.",
+    "PERFORM frm_once USING gv_third.",
+    "FORM frm_once USING iv_value TYPE string.",
+    "  CLEAR iv_value.",
+    "ENDFORM."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+  const renderRoots = Array.isArray(state.renderObjects) ? state.renderObjects : [];
+  const performRoots = renderRoots.filter((obj) => obj && obj.objectType === "PERFORM");
+  const formRoots = renderRoots.filter((obj) => obj && obj.objectType === "FORM");
+
+  assert.strictEqual(performRoots.length, 3, "Expected every PERFORM call to stay visible.");
+  assert(
+    performRoots.every((obj) => !Array.isArray(obj.children) || obj.children.length === 0),
+    "Expected PERFORM calls not to inline-expand FORM children."
+  );
+  assert.strictEqual(formRoots.length, 1, "Expected the FORM definition to render exactly once.");
+  assert.strictEqual(String(formRoots[0].children?.[0]?.raw || "").trim(), "CLEAR iv_value.");
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const formTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="FORM"]');
+  assert(formTable, "Expected a Template block for the FORM definition.");
+  const formBlock = formTable.closest(".template-block");
+  const sourceSelect = formBlock?.querySelector('.perform-source-select[data-perform-form="FRM_ONCE"]');
+  assert(sourceSelect, "Expected source selector on FORM header.");
+
+  const performTables = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="PERFORM"]'));
+  assert.strictEqual(performTables.length, 3);
+  assert(
+    performTables.every((table) => !table.closest(".template-block")?.querySelector(".perform-source-select")),
+    "Expected PERFORM headers not to repeat the source selector."
+  );
+
+  const candidates = state.performSourceRegistry.candidatesByFormUpper.get("FRM_ONCE") || [];
+  els.templatePreviewOutput.scrollTop = 80;
+  sourceSelect.value = candidates[1].key;
+  sourceSelect.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await settleViewerUi(window, 8);
+  assert(Math.abs(els.templatePreviewOutput.scrollTop - 80) <= 40, "Expected FORM source switching to preserve the Template viewport.");
+  const selectedForm = (state.renderObjects || []).find((obj) => obj && obj.objectType === "FORM");
+  const selectedClear = selectedForm?.children?.[0];
+  const selectedTrace = selectedClear?.__abapPerformTraceBinding?.byParamUpper?.get("IV_VALUE") || [];
+  assert.deepStrictEqual(Array.from(selectedTrace, (decl) => String(decl && decl.name || "")), ["gv_second"]);
+
+  dom.window.close();
+}
+
 async function assertTemplateRowDescriptionTargetsExactConditionDecls() {
   const source = [
     "DATA lt_rows TYPE TABLE OF string.",
@@ -1404,7 +1463,7 @@ async function assertTemplateAppendUnboundOperandsUseCanonicalTargets() {
   dom.window.close();
 }
 
-async function assertLegacyPathAliasUsesTemplateIndexAfterPerformExpansion() {
+async function assertLegacyPathAliasUsesSourceShapedTemplateIndex() {
   const source = [
     "PERFORM f.",
     "APPEND a TO b.",
@@ -1416,19 +1475,19 @@ async function assertLegacyPathAliasUsesTemplateIndexAfterPerformExpansion() {
   const { window } = dom;
   const runtime = window.AbapViewerRuntime;
   const { els, state } = runtime;
-  const legacySourceKey = "PATH:OBJECTS/OBJECT[3]/VALUES/WHAT/DECL:A";
+  const legacySourceKey = "PATH:OBJECTS/OBJECT[2]/VALUES/WHAT/DECL:A";
 
   const templateItems = typeof window.getRenderableObjectListForTemplate === "function"
     ? window.getRenderableObjectListForTemplate()
     : [];
   const appendIndex = templateItems.findIndex((item) => item && item.obj && item.obj.objectType === "APPEND");
-  assert.strictEqual(appendIndex, 2, "Expected expanded FORM content to shift APPEND to Template object 3.");
+  assert.strictEqual(appendIndex, 1, "Expected APPEND to stay before the later FORM definition in Template order.");
 
   state.descOverrides[legacySourceKey] = "Legacy shifted A";
   runtime.api.renderTemplatePreview();
 
   const appendTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="APPEND"]');
-  assert(findTemplateCellByText(appendTable, "Legacy shifted A"), "Expected Template to resolve the same shifted legacy alias.");
+  assert(findTemplateCellByText(appendTable, "Legacy shifted A"), "Expected Template to resolve the source-shaped legacy alias.");
 
   dom.window.close();
 }
@@ -2547,7 +2606,7 @@ async function assertTemplateResolverWarnsOnceWithCellMetadata() {
   }
 }
 
-async function assertExpandedPerformTraceUsesRootDeclarations() {
+async function assertFormSourceTraceUsesRootDeclarations() {
   const source = [
     "TYPES: BEGIN OF ty_ctx,",
     "         name TYPE string,",
@@ -2600,6 +2659,13 @@ async function assertExpandedPerformTraceUsesRootDeclarations() {
   const performRoots = (Array.isArray(state.renderObjects) ? state.renderObjects : [])
     .filter((obj) => obj && obj.objectType === "PERFORM");
   assert.strictEqual(performRoots.length, 4, "Expected two normal, one literal, and one external PERFORM root.");
+  assert(
+    performRoots.every((obj) => !Array.isArray(obj.children) || obj.children.length === 0),
+    "Expected every PERFORM call to remain a leaf statement."
+  );
+  const formRoots = (Array.isArray(state.renderObjects) ? state.renderObjects : [])
+    .filter((obj) => obj && obj.objectType === "FORM");
+  const getFormRoot = (name) => formRoots.find((obj) => String(obj?.extras?.form?.name || "") === name);
 
   const findDescendant = (root, predicate) => {
     const stack = root ? [root] : [];
@@ -2621,15 +2687,17 @@ async function assertExpandedPerformTraceUsesRootDeclarations() {
     return Array.from(decls || [], (decl) => String(decl && decl.name || ""));
   };
 
-  const firstIf = findByRaw(performRoots[0], "IF iv_inner IS INITIAL OR is_inner-city IS NOT INITIAL.");
-  const secondIf = findByRaw(performRoots[1], "IF iv_inner IS INITIAL OR is_inner-city IS NOT INITIAL.");
-  assert(firstIf && secondIf, "Expected each normal PERFORM path to expand into the inner IF.");
+  const outerForm = getFormRoot("frm_outer");
+  const localForm = getFormRoot("frm_local");
+  const innerForm = getFormRoot("frm_inner");
+  const literalForm = getFormRoot("frm_literal");
+  assert(outerForm && localForm && innerForm && literalForm, "Expected every local FORM definition to render once.");
+  const firstIf = findByRaw(innerForm, "IF iv_inner IS INITIAL OR is_inner-city IS NOT INITIAL.");
+  assert(firstIf, "Expected inner IF inside the source-shaped FORM.");
   assert.deepStrictEqual(getBindingNames(firstIf, "iv_inner"), ["iv_outer", "gv_root"]);
   assert.deepStrictEqual(getBindingNames(firstIf, "is_inner"), ["is_outer", "gs_root"]);
   assert.deepStrictEqual(getBindingNames(firstIf, "cv_inner"), ["cv_outer", "gv_change"]);
   assert.deepStrictEqual(getBindingNames(firstIf, "tt_inner"), ["tt_outer", "gt_root"]);
-  assert.deepStrictEqual(getBindingNames(secondIf, "iv_inner"), ["iv_outer", "gv_root"]);
-  assert.deepStrictEqual(getBindingNames(secondIf, "is_inner"), ["is_outer", "gs_root"]);
 
   const externalPerform = performRoots[3];
   assert.strictEqual(
@@ -2654,48 +2722,40 @@ async function assertExpandedPerformTraceUsesRootDeclarations() {
   };
   const assertTemplateRows = (root, raw, expectedRows) => {
     const obj = findByRaw(root, raw);
-    assert(obj, `Expected expanded object for ${raw}`);
+    assert(obj, `Expected source-shaped FORM object for ${raw}`);
     const table = findTemplateTable(obj);
     assert(table, `Expected Template preview table for ${raw}`);
     assert.deepStrictEqual(getTemplateTableRows(table), expectedRows);
   };
 
-  assertTemplateRows(performRoots[0], "iv_inner = iv_inner && '-x'.", [
+  assertTemplateRows(innerForm, "iv_inner = iv_inner && '-x'.", [
     ["Đích", "Nguồn"],
     ["gv_root", "gv_root && '-x'"]
   ]);
-  assertTemplateRows(performRoots[0], "is_inner-city = is_inner-name.", [
+  assertTemplateRows(innerForm, "is_inner-city = is_inner-name.", [
     ["Đích", "Nguồn"],
     ["gs_root-city", "gs_root-name"]
   ]);
-  assertTemplateRows(performRoots[0], "cv_inner = iv_inner.", [
+  assertTemplateRows(innerForm, "cv_inner = iv_inner.", [
     ["Đích", "Nguồn"],
     ["gv_change", "gv_root"]
   ]);
-  assertTemplateRows(performRoots[0], "APPEND iv_inner TO tt_inner.", [
+  assertTemplateRows(innerForm, "APPEND iv_inner TO tt_inner.", [
     ["APPEND", "gv_root"],
     ["TO", "gt_root"]
   ]);
-  assertTemplateRows(performRoots[0], "IF iv_inner IS INITIAL OR is_inner-city IS NOT INITIAL.", [
+  assertTemplateRows(innerForm, "IF iv_inner IS INITIAL OR is_inner-city IS NOT INITIAL.", [
     ["Điều kiện trái", "Toán tử", "Điều kiện phải", "Kết nối"],
     ["gv_root", "IS", "INITIAL", "OR"],
     ["gs_root-city", "IS", "NOT INITIAL"]
   ]);
-  assertTemplateRows(performRoots[0], "IF iv_inner = cv_inner AND is_inner-city = is_inner-name.", [
+  assertTemplateRows(innerForm, "IF iv_inner = cv_inner AND is_inner-city = is_inner-name.", [
     ["Điều kiện trái", "Toán tử", "Điều kiện phải", "Kết nối"],
     ["gv_root", "=", "gv_change", "AND"],
     ["gs_root-city", "=", "gs_root-name"]
   ]);
-  assertTemplateRows(performRoots[1], "iv_inner = iv_inner && '-x'.", [
-    ["Đích", "Nguồn"],
-    ["gv_root", "gv_root && '-x'"]
-  ]);
-  assertTemplateRows(performRoots[1], "is_inner-city = is_inner-name.", [
-    ["Đích", "Nguồn"],
-    ["gs_root-city", "gs_root-name"]
-  ]);
-  assertTemplateRows(performRoots[0], "CLEAR iv_local.", [["CLEAR", "lv_local"]]);
-  assertTemplateRows(performRoots[2], "CLEAR iv_literal.", [["CLEAR", "iv_literal"]]);
+  assertTemplateRows(localForm, "CLEAR iv_local.", [["CLEAR", "lv_local"]]);
+  assertTemplateRows(literalForm, "CLEAR iv_literal.", [["CLEAR", "iv_literal"]]);
 
   dom.window.close();
 }
@@ -2768,8 +2828,11 @@ async function assertGlobalPerformSourceSelection() {
   );
   els.rightTabTemplateBtn.click();
   await settleViewerUi(window);
+  Object.defineProperty(els.templatePreviewOutput, "clientHeight", { configurable: true, value: 100000 });
+  runtime.api.renderTemplatePreview();
+  await settleViewerUi(window, 8);
   let templateOuterSelect = getSourceSelect(els.templatePreviewOutput, "FRM_OUTER");
-  assert(templateOuterSelect, "Expected Template PERFORM header source selector.");
+  assert(templateOuterSelect, "Expected Template FORM header source selector.");
   assert.strictEqual(getSourceBadge(els.templatePreviewOutput, "FRM_OUTER")?.textContent, "⇄ 3 nguồn");
   assert.strictEqual(templateOuterSelect.options.length, 3);
   assert.strictEqual(templateOuterSelect.options[0].textContent, "Nguồn 1/3 · line 7 · USING gv_first · CHANGING gv_change_first");
@@ -2789,13 +2852,8 @@ async function assertGlobalPerformSourceSelection() {
   assert.strictEqual(getSourceSelect(els.templatePreviewOutput, "FRM_OUTER")?.value, outerCandidates[1].key);
   assert.strictEqual(state.selectedTemplateIndex, "0");
   assert.deepStrictEqual(Array.from(state.selectedTemplateIndexes).sort(), ["0", "2"], "Expected source switching to preserve multi-selection.");
-  assert(Math.abs(els.templatePreviewOutput.scrollTop - 80) <= 40, "Expected Template logical viewport anchor to stay near its prior offset.");
   assert(els.templatePreviewOutput.querySelector('.template-block.selected[data-template-index="0"]'), "Expected Template selection anchor to survive rebuild.");
   assert(els.templatePreviewOutput.querySelector('.template-block.selected[data-template-index="2"]'), "Expected secondary Template selection to survive rebuild.");
-
-  Object.defineProperty(els.templatePreviewOutput, "clientHeight", { configurable: true, value: 100000 });
-  runtime.api.renderTemplatePreview();
-  await settleViewerUi(window, 8);
 
   const findDescendant = (root, predicate) => {
     const queue = root ? [root] : [];
@@ -2819,18 +2877,20 @@ async function assertGlobalPerformSourceSelection() {
     obj && obj.objectType === "PERFORM" && obj.extras?.performCall?.form === "frm_outer"
   ));
   assert.strictEqual(outerPerformRoots.length, 3);
-  let firstLocalAssignment = null;
-  let firstMissingAssignment = null;
-  for (const root of outerPerformRoots) {
-    const localAssignment = findDescendant(root, (obj) => String(obj && obj.raw || "").trim() === "lv_local = iv_outer.");
-    const missingAssignment = findDescendant(root, (obj) => String(obj && obj.raw || "").trim() === "iv_missing = iv_outer.");
-    assert(localAssignment && missingAssignment);
-    firstLocalAssignment = firstLocalAssignment || localAssignment;
-    firstMissingAssignment = firstMissingAssignment || missingAssignment;
-    assert.deepStrictEqual(getBindingNames(localAssignment, "iv_outer"), ["gv_second"]);
-    assert.strictEqual(localAssignment.values?.target?.decl?.name, "lv_local", "Expected local DATA to stay local.");
-    assert.deepStrictEqual(getBindingNames(missingAssignment, "iv_missing"), [], "Expected missing actual argument to use local FORM_PARAM fallback.");
-  }
+  assert(
+    outerPerformRoots.every((obj) => !Array.isArray(obj.children) || obj.children.length === 0),
+    "Expected every PERFORM call to remain a leaf statement."
+  );
+  const outerFormRoot = (state.renderObjects || []).find((obj) => (
+    obj && obj.objectType === "FORM" && obj.extras?.form?.name === "frm_outer"
+  ));
+  assert(outerFormRoot, "Expected one source-shaped FORM root.");
+  const firstLocalAssignment = findDescendant(outerFormRoot, (obj) => String(obj && obj.raw || "").trim() === "lv_local = iv_outer.");
+  const firstMissingAssignment = findDescendant(outerFormRoot, (obj) => String(obj && obj.raw || "").trim() === "iv_missing = iv_outer.");
+  assert(firstLocalAssignment && firstMissingAssignment);
+  assert.deepStrictEqual(getBindingNames(firstLocalAssignment, "iv_outer"), ["gv_second"]);
+  assert.strictEqual(firstLocalAssignment.values?.target?.decl?.name, "lv_local", "Expected local DATA to stay local.");
+  assert.deepStrictEqual(getBindingNames(firstMissingAssignment, "iv_missing"), [], "Expected missing actual argument to use local FORM_PARAM fallback.");
 
   const findTemplateTable = (obj) => {
     const idText = `#${String(obj && obj.id || "")}`;
@@ -2869,14 +2929,14 @@ async function assertGlobalPerformSourceSelection() {
     "Expected changing a parent source to reset descendant FORM selection to the new branch default."
   );
   const innerClear = findDescendant(
-    (state.renderObjects || []).find((obj) => obj && obj.objectType === "PERFORM" && obj.extras?.performCall?.form === "frm_outer"),
+    (state.renderObjects || []).find((obj) => obj && obj.objectType === "FORM" && obj.extras?.form?.name === "frm_inner"),
     (obj) => String(obj && obj.raw || "").trim() === "CLEAR iv_inner."
   );
   assert(innerClear);
   assert.deepStrictEqual(getBindingNames(innerClear, "iv_inner"), ["iv_outer", "gv_third"]);
   assert.deepStrictEqual(getTemplateTableRows(findTemplateTable(innerClear)), [["CLEAR", "gv_third"]]);
 
-  const literalRoot = (state.renderObjects || []).find((obj) => obj && obj.extras?.performCall?.form === "frm_literal");
+  const literalRoot = (state.renderObjects || []).find((obj) => obj && obj.objectType === "FORM" && obj.extras?.form?.name === "frm_literal");
   const literalClear = findDescendant(literalRoot, (obj) => String(obj && obj.raw || "").trim() === "CLEAR iv_literal.");
   assert(literalClear);
   assert.deepStrictEqual(getBindingNames(literalClear, "iv_literal"), [], "Expected literal actual to keep local fallback.");
@@ -2892,10 +2952,10 @@ async function assertGlobalPerformSourceSelection() {
   assert.strictEqual(Array.isArray(externalRoot.children) ? externalRoot.children.length : 0, 0);
   assert.strictEqual(getSourceSelect(els.templatePreviewOutput, "FRM_EXTERNAL"), null);
 
-  const cycleRoot = (state.renderObjects || []).find((obj) => obj && obj.extras?.performCall?.form === "frm_cycle");
+  const cycleRoot = (state.renderObjects || []).find((obj) => obj && obj.objectType === "FORM" && obj.extras?.form?.name === "frm_cycle");
   const recursivePerform = findDescendant(cycleRoot, (obj) => obj !== cycleRoot && obj?.extras?.performCall?.form === "frm_cycle");
   assert(recursivePerform, "Expected the recursive call statement itself to remain visible.");
-  assert.strictEqual(Array.isArray(recursivePerform.children) ? recursivePerform.children.length : 0, 0, "Expected cycle guard to stop recursive expansion.");
+  assert.strictEqual(Array.isArray(recursivePerform.children) ? recursivePerform.children.length : 0, 0, "Expected recursive PERFORM to remain a leaf statement.");
 
   assert(!Object.prototype.hasOwnProperty.call(state.data, "performSourceRegistry"));
   assert(!JSON.stringify(state.data).includes("__abapPerformSource"));
@@ -2970,9 +3030,13 @@ async function assertPerformSourcesUseSourceOrderAndLazyLargeSelectors() {
   );
   const largeDom = await renderFixture(largeLines.join("\n"));
   const { window } = largeDom;
-  const { els, state } = window.AbapViewerRuntime;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
   const largeCandidates = state.performSourceRegistry.candidatesByFormUpper.get("FRM_MANY") || [];
   assert.strictEqual(largeCandidates.length, callCount);
+  Object.defineProperty(els.templatePreviewOutput, "clientHeight", { configurable: true, value: 100000 });
+  runtime.api.renderTemplatePreview();
+  await settleViewerUi(window, 8);
   const visibleSelect = els.templatePreviewOutput.querySelector(
     '.perform-source-select[data-perform-form="FRM_MANY"]'
   );
@@ -2980,7 +3044,7 @@ async function assertPerformSourcesUseSourceOrderAndLazyLargeSelectors() {
   assert.strictEqual(
     visibleSelect.options.length,
     1,
-    "Expected a large source selector to defer option creation instead of duplicating every source per visible call."
+    "Expected the single FORM selector to defer option creation for a large source registry."
   );
   visibleSelect.dispatchEvent(new window.Event("focus"));
   assert.strictEqual(visibleSelect.options.length, callCount, "Expected focusing the selector to populate all sources on demand.");
@@ -3058,9 +3122,9 @@ async function assertStructFieldFinalDescNormalizesParentOnly() {
     "Expected committed Viewer templates to keep using finalDesc rather than desc."
   );
 
-  const performRoot = (Array.isArray(state.renderObjects) ? state.renderObjects : [])
-    .find((obj) => obj && obj.objectType === "PERFORM");
-  assert(performRoot, "Expected expanded PERFORM root.");
+  const innerForm = (Array.isArray(state.renderObjects) ? state.renderObjects : [])
+    .find((obj) => obj && obj.objectType === "FORM" && obj.extras?.form?.name === "frm_inner");
+  assert(innerForm, "Expected source-shaped inner FORM root.");
   const findDescendantByRaw = (root, raw) => {
     const stack = root ? [root] : [];
     while (stack.length) {
@@ -3072,8 +3136,8 @@ async function assertStructFieldFinalDescNormalizesParentOnly() {
     }
     return null;
   };
-  const tracedAssignment = findDescendantByRaw(performRoot, "cv_inner = ids_inner-item.");
-  assert(tracedAssignment, "Expected structure-field assignment inside expanded PERFORM.");
+  const tracedAssignment = findDescendantByRaw(innerForm, "cv_inner = ids_inner-item.");
+  assert(tracedAssignment, "Expected structure-field assignment inside FORM.");
 
   try {
     Object.defineProperty(els.templatePreviewOutput, "clientHeight", { configurable: true, value: 100000 });
@@ -3644,17 +3708,20 @@ async function assertViewerFixture(fileName) {
     const performNode = (Array.isArray(state.renderObjects) ? state.renderObjects : [])
       .find((obj) => obj && obj.objectType === "PERFORM");
     assert(performNode, "Expected PERFORM node in renderObjects.");
-    assert(Array.isArray(performNode.children) && performNode.children.length > 0, "Expected expanded FORM children under PERFORM.");
+    assert.strictEqual(Array.isArray(performNode.children) ? performNode.children.length : 0, 0, "Expected PERFORM to remain a leaf statement.");
+    const formNode = (Array.isArray(state.renderObjects) ? state.renderObjects : [])
+      .find((obj) => obj && obj.objectType === "FORM");
+    assert(formNode, "Expected the FORM definition in renderObjects.");
 
-    const ifNode = performNode.children.find((obj) => obj && obj.objectType === "IF");
-    assert(ifNode, "Expected expanded IF node inside PERFORM.");
-    assert(ifNode.values && ifNode.values.condition && ifNode.values.condition.decl, "Expected IF condition decl inside expanded PERFORM.");
+    const ifNode = formNode.children.find((obj) => obj && obj.objectType === "IF");
+    assert(ifNode, "Expected IF node inside the source-shaped FORM.");
+    assert(ifNode.values && ifNode.values.condition && ifNode.values.condition.decl, "Expected IF condition decl inside FORM.");
     assert.strictEqual(ifNode.values.condition.decl.name, "is_ctx-uname");
     assert.strictEqual(ifNode.values.condition.decl.file, "input.abap");
     assert.strictEqual(ifNode.values.condition.decl.lineStart, 17);
 
     const assignmentNode = ifNode.children.find((obj) => obj && obj.objectType === "ASSIGNMENT");
-    assert(assignmentNode, "Expected assignment inside expanded IF.");
+    assert(assignmentNode, "Expected assignment inside IF.");
     assert(assignmentNode.values && assignmentNode.values.target && assignmentNode.values.target.decl, "Expected assignment target decl.");
     assert.strictEqual(assignmentNode.values.target.decl.name, "is_ctx-city");
     assert.strictEqual(assignmentNode.values.target.decl.file, "input.abap");
@@ -4038,9 +4105,10 @@ async function main() {
     await assertLegacyTemplateImportAddsMissingSpecificConfigs();
   }
   if (!focus || focus === "perform-root-trace") {
-    await assertExpandedPerformTraceUsesRootDeclarations();
+    await assertFormSourceTraceUsesRootDeclarations();
   }
   if (!focus || focus === "perform-source-selection") {
+    await assertTemplateRendersEachFormOnceInSourceOrder();
     await assertGlobalPerformSourceSelection();
     await assertPerformSourcesUseSourceOrderAndLazyLargeSelectors();
   }
@@ -4054,7 +4122,7 @@ async function main() {
     await assertPerformAndCallMultiValueRows();
   }
   if (!focus || focus === "template-multi-value-perform-root") {
-    await assertExpandedPerformMultiValueRowsUseRootDescriptions();
+    await assertFormSourceMultiValueRowsUseRootDescriptions();
   }
   if (!focus || focus === "template-multi-value-conditions") {
     await assertConditionListsExpandRows();
@@ -4075,7 +4143,7 @@ async function main() {
   if (!focus || focus === "template-provenance") {
     await assertTemplateAppendDeclaredOperandsPreferRealDeclarations();
     await assertTemplateAppendUnboundOperandsUseCanonicalTargets();
-    await assertLegacyPathAliasUsesTemplateIndexAfterPerformExpansion();
+    await assertLegacyPathAliasUsesSourceShapedTemplateIndex();
     await assertTemplateAppendLiteralKeepsOnlyTargetEditable();
     await assertTemplateIfArrayProvenanceIsPerRenderedLine();
     await assertTemplateIndexedAndCompositePlaceholdersKeepProvenance();

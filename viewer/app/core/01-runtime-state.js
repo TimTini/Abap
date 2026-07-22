@@ -139,9 +139,9 @@ window.AbapViewerRuntime.api = window.AbapViewerRuntime.api || {};
   const LAYOUT_SPLIT_MAX = 72;
   const MOBILE_LAYOUT_QUERY = "(max-width: 980px)";
   const RENDER_TREE_OPTIONS = Object.freeze({
-    expandPerformForms: true,
-    hideFormRoots: true,
-    maxExpandDepth: Number.POSITIVE_INFINITY
+    expandPerformForms: false,
+    hideFormRoots: false,
+    maxExpandDepth: 0
   });
 
   const DECL_TYPE_OPTIONS = [
