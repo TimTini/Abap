@@ -851,6 +851,366 @@ async function assertDataCatalogSourceSelectorStaysSynchronized() {
   dom.window.close();
 }
 
+async function assertPerformSourcePickerRegistryTreeAndSuggestions() {
+  const source = [
+    "DATA gv_a TYPE string.",
+    "DATA gv_b TYPE string.",
+    "PERFORM frm_outer USING gv_a.",
+    "PERFORM frm_outer USING gv_b.",
+    "FORM frm_outer USING iv_outer TYPE string.",
+    "  PERFORM frm_inner USING iv_outer.",
+    "  PERFORM frm_deep USING iv_outer.",
+    "ENDFORM.",
+    "FORM frm_inner USING iv_inner TYPE string.",
+    "  PERFORM frm_leaf USING iv_inner.",
+    "ENDFORM.",
+    "FORM frm_deep USING iv_deep TYPE string.",
+    "  PERFORM frm_mid USING iv_deep.",
+    "ENDFORM.",
+    "FORM frm_mid USING iv_mid TYPE string.",
+    "  PERFORM frm_leaf USING iv_mid.",
+    "ENDFORM.",
+    "FORM frm_leaf USING iv_leaf TYPE string.",
+    "  CLEAR iv_leaf.",
+    "ENDFORM."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const registry = dom.window.AbapViewerRuntime.state.performSourceRegistry;
+  const outerCandidates = registry.candidatesByFormUpper.get("FRM_OUTER") || [];
+  const innerCandidates = registry.candidatesByFormUpper.get("FRM_INNER") || [];
+  const leafCandidates = registry.candidatesByFormUpper.get("FRM_LEAF") || [];
+
+  assert.strictEqual(outerCandidates.length, 2);
+  assert.strictEqual(innerCandidates.length, 2);
+  assert.strictEqual(leafCandidates.length, 4);
+  assert.strictEqual(outerCandidates[0].rootTreeKey, outerCandidates[0].key);
+  assert.strictEqual(outerCandidates[0].depth, 0);
+  assert.deepStrictEqual(Array.from(outerCandidates[0].callChain), [outerCandidates[0].key]);
+
+  const directLeaf = leafCandidates.find((candidate) => candidate.depth === 2);
+  const deepLeaf = leafCandidates.find((candidate) => candidate.depth === 3);
+  assert(directLeaf && deepLeaf, "Expected both direct and deep nested leaf candidates.");
+  const directParent = registry.candidateByKey.get(directLeaf.parentCandidateKey);
+  assert(directParent, "Expected the direct leaf candidate to retain its parent key.");
+  assert.strictEqual(directLeaf.rootTreeKey, outerCandidates[0].key);
+  assert.deepStrictEqual(Array.from(directLeaf.callChain), [
+    outerCandidates[0].key,
+    directParent.key,
+    directLeaf.key
+  ]);
+  assert.strictEqual(deepLeaf.rootTreeKey, outerCandidates[0].key);
+  assert.strictEqual(deepLeaf.callChain.length, deepLeaf.depth + 1);
+
+  assert.strictEqual(typeof registry.getSuggestedCandidates, "function");
+  const suggestions = registry.getSuggestedCandidates("FRM_LEAF", directParent.key);
+  assert(suggestions.length <= 3, "Expected at most three source suggestions.");
+  assert.strictEqual(
+    suggestions[0]?.parentCandidateKey,
+    directParent.key,
+    "Expected a candidate under the directly changed parent to rank first."
+  );
+  for (let index = 1; index < suggestions.length; index += 1) {
+    const previous = suggestions[index - 1];
+    const current = suggestions[index];
+    const previousPriority = previous.parentCandidateKey === directParent.key ? 0 : 1;
+    const currentPriority = current.parentCandidateKey === directParent.key ? 0 : 1;
+    assert(
+      previousPriority < currentPriority
+        || previousPriority === currentPriority && (
+          previous.depth < current.depth
+          || previous.depth === current.depth && (
+            previous.lineStart < current.lineStart
+            || previous.lineStart === current.lineStart && previous.sourceOrder <= current.sourceOrder
+          )
+        ),
+      "Expected source suggestions to rank direct-parent, shallower, then source-order candidates."
+    );
+  }
+
+  const runtime = dom.window.AbapViewerRuntime;
+  runtime.els.rightTabTemplateBtn.click();
+  await settleViewerUi(dom.window, 4);
+  Object.defineProperty(runtime.els.templatePreviewOutput, "clientHeight", { configurable: true, value: 100000 });
+  runtime.api.renderTemplatePreview();
+  await settleViewerUi(dom.window, 4);
+  const leafPicker = runtime.els.templatePreviewOutput.querySelector('.perform-source-picker[data-perform-form="FRM_LEAF"]');
+  assert(leafPicker, "Expected the nested FORM to expose its source trees.");
+  leafPicker.querySelector(".perform-source-trigger").click();
+  await settleViewerUi(dom.window, 2);
+  const directRow = leafPicker.querySelector(`[data-candidate-key="${directLeaf.key}"]`);
+  const deepRow = leafPicker.querySelector(`[data-candidate-key="${deepLeaf.key}"]`);
+  assert(directRow && deepRow, "Expected direct and deep sources in the same root tree.");
+  assert.strictEqual(
+    directRow.style.getPropertyValue("--perform-source-tree-hue"),
+    deepRow.style.getPropertyValue("--perform-source-tree-hue")
+  );
+  assert.notStrictEqual(
+    directRow.style.getPropertyValue("--perform-source-tree-lightness"),
+    deepRow.style.getPropertyValue("--perform-source-tree-lightness"),
+    "Expected deeper branches to use a different tint while retaining the root hue."
+  );
+
+  dom.window.close();
+}
+
+async function assertPerformSourcePickerKeepsOrFallsBackToActiveSelection() {
+  const source = [
+    "DATA gv_a TYPE string.",
+    "DATA gv_b TYPE string.",
+    "DATA gv_direct TYPE string.",
+    "PERFORM frm_outer USING gv_a.",
+    "PERFORM frm_outer USING gv_b.",
+    "PERFORM frm_inner USING gv_direct.",
+    "FORM frm_outer USING iv_outer TYPE string.",
+    "  PERFORM frm_inner USING iv_outer.",
+    "  PERFORM frm_inner USING iv_outer.",
+    "ENDFORM.",
+    "FORM frm_inner USING iv_inner TYPE string.",
+    "  CLEAR iv_inner.",
+    "ENDFORM."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const registry = dom.window.AbapViewerRuntime.state.performSourceRegistry;
+  const outerCandidates = registry.candidatesByFormUpper.get("FRM_OUTER") || [];
+  const innerCandidates = registry.candidatesByFormUpper.get("FRM_INNER") || [];
+  const nestedInner = innerCandidates.filter((candidate) => candidate.parentCandidateKey === outerCandidates[0].key);
+  const directInner = innerCandidates.find((candidate) => candidate.depth === 0);
+  assert.strictEqual(nestedInner.length, 2);
+  assert(directInner, "Expected an independent, always-active source candidate.");
+
+  assert.strictEqual(registry.selectCandidate("FRM_INNER", nestedInner[1].key), true);
+  assert.strictEqual(registry.selectCandidate("FRM_OUTER", outerCandidates[1].key), true);
+  const fallback = registry.getSuggestedCandidates("FRM_INNER", outerCandidates[1].key)[0];
+  assert(fallback, "Expected a fallback suggestion for the newly active parent branch.");
+  assert.strictEqual(
+    registry.selectedKeyByFormUpper.get("FRM_INNER"),
+    fallback.key,
+    "Expected an inactive child selection to fall back to the best suggestion."
+  );
+
+  assert.strictEqual(registry.selectCandidate("FRM_INNER", directInner.key), true);
+  assert.strictEqual(registry.selectCandidate("FRM_OUTER", outerCandidates[0].key), true);
+  assert.strictEqual(
+    registry.selectedKeyByFormUpper.get("FRM_INNER"),
+    directInner.key,
+    "Expected an independently active child selection to remain selected after a parent change."
+  );
+
+  dom.window.close();
+
+  const oneActiveDom = await renderFixture([
+    "DATA gv_a TYPE string.",
+    "DATA gv_b TYPE string.",
+    "PERFORM frm_outer USING gv_a.",
+    "PERFORM frm_outer USING gv_b.",
+    "FORM frm_outer USING iv_outer TYPE string.",
+    "  PERFORM frm_inner USING iv_outer.",
+    "ENDFORM.",
+    "FORM frm_inner USING iv_inner TYPE string.",
+    "  CLEAR iv_inner.",
+    "ENDFORM."
+  ].join("\n"));
+  const oneActiveRuntime = oneActiveDom.window.AbapViewerRuntime;
+  const oneActiveRegistry = oneActiveRuntime.state.performSourceRegistry;
+  assert.strictEqual(oneActiveRegistry.candidatesByFormUpper.get("FRM_INNER")?.length, 2);
+  assert.strictEqual(oneActiveRegistry.getActiveCandidates("FRM_INNER").length, 1);
+  oneActiveRuntime.els.rightTabTemplateBtn.click();
+  await settleViewerUi(oneActiveDom.window, 4);
+  Object.defineProperty(oneActiveRuntime.els.templatePreviewOutput, "clientHeight", { configurable: true, value: 100000 });
+  oneActiveRuntime.api.renderTemplatePreview();
+  await settleViewerUi(oneActiveDom.window, 4);
+  assert(
+    oneActiveRuntime.els.templatePreviewOutput.querySelector('.perform-source-picker[data-perform-form="FRM_INNER"]'),
+    "Expected alternative call-chain trees to remain selectable when only one candidate is active."
+  );
+  oneActiveDom.window.close();
+}
+
+async function assertPerformSourcePickerIsSharedSearchableAndLazy() {
+  const rootCallCount = 60;
+  const callCount = rootCallCount * 2;
+  const sourceLines = ["DATA gv_value TYPE string."];
+  for (let index = 1; index <= rootCallCount; index += 1) {
+    sourceLines.push(`PERFORM frm_outer USING 'ROOT_${String(index).padStart(3, "0")}'.`);
+  }
+  sourceLines.push(
+    "FORM frm_outer USING iv_value TYPE string.",
+    "  PERFORM frm_many USING iv_value.",
+    "  PERFORM frm_many USING iv_value.",
+    "ENDFORM.",
+    "FORM frm_many USING iv_value TYPE string.",
+    "  CLEAR iv_value.",
+    "ENDFORM."
+  );
+  const dom = await renderFixture(sourceLines.join("\n"));
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+  const candidates = state.performSourceRegistry.candidatesByFormUpper.get("FRM_MANY") || [];
+  assert.strictEqual(candidates.length, callCount);
+
+  const assertPicker = (container, label) => {
+    const picker = container.querySelector('.perform-source-picker[data-perform-form="FRM_MANY"]');
+    assert(picker, `Expected ${label} to use the shared source picker.`);
+    const trigger = picker.querySelector(".perform-source-trigger");
+    const popup = picker.querySelector(".perform-source-popup");
+    assert(trigger && popup, `Expected ${label} picker trigger and popup.`);
+    assert.strictEqual(
+      popup.querySelectorAll("[data-candidate-key]").length,
+      0,
+      `Expected ${label} picker to defer building 120 tree rows until opened.`
+    );
+    return { picker, trigger, popup };
+  };
+
+  els.rightTabDescBtn.click();
+  await settleViewerUi(window, 8);
+  const dataPicker = assertPicker(els.declDescPanel, "Data");
+
+  els.rightTabTemplateBtn.click();
+  await settleViewerUi(window, 8);
+  Object.defineProperty(els.templatePreviewOutput, "clientHeight", { configurable: true, value: 100000 });
+  window.AbapViewerRuntime.api.renderTemplatePreview();
+  await settleViewerUi(window, 8);
+  let templatePicker = assertPicker(els.templatePreviewOutput, "Template");
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 800 });
+  Object.defineProperty(window, "innerHeight", { configurable: true, value: 600 });
+  templatePicker.trigger.getBoundingClientRect = () => ({
+    left: 730,
+    right: 790,
+    top: 100,
+    bottom: 130,
+    width: 60,
+    height: 30
+  });
+  templatePicker.trigger.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await settleViewerUi(window, 4);
+  assert.strictEqual(templatePicker.popup.hidden, false);
+  assert.strictEqual(templatePicker.trigger.getAttribute("aria-expanded"), "true");
+  const popupLeft = Number.parseFloat(templatePicker.popup.style.left);
+  assert(Number.isFinite(popupLeft) && popupLeft >= 12, "Expected the popup to clamp inside the viewport.");
+  assert(templatePicker.popup.style.top, "Expected opening the popup to calculate a viewport-safe vertical position.");
+  let search = templatePicker.popup.querySelector(".perform-source-search");
+  let suggestions = templatePicker.popup.querySelector(".perform-source-suggestions");
+  let tree = templatePicker.popup.querySelector(".perform-source-tree");
+  assert(search && suggestions && tree, "Expected popup search, suggestions, and tree sections.");
+  assert.strictEqual(window.document.activeElement, search, "Expected opening the picker to focus its search.");
+  const suggestedRows = Array.from(suggestions.querySelectorAll('[data-suggested="true"][data-candidate-key]'));
+  assert(suggestedRows.length > 0 && suggestedRows.length <= 3, "Expected one to three actionable source suggestions.");
+  assert.strictEqual(tree.querySelectorAll("[data-candidate-key]").length, callCount);
+
+  const treeRows = Array.from(tree.querySelectorAll("[data-candidate-key]"));
+  const rowsByRoot = new Map();
+  for (const row of treeRows) {
+    const rootTreeKey = row.getAttribute("data-root-tree-key");
+    if (!rowsByRoot.has(rootTreeKey)) {
+      rowsByRoot.set(rootTreeKey, []);
+    }
+    rowsByRoot.get(rootTreeKey).push(row);
+  }
+  const sameTreeRows = Array.from(rowsByRoot.values()).find((rows) => rows.length === 2);
+  const differentTreeRows = Array.from(rowsByRoot.values());
+  assert(sameTreeRows && differentTreeRows.length > 1, "Expected nested sources to retain their root trees.");
+  assert.strictEqual(
+    sameTreeRows[0].style.getPropertyValue("--perform-source-tree-hue"),
+    sameTreeRows[1].style.getPropertyValue("--perform-source-tree-hue"),
+    "Expected source rows from one root tree to use the same hue."
+  );
+  assert.notStrictEqual(
+    differentTreeRows[0][0].style.getPropertyValue("--perform-source-tree-hue"),
+    differentTreeRows[1][0].style.getPropertyValue("--perform-source-tree-hue"),
+    "Expected different source trees to use different hues."
+  );
+
+  const selectedTreeRow = tree.querySelector(".perform-source-candidate-row.is-selected");
+  const selectedRoot = selectedTreeRow?.closest(".perform-source-root");
+  const selectedRootToggle = selectedRoot?.querySelector(".perform-source-root-toggle");
+  const selectedRootGroup = selectedRoot?.querySelector('[role="group"]');
+  assert(selectedTreeRow && selectedRootToggle && selectedRootGroup, "Expected an accessible root treeitem and child group.");
+  assert.strictEqual(selectedRootToggle.getAttribute("role"), "treeitem");
+  assert.strictEqual(selectedRootToggle.getAttribute("aria-level"), "1");
+  assert.strictEqual(selectedTreeRow.getAttribute("role"), "treeitem");
+  assert(Number(selectedTreeRow.getAttribute("aria-level")) > 1, "Expected child rows to expose their call depth.");
+  selectedTreeRow.focus();
+  selectedTreeRow.dispatchEvent(new window.KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+  assert.strictEqual(window.document.activeElement, selectedRootToggle, "Expected collapsing a tree to preserve keyboard focus.");
+  assert.strictEqual(selectedRootToggle.getAttribute("aria-expanded"), "false");
+  selectedRootToggle.dispatchEvent(new window.KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+  assert.strictEqual(selectedRootToggle.getAttribute("aria-expanded"), "true");
+
+  const visibleControls = () => Array.from(templatePicker.popup.querySelectorAll(
+    ".perform-source-suggestion, .perform-source-root-toggle, .perform-source-candidate-row"
+  )).filter((node) => !node.hidden && node.style.display !== "none" && !node.closest("[hidden]"));
+  selectedRootToggle.dispatchEvent(new window.KeyboardEvent("keydown", { key: "End", bubbles: true }));
+  assert.strictEqual(window.document.activeElement, visibleControls().at(-1));
+  window.document.activeElement.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Home", bubbles: true }));
+  assert.strictEqual(window.document.activeElement, visibleControls()[0]);
+  assert(
+    String(templatePicker.trigger.textContent || "").includes("ROOT_001"),
+    "Expected the trigger to identify the selected source arguments."
+  );
+
+  const firstSuggestedKey = suggestedRows
+    .map((row) => row.getAttribute("data-candidate-key"))
+    .find((key) => key && key !== state.performSourceRegistry.selectedKeyByFormUpper.get("FRM_MANY"));
+  assert(firstSuggestedKey, "Expected a suggestion different from the initial source.");
+  suggestions.querySelector(`[data-candidate-key="${firstSuggestedKey}"]`).click();
+  await settleViewerUi(window, 6);
+  assert.strictEqual(state.performSourceRegistry.selectedKeyByFormUpper.get("FRM_MANY"), firstSuggestedKey);
+
+  els.rightTabDescBtn.click();
+  await settleViewerUi(window, 6);
+  const syncedDataPicker = els.declDescPanel.querySelector('.perform-source-picker[data-perform-form="FRM_MANY"]');
+  assert(syncedDataPicker && syncedDataPicker.isConnected, "Expected Data to rebuild the shared picker after Template selection.");
+  assert.strictEqual(
+    syncedDataPicker.querySelector(".data-perform-source-select")?.value,
+    firstSuggestedKey,
+    "Expected Data and Template pickers to share the selected source."
+  );
+
+  els.rightTabTemplateBtn.click();
+  await settleViewerUi(window, 6);
+  templatePicker = assertPicker(els.templatePreviewOutput, "Template after suggestion");
+  templatePicker.trigger.click();
+  await settleViewerUi(window, 2);
+  search = templatePicker.popup.querySelector(".perform-source-search");
+  tree = templatePicker.popup.querySelector(".perform-source-tree");
+  search.value = "ROOT_060";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  await settleViewerUi(window, 2);
+  assert.strictEqual(
+    window.getComputedStyle(templatePicker.popup.querySelector(".perform-source-suggestions")).display,
+    "none",
+    "Expected search results to replace unrelated suggestions while a query is active."
+  );
+  const visibleRows = Array.from(tree.querySelectorAll("[data-candidate-key]")).filter((row) => (
+    !row.hidden && row.style.display !== "none"
+  ));
+  assert(
+    visibleRows.length > 0 && visibleRows.length < callCount,
+    "Expected source picker search to filter tree rows."
+  );
+  assert(
+    Array.from(tree.querySelectorAll(".perform-source-root[hidden]"))
+      .every((section) => window.getComputedStyle(section).display === "none"),
+    "Expected search to hide root sections that have no matching source."
+  );
+  const selectedKey = visibleRows[0].getAttribute("data-candidate-key");
+  search.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await settleViewerUi(window, 6);
+  assert.strictEqual(state.performSourceRegistry.selectedKeyByFormUpper.get("FRM_MANY"), selectedKey);
+
+  templatePicker = assertPicker(els.templatePreviewOutput, "Template after search selection");
+  assert(templatePicker.picker.isConnected, "Expected the picker queried after selection to belong to the current render.");
+  templatePicker.trigger.click();
+  await settleViewerUi(window, 2);
+  search = templatePicker.popup.querySelector(".perform-source-search");
+  search.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  await settleViewerUi(window, 2);
+  assert.strictEqual(templatePicker.popup.hidden, true, "Expected Escape to close the source picker popup.");
+
+  dom.window.close();
+}
+
 defineFocusedTest(test, "viewer if template contract", ["if-template"], async (t) => {
 assertViewerFixtureDirectoriesStayInSync();
 
@@ -908,5 +1268,21 @@ assertViewerFixtureDirectoriesStayInSync();
 
   await t.test("data catalog source selector stays synchronized", async () => {
     await assertDataCatalogSourceSelectorStaysSynchronized();
+  });
+});
+
+defineFocusedTest(test, "viewer perform source picker contracts", ["perform-source-picker"], async (t) => {
+  assertViewerFixtureDirectoriesStayInSync();
+
+  await t.test("registry records stable source trees and ranks suggestions", async () => {
+    await assertPerformSourcePickerRegistryTreeAndSuggestions();
+  });
+
+  await t.test("parent changes preserve active children or select the best fallback", async () => {
+    await assertPerformSourcePickerKeepsOrFallsBackToActiveSelection();
+  });
+
+  await t.test("shared popup is lazy, searchable, tree-based, and keyboard accessible", async () => {
+    await assertPerformSourcePickerIsSharedSearchableAndLazy();
   });
 });

@@ -511,6 +511,16 @@ async function assertStatementSpecificTwentyCellTemplates() {
     assert(assignment[rangeKey], `Expected ASSIGNMENT range ${rangeKey}.`);
   }
 
+  const CONDITION_WIDTH_TEMPLATE_KEYS = [
+    "IF",
+    "ELSEIF",
+    "SELECT",
+    "READ_TABLE",
+    "LOOP_AT_ITAB",
+    "MODIFY_ITAB",
+    "DELETE_ITAB"
+  ];
+
   for (const templateKey of ["IF", "ELSEIF"]) {
     const conditionTemplate = state.templateConfig.templates[templateKey];
     for (const rangeKey of [
@@ -519,6 +529,13 @@ async function assertStatementSpecificTwentyCellTemplates() {
     ]) {
       assert(conditionTemplate[rangeKey], `Expected ${templateKey} range ${rangeKey}.`);
     }
+  }
+
+  for (const templateKey of ["SELECT", "READ_TABLE", "LOOP_AT_ITAB", "MODIFY_ITAB", "DELETE_ITAB"]) {
+    const hybrid = state.templateConfig.templates[templateKey];
+    assert.strictEqual(hybrid.A1.text, "{rows.keyword}");
+    assert.strictEqual(hybrid.U1.text, "{rows.finalDesc}");
+    assert(hybrid.A2 || hybrid.A3, `Expected ${templateKey} condition block rows.`);
   }
 
   Object.defineProperty(els.templatePreviewOutput, "clientHeight", {
@@ -538,7 +555,7 @@ async function assertStatementSpecificTwentyCellTemplates() {
       templateKey,
       `Expected ${templateKey} to render with its dedicated config instead of DEFAULT.`
     );
-    const expectedCellCount = ["IF", "ELSEIF"].includes(templateKey) ? 80 : 40;
+    const expectedCellCount = CONDITION_WIDTH_TEMPLATE_KEYS.includes(templateKey) ? 80 : 40;
     for (const row of Array.from(table.querySelectorAll("tr"))) {
       assert.strictEqual(row.querySelectorAll("td").length, expectedCellCount, `${templateKey} row width mismatch.`);
     }
@@ -547,8 +564,10 @@ async function assertStatementSpecificTwentyCellTemplates() {
   const readTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="READ_TABLE"]');
   assert.deepStrictEqual(getTemplateTableRows(readTable), [
     ["READ TABLE", "lt_rows"],
-    ["WITH KEY", "table_line = lv_a"],
-    ["INTO", "ls_row"]
+    ["INTO", "ls_row"],
+    ["WITH KEY", "="],
+    ["Điều kiện trái", "Toán tử", "Điều kiện phải", "="],
+    ["table_line", "=", "lv_a"]
   ]);
 
   const appendTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="APPEND"]');
@@ -581,7 +600,9 @@ async function assertStatementSpecificTwentyCellTemplates() {
     ["SELECT", "*"],
     ["FROM", "usr02"],
     ["INTO TABLE", "lt_rows"],
-    ["WHERE", "bname = p_user"]
+    ["WHERE", "="],
+    ["Điều kiện trái", "Toán tử", "Điều kiện phải", "="],
+    ["bname", "=", "p_user"]
   ]);
 
   const elseTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="ELSE"]');

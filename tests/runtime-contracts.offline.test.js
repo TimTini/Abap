@@ -24,6 +24,7 @@ const expectedScriptSrcs = [
   "./app/output/01-output-render.js",
   "./app/descriptions/01-normalize-and-desc.js",
   "./app/perform/01-perform-sources.js",
+  "./app/template/00-excel-roundtrip.js",
   "./app/template/01-path-resolver.js",
   "./app/ui/01-navigation.js",
   "./app/parser/01-parser-controller.js",

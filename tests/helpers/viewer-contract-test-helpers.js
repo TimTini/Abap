@@ -104,6 +104,11 @@ async function openTemplateCellDescriptionTab(window, cell) {
   const descriptionTab = Array.from(modal.querySelectorAll("button"))
     .find((button) => String(button.textContent || "").trim() === "Description");
   assert(descriptionTab, "Expected the Template cell editor to expose the Description tab.");
+  assert.strictEqual(
+    String(descriptionTab.style.fontWeight || ""),
+    "700",
+    "Expected Description to be the default active tab when Edit Template Cell opens."
+  );
   descriptionTab.click();
   await waitForViewerUi(window);
   return modal;

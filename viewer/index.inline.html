@@ -9,9 +9,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.07.26-r66">
-  <meta name="abap-viewer-updated-at" content="2026-07-26 11:01:47">
-  <meta name="abap-viewer-updated-note" content="The default sample now uses the extended flight operations program.">
+  <meta name="abap-viewer-version" content="v2026.07.26-r80">
+  <meta name="abap-viewer-updated-at" content="2026-07-26 22:32:05">
+  <meta name="abap-viewer-updated-note" content="Excel imports now preserve adjacent outlines encoded through shared cell edges.">
   <title>ABAP Parser Viewer</title>
     <style>
 /* inlined from: ./styles/viewer.css */
@@ -726,11 +726,13 @@
       white-space: pre-wrap;
     }
 
-    .perform-source-control {
+    .perform-source-picker {
+      position: relative;
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      max-width: min(520px, 100%);
+      max-width: min(680px, 100%);
+      color: var(--text);
     }
 
     .perform-source-badge {
@@ -742,15 +744,239 @@
       white-space: nowrap;
     }
 
-    .perform-source-select {
-      min-width: 180px;
-      max-width: 360px;
+    .perform-source-trigger {
       border: 1px solid var(--border);
       border-radius: 6px;
-      padding: 4px 6px;
+      padding: 5px 8px;
       background: var(--panel);
       color: var(--text);
       font-size: 12px;
+      line-height: 1.25;
+      max-width: min(560px, 100%);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .perform-source-trigger::after {
+      content: " ▾";
+      color: var(--muted);
+    }
+
+    .perform-source-trigger[aria-expanded="true"] {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+    }
+
+    .perform-source-select,
+    .data-perform-source-select {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      margin: -1px !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      clip: rect(0 0 0 0) !important;
+      clip-path: inset(50%) !important;
+      white-space: nowrap !important;
+      border: 0 !important;
+    }
+
+    .perform-source-popup {
+      position: fixed;
+      z-index: 80;
+      top: 0;
+      right: auto;
+      left: 0;
+      width: min(720px, calc(100vw - 40px));
+      max-height: min(70vh, 620px);
+      overflow: auto;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel);
+      color: var(--text);
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+    }
+
+    .perform-source-popup[hidden] {
+      display: none;
+    }
+
+    .perform-source-search {
+      position: sticky;
+      z-index: 2;
+      top: -10px;
+      width: 100%;
+      margin: 0 0 10px;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--code-bg);
+      color: var(--text);
+      font: inherit;
+    }
+
+    .perform-source-search:focus-visible,
+    .perform-source-trigger:focus-visible,
+    .perform-source-popup button:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .perform-source-section-title {
+      margin: 4px 0 6px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .perform-source-suggestions {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .perform-source-suggestions[hidden] {
+      display: none;
+    }
+
+    .perform-source-suggestions .perform-source-section-title {
+      grid-column: 1 / -1;
+    }
+
+    .perform-source-suggestion,
+    .perform-source-candidate-row {
+      --perform-source-row-color: hsl(
+        var(--perform-source-tree-hue)
+        68%
+        var(--perform-source-tree-lightness, 52%)
+      );
+      position: relative;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 2px 8px;
+      width: 100%;
+      min-width: 0;
+      padding: 7px 9px 7px calc(12px + var(--perform-source-indent, 0px));
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--perform-source-row-color);
+      border-radius: 7px;
+      background: var(--panel);
+      background: color-mix(in srgb, var(--perform-source-row-color) 7%, var(--panel));
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .perform-source-suggestion::before,
+    .perform-source-candidate-row::before {
+      content: "";
+      position: absolute;
+      top: 12px;
+      left: 3px;
+      width: 6px;
+      height: 6px;
+      border: 2px solid var(--panel);
+      border-radius: 50%;
+      background: var(--perform-source-row-color);
+    }
+
+    .perform-source-suggestion:hover,
+    .perform-source-candidate-row:hover {
+      background: var(--hover);
+      background: color-mix(in srgb, var(--perform-source-row-color) 14%, var(--panel));
+    }
+
+    .perform-source-suggestion.is-selected,
+    .perform-source-candidate-row.is-selected {
+      border-width: 2px;
+      border-left-width: 5px;
+      box-shadow: inset 0 0 0 1px var(--selected-focus-ring);
+    }
+
+    .perform-source-suggestion.is-recommended:not(.is-selected) {
+      border-style: dashed;
+    }
+
+    .perform-source-row-status {
+      grid-row: 1 / span 2;
+      align-self: start;
+      min-width: 64px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .is-selected > .perform-source-row-status {
+      color: var(--text);
+    }
+
+    .perform-source-row-label {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .perform-source-row-chain,
+    .perform-source-row-reason {
+      grid-column: 2;
+      min-width: 0;
+      overflow-wrap: anywhere;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .perform-source-tree {
+      display: grid;
+      gap: 6px;
+    }
+
+    .perform-source-root {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .perform-source-root[hidden] {
+      display: none;
+    }
+
+    .perform-source-root-group {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .perform-source-root-toggle {
+      --perform-source-row-color: hsl(
+        var(--perform-source-tree-hue)
+        68%
+        var(--perform-source-tree-lightness, 52%)
+      );
+      display: flex;
+      gap: 7px;
+      align-items: flex-start;
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--perform-source-row-color);
+      border-radius: 7px;
+      background: var(--code-bg);
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .perform-source-root-marker {
+      flex: 0 0 1em;
+      color: var(--muted);
     }
 
     .muted {
@@ -1089,6 +1315,101 @@
       justify-content: space-between;
       padding-bottom: 8px;
       border-bottom: 1px solid var(--border);
+    }
+
+    .template-excel-import-panel {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel);
+    }
+
+    .template-excel-status {
+      margin-top: 8px;
+      padding: 7px 9px;
+      border-left: 3px solid var(--accent);
+      border-radius: 5px;
+      background: var(--code-bg);
+      color: var(--text);
+      font-size: 12px;
+    }
+
+    .template-excel-status[hidden] {
+      display: none;
+    }
+
+    .template-excel-status.is-success {
+      border-left-color: #2e9b62;
+      background: rgba(46, 155, 98, 0.12);
+      color: #2e9b62;
+    }
+
+    .template-excel-status.is-warning {
+      border-left-color: #d98b22;
+      background: rgba(217, 139, 34, 0.12);
+      color: #d98b22;
+    }
+
+    .template-excel-import-head {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .template-excel-paste-zone {
+      min-height: 76px;
+      display: grid;
+      place-items: center;
+      padding: 12px;
+      border: 2px dashed var(--accent);
+      border-radius: 8px;
+      color: var(--muted);
+      text-align: center;
+      cursor: text;
+    }
+
+    .template-excel-paste-zone:focus {
+      outline: 3px solid rgba(54, 132, 240, 0.25);
+      outline-offset: 2px;
+    }
+
+    .template-excel-import-summary,
+    .template-excel-import-warnings {
+      font-size: 12px;
+    }
+
+    .template-excel-import-summary {
+      color: var(--muted);
+    }
+
+    .template-excel-import-warnings {
+      margin: 0;
+      padding-left: 20px;
+      color: #a65b00;
+    }
+
+    .template-excel-import-preview {
+      max-height: 280px;
+      overflow: auto;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #ffffff;
+      color: #111111;
+    }
+
+    .template-excel-import-preview table {
+      border-collapse: collapse;
+      width: max-content;
+      min-width: 100%;
+    }
+
+    .template-excel-import-preview td {
+      min-width: 48px;
+      padding: 4px 6px;
     }
 
     .template-builder-field {
@@ -1469,6 +1790,20 @@
 
       .splitter {
         display: none;
+      }
+
+      .perform-source-picker {
+        max-width: 100%;
+        flex-wrap: wrap;
+      }
+
+      .perform-source-popup {
+        width: min(680px, calc(100vw - 24px));
+        max-height: 65vh;
+      }
+
+      .perform-source-suggestions {
+        grid-template-columns: 1fr;
       }
     }
 
@@ -4214,7 +4549,14 @@
   }
 
   function normalizeIdentifierCandidate(raw) {
-    const trimmed = String(raw || "").trim();
+    let trimmed = String(raw || "").trim();
+    if (!trimmed) {
+      return "";
+    }
+    // ABAP SQL host escape: @lv_x / @lt_rows-field
+    if (trimmed.startsWith("@")) {
+      trimmed = trimmed.slice(1).trim();
+    }
     if (!trimmed) {
       return "";
     }
@@ -4692,7 +5034,7 @@
   }
 
   function extractFirstIdentifierFromExpression(expression) {
-    const text = String(expression || "").trim();
+    let text = String(expression || "").trim();
     if (!text) {
       return "";
     }
@@ -4703,19 +5045,28 @@
       return "";
     }
 
+    // Host escape must be stripped before field-path so @itab-field stays one path.
+    if (text.startsWith("@")) {
+      text = text.slice(1).trim();
+      if (!text) {
+        return "";
+      }
+    }
+
     const sysMatch = text.match(/^SY-[A-Za-z_][A-Za-z0-9_]*/i);
     if (sysMatch) {
       return sysMatch[0].toUpperCase();
     }
 
-    const fieldPath = extractFirstFieldPathFromExpression(text);
-    if (fieldPath) {
-      return fieldPath;
-    }
-
+    // Inline decls before field-path: FIELD-SYMBOL(<fs>) looks like path FIELD-SYMBOL.
     const inline = extractFirstInlineDeclaration(text);
     if (inline) {
       return inline;
+    }
+
+    const fieldPath = extractFirstFieldPathFromExpression(text);
+    if (fieldPath) {
+      return fieldPath;
     }
 
     const matches = text.matchAll(/<[^>]+>|[A-Za-z_][A-Za-z0-9_]*/g);
@@ -5698,6 +6049,11 @@
       const valueIndex = index + bestRule.afterTokens.length;
       if (valueIndex < tokens.length) {
         const captured = captureValue(tokens, valueIndex, bestRule);
+        // Empty rest captures must not win first-slot (e.g. SELECT SINGLE FROM … FIELDS …).
+        if (bestRule.capture === "rest" && !String(captured.raw || "").trim()) {
+          index += bestRule.afterTokens.length - 1;
+          continue;
+        }
         const userDesc = resolveUserDesc(descMap, bestRule.descKey, captured.upper);
 
         values.push({
@@ -7764,6 +8120,7 @@
         "SINGLE": "single",
         "DISTINCT": "distinct",
         "FROM": "from",
+        "FIELDS": "fields",
         "INTO": "into",
         "APPENDING": "appending",
         "TABLE": "table",
@@ -7777,8 +8134,11 @@
         "ROWS": "rows"
       },
       "keywordPhrases": {
+        "INTO CORRESPONDING FIELDS OF TABLE": "into-corresponding-fields-of-table",
+        "APPENDING CORRESPONDING FIELDS OF TABLE": "appending-corresponding-fields-of-table",
         "INTO TABLE": "into-table",
         "APPENDING TABLE": "appending-table",
+        "FOR ALL ENTRIES IN": "for-all-entries-in",
         "ORDER BY": "order-by",
         "GROUP BY": "group-by",
         "UP TO": "up-to"
@@ -7790,6 +8150,26 @@
           "label": "fields",
           "capture": "rest",
           "stopTokens": [
+            "FROM",
+            "SINGLE",
+            "DISTINCT"
+          ]
+        },
+        {
+          "after": "SINGLE",
+          "name": "fields",
+          "label": "fields",
+          "capture": "rest",
+          "stopTokens": [
+            "FROM"
+          ]
+        },
+        {
+          "after": "DISTINCT",
+          "name": "fields",
+          "label": "fields",
+          "capture": "rest",
+          "stopTokens": [
             "FROM"
           ]
         },
@@ -7797,6 +8177,34 @@
           "after": "FROM",
           "name": "from",
           "label": "from"
+        },
+        {
+          "after": "FIELDS",
+          "name": "fields",
+          "label": "fields",
+          "capture": "rest",
+          "stopTokens": [
+            "WHERE",
+            "INTO",
+            "APPENDING",
+            "ORDER",
+            "GROUP",
+            "HAVING",
+            "UP",
+            "FOR",
+            "UNION",
+            "OF"
+          ]
+        },
+        {
+          "after": "INTO CORRESPONDING FIELDS OF TABLE",
+          "name": "intoTable",
+          "label": "into-corresponding-table"
+        },
+        {
+          "after": "APPENDING CORRESPONDING FIELDS OF TABLE",
+          "name": "appendingTable",
+          "label": "appending-corresponding-table"
         },
         {
           "after": "INTO TABLE",
@@ -7814,6 +8222,12 @@
           "label": "into"
         },
         {
+          "after": "FOR ALL ENTRIES IN",
+          "name": "forAllEntries",
+          "label": "for-all-entries",
+          "descKey": "forAllEntries"
+        },
+        {
           "after": "WHERE",
           "name": "where",
           "label": "where",
@@ -7822,7 +8236,10 @@
             "ORDER",
             "GROUP",
             "HAVING",
-            "UP"
+            "UP",
+            "INTO",
+            "APPENDING",
+            "UNION"
           ]
         },
         {
@@ -7832,7 +8249,9 @@
           "capture": "rest",
           "stopTokens": [
             "ORDER",
-            "UP"
+            "UP",
+            "INTO",
+            "APPENDING"
           ]
         }
       ]
@@ -8395,6 +8814,8 @@ const els = {
     "* Flight Operations Overview - extended ABAP statement coverage",
     "*---------------------------------------------------------------------*",
     "* Target: classic on-premise ABAP 7.54 or newer.",
+    "* Includes both traditional and inline ABAP declarations for parser coverage.",
+    "* Adds classic Open SQL SELECT clause order without the FIELDS keyword.",
     "*",
     "* Safety defaults:",
     "* - Dataset, self-SUBMIT, Dynpro, and database DML demos are disabled.",
@@ -8405,13 +8826,16 @@ const els = {
     "*---------------------------------------------------------------------*",
     "",
     "INCLUDE <icon>.",
+    "* The type pool include supplies standard SAP icon constants.",
     "",
     "TABLES:",
+    "* Classic TABLES work areas retained for parser coverage.",
     "  sflight,",
     "  spfli,",
     "  scarr.",
     "",
     "CONSTANTS:",
+    "* Named constants centralize status, priority, and demo values.",
     "  gc_status_open       TYPE char12 VALUE 'OPEN',",
     "  gc_status_limited    TYPE char12 VALUE 'LIMITED',",
     "  gc_status_full       TYPE char12 VALUE 'FULL',",
@@ -8427,100 +8851,107 @@ const els = {
     "  gc_block_dataset     TYPE c LENGTH 30 VALUE 'Dataset options',",
     "  gc_block_demo        TYPE c LENGTH 30 VALUE 'Optional parser demos'.",
     "",
+    "* Request structure used to decouple screen input from processing logic.",
     "TYPES:",
     "  BEGIN OF ty_request,",
-    "    carrid       TYPE sflight-carrid,",
-    "    connid       TYPE sflight-connid,",
-    "    date_low     TYPE sflight-fldate,",
-    "    date_high    TYPE sflight-fldate,",
-    "    min_free     TYPE i,",
-    "    include_full TYPE abap_bool,",
+    "    carrid       TYPE sflight-carrid, \"Airline carrier identifier.",
+    "    connid       TYPE sflight-connid, \"Flight connection number.",
+    "    date_low     TYPE sflight-fldate, \"Lower date boundary of the request.",
+    "    date_high    TYPE sflight-fldate, \"Upper date boundary of the request.",
+    "    min_free     TYPE i, \"Minimum free-seat threshold.",
+    "    include_full TYPE abap_bool, \"Controls whether full flights remain visible.",
     "  END OF ty_request.",
     "",
+    "* Joined database row containing flight, route, and carrier attributes.",
     "TYPES:",
     "  BEGIN OF ty_db_flight,",
-    "    carrid    TYPE sflight-carrid,",
-    "    connid    TYPE sflight-connid,",
-    "    fldate    TYPE sflight-fldate,",
-    "    price     TYPE sflight-price,",
-    "    currency  TYPE sflight-currency,",
-    "    planetype TYPE sflight-planetype,",
-    "    seatsmax  TYPE sflight-seatsmax,",
-    "    seatsocc  TYPE sflight-seatsocc,",
-    "    cityfrom  TYPE spfli-cityfrom,",
-    "    cityto    TYPE spfli-cityto,",
-    "    airpfrom  TYPE spfli-airpfrom,",
-    "    airpto    TYPE spfli-airpto,",
-    "    carrname  TYPE scarr-carrname,",
+    "    carrid    TYPE sflight-carrid, \"Airline carrier identifier.",
+    "    connid    TYPE sflight-connid, \"Flight connection number.",
+    "    fldate    TYPE sflight-fldate, \"Scheduled flight date.",
+    "    price     TYPE sflight-price, \"Ticket price stored in SFLIGHT.",
+    "    currency  TYPE sflight-currency, \"Currency key associated with the price.",
+    "    planetype TYPE sflight-planetype, \"Aircraft type assigned to the flight.",
+    "    seatsmax  TYPE sflight-seatsmax, \"Maximum configured seat capacity.",
+    "    seatsocc  TYPE sflight-seatsocc, \"Number of occupied seats.",
+    "    cityfrom  TYPE spfli-cityfrom, \"Departure city from route master data.",
+    "    cityto    TYPE spfli-cityto, \"Arrival city from route master data.",
+    "    airpfrom  TYPE spfli-airpfrom, \"Departure airport code.",
+    "    airpto    TYPE spfli-airpto, \"Arrival airport code.",
+    "    carrname  TYPE scarr-carrname, \"Descriptive carrier name.",
     "  END OF ty_db_flight.",
     "",
     "TYPES ty_t_db_flight TYPE STANDARD TABLE OF ty_db_flight",
     "  WITH EMPTY KEY.",
     "",
+    "* Operational row enriched with availability, status, and priority.",
     "TYPES:",
     "  BEGIN OF ty_flight,",
-    "    carrid            TYPE sflight-carrid,",
+    "    carrid            TYPE sflight-carrid, \"Airline carrier identifier.",
     "    connid            TYPE sflight-connid,",
-    "    fldate            TYPE sflight-fldate,",
-    "    price             TYPE sflight-price,",
+    "    fldate            TYPE sflight-fldate, \"Scheduled flight date.",
+    "    price             TYPE sflight-price, \"Ticket price stored in SFLIGHT.",
     "    currency          TYPE sflight-currency,",
-    "    planetype         TYPE sflight-planetype,",
+    "    planetype         TYPE sflight-planetype, \"Aircraft type assigned to the flight.",
     "    seatsmax          TYPE sflight-seatsmax,",
-    "    seatsocc          TYPE sflight-seatsocc,",
-    "    seatsfree         TYPE i,",
-    "    occupancy_percent TYPE p LENGTH 5 DECIMALS 1,",
+    "    seatsocc          TYPE sflight-seatsocc, \"Number of occupied seats.",
+    "    seatsfree         TYPE i, \"Calculated number of available seats.",
+    "    occupancy_percent TYPE p LENGTH 5 DECIMALS 1, \"Calculated load percentage.",
     "    cityfrom          TYPE spfli-cityfrom,",
     "    cityto            TYPE spfli-cityto,",
-    "    airpfrom          TYPE spfli-airpfrom,",
-    "    airpto            TYPE spfli-airpto,",
+    "    airpfrom          TYPE spfli-airpfrom, \"Departure airport code.",
+    "    airpto            TYPE spfli-airpto, \"Arrival airport code.",
     "    carrname          TYPE scarr-carrname,",
-    "    route_text        TYPE string,",
-    "    status            TYPE char12,",
-    "    priority          TYPE char1,",
-    "    priority_text     TYPE char10,",
+    "    route_text        TYPE string, \"Human-readable route description.",
+    "    status            TYPE char12, \"Operational availability status.",
+    "    priority          TYPE char1, \"Sortable operational priority code.",
+    "    priority_text     TYPE char10, \"Readable priority label.",
     "  END OF ty_flight.",
     "",
     "TYPES ty_t_flight TYPE STANDARD TABLE OF ty_flight",
     "  WITH NON-UNIQUE SORTED KEY priority_key",
     "  COMPONENTS priority seatsfree.",
     "",
+    "* Carrier summary row used by COLLECT.",
     "TYPES:",
     "  BEGIN OF ty_summary,",
-    "    carrid       TYPE sflight-carrid,",
-    "    flight_count TYPE i,",
-    "    seatsmax     TYPE i,",
+    "    carrid       TYPE sflight-carrid, \"Airline carrier identifier.",
+    "    flight_count TYPE i, \"Number of flights in the aggregation.",
+    "    seatsmax     TYPE i, \"Maximum configured seat capacity.",
     "    seatsocc     TYPE i,",
-    "    seatsfree    TYPE i,",
+    "    seatsfree    TYPE i, \"Calculated number of available seats.",
     "  END OF ty_summary.",
     "",
     "TYPES ty_t_summary TYPE HASHED TABLE OF ty_summary",
     "  WITH UNIQUE KEY carrid.",
     "",
+    "* SQL aggregate target used by GROUP BY examples.",
     "TYPES:",
     "  BEGIN OF ty_sql_summary,",
-    "    carrid       TYPE sflight-carrid,",
-    "    flight_count TYPE i,",
-    "    seatsmax     TYPE p LENGTH 16 DECIMALS 0,",
+    "    carrid       TYPE sflight-carrid, \"Airline carrier identifier.",
+    "    flight_count TYPE i, \"Number of flights in the aggregation.",
+    "    seatsmax     TYPE p LENGTH 16 DECIMALS 0, \"Maximum configured seat capacity.",
     "    seatsocc     TYPE p LENGTH 16 DECIMALS 0,",
     "  END OF ty_sql_summary.",
     "",
     "TYPES ty_t_sql_summary TYPE STANDARD TABLE OF ty_sql_summary",
     "  WITH EMPTY KEY.",
     "",
+    "* Lightweight carrier projection for classic and modern SELECT examples.",
     "TYPES:",
     "  BEGIN OF ty_carrier,",
     "    carrid   TYPE scarr-carrid,",
-    "    carrname TYPE scarr-carrname,",
+    "    carrname TYPE scarr-carrname, \"Descriptive carrier name.",
     "  END OF ty_carrier.",
     "",
     "TYPES ty_t_carrier TYPE STANDARD TABLE OF ty_carrier",
     "  WITH EMPTY KEY.",
     "",
+    "* Audit entry written for each meaningful processing step.",
     "TYPES:",
     "  BEGIN OF ty_audit,",
-    "    sequence TYPE i,",
-    "    category TYPE char12,",
-    "    message  TYPE string,",
+    "    sequence TYPE i, \"Monotonically increasing audit sequence.",
+    "    category TYPE char12, \"Audit message category.",
+    "    message  TYPE string, \"Audit message text.",
     "  END OF ty_audit.",
     "",
     "TYPES ty_t_audit TYPE STANDARD TABLE OF ty_audit",
@@ -8545,91 +8976,93 @@ const els = {
     "  s_date FOR sflight-fldate.",
     "",
     "PARAMETERS:",
-    "  p_minfr TYPE i DEFAULT 5,",
-    "  p_full  AS CHECKBOX DEFAULT abap_false,",
-    "  p_pack  TYPE i DEFAULT gc_default_pack_size.",
+    "  p_minfr TYPE i DEFAULT 5, \"User-defined free-seat warning threshold.",
+    "  p_full  AS CHECKBOX DEFAULT abap_false, \"Includes fully booked flights when selected.",
+    "  p_pack  TYPE i DEFAULT gc_default_pack_size. \"Number of rows fetched per cursor package.",
     "SELECTION-SCREEN END OF BLOCK b01.",
     "",
     "SELECTION-SCREEN BEGIN OF BLOCK b02 WITH FRAME TITLE gc_block_dataset.",
     "PARAMETERS:",
-    "  p_export AS CHECKBOX USER-COMMAND opt,",
-    "  p_import AS CHECKBOX,",
+    "  p_export AS CHECKBOX USER-COMMAND opt, \"Enables the optional dataset export demo.",
+    "  p_import AS CHECKBOX, \"Enables the optional dataset import demo.",
     "  p_file   TYPE rlgrap-filename",
     "           DEFAULT '/tmp/zflight_operations.csv'",
     "           LOWER CASE MODIF ID fil,",
-    "  p_prev   TYPE i DEFAULT 5 MODIF ID fil.",
+    "  p_prev   TYPE i DEFAULT 5 MODIF ID fil. \"Maximum number of preview lines to read.",
     "SELECTION-SCREEN END OF BLOCK b02.",
     "",
     "SELECTION-SCREEN BEGIN OF BLOCK b03 WITH FRAME TITLE gc_block_demo.",
     "PARAMETERS:",
-    "  p_submit AS CHECKBOX,",
-    "  p_screen AS CHECKBOX,",
-    "  p_dml    AS CHECKBOX,",
-    "  p_commit AS CHECKBOX,",
-    "  p_child  AS CHECKBOX NO-DISPLAY.",
+    "  p_submit AS CHECKBOX, \"Enables the guarded self-SUBMIT demo.",
+    "  p_screen AS CHECKBOX, \"Enables the optional Dynpro call.",
+    "  p_dml    AS CHECKBOX, \"Enables rollback-only database DML coverage.",
+    "  p_commit AS CHECKBOX, \"Enables an empty COMMIT WORK demonstration.",
+    "  p_child  AS CHECKBOX NO-DISPLAY. \"Prevents recursive execution after SUBMIT.",
     "SELECTION-SCREEN END OF BLOCK b03.",
     "",
     "DATA:",
-    "  gs_request              TYPE ty_request,",
-    "  gs_preview_request      TYPE ty_request,",
-    "  gt_db_flights           TYPE ty_t_db_flight,",
-    "  gt_report               TYPE ty_t_flight,",
-    "  gt_priority             TYPE ty_t_flight,",
-    "  gt_high_priority        TYPE ty_t_flight,",
-    "  gt_summary              TYPE ty_t_summary,",
-    "  gt_sql_summary          TYPE ty_t_sql_summary,",
-    "  gt_active_carriers      TYPE ty_t_carrier,",
-    "  gt_planetypes           TYPE ty_t_planetype,",
-    "  gt_union_carriers       TYPE ty_t_carrid,",
-    "  gt_dataset_preview      TYPE ty_t_string,",
-    "  gt_audit                TYPE ty_t_audit.",
+    "  gs_request              TYPE ty_request, \"Stable request built from selection-screen values.",
+    "  gs_preview_request      TYPE ty_request, \"Relaxed request used for planning validation.",
+    "  gt_db_flights           TYPE ty_t_db_flight, \"Database rows enriched by the join query.",
+    "  gt_report               TYPE ty_t_flight, \"Final operational report rows.",
+    "  gt_priority             TYPE ty_t_flight, \"High and medium priority working queue.",
+    "  gt_high_priority        TYPE ty_t_flight, \"Filtered high-priority subset.",
+    "  gt_summary              TYPE ty_t_summary, \"Carrier-level capacity totals.",
+    "  gt_sql_summary          TYPE ty_t_sql_summary, \"Database-side aggregate results.",
+    "  gt_active_carriers      TYPE ty_t_carrier, \"Carriers having matching flight records.",
+    "  gt_planetypes           TYPE ty_t_planetype, \"Distinct aircraft types in the result set.",
+    "  gt_union_carriers       TYPE ty_t_carrid, \"Carrier IDs produced by the UNION demo.",
+    "  gt_dataset_preview      TYPE ty_t_string, \"Text lines read back from the dataset.",
+    "  gt_audit                TYPE ty_t_audit. \"Execution audit trail.",
     "",
     "DATA:",
-    "  gv_request_valid        TYPE abap_bool,",
-    "  gv_preview_valid        TYPE abap_bool,",
-    "  gv_program_loaded       TYPE abap_bool,",
-    "  gv_authorized           TYPE abap_bool,",
-    "  gv_message              TYPE string,",
-    "  gv_preview_message      TYPE string,",
-    "  gv_title                TYPE string,",
-    "  gv_default_carrier_name TYPE scarr-carrname,",
-    "  gv_priority_copy_to     TYPE i,",
-    "  gv_weekday              TYPE scal-indicator,",
-    "  gv_audit_sequence       TYPE i,",
-    "  gv_processed_count      TYPE i,",
-    "  gv_total_free           TYPE i,",
-    "  gv_dataset_message      TYPE string,",
-    "  gv_screen_text          TYPE string,",
-    "  gv_cursor               TYPE cursor.",
+    "  gv_request_valid        TYPE abap_bool, \"Validation result for the submitted request.",
+    "  gv_preview_valid        TYPE abap_bool, \"Validation result for the preview request.",
+    "  gv_program_loaded       TYPE abap_bool, \"Confirms that LOAD-OF-PROGRAM executed.",
+    "  gv_authorized           TYPE abap_bool, \"Result of optional authorization checks.",
+    "  gv_message              TYPE string, \"General validation or runtime message.",
+    "  gv_preview_message      TYPE string, \"Message returned by preview validation.",
+    "  gv_title                TYPE string, \"Title printed by the classic list report.",
+    "  gv_default_carrier_name TYPE scarr-carrname, \"Carrier name read for the current request.",
+    "  gv_priority_copy_to     TYPE i, \"Upper row index of the priority review window.",
+    "  gv_weekday              TYPE scal-indicator, \"Calendar weekday indicator for the run date.",
+    "  gv_audit_sequence       TYPE i, \"Current audit sequence counter.",
+    "  gv_processed_count      TYPE i, \"Number of flights transformed successfully.",
+    "  gv_total_free           TYPE i, \"Total available seats across report rows.",
+    "  gv_dataset_message      TYPE string, \"Status text for dataset processing.",
+    "  gv_screen_text          TYPE string, \"Text displayed on optional Dynpro 0100.",
+    "  gv_cursor               TYPE cursor. \"Database cursor handle.",
     "",
     "DATA:",
-    "  go_processor TYPE REF TO lcl_flight_processor,",
-    "  go_handler   TYPE REF TO lcl_event_handler,",
-    "  gr_flight    TYPE REF TO ty_flight,",
-    "  gr_any       TYPE REF TO data.",
+    "  go_processor TYPE REF TO lcl_flight_processor, \"Processor object raising flight events.",
+    "  go_handler   TYPE REF TO lcl_event_handler, \"Event-handler object for audit callbacks.",
+    "  gr_flight    TYPE REF TO ty_flight, \"Reference to a flight row.",
+    "  gr_any       TYPE REF TO data. \"Generic data reference used by dynamic access.",
     "",
     "FIELD-SYMBOLS:",
-    "  <ls_audit>          TYPE ty_audit,",
-    "  <ls_report>         TYPE ty_flight,",
-    "  <ls_dynamic_flight> TYPE ty_flight,",
-    "  <lv_component>      TYPE any,",
-    "  <lv_any>            TYPE any.",
+    "* Global field symbols support direct and dynamic data access.",
+    "  <ls_audit>          TYPE ty_audit, \"Field symbol bound to an audit row.",
+    "  <ls_report>         TYPE ty_flight, \"Field symbol bound to a report row.",
+    "  <ls_dynamic_flight> TYPE ty_flight, \"Dynamically assigned flight structure.",
+    "  <lv_component>      TYPE any, \"Dynamically selected structure component.",
+    "  <lv_any>            TYPE any. \"Generic field symbol for parser coverage.",
     "",
     "*---------------------------------------------------------------------*",
     "* Local exception",
     "*---------------------------------------------------------------------*",
     "CLASS lcx_invalid_capacity DEFINITION",
+    "  \"Static exception class preserves compile-time RAISING declarations.",
     "  INHERITING FROM cx_static_check",
     "  FINAL.",
     "  PUBLIC SECTION.",
     "    DATA:",
-    "      seatsmax TYPE i READ-ONLY,",
-    "      seatsocc TYPE i READ-ONLY.",
+    "      seatsmax TYPE i READ-ONLY, \"Maximum configured seat capacity.",
+    "      seatsocc TYPE i READ-ONLY. \"Number of occupied seats.",
     "",
     "    METHODS constructor",
     "      IMPORTING",
     "        iv_seatsmax TYPE i",
-    "        iv_seatsocc TYPE i.",
+    "        iv_seatsocc TYPE i. \"Occupied seats supplied to the method.",
     "ENDCLASS.",
     "",
     "CLASS lcx_invalid_capacity IMPLEMENTATION.",
@@ -8644,6 +9077,7 @@ const els = {
     "* Processor with instance and static events",
     "*---------------------------------------------------------------------*",
     "CLASS lcl_flight_processor DEFINITION FINAL.",
+    "  \"The processor converts one joined database row into one report row.",
     "  PUBLIC SECTION.",
     "    EVENTS flight_processed",
     "      EXPORTING",
@@ -8664,7 +9098,7 @@ const els = {
     "",
     "    CLASS-METHODS raise_run_finished",
     "      IMPORTING",
-    "        iv_count TYPE i.",
+    "        iv_count TYPE i. \"Number of processed report rows.",
     "ENDCLASS.",
     "",
     "CLASS lcl_flight_processor IMPLEMENTATION.",
@@ -8672,6 +9106,7 @@ const els = {
     "    rs_flight = CORRESPONDING #( is_db_flight ).",
     "",
     "    IF rs_flight-seatsocc > rs_flight-seatsmax.",
+    "      \"Raise a class-based exception for invalid state.",
     "      RAISE EXCEPTION TYPE lcx_invalid_capacity",
     "        EXPORTING",
     "          iv_seatsmax = CONV i( rs_flight-seatsmax )",
@@ -8715,6 +9150,7 @@ const els = {
     "      INTO rs_flight-route_text",
     "      SEPARATED BY ' -> '.",
     "",
+    "    \"Publish an event to registered handlers.",
     "    RAISE EVENT flight_processed",
     "      EXPORTING",
     "        es_flight = rs_flight.",
@@ -8749,6 +9185,7 @@ const els = {
     "    gv_processed_count = gv_processed_count + 1.",
     "",
     "    IF es_flight-priority = gc_priority_high.",
+    "      \"Delegate this processing step to a FORM routine.",
     "      PERFORM frm_add_audit",
     "        USING 'EVENT'",
     "              |High-priority event: { es_flight-carrid }/{ es_flight-connid }|.",
@@ -8811,16 +9248,19 @@ const els = {
     "    s_date-option = 'BT'.",
     "    s_date-low = sy-datum.",
     "    s_date-high = sy-datum + 30.",
+    "    \"Append one or more rows to an internal table.",
     "    APPEND s_date.",
     "  ENDIF.",
     "",
     "AT SELECTION-SCREEN OUTPUT.",
+    "  \"Iterate over the implicit SCREEN table.",
     "  LOOP AT SCREEN.",
     "    IF screen-group1 = 'FIL'.",
     "      screen-active = COND i(",
     "        WHEN p_export = abap_true OR p_import = abap_true",
     "        THEN 1",
     "        ELSE 0 ).",
+    "      \"Apply changed attributes to the current screen element.",
     "      MODIFY SCREEN.",
     "    ENDIF.",
     "  ENDLOOP.",
@@ -8845,19 +9285,22 @@ const els = {
     "  ENDIF.",
     "",
     "START-OF-SELECTION.",
+    "  \"Main report event: orchestrate validation, loading, transformation, and output.",
     "  PERFORM frm_initialize_run.",
     "",
+    "  \"Check an internal invariant during report execution.",
     "  ASSERT gv_program_loaded = abap_true.",
     "  ASSERT p_pack > 0.",
     "",
     "  PERFORM frm_build_request.",
+    "  \"Delegate this processing step to a FORM routine.",
     "  PERFORM frm_validate_request",
     "    USING gs_request",
     "    CHANGING gv_request_valid gv_message.",
     "",
     "  IF gv_request_valid = abap_false.",
     "    MESSAGE gv_message TYPE 'S' DISPLAY LIKE 'E'.",
-    "    RETURN.",
+    "    RETURN. \"Leave the current processing block immediately.",
     "  ENDIF.",
     "",
     "  gs_preview_request = VALUE #(",
@@ -8873,9 +9316,10 @@ const els = {
     "      USING 'VALIDATION' gv_preview_message.",
     "  ENDIF.",
     "",
+    "  \"Delegate this processing step to a FORM routine.",
     "  PERFORM frm_check_optional_authority.",
     "  IF gv_authorized = abap_false.",
-    "    RETURN.",
+    "    RETURN. \"Leave the current processing block immediately.",
     "  ENDIF.",
     "",
     "  PERFORM frm_create_runtime_objects.",
@@ -8886,17 +9330,24 @@ const els = {
     "    MESSAGE 'No flights match the current request' TYPE 'S'.",
     "    PERFORM frm_add_audit",
     "      USING 'LOAD' 'No matching flights'.",
-    "    RETURN.",
+    "    RETURN. \"Leave the current processing block immediately.",
     "  ENDIF.",
     "",
+    "  \"Delegate this processing step to a FORM routine.",
     "  PERFORM frm_build_operational_report.",
     "  PERFORM frm_prepare_priority_list.",
     "  PERFORM frm_merge_priority_window.",
     "  PERFORM frm_apply_report_policy.",
     "  PERFORM frm_build_summary.",
     "  PERFORM frm_run_modern_expression_examples.",
+    "  PERFORM frm_run_inline_declaration_examples.",
+    "  \"Delegate this processing step to a FORM routine.",
+    "  PERFORM frm_run_classic_select_examples.",
+    "  \"Delegate this processing step to a FORM routine.",
     "  PERFORM frm_run_sql_examples.",
+    "  \"Delegate this processing step to a FORM routine.",
     "  PERFORM frm_run_string_examples.",
+    "  \"Delegate this processing step to a FORM routine.",
     "  PERFORM frm_run_dynamic_access.",
     "",
     "  IF p_export = abap_true.",
@@ -8916,20 +9367,25 @@ const els = {
     "  ENDIF.",
     "",
     "  IF p_submit = abap_true AND p_child = abap_false.",
+    "    \"Delegate this processing step to a FORM routine.",
     "    PERFORM frm_submit_self.",
     "  ENDIF.",
     "",
     "  IF p_screen = abap_true.",
+    "    \"Open the optional classic Dynpro screen.",
     "    CALL SCREEN 0100",
     "      STARTING AT 5 3",
     "      ENDING AT 110 22.",
     "  ENDIF.",
     "",
+    "  \"Delegate this processing step to a FORM routine.",
     "  PERFORM frm_write_report.",
     "  lcl_flight_processor=>raise_run_finished( gv_processed_count ).",
     "",
     "END-OF-SELECTION.",
+    "  \"Final report event: print audit information and release transient resources.",
     "  PERFORM frm_write_audit_log.",
+    "  \"Delegate this processing step to a FORM routine.",
     "  PERFORM frm_release_resources.",
     "",
     "TOP-OF-PAGE.",
@@ -8937,10 +9393,10 @@ const els = {
     "           40 'Program:', sy-repid,",
     "           90 'Date:', sy-datum,",
     "           110 'Time:', sy-uzeit.",
-    "  ULINE.",
+    "  ULINE. \"Draw a horizontal separator in the classic list.",
     "",
     "END-OF-PAGE.",
-    "  ULINE.",
+    "  ULINE. \"Draw a horizontal separator in the classic list.",
     "  WRITE: / 'Page', sy-pagno,",
     "           30 'Flight Operations Overview'.",
     "",
@@ -8958,13 +9414,14 @@ const els = {
     "ENDMODULE.",
     "",
     "MODULE user_command_0100 INPUT.",
+    "  \"Choose a branch from a finite set of values.",
     "  CASE sy-ucomm.",
     "    WHEN 'BACK' OR 'EXIT' OR 'CANC'.",
     "      SET SCREEN 0.",
-    "      LEAVE SCREEN.",
+    "      LEAVE SCREEN. \"Finish the current Dynpro screen sequence.",
     "    WHEN OTHERS.",
     "      SET SCREEN 0100.",
-    "      LEAVE SCREEN.",
+    "      LEAVE SCREEN. \"Finish the current Dynpro screen sequence.",
     "  ENDCASE.",
     "ENDMODULE.",
     "",
@@ -9013,6 +9470,7 @@ const els = {
     "  DATA:",
     "    lv_date_high TYPE sflight-fldate.",
     "",
+    "  \"Read one row from an internal table.",
     "  READ TABLE s_date INDEX 1.",
     "  IF sy-subrc = 0.",
     "    lv_date_high = COND #(",
@@ -9075,6 +9533,7 @@ const els = {
     "  gv_authorized = abap_true.",
     "",
     "  IF p_submit = abap_true.",
+    "    \"Verify that the user is authorized for this optional operation.",
     "    AUTHORITY-CHECK OBJECT 'S_PROGRAM'",
     "      ID 'P_ACTION' FIELD 'SUBMIT'",
     "      ID 'P_GROUP'  DUMMY.",
@@ -9082,11 +9541,12 @@ const els = {
     "    IF sy-subrc <> 0.",
     "      gv_authorized = abap_false.",
     "      MESSAGE 'No authorization for SUBMIT' TYPE 'S' DISPLAY LIKE 'E'.",
-    "      RETURN.",
+    "      RETURN. \"Leave the current processing block immediately.",
     "    ENDIF.",
     "  ENDIF.",
     "",
     "  IF p_export = abap_true.",
+    "    \"Verify that the user is authorized for this optional operation.",
     "    AUTHORITY-CHECK OBJECT 'S_DATASET'",
     "      ID 'PROGRAM'  FIELD sy-repid",
     "      ID 'ACTVT'    FIELD '34'",
@@ -9096,7 +9556,7 @@ const els = {
     "      gv_authorized = abap_false.",
     "      MESSAGE 'No authorization to write the dataset' TYPE 'S'",
     "        DISPLAY LIKE 'E'.",
-    "      RETURN.",
+    "      RETURN. \"Leave the current processing block immediately.",
     "    ENDIF.",
     "  ENDIF.",
     "",
@@ -9110,7 +9570,7 @@ const els = {
     "      gv_authorized = abap_false.",
     "      MESSAGE 'No authorization to read the dataset' TYPE 'S'",
     "        DISPLAY LIKE 'E'.",
-    "      RETURN.",
+    "      RETURN. \"Leave the current processing block immediately.",
     "    ENDIF.",
     "  ENDIF.",
     "ENDFORM.",
@@ -9119,9 +9579,11 @@ const els = {
     "* CREATE OBJECT, NEW, EVENTS, SET HANDLER",
     "*---------------------------------------------------------------------*",
     "FORM frm_create_runtime_objects.",
+    "  \"Instantiate an object using classic ABAP syntax.",
     "  CREATE OBJECT go_processor.",
     "  CREATE OBJECT go_handler.",
     "",
+    "  \"Register or deactivate an ABAP Objects event handler.",
     "  SET HANDLER go_handler->on_flight_processed FOR go_processor.",
     "  SET HANDLER lcl_event_handler=>on_run_finished ACTIVATION abap_true.",
     "",
@@ -9139,6 +9601,7 @@ const els = {
     "  CLEAR gv_default_carrier_name.",
     "",
     "  IF gs_request-carrid IS NOT INITIAL.",
+    "    \"Read one matching database row.",
     "    SELECT SINGLE FROM scarr",
     "      FIELDS carrname",
     "      WHERE carrid = @gs_request-carrid",
@@ -9162,8 +9625,11 @@ const els = {
     "",
     "  CLEAR lv_open.",
     "",
+    "  \"Start protected exception-handling logic.",
     "  TRY.",
+    "      \"Open a cursor for package-oriented database access.",
     "      OPEN CURSOR @gv_cursor FOR",
+    "        \"Execute an ABAP Open SQL read.",
     "        SELECT FROM sflight AS f",
     "          INNER JOIN spfli AS r",
     "            ON  r~carrid = f~carrid",
@@ -9191,26 +9657,31 @@ const els = {
     "",
     "      lv_open = abap_true.",
     "",
+    "      \"Start a bounded or conditionally terminated loop.",
     "      DO.",
     "        CLEAR lt_batch.",
     "",
+    "        \"Fetch the next package from the open cursor.",
     "        FETCH NEXT CURSOR @gv_cursor",
     "          INTO TABLE @lt_batch",
     "          PACKAGE SIZE @p_pack.",
     "",
     "        IF sy-subrc <> 0.",
-    "          EXIT.",
+    "          EXIT. \"Terminate the current loop.",
     "        ENDIF.",
     "",
     "        CHECK lt_batch IS NOT INITIAL.",
+    "        \"Insert a row using the statement-specific target semantics.",
     "        INSERT LINES OF lt_batch INTO TABLE gt_db_flights.",
     "      ENDDO.",
     "",
+    "      \"Close the database cursor explicitly.",
     "      CLOSE CURSOR @gv_cursor.",
     "      lv_open = abap_false.",
     "",
     "    CATCH cx_sy_open_sql_db INTO DATA(lx_sql).",
     "      IF lv_open = abap_true.",
+    "        \"Close the database cursor explicitly.",
     "        CLOSE CURSOR @gv_cursor.",
     "      ENDIF.",
     "",
@@ -9220,6 +9691,7 @@ const els = {
     "",
     "  SORT gt_db_flights BY carrid connid fldate.",
     "",
+    "  \"Delegate this processing step to a FORM routine.",
     "  PERFORM frm_add_audit",
     "    USING 'LOAD'",
     "          |Cursor loaded { lines( gt_db_flights ) } joined rows|.",
@@ -9233,6 +9705,7 @@ const els = {
     "    ls_db_flight TYPE ty_db_flight,",
     "    ls_flight    TYPE ty_flight.",
     "",
+    "  \"Iterate over an internal table.",
     "  LOOP AT gt_db_flights INTO ls_db_flight.",
     "    CHECK ls_db_flight-carrid IS NOT INITIAL.",
     "",
@@ -9240,7 +9713,7 @@ const els = {
     "      PERFORM frm_add_audit",
     "        USING 'DATA_QUALITY'",
     "              |Skipped zero-capacity flight { ls_db_flight-carrid }/{ ls_db_flight-connid }|.",
-    "      CONTINUE.",
+    "      CONTINUE. \"Skip the remaining statements of this loop pass.",
     "    ENDIF.",
     "",
     "    TRY.",
@@ -9252,7 +9725,7 @@ const els = {
     "        PERFORM frm_add_audit",
     "          USING 'DATA_QUALITY'",
     "                |Occupied { lx_capacity->seatsocc } exceeds max { lx_capacity->seatsmax }|.",
-    "        CONTINUE.",
+    "        CONTINUE. \"Skip the remaining statements of this loop pass.",
     "    ENDTRY.",
     "",
     "    APPEND ls_flight TO gt_report.",
@@ -9286,8 +9759,10 @@ const els = {
     "  ENDIF.",
     "",
     "  IF lines( gt_priority ) > 20.",
+    "    \"Read one row from an internal table.",
     "    READ TABLE gt_priority INTO ls_flight INDEX 21.",
     "    IF sy-subrc = 0.",
+    "      \"Delete data according to the specified target and condition.",
     "      DELETE TABLE gt_priority FROM ls_flight.",
     "    ENDIF.",
     "  ENDIF.",
@@ -9306,6 +9781,7 @@ const els = {
     "* DESCRIBE TABLE, APPEND LINES OF",
     "*---------------------------------------------------------------------*",
     "FORM frm_merge_priority_window.",
+    "  \"Determine internal-table metadata at runtime.",
     "  DESCRIBE TABLE gt_priority LINES gv_priority_copy_to.",
     "",
     "  IF gv_priority_copy_to > 5.",
@@ -9334,12 +9810,14 @@ const els = {
     "  ENDIF.",
     "",
     "  SORT gt_report BY priority carrid connid fldate.",
+    "  \"Delete data according to the specified target and condition.",
     "  DELETE ADJACENT DUPLICATES FROM gt_report",
     "    COMPARING carrid connid fldate.",
     "",
     "  IF line_exists( gt_report[ 1 ] ).",
     "    ls_flight = gt_report[ 1 ].",
     "    ls_flight-route_text = |{ ls_flight-route_text } (lead)|.",
+    "    \"Modify an existing row or database record.",
     "    MODIFY gt_report FROM ls_flight INDEX 1.",
     "  ENDIF.",
     "",
@@ -9373,6 +9851,7 @@ const els = {
     "      seatsocc     = ls_flight-seatsocc",
     "      seatsfree    = ls_flight-seatsfree ).",
     "",
+    "    \"Aggregate numeric fields using the table key.",
     "    COLLECT ls_summary INTO gt_summary.",
     "  ENDLOOP.",
     "",
@@ -9414,6 +9893,319 @@ const els = {
     "ENDFORM.",
     "",
     "*---------------------------------------------------------------------*",
+    "* ABAP inline declarations: DATA(...), FINAL(...), FIELD-SYMBOL(...)",
+    "* These examples are added alongside the traditional declarations above.",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_run_inline_declaration_examples.",
+    "  \"This routine demonstrates inline DATA, FINAL, reference, and field-symbol targets.",
+    "  \"Inline variables inferred from assignments and constructor expressions.",
+    "  DATA(lv_inline_row_count) = lines( gt_report ).",
+    "  DATA(lt_inline_flights) = VALUE ty_t_flight( ).",
+    "  DATA(lt_inline_audit) = VALUE ty_t_audit( ).",
+    "  FINAL(lv_inline_program) = sy-repid.",
+    "  FINAL(lv_inline_summary) =",
+    "    |Program { lv_inline_program }: { lv_inline_row_count } report rows|.",
+    "",
+    "  IF gt_report IS INITIAL.",
+    "    \"Delegate this processing step to a FORM routine.",
+    "    PERFORM frm_add_audit",
+    "      USING 'INLINE' lv_inline_summary.",
+    "    RETURN. \"Leave the current processing block immediately.",
+    "  ENDIF.",
+    "",
+    "  \"Inline work area as READ TABLE result.",
+    "  READ TABLE gt_report INTO DATA(ls_inline_read)",
+    "    INDEX 1.",
+    "",
+    "  IF sy-subrc = 0.",
+    "    DATA(lv_inline_route) = ls_inline_read-route_text.",
+    "    FINAL(lv_inline_carrier) = ls_inline_read-carrid.",
+    "",
+    "    PERFORM frm_add_audit",
+    "      USING 'INLINE'",
+    "            |DATA(...): { lv_inline_carrier } { lv_inline_route }|.",
+    "  ENDIF.",
+    "",
+    "  \"Inline field symbol as READ TABLE result.",
+    "  READ TABLE gt_report",
+    "    ASSIGNING FIELD-SYMBOL(<ls_inline_read>)",
+    "    INDEX 1.",
+    "",
+    "  IF sy-subrc = 0 AND <ls_inline_read> IS ASSIGNED.",
+    "    DATA(lv_inline_free) = <ls_inline_read>-seatsfree.",
+    "",
+    "    \"Inline field symbol for one structure component.",
+    "    ASSIGN COMPONENT 'ROUTE_TEXT'",
+    "      OF STRUCTURE <ls_inline_read>",
+    "      TO FIELD-SYMBOL(<lv_inline_route_component>).",
+    "",
+    "    IF sy-subrc = 0 AND <lv_inline_route_component> IS ASSIGNED.",
+    "      DATA(lv_inline_route_length) =",
+    "        strlen( CONV string( <lv_inline_route_component> ) ).",
+    "",
+    "      PERFORM frm_add_audit",
+    "        USING 'INLINE_FS'",
+    "              |READ/ASSIGNING free={ lv_inline_free }, route length={ lv_inline_route_length }|.",
+    "    ENDIF.",
+    "  ENDIF.",
+    "",
+    "  \"Inline data reference as READ TABLE result.",
+    "  READ TABLE gt_report",
+    "    REFERENCE INTO DATA(lr_inline_read)",
+    "    INDEX 1.",
+    "",
+    "  IF sy-subrc = 0 AND lr_inline_read IS BOUND.",
+    "    DATA(ls_inline_reference_copy) = lr_inline_read->*.",
+    "    ls_inline_reference_copy-route_text =",
+    "      |{ ls_inline_reference_copy-route_text } [reference copy]|.",
+    "  ENDIF.",
+    "",
+    "  \"Inline work area and field symbol in LOOP AT.",
+    "  LOOP AT gt_report INTO DATA(ls_inline_loop)",
+    "    FROM 1 TO 3.",
+    "    APPEND ls_inline_loop TO lt_inline_flights.",
+    "  ENDLOOP.",
+    "",
+    "  LOOP AT lt_inline_flights",
+    "    ASSIGNING FIELD-SYMBOL(<ls_inline_loop>).",
+    "    DATA(lv_inline_key) =",
+    "      |{ <ls_inline_loop>-carrid }/{ <ls_inline_loop>-connid }|.",
+    "",
+    "    IF lv_inline_key IS INITIAL.",
+    "      CONTINUE. \"Skip the remaining statements of this loop pass.",
+    "    ENDIF.",
+    "  ENDLOOP.",
+    "",
+    "  \"Inline field symbol with a table expression.",
+    "  ASSIGN gt_report[ 1 ]",
+    "    TO FIELD-SYMBOL(<ls_inline_expression>).",
+    "",
+    "  IF sy-subrc = 0 AND <ls_inline_expression> IS ASSIGNED.",
+    "    FINAL(lv_inline_status) = <ls_inline_expression>-status.",
+    "  ENDIF.",
+    "",
+    "  \"Inline field symbol returned by APPEND INITIAL LINE.",
+    "  APPEND INITIAL LINE TO lt_inline_audit",
+    "    ASSIGNING FIELD-SYMBOL(<ls_inline_audit>).",
+    "",
+    "  IF <ls_inline_audit> IS ASSIGNED.",
+    "    <ls_inline_audit> = VALUE #(",
+    "      sequence = 1",
+    "      category = 'INLINE'",
+    "      message  = lv_inline_summary ).",
+    "  ENDIF.",
+    "",
+    "  \"Inline field symbol returned by INSERT INITIAL LINE.",
+    "  INSERT INITIAL LINE INTO TABLE lt_inline_flights",
+    "    ASSIGNING FIELD-SYMBOL(<ls_inline_insert>).",
+    "",
+    "  IF sy-subrc = 0 AND <ls_inline_insert> IS ASSIGNED.",
+    "    <ls_inline_insert> = CORRESPONDING #(",
+    "      BASE ( <ls_inline_insert> )",
+    "      ls_inline_read ).",
+    "    <ls_inline_insert>-route_text =",
+    "      |{ <ls_inline_insert>-route_text } [inline insert]|.",
+    "  ENDIF.",
+    "",
+    "  \"Inline immutable reference returned by INSERT ... REFERENCE INTO.",
+    "  INSERT VALUE ty_flight(",
+    "      carrid     = ls_inline_read-carrid",
+    "      connid     = ls_inline_read-connid",
+    "      fldate     = ls_inline_read-fldate",
+    "      route_text = 'Inline reference row' )",
+    "    INTO TABLE lt_inline_flights",
+    "    REFERENCE INTO FINAL(lr_inline_insert).",
+    "",
+    "  IF sy-subrc = 0 AND lr_inline_insert IS BOUND.",
+    "    DATA(lv_inline_insert_text) = lr_inline_insert->route_text.",
+    "  ENDIF.",
+    "",
+    "  \"Inline variables as ABAP SQL targets.",
+    "  SELECT SINGLE FROM scarr",
+    "    FIELDS carrname",
+    "    WHERE carrid = @ls_inline_read-carrid",
+    "    INTO @DATA(lv_inline_carrname).",
+    "",
+    "  SELECT FROM scarr",
+    "    FIELDS carrid, carrname",
+    "    WHERE carrid IN @s_carr",
+    "    ORDER BY carrid",
+    "    INTO TABLE @DATA(lt_inline_carriers).",
+    "",
+    "  \"Inline variable as an IMPORTING target of a function module call.",
+    "  CALL FUNCTION 'DATE_COMPUTE_DAY'",
+    "    EXPORTING",
+    "      date         = sy-datum",
+    "    IMPORTING",
+    "      day          = DATA(lv_inline_weekday)",
+    "    EXCEPTIONS",
+    "      date_invalid = 1",
+    "      OTHERS       = 2.",
+    "",
+    "  DATA(lv_inline_sql_subrc) = sy-subrc.",
+    "",
+    "  PERFORM frm_add_audit",
+    "    USING 'INLINE'",
+    "          |SQL carrier={ lv_inline_carrname }, carriers={ lines( lt_inline_carriers ) }, weekday={ lv_inline_weekday }, subrc={ lv_inline_sql_subrc }, refs={ lv_inline_insert_text }|.",
+    "",
+    "  \"Explicitly unassign inline field symbols; traditional UNASSIGN remains too.",
+    "  UNASSIGN:",
+    "    <ls_inline_read>,",
+    "    <lv_inline_route_component>,",
+    "    <ls_inline_loop>,",
+    "    <ls_inline_expression>,",
+    "    <ls_inline_audit>,",
+    "    <ls_inline_insert>.",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
+    "* Classic Open SQL SELECT syntax: SELECT list before FROM, no FIELDS",
+    "* Existing modern SELECT examples are intentionally retained unchanged.",
+    "*---------------------------------------------------------------------*",
+    "FORM frm_run_classic_select_examples.",
+    "  \"Classic Open SQL examples intentionally omit the FIELDS addition.",
+    "  TYPES:",
+    "    BEGIN OF ty_classic_flight,",
+    "      carrid    TYPE sflight-carrid, \"Airline carrier identifier.",
+    "      connid    TYPE sflight-connid,",
+    "      fldate    TYPE sflight-fldate, \"Scheduled flight date.",
+    "      price     TYPE sflight-price,",
+    "      currency  TYPE sflight-currency,",
+    "      planetype TYPE sflight-planetype, \"Aircraft type assigned to the flight.",
+    "      seatsmax  TYPE sflight-seatsmax, \"Maximum configured seat capacity.",
+    "      seatsocc  TYPE sflight-seatsocc, \"Number of occupied seats.",
+    "    END OF ty_classic_flight,",
+    "    BEGIN OF ty_classic_join,",
+    "      carrid   TYPE sflight-carrid,",
+    "      connid   TYPE sflight-connid,",
+    "      fldate   TYPE sflight-fldate,",
+    "      carrname TYPE scarr-carrname, \"Descriptive carrier name.",
+    "    END OF ty_classic_join.",
+    "",
+    "  DATA:",
+    "    ls_classic_carrier       TYPE scarr,",
+    "    lt_classic_carriers      TYPE STANDARD TABLE OF scarr,",
+    "    lt_classic_names         TYPE ty_t_carrier,",
+    "    lt_classic_flights       TYPE STANDARD TABLE OF ty_classic_flight,",
+    "    lt_classic_join          TYPE STANDARD TABLE OF ty_classic_join,",
+    "    lt_classic_planetypes    TYPE ty_t_planetype,",
+    "    lt_classic_package       TYPE STANDARD TABLE OF sflight,",
+    "    lv_classic_carrid        TYPE scarr-carrid,",
+    "    lv_classic_carrname      TYPE scarr-carrname,",
+    "    lv_classic_count         TYPE i,",
+    "    lv_classic_loop_count    TYPE i,",
+    "    lv_classic_package_count TYPE i,",
+    "    lv_classic_audit         TYPE string.",
+    "",
+    "  \"Classic SELECT SINGLE with the INTO clause before FROM.",
+    "  SELECT SINGLE *",
+    "    INTO ls_classic_carrier",
+    "    FROM scarr",
+    "    WHERE carrid = gs_request-carrid.",
+    "",
+    "  \"Classic SELECT * into an internal table.",
+    "  SELECT *",
+    "    INTO TABLE lt_classic_carriers",
+    "    FROM scarr",
+    "    WHERE carrid IN s_carr",
+    "    UP TO 10 ROWS.",
+    "",
+    "  \"Classic column list into an internal table; no FIELDS keyword.",
+    "  SELECT carrid carrname",
+    "    INTO TABLE lt_classic_names",
+    "    FROM scarr",
+    "    WHERE carrid IN s_carr",
+    "    UP TO 10 ROWS",
+    "    ORDER BY carrid.",
+    "",
+    "  \"Classic APPENDING variant. This appends instead of replacing rows.",
+    "  SELECT carrid carrname",
+    "    APPENDING TABLE lt_classic_names",
+    "    FROM scarr",
+    "    WHERE carrid IN s_carr",
+    "    UP TO 2 ROWS.",
+    "",
+    "  \"Classic column list into a compatible internal table.",
+    "  SELECT carrid connid fldate price currency planetype seatsmax seatsocc",
+    "    INTO TABLE lt_classic_flights",
+    "    FROM sflight",
+    "    WHERE carrid IN s_carr",
+    "      AND connid IN s_conn",
+    "      AND fldate IN s_date",
+    "    UP TO 20 ROWS",
+    "    ORDER BY carrid connid fldate.",
+    "",
+    "  \"Classic JOIN: the SELECT list remains directly after SELECT.",
+    "  SELECT f~carrid f~connid f~fldate c~carrname",
+    "    INTO TABLE lt_classic_join",
+    "    FROM sflight AS f",
+    "    INNER JOIN scarr AS c",
+    "      ON c~carrid = f~carrid",
+    "    WHERE f~carrid IN s_carr",
+    "      AND f~connid IN s_conn",
+    "      AND f~fldate IN s_date",
+    "    UP TO 20 ROWS",
+    "    ORDER BY f~carrid f~connid f~fldate.",
+    "",
+    "  \"Classic DISTINCT selection.",
+    "  SELECT DISTINCT planetype",
+    "    INTO TABLE lt_classic_planetypes",
+    "    FROM sflight",
+    "    WHERE carrid IN s_carr",
+    "      AND connid IN s_conn",
+    "      AND fldate IN s_date",
+    "    UP TO 10 ROWS",
+    "    ORDER BY planetype.",
+    "",
+    "  \"Classic aggregate selection into a scalar variable.",
+    "  SELECT COUNT( * )",
+    "    INTO lv_classic_count",
+    "    FROM sflight",
+    "    WHERE carrid IN s_carr",
+    "      AND connid IN s_conn",
+    "      AND fldate IN s_date.",
+    "",
+    "  \"Classic SELECT loop into a parenthesized list of variables.",
+    "  SELECT carrid carrname",
+    "    INTO (lv_classic_carrid, lv_classic_carrname)",
+    "    FROM scarr",
+    "    WHERE carrid IN s_carr",
+    "    UP TO 2 ROWS.",
+    "",
+    "    lv_classic_loop_count = lv_classic_loop_count + 1.",
+    "  ENDSELECT.",
+    "",
+    "  \"Classic package processing. PACKAGE SIZE creates a SELECT loop.",
+    "  SELECT *",
+    "    INTO TABLE lt_classic_package",
+    "    PACKAGE SIZE 5",
+    "    FROM sflight",
+    "    WHERE carrid IN s_carr",
+    "      AND connid IN s_conn",
+    "      AND fldate IN s_date",
+    "    UP TO 10 ROWS.",
+    "",
+    "    lv_classic_package_count =",
+    "      lv_classic_package_count + lines( lt_classic_package ).",
+    "  ENDSELECT.",
+    "",
+    "  lv_classic_audit =",
+    "    |single={ ls_classic_carrier-carrid }, | &&",
+    "    |all={ lines( lt_classic_carriers ) }, | &&",
+    "    |names={ lines( lt_classic_names ) }, | &&",
+    "    |flights={ lines( lt_classic_flights ) }, | &&",
+    "    |join={ lines( lt_classic_join ) }, | &&",
+    "    |distinct={ lines( lt_classic_planetypes ) }, | &&",
+    "    |count={ lv_classic_count }, | &&",
+    "    |loop={ lv_classic_loop_count }, | &&",
+    "    |packages={ lv_classic_package_count }, | &&",
+    "    |last={ lv_classic_carrid }/{ lv_classic_carrname }|.",
+    "",
+    "  PERFORM frm_add_audit",
+    "    USING 'SQL_CLASSIC' lv_classic_audit.",
+    "ENDFORM.",
+    "",
+    "*---------------------------------------------------------------------*",
     "* Aggregate SQL, DISTINCT, GROUP BY, HAVING, EXISTS, UNION, OFFSET",
     "*---------------------------------------------------------------------*",
     "FORM frm_run_sql_examples.",
@@ -9452,6 +10244,7 @@ const els = {
     "    ORDER BY c~carrid",
     "    INTO TABLE @gt_active_carriers.",
     "",
+    "  \"Execute an ABAP Open SQL read.",
     "  SELECT FROM scarr",
     "    FIELDS carrid",
     "    WHERE carrid IN @s_carr",
@@ -9509,6 +10302,7 @@ const els = {
     "    IN lv_route",
     "    WITH 'to'.",
     "",
+    "  \"Delegate this processing step to a FORM routine.",
     "  PERFORM frm_add_audit",
     "    USING 'STRING'",
     "          |{ lv_from }/{ lv_to }, find={ lv_find_offset }:{ lv_find_length }, normalized={ lv_route }|.",
@@ -9520,7 +10314,9 @@ const els = {
     "FORM frm_run_dynamic_access.",
     "  CHECK gt_report IS NOT INITIAL.",
     "",
+    "  \"Allocate a data object dynamically.",
     "  CREATE DATA gr_flight.",
+    "  \"Bind a field symbol to a data object or component.",
     "  ASSIGN gr_flight->* TO <ls_dynamic_flight>.",
     "",
     "  IF <ls_dynamic_flight> IS ASSIGNED.",
@@ -9543,7 +10339,9 @@ const els = {
     "    ENDIF.",
     "  ENDIF.",
     "",
+    "  \"Remove the current field-symbol binding.",
     "  UNASSIGN <lv_component>.",
+    "  \"Remove the current field-symbol binding.",
     "  UNASSIGN <lv_any>.",
     "  UNASSIGN <ls_dynamic_flight>.",
     "",
@@ -9559,6 +10357,7 @@ const els = {
     "    ls_flight TYPE ty_flight,",
     "    lv_line   TYPE string.",
     "",
+    "  \"Open an application-server dataset.",
     "  OPEN DATASET p_file",
     "    FOR OUTPUT",
     "    IN TEXT MODE",
@@ -9568,10 +10367,11 @@ const els = {
     "  IF sy-subrc <> 0.",
     "    PERFORM frm_add_audit",
     "      USING 'DATASET' gv_dataset_message.",
-    "    RETURN.",
+    "    RETURN. \"Leave the current processing block immediately.",
     "  ENDIF.",
     "",
     "  lv_line = 'CARRIER;CONNECTION;DATE;ROUTE;FREE;LOAD_PERCENT;STATUS'.",
+    "  \"Write one text record to the open dataset.",
     "  TRANSFER lv_line TO p_file.",
     "",
     "  LOOP AT gt_report INTO ls_flight.",
@@ -9579,6 +10379,7 @@ const els = {
     "    TRANSFER lv_line TO p_file.",
     "  ENDLOOP.",
     "",
+    "  \"Close the dataset and release the file handle.",
     "  CLOSE DATASET p_file.",
     "",
     "  PERFORM frm_add_audit",
@@ -9601,24 +10402,29 @@ const els = {
     "    MESSAGE gv_dataset_message.",
     "",
     "  IF sy-subrc <> 0.",
+    "    \"Delegate this processing step to a FORM routine.",
     "    PERFORM frm_add_audit",
     "      USING 'DATASET' gv_dataset_message.",
-    "    RETURN.",
+    "    RETURN. \"Leave the current processing block immediately.",
     "  ENDIF.",
     "",
     "  CLEAR lv_count.",
     "",
+    "  \"Repeat while the controlling condition remains true.",
     "  WHILE lv_count < p_prev.",
+    "    \"Read one text record from the open dataset.",
     "    READ DATASET p_file INTO lv_line.",
     "",
     "    IF sy-subrc <> 0.",
-    "      EXIT.",
+    "      EXIT. \"Terminate the current loop.",
     "    ENDIF.",
     "",
+    "    \"Append one or more rows to an internal table.",
     "    APPEND lv_line TO gt_dataset_preview.",
     "    lv_count = lv_count + 1.",
     "  ENDWHILE.",
     "",
+    "  \"Close the dataset and release the file handle.",
     "  CLOSE DATASET p_file.",
     "",
     "  PERFORM frm_add_audit",
@@ -9631,6 +10437,7 @@ const els = {
     "* This branch is parser/test coverage only and is disabled by default.",
     "*---------------------------------------------------------------------*",
     "FORM frm_demo_database_dml_rollback.",
+    "  \"All database changes in this routine are synthetic and rolled back.",
     "  DATA:",
     "    ls_demo     TYPE sflight,",
     "    lv_seatsocc TYPE sflight-seatsocc VALUE 1.",
@@ -9673,13 +10480,13 @@ const els = {
     "          AND connid = @gc_demo_connid",
     "          AND fldate = @gc_demo_fldate.",
     "",
-    "      ROLLBACK WORK.",
+    "      ROLLBACK WORK. \"Discard the rollback-only DML demonstration.",
     "",
     "      PERFORM frm_add_audit",
     "        USING 'LUW' 'DML parser demo executed and rolled back'.",
     "",
     "    CATCH cx_sy_open_sql_db INTO DATA(lx_dml).",
-    "      ROLLBACK WORK.",
+    "      ROLLBACK WORK. \"Discard the rollback-only DML demonstration.",
     "      PERFORM frm_add_audit",
     "        USING 'LUW_ERROR' lx_dml->get_text( ).",
     "  ENDTRY.",
@@ -9689,7 +10496,7 @@ const els = {
     "* COMMIT WORK demonstration with no pending report changes",
     "*---------------------------------------------------------------------*",
     "FORM frm_demo_empty_commit.",
-    "  COMMIT WORK AND WAIT.",
+    "  COMMIT WORK AND WAIT. \"End the empty demonstration LUW synchronously.",
     "",
     "  PERFORM frm_add_audit",
     "    USING 'LUW'",
@@ -9700,6 +10507,7 @@ const els = {
     "* SUBMIT the same executable once, protected from recursion",
     "*---------------------------------------------------------------------*",
     "FORM frm_submit_self.",
+    "  \"Execute the report through a guarded SUBMIT call.",
     "  SUBMIT (sy-repid)",
     "    WITH s_carr IN s_carr",
     "    WITH s_conn IN s_conn",
@@ -9724,6 +10532,7 @@ const els = {
     "    ls_summary    TYPE ty_summary,",
     "    lv_date_text  TYPE char10.",
     "",
+    "  \"Invoke a method using classic CALL METHOD syntax.",
     "  CALL METHOD lcl_report_helper=>write_header",
     "    EXPORTING",
     "      iv_title = gv_title.",
@@ -9736,7 +10545,7 @@ const els = {
     "           95 'Load %',",
     "           108 'Status',",
     "           122 'Priority'.",
-    "  ULINE.",
+    "  ULINE. \"Draw a horizontal separator in the classic list.",
     "",
     "  LOOP AT gt_report INTO ls_flight.",
     "    WRITE ls_flight-fldate TO lv_date_text.",
@@ -9751,9 +10560,9 @@ const els = {
     "             122 ls_flight-priority_text.",
     "  ENDLOOP.",
     "",
-    "  SKIP 2.",
+    "  SKIP 2. \"Add vertical spacing to the list output.",
     "  WRITE: / 'Carrier totals'.",
-    "  ULINE.",
+    "  ULINE. \"Draw a horizontal separator in the classic list.",
     "",
     "  LOOP AT gt_summary INTO ls_summary.",
     "    WRITE: / ls_summary-carrid,",
@@ -9764,9 +10573,9 @@ const els = {
     "  ENDLOOP.",
     "",
     "  IF gt_dataset_preview IS NOT INITIAL.",
-    "    SKIP 2.",
+    "    SKIP 2. \"Add vertical spacing to the list output.",
     "    WRITE: / 'Dataset preview'.",
-    "    ULINE.",
+    "    ULINE. \"Draw a horizontal separator in the classic list.",
     "",
     "    LOOP AT gt_dataset_preview INTO DATA(lv_preview_line).",
     "      WRITE: / lv_preview_line.",
@@ -9780,6 +10589,7 @@ const els = {
     "* Function module call",
     "*---------------------------------------------------------------------*",
     "FORM frm_write_run_calendar_note.",
+    "  \"Call a function module through the ABAP runtime.",
     "  CALL FUNCTION 'DATE_COMPUTE_DAY'",
     "    EXPORTING",
     "      date         = sy-datum",
@@ -9823,12 +10633,12 @@ const els = {
     "  DATA ls_audit TYPE ty_audit.",
     "",
     "  IF gt_audit IS INITIAL.",
-    "    RETURN.",
+    "    RETURN. \"Leave the current processing block immediately.",
     "  ENDIF.",
     "",
-    "  SKIP 2.",
+    "  SKIP 2. \"Add vertical spacing to the list output.",
     "  WRITE: / 'Execution audit'.",
-    "  ULINE.",
+    "  ULINE. \"Draw a horizontal separator in the classic list.",
     "",
     "  LOOP AT gt_audit INTO ls_audit.",
     "    WRITE: / ls_audit-sequence,",
@@ -9960,6 +10770,48 @@ const els = {
     }
   };
 
+  function appendConditionBlockToTemplate(template, startRow, pathPrefix, sectionLabel) {
+    let row = Number(startRow) || 1;
+    const prefix = String(pathPrefix || "").trim();
+    if (!prefix) {
+      return row;
+    }
+
+    // Gate empty condition blocks: placeholder resolves only when at least one clause exists.
+    const presenceGate = `{${prefix}[0].comparisonOperator}`;
+
+    if (sectionLabel) {
+      template[`A${row}:T${row}`] = createTemplateBaseStyle("#dbeef4");
+      template[`A${row}`] = { text: String(sectionLabel) };
+      template[`U${row}:CB${row}`] = createTemplateBaseStyle("#ffffff");
+      template[`U${row}`] = { text: presenceGate };
+      row += 1;
+    }
+
+    const headerRow = row;
+    const bodyRow = row + 1;
+    template[`A${headerRow}:T${headerRow}`] = createTemplateBaseStyle("#dbeef4");
+    template[`A${headerRow}`] = { text: "Điều kiện trái" };
+    template[`U${headerRow}:AN${headerRow}`] = createTemplateBaseStyle("#dbeef4");
+    template[`U${headerRow}`] = { text: "Toán tử" };
+    template[`AO${headerRow}:BH${headerRow}`] = createTemplateBaseStyle("#dbeef4");
+    template[`AO${headerRow}`] = { text: "Điều kiện phải" };
+    template[`BI${headerRow}:CB${headerRow}`] = createTemplateBaseStyle("#dbeef4");
+    // Gate empty blocks (shows first operator as column cue; body still has connectors).
+    template[`BI${headerRow}`] = { text: presenceGate };
+
+    template[`A${bodyRow}:T${bodyRow}`] = createTemplateBaseStyle("#ffffff");
+    template[`A${bodyRow}`] = { text: `{${prefix}.leftOperandDecl.finalDesc}` };
+    template[`U${bodyRow}:AN${bodyRow}`] = createTemplateBaseStyle("#ffffff");
+    template[`U${bodyRow}`] = { text: `{${prefix}.comparisonOperator}` };
+    template[`AO${bodyRow}:BH${bodyRow}`] = createTemplateBaseStyle("#ffffff");
+    template[`AO${bodyRow}`] = { text: `{${prefix}.rightOperandDecl.finalDesc}` };
+    template[`BI${bodyRow}:CB${bodyRow}`] = createTemplateBaseStyle("#ffffff");
+    template[`BI${bodyRow}`] = { text: `{${prefix}.logicalConnector}` };
+
+    return bodyRow + 1;
+  }
+
   function createConditionRowTemplate() {
     return {
       _options: {
@@ -10002,6 +10854,29 @@ const els = {
     };
   }
 
+  function createKeywordAndConditionTemplate(conditionBlocks) {
+    const template = createKeywordDescriptionTemplate();
+    template._options = {
+      hideEmptyRows: true,
+      hideRowsWithoutValues: true,
+      expandMultilineRows: true
+    };
+    let nextRow = 2;
+    const blocks = Array.isArray(conditionBlocks) ? conditionBlocks : [];
+    for (const block of blocks) {
+      if (!block || !block.pathPrefix) {
+        continue;
+      }
+      nextRow = appendConditionBlockToTemplate(
+        template,
+        nextRow,
+        block.pathPrefix,
+        block.sectionLabel || ""
+      );
+    }
+    return template;
+  }
+
   const TEMPLATE_DEFAULT_CONFIG_V1 = {
     version: 1,
     templates: {
@@ -10014,20 +10889,31 @@ const els = {
       CLEAR: createKeywordDescriptionTemplate(),
       CONSTANTS: createKeywordDescriptionTemplate(),
       DATA: createKeywordDescriptionTemplate(),
-      DELETE_ITAB: createKeywordDescriptionTemplate(),
+      DELETE_ITAB: createKeywordAndConditionTemplate([
+        { pathPrefix: "extras.deleteItab.conditions", sectionLabel: "WHERE" }
+      ]),
       DO: createKeywordDescriptionTemplate(),
       ELSE: createKeywordDescriptionTemplate(),
       ELSEIF: createConditionRowTemplate(),
       "FIELD-SYMBOLS": createKeywordDescriptionTemplate(),
       IF: createConditionRowTemplate(),
-      LOOP_AT_ITAB: createKeywordDescriptionTemplate(),
+      LOOP_AT_ITAB: createKeywordAndConditionTemplate([
+        { pathPrefix: "extras.loopAtItab.conditions", sectionLabel: "WHERE" }
+      ]),
       MESSAGE: createKeywordDescriptionTemplate(),
-      MODIFY_ITAB: createKeywordDescriptionTemplate(),
+      MODIFY_ITAB: createKeywordAndConditionTemplate([
+        { pathPrefix: "extras.modifyItab.conditions", sectionLabel: "WHERE" }
+      ]),
       "MOVE-CORRESPONDING": createKeywordDescriptionTemplate(),
       PARAMETERS: createKeywordDescriptionTemplate(),
       PERFORM: createKeywordDescriptionTemplate(),
-      READ_TABLE: createKeywordDescriptionTemplate(),
-      SELECT: createKeywordDescriptionTemplate(),
+      READ_TABLE: createKeywordAndConditionTemplate([
+        { pathPrefix: "extras.readTable.conditions", sectionLabel: "WITH KEY" }
+      ]),
+      SELECT: createKeywordAndConditionTemplate([
+        { pathPrefix: "extras.select.whereConditions", sectionLabel: "WHERE" },
+        { pathPrefix: "extras.select.havingConditions", sectionLabel: "HAVING" }
+      ]),
       "SELECT-OPTIONS": createKeywordDescriptionTemplate(),
       SORT_ITAB: createKeywordDescriptionTemplate(),
       TYPES: createKeywordDescriptionTemplate(),
@@ -12146,7 +13032,7 @@ function isValueLikeEntryObject(value) {
   const isStructFieldDecl = runtime.requireServiceMethod("output", "isStructFieldDecl");
   const buildDeclTitle = runtime.requireServiceMethod("output", "buildDeclTitle");
   const el = runtime.requireServiceMethod("output", "el");
-  const selectPerformSourceCandidate = runtime.requireServiceMethod("performSources", "selectPerformSourceCandidate");
+  const createPerformSourcePicker = runtime.requireServiceMethod("performSources", "createPerformSourcePicker");
   const renderActiveRightPanel = runtime.requireServiceMethod("uiNavigation", "renderActiveRightPanel");
   const jumpInputToCodeRange = runtime.requireServiceMethod("uiNavigation", "jumpInputToCodeRange");
   const findDeclSegmentIndex = runtime.requireServiceMethod("uiNavigation", "findDeclSegmentIndex");
@@ -12435,40 +13321,18 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     if (!group || group.scopeType !== "FORM" || !group.scopeName) {
       return null;
     }
-    const registry = state.performSourceRegistry;
-    if (!registry || typeof registry.getActiveCandidates !== "function") {
-      return null;
-    }
     const formNameUpper = group.scopeName.toUpperCase();
-    const candidates = registry.getActiveCandidates(formNameUpper);
-    if (candidates.length < 2) {
+    const picker = createPerformSourcePicker(formNameUpper, {
+      formName: group.scopeName,
+      nativeSelectClassName: "data-perform-source-select",
+      selectionOptions: { originTab: "descriptions" }
+    });
+    if (!picker) {
       return null;
     }
-    const selected = registry.getSelectedCandidate(formNameUpper) || candidates[0];
     const control = el("div", { className: "data-decl-group-controls" });
     control.appendChild(el("span", { className: "muted", text: "PERFORM source" }));
-    const select = el("select", {
-      className: "data-perform-source-select",
-      attrs: {
-        "data-perform-form": formNameUpper,
-        "aria-label": `PERFORM source for ${group.scopeName}`
-      }
-    });
-    for (let index = 0; index < candidates.length; index += 1) {
-      const candidate = candidates[index];
-      const lineLabel = candidate.lineStart > 0 ? String(candidate.lineStart) : "?";
-      select.appendChild(el("option", {
-        text: `Source ${index + 1}/${candidates.length} · line ${lineLabel} · ${candidate.actualSummary || "no arguments"}`,
-        attrs: { value: candidate.key }
-      }));
-    }
-    select.value = selected.key;
-    select.addEventListener("click", (ev) => ev.stopPropagation());
-    select.addEventListener("change", (ev) => {
-      ev.stopPropagation();
-      selectPerformSourceCandidate(formNameUpper, select.value, { originTab: "descriptions" });
-    });
-    control.appendChild(select);
+    control.appendChild(picker);
     return control;
   }
 
@@ -13690,7 +14554,7 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
   }
 
   function extractIdentifierCandidate(text) {
-    const raw = String(text || "").trim();
+    let raw = String(text || "").trim();
     if (!raw) {
       return "";
     }
@@ -13701,18 +14565,20 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       return "";
     }
 
+    // Host escape must be stripped before field-path so @itab-field stays one path.
+    if (raw.startsWith("@")) {
+      raw = raw.slice(1).trim();
+      if (!raw) {
+        return "";
+      }
+    }
+
     const sysMatch = raw.match(/^SY-[A-Za-z_][A-Za-z0-9_]*/i);
     if (sysMatch) {
       return sysMatch[0].toUpperCase();
     }
 
-    const fieldPathMatch = raw.match(
-      /^(<[^>]+>|[A-Za-z_][A-Za-z0-9_]*)(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)+/
-    );
-    if (fieldPathMatch) {
-      return String(fieldPathMatch[0] || "").trim();
-    }
-
+    // Inline decls before field-path: FIELD-SYMBOL(<fs>) looks like path FIELD-SYMBOL.
     const inlinePatterns = [
       /@?DATA\s*\(\s*([^)]+)\s*\)/i,
       /@?FINAL\s*\(\s*([^)]+)\s*\)/i,
@@ -13727,6 +14593,13 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       if (candidate) {
         return candidate;
       }
+    }
+
+    const fieldPathMatch = raw.match(
+      /^(<[^>]+>|[A-Za-z_][A-Za-z0-9_]*)(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)+/
+    );
+    if (fieldPathMatch) {
+      return String(fieldPathMatch[0] || "").trim();
     }
 
     const genericMatch = raw.match(
@@ -14720,6 +15593,8 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
     const candidatesByFormUpper = new Map();
     const candidateByKey = new Map();
     const selectedKeyByFormUpper = new Map();
+    const suggestionContextByFormUpper = new Map();
+    const treeHueByRootKey = new Map();
     const formOrder = [];
     const tools = createPerformBindingTools();
     let sourceOrder = 0;
@@ -14730,6 +15605,8 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
       candidatesByFormUpper,
       candidateByKey,
       selectedKeyByFormUpper,
+      suggestionContextByFormUpper,
+      treeHueByRootKey,
       formOrder,
       getActiveCandidates(formNameUpper) {
         const upper = String(formNameUpper || "").trim().toUpperCase();
@@ -14752,6 +15629,45 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
         const selectedKey = selectedKeyByFormUpper.get(upper);
         return selectedKey ? candidateByKey.get(selectedKey) || null : null;
       },
+      getSuggestedCandidates(formNameUpper, contextCandidateKey) {
+        const upper = String(formNameUpper || "").trim().toUpperCase();
+        const activeCandidates = this.getActiveCandidates(upper);
+        if (!activeCandidates.length) {
+          return [];
+        }
+        const selectedCandidate = this.getSelectedCandidate(upper);
+        const contextKey = String(
+          contextCandidateKey
+          || (selectedCandidate && selectedCandidate.parentCandidateKey)
+          || suggestionContextByFormUpper.get(upper)
+          || ""
+        ).trim();
+        const ranked = activeCandidates.map((candidate) => {
+          const ancestry = Array.isArray(candidate.ancestry) ? candidate.ancestry : [];
+          const contextIndex = contextKey ? ancestry.lastIndexOf(contextKey) : -1;
+          const directParent = Boolean(contextKey) && candidate.parentCandidateKey === contextKey;
+          return {
+            candidate,
+            related: directParent || contextIndex >= 0,
+            directParent,
+            callDistance: directParent
+              ? 0
+              : (contextIndex >= 0 ? ancestry.length - contextIndex : Number.MAX_SAFE_INTEGER)
+          };
+        });
+        const hasRelated = ranked.some((entry) => entry.related);
+        return ranked
+          .filter((entry) => !hasRelated || entry.related)
+          .sort((left, right) => (
+            Number(right.directParent) - Number(left.directParent)
+            || left.callDistance - right.callDistance
+            || left.candidate.depth - right.candidate.depth
+            || left.candidate.lineStart - right.candidate.lineStart
+            || left.candidate.sourceOrder - right.candidate.sourceOrder
+          ))
+          .slice(0, 3)
+          .map((entry) => entry.candidate);
+      },
       ensureSelections() {
         for (const formNameUpper of formOrder) {
           const activeCandidates = this.getActiveCandidates(formNameUpper);
@@ -14760,7 +15676,11 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
             continue;
           }
           if (activeCandidates.length) {
-            selectedKeyByFormUpper.set(formNameUpper, activeCandidates[0].key);
+            const suggestionContext = suggestionContextByFormUpper.get(formNameUpper);
+            const suggested = suggestionContext
+              ? this.getSuggestedCandidates(formNameUpper, suggestionContext)[0]
+              : null;
+            selectedKeyByFormUpper.set(formNameUpper, (suggested || activeCandidates[0]).key);
           } else {
             selectedKeyByFormUpper.delete(formNameUpper);
           }
@@ -14789,7 +15709,7 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
         selectedKeyByFormUpper.set(upper, nextKey);
         for (const descendantForm of descendantForms) {
           if (descendantForm !== upper) {
-            selectedKeyByFormUpper.delete(descendantForm);
+            suggestionContextByFormUpper.set(descendantForm, nextKey);
           }
         }
         this.ensureSelections();
@@ -14892,6 +15812,16 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
     };
     for (const candidates of candidatesByFormUpper.values()) {
       candidates.sort(compareCandidatesBySource);
+      for (const candidate of candidates) {
+        candidate.rootTreeKey = candidate.ancestry[0] || candidate.key;
+        candidate.depth = candidate.ancestry.length;
+        candidate.callChain = [...candidate.ancestry, candidate.key];
+        if (!treeHueByRootKey.has(candidate.rootTreeKey)) {
+          const treeIndex = treeHueByRootKey.size;
+          treeHueByRootKey.set(candidate.rootTreeKey, Number(((treeIndex * 137.508 + 211) % 360).toFixed(3)));
+        }
+        candidate.treeHue = treeHueByRootKey.get(candidate.rootTreeKey);
+      }
     }
     registry.ensureSelections();
     return registry;
@@ -14915,15 +15845,40 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
       return null;
     }
     const candidates = registry.getActiveCandidates(formNameUpper);
-    if (candidates.length < 2) {
+    const allCandidates = registry.candidatesByFormUpper.get(formNameUpper) || candidates;
+    if (allCandidates.length < 2) {
       return null;
     }
-    const selected = registry.getSelectedCandidate(formNameUpper) || candidates[0];
+    const selected = registry.getSelectedCandidate(formNameUpper) || candidates[0] || allCandidates[0];
     const formName = directFormName || selected.formName || formNameUpper;
     return {
       formName,
       formNameUpper,
       candidates,
+      allCandidates,
+      selectedKey: selected.key
+    };
+  }
+
+
+
+  function getPerformSourcePickerModel(formNameUpper, formName) {
+    const registry = state.performSourceRegistry;
+    const upper = String(formNameUpper || "").trim().toUpperCase();
+    if (!upper || !registry || typeof registry.getActiveCandidates !== "function") {
+      return null;
+    }
+    const candidates = registry.getActiveCandidates(upper);
+    const allCandidates = registry.candidatesByFormUpper.get(upper) || candidates;
+    if (allCandidates.length < 2) {
+      return null;
+    }
+    const selected = registry.getSelectedCandidate(upper) || candidates[0] || allCandidates[0];
+    return {
+      formName: String(formName || selected.formName || upper).trim(),
+      formNameUpper: upper,
+      candidates,
+      allCandidates,
       selectedKey: selected.key
     };
   }
@@ -14938,9 +15893,24 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
     const templateAnchor = typeof captureTemplateViewportAnchor === "function"
       ? captureTemplateViewportAnchor()
       : null;
-    if (!registry.selectCandidate(formNameUpper, candidateKey)) {
+    const upper = String(formNameUpper || "").trim().toUpperCase();
+    const nextKey = String(candidateKey || "").trim();
+    const targetCandidate = registry.candidateByKey && registry.candidateByKey.get(nextKey);
+    let selectionChanged = false;
+    if (targetCandidate && Array.isArray(targetCandidate.callChain)) {
+      for (const pathKey of targetCandidate.callChain) {
+        const pathCandidate = registry.candidateByKey.get(pathKey);
+        if (pathCandidate && registry.selectCandidate(pathCandidate.formNameUpper, pathKey)) {
+          selectionChanged = true;
+        }
+      }
+    } else if (registry.selectCandidate(upper, nextKey)) {
+      selectionChanged = true;
+    }
+    if (!selectionChanged) {
       return false;
     }
+    registry.suggestionContextByFormUpper.delete(upper);
 
     state.pendingTemplateViewportAnchor = templateAnchor;
     state.templatePreviewCache = null;
@@ -14957,25 +15927,96 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
 
 
 
-  function createPerformSourceControl(obj) {
-    const model = getPerformSourceControlModel(obj);
+  let performSourcePopupSequence = 0;
+  let openPerformSourcePopup = null;
+
+  document.addEventListener("click", (ev) => {
+    if (!openPerformSourcePopup || openPerformSourcePopup.root.contains(ev.target)) {
+      return;
+    }
+    openPerformSourcePopup.close();
+  });
+  global.addEventListener("resize", () => {
+    if (openPerformSourcePopup && typeof openPerformSourcePopup.reposition === "function") {
+      openPerformSourcePopup.reposition();
+    }
+  });
+
+
+
+  function createPerformSourcePicker(formNameUpper, options) {
+    const opts = options && typeof options === "object" ? options : {};
+    const model = opts.model || getPerformSourcePickerModel(formNameUpper, opts.formName);
     if (!model) {
       return null;
     }
     const attrs = { "data-perform-form": model.formNameUpper };
-    const control = el("div", { className: "perform-source-control", attrs });
+    const control = el("div", { className: "perform-source-picker perform-source-control", attrs });
     control.addEventListener("click", (ev) => ev.stopPropagation());
     control.appendChild(el("span", {
       className: "perform-source-badge",
-      text: `⇄ ${model.candidates.length} nguồn`,
+      text: `⇄ ${model.allCandidates.length} nguồn`,
       attrs
     }));
 
+    const registry = state.performSourceRegistry;
+    const selectedCandidate = registry.getSelectedCandidate(model.formNameUpper)
+      || model.candidates.find((candidate) => candidate.key === model.selectedKey)
+      || model.candidates[0]
+      || model.allCandidates[0];
+    const getCandidateChainEntries = (candidate) => (
+      (Array.isArray(candidate && candidate.callChain) ? candidate.callChain : [])
+        .map((key) => registry.candidateByKey.get(key))
+        .filter(Boolean)
+    );
+    const getCandidateBreadcrumb = (candidate) => (
+      getCandidateChainEntries(candidate)
+        .map((entry) => (
+          `${entry.formNameUpper} · line ${entry.lineStart || "?"} · ${entry.actualSummary || "không có đối số"}`
+        ))
+        .join(" › ")
+    );
+    performSourcePopupSequence += 1;
+    const popupId = `perform-source-popup-${performSourcePopupSequence}`;
+    const triggerLine = selectedCandidate.lineStart > 0 ? selectedCandidate.lineStart : "?";
+    const selectedIndex = Math.max(
+      0,
+      model.allCandidates.findIndex((candidate) => candidate.key === selectedCandidate.key)
+    );
+    const selectedAncestorSummary = getCandidateChainEntries(selectedCandidate)
+      .slice(0, -1)
+      .map((candidate) => candidate.actualSummary)
+      .filter(Boolean)
+      .join(" › ");
+    const triggerSummary = [
+      selectedAncestorSummary,
+      selectedCandidate.actualSummary
+    ].filter(Boolean).join(" · ");
+    const selectedBreadcrumb = getCandidateBreadcrumb(selectedCandidate);
+    const trigger = el("button", {
+      className: "perform-source-trigger",
+      text: `Nguồn ${selectedIndex + 1}/${model.allCandidates.length} · line ${triggerLine} · ${triggerSummary}`,
+      attrs: {
+        type: "button",
+        "aria-haspopup": "dialog",
+        "aria-expanded": "false",
+        "aria-controls": popupId,
+        "aria-label": `Nguồn mô tả FORM ${model.formName}: ${selectedBreadcrumb}`,
+        title: selectedBreadcrumb
+      }
+    });
+    control.appendChild(trigger);
+
     const select = el("select", {
-      className: "perform-source-select",
+      className: [
+        "perform-source-select",
+        opts.nativeSelectClassName || ""
+      ].filter(Boolean).join(" "),
       attrs: {
         ...attrs,
-        "aria-label": `Nguồn mô tả FORM ${model.formName}`
+        "aria-label": `Nguồn mô tả FORM ${model.formName}`,
+        "aria-hidden": "true",
+        tabindex: "-1"
       }
     });
     const appendSourceOption = (candidate, index) => {
@@ -15013,10 +16054,418 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
     select.disabled = model.candidates.length < 2;
     select.addEventListener("change", (ev) => {
       ev.stopPropagation();
-      selectPerformSourceCandidate(model.formNameUpper, select.value);
+      selectPerformSourceCandidate(model.formNameUpper, select.value, opts.selectionOptions);
     });
     control.appendChild(select);
+
+    const popup = el("div", {
+      className: "perform-source-popup",
+      attrs: {
+        id: popupId,
+        role: "dialog",
+        "aria-label": `Chọn nguồn PERFORM cho FORM ${model.formName}`,
+        hidden: ""
+      }
+    });
+    popup.hidden = true;
+    control.appendChild(popup);
+
+    let popupBuilt = false;
+    let searchInput = null;
+    let suggestionsContainer = null;
+    let treeContainer = null;
+    let candidateRows = [];
+    const candidateRowsByRoot = new Map();
+    const expandedRootKeys = new Set([selectedCandidate.rootTreeKey]);
+
+    const isElementVisible = (node) => {
+      if (!node || node.hidden || node.style.display === "none") {
+        return false;
+      }
+      let parent = node.parentElement;
+      while (parent && parent !== popup) {
+        if (parent.hidden || parent.style.display === "none") {
+          return false;
+        }
+        parent = parent.parentElement;
+      }
+      return true;
+    };
+
+    const getCandidateSearchText = (candidate) => {
+      const chainParts = (Array.isArray(candidate.callChain) ? candidate.callChain : [])
+        .map((key) => registry.candidateByKey.get(key))
+        .filter(Boolean)
+        .map((entry) => `${entry.formNameUpper} line ${entry.lineStart || "?"} ${entry.actualSummary || ""}`);
+      return [
+        candidate.formName,
+        candidate.formNameUpper,
+        `line ${candidate.lineStart || "?"}`,
+        candidate.lineStart,
+        candidate.actualSummary,
+        chainParts.join(" > ")
+      ].filter(Boolean).join("\n").toLowerCase();
+    };
+
+    const selectCandidateFromPicker = (candidate) => {
+      if (!candidate) {
+        return;
+      }
+      closePopup();
+      selectPerformSourceCandidate(model.formNameUpper, candidate.key, opts.selectionOptions);
+    };
+
+    const updateTreeVisibility = () => {
+      const query = String(searchInput && searchInput.value || "").trim().toLowerCase();
+      if (suggestionsContainer) {
+        suggestionsContainer.hidden = Boolean(query);
+      }
+      const rootSections = treeContainer
+        ? Array.from(treeContainer.querySelectorAll(".perform-source-root"))
+        : [];
+      for (const section of rootSections) {
+        const rootKey = section.getAttribute("data-root-tree-key") || "";
+        const sectionRows = candidateRowsByRoot.get(rootKey) || [];
+        let visibleCount = 0;
+        for (const entry of sectionRows) {
+          const matches = !query || entry.searchText.includes(query);
+          const visible = query ? matches : expandedRootKeys.has(rootKey);
+          entry.row.hidden = !visible;
+          entry.row.style.display = visible ? "" : "none";
+          if (visible) {
+            visibleCount += 1;
+          }
+        }
+        section.hidden = Boolean(query) && visibleCount === 0;
+        const toggle = section.querySelector(".perform-source-root-toggle");
+        if (toggle) {
+          const expanded = query ? visibleCount > 0 : expandedRootKeys.has(rootKey);
+          toggle.setAttribute("aria-expanded", String(expanded));
+          toggle.querySelector(".perform-source-root-marker").textContent = expanded ? "▼" : "▶";
+        }
+      }
+    };
+
+    const createCandidateButton = (candidate, className, reason) => {
+      const lineLabel = candidate.lineStart > 0 ? String(candidate.lineStart) : "?";
+      const isSelected = candidate.key === model.selectedKey;
+      const button = el("button", {
+        className: [
+          className,
+          isSelected ? "is-selected" : "",
+          reason ? "is-recommended" : ""
+        ].filter(Boolean).join(" "),
+        attrs: {
+          type: "button",
+          "data-candidate-key": candidate.key,
+          "data-root-tree-key": candidate.rootTreeKey,
+          ...(reason ? { "data-suggested": "true" } : {}),
+          "aria-selected": String(isSelected)
+        }
+      });
+      button.style.setProperty("--perform-source-tree-hue", String(candidate.treeHue));
+      button.style.setProperty("--perform-source-depth", String(candidate.depth));
+      button.style.setProperty("--perform-source-indent", `${Math.min(candidate.depth, 8) * 12}px`);
+      button.style.setProperty(
+        "--perform-source-tree-lightness",
+        `${52 + Math.min(candidate.depth, 6) * 4}%`
+      );
+      button.appendChild(el("span", {
+        className: "perform-source-row-status",
+        text: isSelected ? "✓ Đang chọn" : (reason ? "★ Gợi ý" : "Nguồn")
+      }));
+      button.appendChild(el("span", {
+        className: "perform-source-row-label",
+        text: `FORM ${candidate.formName || candidate.formNameUpper} · line ${lineLabel} · ${candidate.actualSummary}`
+      }));
+      button.appendChild(el("span", {
+        className: "perform-source-row-chain",
+        text: getCandidateBreadcrumb(candidate)
+      }));
+      if (reason) {
+        button.appendChild(el("span", { className: "perform-source-row-reason", text: reason }));
+      }
+      button.addEventListener("click", () => selectCandidateFromPicker(candidate));
+      return button;
+    };
+
+    const buildPopup = () => {
+      if (popupBuilt) {
+        return;
+      }
+      popupBuilt = true;
+
+      searchInput = el("input", {
+        className: "perform-source-search",
+        attrs: {
+          type: "search",
+          placeholder: "Tìm FORM, line, đối số hoặc chuỗi gọi…",
+          "aria-label": `Tìm nguồn PERFORM cho FORM ${model.formName}`
+        }
+      });
+      popup.appendChild(searchInput);
+
+      suggestionsContainer = el("div", {
+        className: "perform-source-suggestions",
+        attrs: { "aria-label": "Nguồn gợi ý" }
+      });
+      suggestionsContainer.appendChild(el("div", {
+        className: "perform-source-section-title",
+        text: "Gợi ý"
+      }));
+      const suggestedCandidates = registry.getSuggestedCandidates(model.formNameUpper);
+      const suggestionContext = selectedCandidate.parentCandidateKey
+        || registry.suggestionContextByFormUpper.get(model.formNameUpper)
+        || "";
+      for (const candidate of suggestedCandidates) {
+        let reason = "Gần nguồn đang chọn";
+        if (suggestionContext && candidate.parentCandidateKey === suggestionContext) {
+          reason = "Con trực tiếp của nguồn vừa chọn";
+        } else if (suggestionContext && candidate.ancestry.includes(suggestionContext)) {
+          reason = "Cùng chuỗi gọi với nguồn vừa chọn";
+        }
+        suggestionsContainer.appendChild(createCandidateButton(
+          candidate,
+          "perform-source-suggestion",
+          reason
+        ));
+      }
+      popup.appendChild(suggestionsContainer);
+
+      treeContainer = el("div", {
+        className: "perform-source-tree",
+        attrs: { role: "tree", "aria-label": "Cây nguồn PERFORM" }
+      });
+      treeContainer.appendChild(el("div", {
+        className: "perform-source-section-title",
+        text: "Tất cả cây nguồn"
+      }));
+
+      const candidatesByRoot = new Map();
+      for (const candidate of model.allCandidates) {
+        if (!candidatesByRoot.has(candidate.rootTreeKey)) {
+          candidatesByRoot.set(candidate.rootTreeKey, []);
+        }
+        candidatesByRoot.get(candidate.rootTreeKey).push(candidate);
+      }
+      for (const [rootKey, rootCandidates] of candidatesByRoot) {
+        const rootCandidate = registry.candidateByKey.get(rootKey) || rootCandidates[0];
+        const rootSection = el("section", {
+          className: "perform-source-root",
+          attrs: { "data-root-tree-key": rootKey }
+        });
+        rootSection.style.setProperty("--perform-source-tree-hue", String(rootCandidate.treeHue));
+        const rootToggle = el("button", {
+          className: "perform-source-root-toggle",
+          attrs: {
+            type: "button",
+            role: "treeitem",
+            "aria-level": "1",
+            "aria-expanded": String(expandedRootKeys.has(rootKey))
+          }
+        });
+        rootToggle.appendChild(el("span", {
+          className: "perform-source-root-marker",
+          text: expandedRootKeys.has(rootKey) ? "▼" : "▶"
+        }));
+        rootToggle.appendChild(el("span", {
+          text: `FORM ${rootCandidate.formName || rootCandidate.formNameUpper} · line ${rootCandidate.lineStart || "?"} · ${rootCandidate.actualSummary}`
+        }));
+        rootToggle.addEventListener("click", () => {
+          if (expandedRootKeys.has(rootKey)) {
+            expandedRootKeys.delete(rootKey);
+          } else {
+            expandedRootKeys.add(rootKey);
+          }
+          updateTreeVisibility();
+        });
+        rootSection.appendChild(rootToggle);
+
+        const rootGroup = el("div", {
+          className: "perform-source-root-group",
+          attrs: { role: "group" }
+        });
+        candidateRowsByRoot.set(rootKey, []);
+        for (const candidate of rootCandidates) {
+          const row = createCandidateButton(candidate, "perform-source-candidate-row", "");
+          row.setAttribute("role", "treeitem");
+          row.setAttribute("aria-level", String(candidate.depth + 2));
+          rootGroup.appendChild(row);
+          const rowEntry = {
+            candidate,
+            row,
+            searchText: getCandidateSearchText(candidate)
+          };
+          candidateRows.push(rowEntry);
+          candidateRowsByRoot.get(rootKey).push(rowEntry);
+        }
+        rootSection.appendChild(rootGroup);
+        treeContainer.appendChild(rootSection);
+      }
+      popup.appendChild(treeContainer);
+
+      searchInput.addEventListener("input", updateTreeVisibility);
+      searchInput.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") {
+          const firstVisible = candidateRows.find((entry) => isElementVisible(entry.row));
+          if (firstVisible) {
+            ev.preventDefault();
+            selectCandidateFromPicker(firstVisible.candidate);
+          }
+        } else if (ev.key === "ArrowDown") {
+          const firstVisible = candidateRows.find((entry) => isElementVisible(entry.row));
+          if (firstVisible) {
+            ev.preventDefault();
+            firstVisible.row.focus();
+          }
+        } else if (ev.key === "Escape") {
+          ev.preventDefault();
+          closePopup();
+          trigger.focus();
+        }
+      });
+      updateTreeVisibility();
+    };
+
+    const positionPopup = () => {
+      if (popup.hidden) {
+        return;
+      }
+      const viewportMargin = 12;
+      const viewportWidth = Math.max(
+        viewportMargin * 2 + 1,
+        Number(global.innerWidth) || document.documentElement.clientWidth || 1024
+      );
+      const viewportHeight = Math.max(
+        viewportMargin * 2 + 1,
+        Number(global.innerHeight) || document.documentElement.clientHeight || 768
+      );
+      const triggerRect = trigger.getBoundingClientRect();
+      const availableWidth = Math.max(1, viewportWidth - viewportMargin * 2);
+      const measuredPopupRect = popup.getBoundingClientRect();
+      const popupWidth = Math.min(
+        availableWidth,
+        Number(measuredPopupRect.width) || 720
+      );
+      const popupHeight = Math.min(
+        Math.max(1, viewportHeight - viewportMargin * 2),
+        Number(measuredPopupRect.height) || Number(popup.scrollHeight) || Math.min(620, viewportHeight * 0.7)
+      );
+      const maximumLeft = Math.max(viewportMargin, viewportWidth - popupWidth - viewportMargin);
+      const preferredLeft = Number(triggerRect.right) - popupWidth;
+      const left = Math.min(maximumLeft, Math.max(viewportMargin, preferredLeft));
+      const gap = 6;
+      const spaceBelow = viewportHeight - Number(triggerRect.bottom) - gap - viewportMargin;
+      const spaceAbove = Number(triggerRect.top) - gap - viewportMargin;
+      const openAbove = spaceBelow < popupHeight && spaceAbove > spaceBelow;
+      const preferredTop = openAbove
+        ? Number(triggerRect.top) - popupHeight - gap
+        : Number(triggerRect.bottom) + gap;
+      const maximumTop = Math.max(viewportMargin, viewportHeight - popupHeight - viewportMargin);
+      const top = Math.min(maximumTop, Math.max(viewportMargin, preferredTop));
+
+      popup.style.left = `${Math.round(left)}px`;
+      popup.style.top = `${Math.round(top)}px`;
+      popup.style.maxWidth = `${Math.round(availableWidth)}px`;
+      popup.style.maxHeight = `${Math.round(Math.max(1, viewportHeight - top - viewportMargin))}px`;
+    };
+
+    const closePopup = () => {
+      popup.hidden = true;
+      trigger.setAttribute("aria-expanded", "false");
+      if (openPerformSourcePopup && openPerformSourcePopup.root === control) {
+        openPerformSourcePopup = null;
+      }
+    };
+
+    const openPopup = () => {
+      if (openPerformSourcePopup && openPerformSourcePopup.root !== control) {
+        openPerformSourcePopup.close();
+      }
+      buildPopup();
+      popup.hidden = false;
+      trigger.setAttribute("aria-expanded", "true");
+      positionPopup();
+      openPerformSourcePopup = {
+        root: control,
+        close: closePopup,
+        reposition: positionPopup
+      };
+      searchInput.focus();
+    };
+
+    trigger.addEventListener("click", () => {
+      if (popup.hidden) {
+        openPopup();
+      } else {
+        closePopup();
+      }
+    });
+    trigger.addEventListener("keydown", (ev) => {
+      if (ev.key === "ArrowDown" || ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        openPopup();
+      } else if (ev.key === "Escape") {
+        closePopup();
+      }
+    });
+    popup.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape") {
+        ev.preventDefault();
+        closePopup();
+        trigger.focus();
+        return;
+      }
+      if (ev.target === searchInput || !["ArrowUp", "ArrowDown", "Home", "End", "ArrowLeft", "ArrowRight"].includes(ev.key)) {
+        return;
+      }
+      const controls = Array.from(popup.querySelectorAll(
+        ".perform-source-suggestion, .perform-source-root-toggle, .perform-source-candidate-row"
+      )).filter(isElementVisible);
+      const currentIndex = controls.indexOf(ev.target);
+      if (ev.key === "ArrowLeft" || ev.key === "ArrowRight") {
+        const rootSection = ev.target.closest(".perform-source-root");
+        if (rootSection) {
+          const rootKey = rootSection.getAttribute("data-root-tree-key") || "";
+          const rootToggle = rootSection.querySelector(".perform-source-root-toggle");
+          if (ev.key === "ArrowRight") {
+            expandedRootKeys.add(rootKey);
+          } else {
+            if (rootToggle && ev.target !== rootToggle) {
+              rootToggle.focus();
+            }
+            expandedRootKeys.delete(rootKey);
+          }
+          updateTreeVisibility();
+          ev.preventDefault();
+        }
+        return;
+      }
+      if (!controls.length) {
+        return;
+      }
+      let nextIndex = currentIndex;
+      if (ev.key === "Home") {
+        nextIndex = 0;
+      } else if (ev.key === "End") {
+        nextIndex = controls.length - 1;
+      } else if (ev.key === "ArrowDown") {
+        nextIndex = Math.min(controls.length - 1, Math.max(0, currentIndex + 1));
+      } else if (ev.key === "ArrowUp") {
+        nextIndex = Math.max(0, currentIndex < 0 ? 0 : currentIndex - 1);
+      }
+      controls[nextIndex].focus();
+      ev.preventDefault();
+    });
+
     return control;
+  }
+
+
+
+  function createPerformSourceControl(obj) {
+    const model = getPerformSourceControlModel(obj);
+    return model ? createPerformSourcePicker(model.formNameUpper, { model }) : null;
   }
 
 
@@ -15131,8 +16580,581 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
   runtime.registerService("performSources", {
     buildPerformCallPathRegistry,
     selectPerformSourceCandidate,
+    createPerformSourcePicker,
     createPerformSourceControl,
     buildRenderableObjects
+  });
+})(window);
+</script>
+  <script>
+// inlined from: ./app/template/00-excel-roundtrip.js
+(function initTemplateExcelRoundTrip(global) {
+  "use strict";
+
+  const runtime = global.AbapViewerRuntime;
+  if (!runtime || typeof runtime.registerService !== "function") {
+    throw new Error("Viewer service registry is unavailable for templateExcel.");
+  }
+
+  const LIMITS = Object.freeze({
+    htmlChars: 2000000,
+    styleChars: 250000,
+    cssRules: 5000,
+    rows: 500,
+    columns: 200,
+    cells: 20000
+  });
+  const SUPPORTED_CSS = new Set([
+    "background", "background-color", "color", "font", "font-family", "font-size",
+    "font-style", "font-weight", "text-align", "text-decoration", "text-decoration-line",
+    "vertical-align", "white-space", "border", "border-top", "border-right",
+    "border-bottom", "border-left", "border-style", "border-width", "border-color"
+  ]);
+  const BENIGN_EXCEL_CSS = new Set([
+    "background-attachment", "background-clip", "background-image", "background-origin",
+    "background-position-x", "background-position-y", "background-repeat", "background-size",
+    "height", "width", "padding-left", "padding-right", "padding-top", "padding-bottom",
+    "text-decoration-color", "text-decoration-style", "text-decoration-thickness",
+    "text-wrap-mode", "white-space-collapse"
+  ]);
+
+  function clone(value) {
+    return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+  }
+
+  function columnToNumber(label) {
+    return String(label || "").toUpperCase().split("").reduce((value, char) => (value * 26) + char.charCodeAt(0) - 64, 0);
+  }
+
+  function numberToColumn(value) {
+    let current = Math.max(1, Number(value) || 1);
+    let result = "";
+    while (current > 0) {
+      const remainder = (current - 1) % 26;
+      result = String.fromCharCode(65 + remainder) + result;
+      current = Math.floor((current - 1) / 26);
+    }
+    return result;
+  }
+
+  function parseRange(rangeKey) {
+    const parts = String(rangeKey || "").trim().toUpperCase().split(":");
+    const parseCell = (value) => {
+      const match = /^([A-Z]+)([1-9][0-9]*)$/.exec(value || "");
+      if (!match) throw new Error(`Invalid template range: ${rangeKey}`);
+      return { row: Number(match[2]), col: columnToNumber(match[1]) };
+    };
+    const start = parseCell(parts[0]);
+    const end = parseCell(parts[1] || parts[0]);
+    return {
+      r1: Math.min(start.row, end.row),
+      c1: Math.min(start.col, end.col),
+      r2: Math.max(start.row, end.row),
+      c2: Math.max(start.col, end.col)
+    };
+  }
+
+  function makeRange(r1, c1, r2, c2) {
+    const start = `${numberToColumn(c1)}${r1}`;
+    const end = `${numberToColumn(c2)}${r2}`;
+    return start === end ? start : `${start}:${end}`;
+  }
+
+  function unwrapDefinition(definition) {
+    const source = definition && typeof definition === "object" ? definition : {};
+    const ranges = source.ranges && typeof source.ranges === "object" ? source.ranges : source;
+    return { ranges, options: clone(source._options || source.options || {}) };
+  }
+
+  function buildGrid(definition) {
+    const { ranges } = unwrapDefinition(definition);
+    let rows = 1;
+    let columns = 1;
+    Object.keys(ranges).forEach((key) => {
+      if (key === "_options" || key === "options") return;
+      const range = parseRange(key);
+      rows = Math.max(rows, range.r2);
+      columns = Math.max(columns, range.c2);
+    });
+    const matrix = Array.from({ length: rows }, (_, row) => Array.from({ length: columns }, (_, col) => ({
+      row: row + 1, col: col + 1, text: "", config: {}, hasStyleRange: false, hidden: false, rowspan: 1, colspan: 1,
+      range: { r1: row + 1, c1: col + 1, r2: row + 1, c2: col + 1 }
+    })));
+    Object.entries(ranges).forEach(([key, raw]) => {
+      if (key === "_options" || key === "options") return;
+      const range = parseRange(key);
+      const config = raw && typeof raw === "object" ? clone(raw) : { text: String(raw || "") };
+      const hasStyle = Object.keys(config).some((field) => field !== "text");
+      for (let row = range.r1; row <= range.r2; row += 1) {
+        for (let col = range.c1; col <= range.c2; col += 1) {
+          const cell = matrix[row - 1][col - 1];
+          cell.config = { ...cell.config, ...config };
+          if (hasStyle || !cell.hasStyleRange) cell.range = range;
+          if (hasStyle) cell.hasStyleRange = true;
+        }
+      }
+      const anchor = matrix[range.r1 - 1][range.c1 - 1];
+      if (Object.prototype.hasOwnProperty.call(config, "text")) anchor.text = String(config.text ?? "");
+      if (config.merge === true && (range.r2 > range.r1 || range.c2 > range.c1)) {
+        anchor.rowspan = range.r2 - range.r1 + 1;
+        anchor.colspan = range.c2 - range.c1 + 1;
+        for (let row = range.r1; row <= range.r2; row += 1) {
+          for (let col = range.c1; col <= range.c2; col += 1) {
+            if (row !== range.r1 || col !== range.c1) matrix[row - 1][col - 1].hidden = true;
+          }
+        }
+      }
+    });
+    return { matrix, rows, columns };
+  }
+
+  function applyClipboardStyle(cellElement, cell) {
+    const config = cell.config || {};
+    if (config.background) cellElement.style.backgroundColor = config.background;
+    if (config["font color"]) cellElement.style.color = config["font color"];
+    const font = String(config["font family"] || config.font || "").trim();
+    if (font && font.toLowerCase() !== "default") cellElement.style.fontFamily = font;
+    if (Number(config["font size"]) > 0) cellElement.style.fontSize = `${Number(config["font size"])}pt`;
+    if (config.bold === true) cellElement.style.fontWeight = "700";
+    if (config.italic === true) cellElement.style.fontStyle = "italic";
+    if (config.underline === true) cellElement.style.textDecoration = "underline";
+    if (config.align) cellElement.style.textAlign = config.align;
+    if (config.valign) cellElement.style.verticalAlign = config.valign;
+    if (config.wrap === true) cellElement.style.whiteSpace = "pre-wrap";
+    if (config.wrap === false) cellElement.style.whiteSpace = "nowrap";
+    cellElement.style.border = "none";
+    if (config.border === "outside-thin") {
+      const range = cell.range;
+      const line = "0.5pt solid #000000";
+      if (config.merge === true) {
+        cellElement.style.border = line;
+      } else {
+        if (cell.row === range.r1) cellElement.style.borderTop = line;
+        if (cell.col === range.c2) cellElement.style.borderRight = line;
+        if (cell.row === range.r2) cellElement.style.borderBottom = line;
+        if (cell.col === range.c1) cellElement.style.borderLeft = line;
+      }
+    }
+    cellElement.style.setProperty("mso-number-format", "\\@");
+  }
+
+  function buildClipboardPayload(templateKey, definition) {
+    const model = buildGrid(definition);
+    const table = document.createElement("table");
+    table.setAttribute("data-template-key", String(templateKey || ""));
+    table.style.borderCollapse = "collapse";
+    const body = document.createElement("tbody");
+    model.matrix.forEach((row) => {
+      const tr = document.createElement("tr");
+      row.forEach((cell) => {
+        if (cell.hidden) return;
+        const td = document.createElement("td");
+        td.textContent = cell.text;
+        if (cell.rowspan > 1) td.rowSpan = cell.rowspan;
+        if (cell.colspan > 1) td.colSpan = cell.colspan;
+        applyClipboardStyle(td, cell);
+        tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    });
+    table.appendChild(body);
+    const quote = (value) => /[\t\n"]/.test(value) ? `"${value.replace(/"/g, "\"\"")}"` : value;
+    const text = model.matrix.map((row) => row.map((cell) => quote(cell.hidden ? "" : cell.text)).join("\t")).join("\r\n");
+    return { html: table.outerHTML, text, stats: { rows: model.rows, cols: model.columns } };
+  }
+
+  function parseColor(value) {
+    const raw = String(value || "").trim().toLowerCase();
+    if (!raw || raw === "transparent" || raw === "rgba(0, 0, 0, 0)") return "";
+    if (/^#[0-9a-f]{6}$/.test(raw)) return raw;
+    if (/^#[0-9a-f]{3}$/.test(raw)) return `#${raw.slice(1).split("").map((char) => char + char).join("")}`;
+    const match = /^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(raw);
+    if (!match) return "";
+    return `#${match.slice(1, 4).map((part) => Math.min(255, Number(part)).toString(16).padStart(2, "0")).join("")}`;
+  }
+
+  function parseFontSize(value) {
+    const raw = String(value || "").trim().toLowerCase();
+    const number = Number.parseFloat(raw);
+    if (!Number.isFinite(number) || number <= 0) return null;
+    return Math.round((raw.endsWith("px") ? number * 0.75 : number) * 100) / 100;
+  }
+
+  function collectCssRules(doc) {
+    const rules = [];
+    let chars = 0;
+    doc.querySelectorAll("style").forEach((style) => {
+      const css = String(style.textContent || "").replace(/\/\*[\s\S]*?\*\//g, "");
+      chars += css.length;
+      if (chars > LIMITS.styleChars) throw new Error("Excel clipboard CSS exceeds the safe limit.");
+      const pattern = /([^{}]+)\{([^{}]*)\}/g;
+      let match;
+      while ((match = pattern.exec(css))) {
+        match[1].split(",").map((selector) => selector.trim()).filter(Boolean).forEach((selector) => {
+          const ids = (selector.match(/#[\w-]+/g) || []).length;
+          const classes = (selector.match(/\.[\w-]+|\[[^\]]+\]|:(?!:)[\w-]+/g) || []).length;
+          const elements = (selector.replace(/#[\w-]+|\.[\w-]+|\[[^\]]+\]|::?[\w-]+/g, " ").match(/[a-z][\w-]*/gi) || []).length;
+          rules.push({ selector, declaration: match[2], specificity: [ids, classes, elements], order: rules.length });
+          if (rules.length > LIMITS.cssRules) throw new Error("Excel clipboard has too many CSS rules.");
+        });
+      }
+    });
+    return rules;
+  }
+
+  function styleForCell(cell, rules) {
+    const probe = document.createElement("span");
+    const matched = rules.filter((rule) => {
+      try {
+        return cell.matches(rule.selector);
+      } catch {
+        return false;
+      }
+    });
+    matched.sort((left, right) => {
+      for (let index = 0; index < 3; index += 1) {
+        if (left.specificity[index] !== right.specificity[index]) return left.specificity[index] - right.specificity[index];
+      }
+      return left.order - right.order;
+    });
+    const applyDeclaration = (declaration) => {
+      const parsed = document.createElement("span").style;
+      parsed.cssText = String(declaration || "");
+      for (let index = 0; index < parsed.length; index += 1) {
+        const property = parsed.item(index);
+        probe.style.setProperty(property, parsed.getPropertyValue(property), parsed.getPropertyPriority(property));
+      }
+    };
+    matched.forEach((rule) => applyDeclaration(rule.declaration));
+    applyDeclaration(cell.getAttribute("style") || "");
+    return probe.style;
+  }
+
+  function visibleBorders(style) {
+    const result = {};
+    ["top", "right", "bottom", "left"].forEach((side) => {
+      const kind = String(style.getPropertyValue(`border-${side}-style`) || "").toLowerCase();
+      const width = String(style.getPropertyValue(`border-${side}-width`) || "").toLowerCase();
+      result[side] = Boolean(kind && kind !== "none" && kind !== "hidden" && width && !/^0(?:px|pt)?$/.test(width));
+    });
+    return result;
+  }
+
+  function styleToConfig(cell, style, unsupported) {
+    const config = {};
+    const background = parseColor(style.getPropertyValue("background-color") || cell.getAttribute("bgcolor"));
+    const color = parseColor(style.getPropertyValue("color"));
+    const font = String(style.getPropertyValue("font-family") || "").split(",")[0].trim().replace(/^['"]|['"]$/g, "");
+    const size = parseFontSize(style.getPropertyValue("font-size"));
+    const weight = String(style.getPropertyValue("font-weight") || "").toLowerCase();
+    const italic = String(style.getPropertyValue("font-style") || "").toLowerCase();
+    const decoration = String(style.getPropertyValue("text-decoration-line") || style.getPropertyValue("text-decoration") || "").toLowerCase();
+    const align = String(style.getPropertyValue("text-align") || cell.getAttribute("align") || "").toLowerCase();
+    const valign = String(style.getPropertyValue("vertical-align") || cell.getAttribute("valign") || "").toLowerCase();
+    const whitespace = String(style.getPropertyValue("white-space") || "").toLowerCase();
+    if (background) config.background = background;
+    if (color) config["font color"] = color;
+    if (font) config["font family"] = font;
+    if (size !== null) config["font size"] = size;
+    if (weight === "bold" || Number.parseInt(weight, 10) >= 600) config.bold = true;
+    if (italic === "italic" || italic === "oblique") config.italic = true;
+    if (decoration.includes("underline")) config.underline = true;
+    if (["left", "center", "right"].includes(align)) config.align = align;
+    if (["top", "middle", "bottom"].includes(valign)) config.valign = valign;
+    if (whitespace) config.wrap = whitespace !== "nowrap";
+    for (let index = 0; index < style.length; index += 1) {
+      const property = String(style.item(index) || "").toLowerCase();
+      if (
+        property
+        && !SUPPORTED_CSS.has(property)
+        && !BENIGN_EXCEL_CSS.has(property)
+        && !property.startsWith("border-")
+        && !property.startsWith("mso-")
+      ) unsupported.add(property);
+    }
+    return config;
+  }
+
+  function extractText(cell) {
+    const walk = (node) => {
+      if (node.nodeType === 3) return node.nodeValue || "";
+      if (node.nodeType !== 1) return "";
+      if (node.tagName === "BR") return "\n";
+      return Array.from(node.childNodes).map(walk).join("") + (/^(DIV|P)$/.test(node.tagName) ? "\n" : "");
+    };
+    return Array.from(cell.childNodes).map(walk).join("").replace(/\u00a0/g, " ").replace(/\r\n?/g, "\n").replace(/\n+$/g, "");
+  }
+
+  function setBorderEdges(grid, range, sides) {
+    const get = (row, col) => {
+      const key = `${row}:${col}`;
+      if (!grid.has(key)) grid.set(key, { top: false, right: false, bottom: false, left: false });
+      return grid.get(key);
+    };
+    if (sides.top) for (let col = range.c1; col <= range.c2; col += 1) get(range.r1, col).top = true;
+    if (sides.bottom) for (let col = range.c1; col <= range.c2; col += 1) get(range.r2, col).bottom = true;
+    if (sides.left) for (let row = range.r1; row <= range.r2; row += 1) get(row, range.c1).left = true;
+    if (sides.right) for (let row = range.r1; row <= range.r2; row += 1) get(row, range.c2).right = true;
+  }
+
+  function mirrorSharedBorderEdges(grid, rows, cols) {
+    const ensure = (row, col) => {
+      const key = `${row}:${col}`;
+      if (!grid.has(key)) grid.set(key, { top: false, right: false, bottom: false, left: false });
+      return grid.get(key);
+    };
+    for (let row = 1; row <= rows; row += 1) {
+      for (let col = 1; col <= cols; col += 1) {
+        const cell = ensure(row, col);
+        if (col < cols) {
+          const rightCell = ensure(row, col + 1);
+          if (cell.right || rightCell.left) {
+            cell.right = true;
+            rightCell.left = true;
+          }
+        }
+        if (row < rows) {
+          const bottomCell = ensure(row + 1, col);
+          if (cell.bottom || bottomCell.top) {
+            cell.bottom = true;
+            bottomCell.top = true;
+          }
+        }
+      }
+    }
+  }
+
+  function extractClosedBorderRanges(grid, rows, cols, reportableEdges) {
+    const working = new Map();
+    grid.forEach((sides, key) => working.set(key, { ...sides }));
+    const has = (row, col, side) => Boolean(working.get(`${row}:${col}`)?.[side]);
+    const clear = (row, col, side) => {
+      const cell = working.get(`${row}:${col}`);
+      if (cell) cell[side] = false;
+    };
+    const isClosed = (r1, c1, r2, c2) => {
+      for (let col = c1; col <= c2; col += 1) {
+        if (!has(r1, col, "top") || !has(r2, col, "bottom")) return false;
+      }
+      for (let row = r1; row <= r2; row += 1) {
+        if (!has(row, c1, "left") || !has(row, c2, "right")) return false;
+      }
+      return true;
+    };
+    const consume = (range) => {
+      for (let col = range.c1; col <= range.c2; col += 1) {
+        clear(range.r1, col, "top");
+        clear(range.r2, col, "bottom");
+      }
+      for (let row = range.r1; row <= range.r2; row += 1) {
+        clear(row, range.c1, "left");
+        clear(row, range.c2, "right");
+      }
+    };
+
+    const ranges = [];
+    for (let row = 1; row <= rows; row += 1) {
+      for (let col = 1; col <= cols; col += 1) {
+        if (!has(row, col, "top") || !has(row, col, "left")) continue;
+        let best = null;
+        findRectangle:
+        for (let endRow = row; endRow <= rows; endRow += 1) {
+          if (!has(endRow, col, "left") || !has(endRow, col, "bottom")) continue;
+          for (let endCol = col; endCol <= cols; endCol += 1) {
+            if (
+              has(row, endCol, "top")
+              && has(row, endCol, "right")
+              && isClosed(row, col, endRow, endCol)
+            ) {
+              best = { r1: row, c1: col, r2: endRow, c2: endCol };
+              break findRectangle;
+            }
+          }
+        }
+        if (best) {
+          ranges.push(best);
+          consume(best);
+        }
+      }
+    }
+
+    let remainingEdges = 0;
+    working.forEach((sides, key) => {
+      remainingEdges += ["top", "right", "bottom", "left"]
+        .filter((side) => sides[side] && (!reportableEdges || reportableEdges.has(`${key}:${side}`)))
+        .length;
+    });
+    return { ranges, remainingEdges };
+  }
+
+  function compactCellRecords(records, rows, cols) {
+    const matrix = Array.from({ length: rows }, () => Array.from({ length: cols }, () => null));
+    const ranges = {};
+    records.forEach((record) => {
+      const style = { ...record.config };
+      delete style.text;
+      delete style.merge;
+      if (record.config.merge === true) {
+        ranges[makeRange(record.range.r1, record.range.c1, record.range.r2, record.range.c2)] = { ...record.config };
+        return;
+      }
+      for (let row = record.range.r1; row <= record.range.r2; row += 1) {
+        for (let col = record.range.c1; col <= record.range.c2; col += 1) {
+          matrix[row - 1][col - 1] = { style, signature: JSON.stringify(style) };
+        }
+      }
+    });
+
+    const used = Array.from({ length: rows }, () => Array(cols).fill(false));
+    for (let row = 1; row <= rows; row += 1) {
+      for (let col = 1; col <= cols; col += 1) {
+        const current = matrix[row - 1][col - 1];
+        if (!current || used[row - 1][col - 1] || !Object.keys(current.style).length) continue;
+        let endCol = col;
+        while (
+          endCol < cols
+          && !used[row - 1][endCol]
+          && matrix[row - 1][endCol]?.signature === current.signature
+        ) endCol += 1;
+        let endRow = row;
+        expandRows: while (endRow < rows) {
+          for (let scanCol = col; scanCol <= endCol; scanCol += 1) {
+            if (
+              used[endRow][scanCol - 1]
+              || matrix[endRow][scanCol - 1]?.signature !== current.signature
+            ) break expandRows;
+          }
+          endRow += 1;
+        }
+        for (let markRow = row; markRow <= endRow; markRow += 1) {
+          for (let markCol = col; markCol <= endCol; markCol += 1) used[markRow - 1][markCol - 1] = true;
+        }
+        ranges[makeRange(row, col, endRow, endCol)] = { ...current.style };
+      }
+    }
+
+    records.forEach((record) => {
+      if (record.config.merge === true || !Object.prototype.hasOwnProperty.call(record.config, "text")) return;
+      const text = String(record.config.text ?? "");
+      if (!text) return;
+      const key = makeRange(record.range.r1, record.range.c1, record.range.r1, record.range.c1);
+      ranges[key] = { ...(ranges[key] || {}), text };
+    });
+    return ranges;
+  }
+
+  function parseHtml(html, options) {
+    if (html.length > LIMITS.htmlChars) throw new Error("Excel clipboard HTML exceeds the 2 MB safe limit.");
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const tables = doc.querySelectorAll("table");
+    if (!tables.length) throw new Error("Excel clipboard does not contain a table.");
+    const warnings = tables.length > 1 ? ["Clipboard has multiple tables; only the first table was imported."] : [];
+    const rules = collectCssRules(doc);
+    const unsupported = new Set();
+    let ranges = {};
+    const records = [];
+    const occupied = new Set();
+    const borderGrid = new Map();
+    let rows = 0;
+    let cols = 0;
+    let cells = 0;
+    Array.from(tables[0].querySelectorAll("tr")).forEach((tr, rowIndex) => {
+      const row = rowIndex + 1;
+      if (row > LIMITS.rows) throw new Error(`Excel table exceeds ${LIMITS.rows} rows.`);
+      let col = 1;
+      Array.from(tr.children).filter((node) => /^(TD|TH)$/i.test(node.tagName)).forEach((cell) => {
+        while (occupied.has(`${row}:${col}`)) col += 1;
+        cells += 1;
+        if (cells > LIMITS.cells) throw new Error(`Excel table exceeds ${LIMITS.cells} cells.`);
+        const rowspan = Math.max(1, Number(cell.getAttribute("rowspan")) || 1);
+        const colspan = Math.max(1, Number(cell.getAttribute("colspan")) || 1);
+        const ignoredColspan = colspan > 1 && /(?:^|;)\s*mso-ignore\s*:\s*colspan/i.test(cell.getAttribute("style") || "");
+        const range = { r1: row, c1: col, r2: row + rowspan - 1, c2: col + colspan - 1 };
+        if (range.r2 > LIMITS.rows || range.c2 > LIMITS.columns) throw new Error(`Excel table exceeds ${LIMITS.rows} rows × ${LIMITS.columns} columns.`);
+        for (let r = range.r1; r <= range.r2; r += 1) for (let c = range.c1; c <= range.c2; c += 1) occupied.add(`${r}:${c}`);
+        const style = styleForCell(cell, rules);
+        const config = { text: extractText(cell), ...styleToConfig(cell, style, unsupported) };
+        if (rowspan > 1 || (colspan > 1 && !ignoredColspan)) config.merge = true;
+        records.push({ range, config });
+        setBorderEdges(borderGrid, range, visibleBorders(style));
+        rows = Math.max(rows, range.r2);
+        cols = Math.max(cols, range.c2);
+        col = range.c2 + 1;
+      });
+    });
+    if (!records.length) throw new Error("Excel table has no importable cells.");
+    ranges = compactCellRecords(records, rows, cols);
+    const originalBorderEdges = new Set();
+    borderGrid.forEach((sides, key) => {
+      ["top", "right", "bottom", "left"].forEach((side) => {
+        if (sides[side]) originalBorderEdges.add(`${key}:${side}`);
+      });
+    });
+    mirrorSharedBorderEdges(borderGrid, rows, cols);
+    const importedBorders = extractClosedBorderRanges(borderGrid, rows, cols, originalBorderEdges);
+    importedBorders.ranges.forEach((range) => {
+      const key = makeRange(range.r1, range.c1, range.r2, range.c2);
+      ranges[key] = { ...(ranges[key] || {}), border: "outside-thin" };
+    });
+    if (importedBorders.remainingEdges) {
+      warnings.push(
+        `${importedBorders.remainingEdges} disconnected Excel border edges were ignored because the template schema only supports closed outlines.`
+      );
+    }
+    if (unsupported.size) warnings.push(`Unsupported Excel CSS was ignored: ${Array.from(unsupported).sort().join(", ")}.`);
+    return {
+      source: "html", ranges, options: clone(options || {}), warnings,
+      stats: { rows, cols, ranges: Object.keys(ranges).length, merged: Object.values(ranges).filter((value) => value.merge === true).length }
+    };
+  }
+
+  function parseTsv(text, options) {
+    if (!text) throw new Error("Clipboard has no HTML or text.");
+    const rows = String(text).replace(/\r\n?/g, "\n").split("\n").map((row) => row.split("\t"));
+    if (rows.length > LIMITS.rows) throw new Error(`TSV exceeds ${LIMITS.rows} rows.`);
+    const ranges = {};
+    let cols = 0;
+    rows.forEach((row, rowIndex) => {
+      cols = Math.max(cols, row.length);
+      if (cols > LIMITS.columns || rows.length * cols > LIMITS.cells) throw new Error("TSV exceeds the safe table size.");
+      row.forEach((value, colIndex) => {
+        ranges[makeRange(rowIndex + 1, colIndex + 1, rowIndex + 1, colIndex + 1)] = { text: value };
+      });
+    });
+    return {
+      source: "tsv", ranges, options: clone(options || {}),
+      warnings: ["Clipboard only contains TSV: text was imported, but format, merge, and border were lost."],
+      stats: { rows: rows.length, cols, ranges: Object.keys(ranges).length, merged: 0 }
+    };
+  }
+
+  function parseClipboardPayload(payload) {
+    const input = payload && typeof payload === "object" ? payload : {};
+    const html = String(input.html || "");
+    if (html && /<table[\s>]/i.test(html)) return parseHtml(html, input.currentOptions);
+    return parseTsv(String(input.text || ""), input.currentOptions);
+  }
+
+  async function writeClipboard(payload) {
+    if (navigator.clipboard && typeof navigator.clipboard.write === "function" && typeof ClipboardItem === "function") {
+      await navigator.clipboard.write([new ClipboardItem({
+        "text/html": new Blob([payload.html], { type: "text/html" }),
+        "text/plain": new Blob([payload.text], { type: "text/plain" })
+      })]);
+      return true;
+    }
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      await navigator.clipboard.writeText(payload.text);
+      return false;
+    }
+    throw new Error("Clipboard write is unavailable.");
+  }
+
+  runtime.registerService("templateExcel", {
+    LIMITS,
+    buildClipboardPayload,
+    writeClipboard,
+    parseClipboardPayload
   });
 })(window);
 </script>
@@ -15765,7 +17787,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       MOVE: ["source", "to", "target"],
       "MOVE-CORRESPONDING": ["source", "to", "target"],
       READ_TABLE: ["itab", "into", "assigning", "refinto", "referenceinto", "reference-into", "index"],
-      SELECT: ["into", "intotable", "into-table", "appendingtable", "appending-table", "assigning", "refinto", "referenceinto", "reference-into"],
+      SELECT: ["into", "intotable", "into-table", "appendingtable", "appending-table", "forallentries", "for-all-entries", "assigning", "refinto", "referenceinto", "reference-into"],
       SORT_ITAB: ["itab"],
       WRITE: ["output", "destination"]
     };
@@ -16379,12 +18401,17 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     return "";
   }
 
-  function createTemplateExpandedRow(text, declCandidates, provenance) {
-    return {
+  function createTemplateExpandedRow(text, declCandidates, provenance, keywordOverride) {
+    const row = {
       text: String(text === undefined || text === null ? "" : text).trim(),
       declCandidates: dedupeTemplateDecls(declCandidates),
       provenance: provenance && typeof provenance === "object" ? { ...provenance } : null
     };
+    const keyword = String(keywordOverride || "").trim();
+    if (keyword) {
+      row.keyword = keyword;
+    }
+    return row;
   }
 
   function createTemplateKeywordRow(keyword, finalDesc, declCandidates, provenance) {
@@ -16587,7 +18614,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     )) : null;
   }
 
-  function buildTemplateWritePositionRow(sourceObj, write, ownerContext, objectIndexOneBased) {
+  function buildTemplateWritePositionRows(sourceObj, write, ownerContext, objectIndexOneBased) {
     if (!write || typeof write !== "object") {
       return null;
     }
@@ -16597,7 +18624,6 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       if (!value) {
         return createTemplateExpandedRow("", []);
       }
-      const capName = `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
       return buildTemplateSemanticValueRow({
         value,
         valueRef: position[`${name}Ref`],
@@ -16611,13 +18637,35 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     };
     const column = buildPart("column");
     const length = buildPart("length");
-    const prefix = write.newLine ? "/" : "";
-    const positionText = `${prefix}${column.text}${length.text ? `(${length.text})` : ""}`;
-    const declCandidates = dedupeTemplateDecls([...column.declCandidates, ...length.declCandidates]);
-    return createTemplateExpandedRow(positionText || prefix, declCandidates, {
-      status: declCandidates.length ? "editable" : "not_applicable",
-      reasonCode: declCandidates.length ? "" : getTemplateNoDeclReason(positionText || prefix, true, false)
-    });
+    const hasColumn = Boolean(String(column.text || "").trim());
+    const hasLength = Boolean(String(length.text || "").trim());
+    const rows = [];
+
+    // Newline-only WRITE / … → flag row with empty value (keyword text comes from synthetic "/").
+    if (!hasColumn && !hasLength) {
+      if (!write.newLine) {
+        return null;
+      }
+      rows.push(createTemplateExpandedRow("", [], {
+        status: "not_applicable",
+        reasonCode: "NON_DECL_SCHEMA_VALUE"
+      }));
+      return rows;
+    }
+
+    // Do not prefix "/" into values — newline is already the keyword when synthetic at text is "/".
+    if (hasColumn) {
+      rows.push(column);
+    }
+    if (hasLength) {
+      rows.push(createTemplateExpandedRow(
+        length.text,
+        length.declCandidates,
+        length.provenance,
+        "LENGTH"
+      ));
+    }
+    return rows.length ? rows : null;
   }
 
   function getTemplateSemanticSectionRows(sourceObj, keywordLabel, ownerContext, objectIndexOneBased) {
@@ -16639,8 +18687,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
 
     if (extras.write) {
       if (keywordLabel === "at") {
-        const positionRow = buildTemplateWritePositionRow(sourceObj, extras.write, ownerContext, objectIndexOneBased);
-        return positionRow ? [positionRow] : null;
+        return buildTemplateWritePositionRows(sourceObj, extras.write, ownerContext, objectIndexOneBased);
       }
       const format = Array.isArray(extras.write.format) ? extras.write.format : [];
       const formatEntry = format.find((entry) => (
@@ -16928,8 +18975,27 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     return null;
   }
 
+  function shouldSkipConditionKeywordInTemplateRows(objectType, keywordLabel) {
+    const type = String(objectType || "").trim().toUpperCase();
+    const label = normalizeTemplatePairToken(keywordLabel);
+    if (type === "SELECT" && (label === "where" || label === "having")) {
+      return true;
+    }
+    if (type === "READ_TABLE" && (label === "with-key" || label === "with-table-key")) {
+      return true;
+    }
+    if ((type === "LOOP_AT_ITAB" || type === "MODIFY_ITAB" || type === "DELETE_ITAB") && label === "where") {
+      return true;
+    }
+    return false;
+  }
+
   function getTemplateExpandedKeywordRows(sourceObj, keyword, valueEntry, ownerContext, objectIndexOneBased) {
     const keywordLabel = normalizeTemplatePairToken(keyword && keyword.label);
+    const objectType = String(sourceObj && sourceObj.objectType || "").trim().toUpperCase();
+    if (shouldSkipConditionKeywordInTemplateRows(objectType, keywordLabel)) {
+      return [];
+    }
     const semanticRows = getTemplateSemanticSectionRows(sourceObj, keywordLabel, ownerContext, objectIndexOneBased);
     if (Array.isArray(semanticRows) && semanticRows.length) {
       return semanticRows;
@@ -16966,6 +19032,9 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       if (!keywordText) {
         continue;
       }
+      if (shouldSkipConditionKeywordInTemplateRows(objectType, keyword && keyword.label)) {
+        continue;
+      }
       const valueEntry = findValueEntryForKeyword(keyword, valueEntries, objectType);
       const expandedRows = getTemplateExpandedKeywordRows(
         sourceObj,
@@ -16976,8 +19045,11 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       );
       if (Array.isArray(expandedRows) && expandedRows.length) {
         for (const expandedRow of expandedRows) {
+          const rowKeyword = expandedRow && typeof expandedRow === "object" && expandedRow.keyword
+            ? expandedRow.keyword
+            : keywordText;
           rows.push(createTemplateKeywordRow(
-            keywordText,
+            rowKeyword,
             expandedRow && typeof expandedRow === "object" ? expandedRow.text : expandedRow,
             expandedRow && typeof expandedRow === "object" ? expandedRow.declCandidates : [],
             expandedRow && typeof expandedRow === "object" && expandedRow.provenance
@@ -16996,6 +19068,9 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
                 }
           ));
         }
+        continue;
+      }
+      if (expandedRows && Array.isArray(expandedRows) && expandedRows.length === 0) {
         continue;
       }
       const canonicalValueEntry = valueEntry
@@ -21876,9 +23951,13 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
 
     const host = document.createElement("div");
     host.className = "template-config-editor-host";
+    const excelStatusEl = document.createElement("div");
+    excelStatusEl.className = "template-excel-status";
+    excelStatusEl.hidden = true;
     const errEl = document.createElement("div");
     errEl.className = "template-error";
     editorPane.appendChild(host);
+    editorPane.appendChild(excelStatusEl);
     editorPane.appendChild(errEl);
 
     const previewPane = document.createElement("section");
@@ -22052,6 +24131,13 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         setTemplateConfigError(t);
       }
     };
+    const showExcelStatus = (message, tone) => {
+      const text = String(message || "").trim();
+      excelStatusEl.textContent = text;
+      excelStatusEl.hidden = !text;
+      excelStatusEl.classList.toggle("is-success", tone === "success");
+      excelStatusEl.classList.toggle("is-warning", tone === "warning");
+    };
     const isOptionKey = (k) => (typeof isTemplateOptionConfigKey === "function")
       ? Boolean(isTemplateOptionConfigKey(k))
       : OPTION_KEYS.has(String(k || "").trim().toLowerCase());
@@ -22069,6 +24155,8 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     }
     let selKey = Object.keys(draft.templates)[0] || "DEFAULT";
     let selRange = "";
+    let pendingExcelImport = null;
+    let excelPasteOpen = false;
     els.templateConfigError = errEl;
     els.templateConfigJson = null;
     showErr("");
@@ -22820,24 +24908,28 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       cols = Math.max(cols, selection.c2);
       return { rows: Math.min(Math.max(rows + 1, 8), 40), cols: Math.min(Math.max(cols + 1, 8), 26) };
     };
-    const getEntryForGridCell = (row, col) => {
-      const matches = getTemplateGridEntries()
-        .filter((entry) => rangeContainsCellForBuilder(entry.parsed, row, col))
-        .sort((left, right) => left.area - right.area);
-      return matches[0] || null;
-    };
-    const applyStyleToGridCell = (td, cell) => {
+    const getEntriesForGridCell = (row, col) => getTemplateGridEntries()
+      .filter((entry) => rangeContainsCellForBuilder(entry.parsed, row, col))
+      .sort((left, right) => right.area - left.area);
+    const applyStyleToGridCell = (td, cell, matches, row, col) => {
       const cfg = cell && typeof cell === "object" ? cell : {};
       if (cfg.background) td.style.backgroundColor = String(cfg.background);
       if (cfg["font color"]) td.style.color = String(cfg["font color"]);
       if (cfg["font size"]) td.style.fontSize = `${Number(cfg["font size"]) || 10}pt`;
-      if (cfg.font) td.style.fontFamily = String(cfg.font);
+      if (cfg["font family"] || cfg.font) td.style.fontFamily = String(cfg["font family"] || cfg.font);
       if (cfg.align) td.style.textAlign = String(cfg.align);
       if (cfg.valign) td.style.verticalAlign = String(cfg.valign);
       if (cfg.bold) td.style.fontWeight = "700";
       if (cfg.italic) td.style.fontStyle = "italic";
       if (cfg.underline) td.style.textDecoration = "underline";
-      if (cfg.border) td.classList.add("has-border-token");
+      const borderLine = "2px solid #111111";
+      for (const entry of Array.isArray(matches) ? matches : []) {
+        if (!entry.cell || entry.cell.border !== "outside-thin") continue;
+        if (row === entry.parsed.r1) td.style.borderTop = borderLine;
+        if (col === entry.parsed.c2) td.style.borderRight = borderLine;
+        if (row === entry.parsed.r2) td.style.borderBottom = borderLine;
+        if (col === entry.parsed.c1) td.style.borderLeft = borderLine;
+      }
     };
     const insertPlaceholderIntoText = (text, placeholder) => {
       const raw = String(placeholder || "").trim();
@@ -22973,6 +25065,9 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       keySelect.addEventListener("change", () => {
         selKey = keySelect.value;
         selRange = listRanges(selKey)[0]?.rangeKey || "A1";
+        pendingExcelImport = null;
+        excelPasteOpen = false;
+        showExcelStatus("");
         showErr("");
         renderActive();
       });
@@ -22982,6 +25077,36 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
 
       const keyActions = document.createElement("div");
       keyActions.className = "template-builder-key-actions";
+      keyActions.appendChild(makeBuilderButton("Copy to Excel", async () => {
+        const excel = runtime.services.templateExcel;
+        const info = tdef(selKey, false);
+        if (!excel || !info) {
+          showErr("Excel template service is unavailable.");
+          return;
+        }
+        try {
+          const payload = excel.buildClipboardPayload(selKey, info.def);
+          const richCopy = await excel.writeClipboard(payload);
+          showErr("");
+          showExcelStatus(
+            richCopy
+              ? `Copied raw template "${selKey}" to Excel.`
+              : `Copied "${selKey}" as TSV because rich clipboard is unavailable.`,
+            richCopy ? "success" : "warning"
+          );
+        } catch (error) {
+          showExcelStatus("");
+          showErr(error && error.message ? error.message : "Copy to Excel failed.");
+        }
+      }));
+      keyActions.appendChild(makeBuilderButton("Paste from Excel", () => {
+        pendingExcelImport = null;
+        excelPasteOpen = true;
+        showExcelStatus("");
+        showErr("");
+        renderActive();
+        host.querySelector(".template-excel-paste-zone")?.focus();
+      }));
       keyActions.appendChild(makeBuilderButton("Add Key", () => {
         let i = 1;
         let key = "NEW_TEMPLATE";
@@ -23026,6 +25151,104 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         renderActive();
       }, "danger-lite"));
       topbar.appendChild(keyActions);
+
+      if (excelPasteOpen) {
+        const excelPanel = document.createElement("section");
+        excelPanel.className = "template-excel-import-panel";
+        const excelHead = document.createElement("div");
+        excelHead.className = "template-excel-import-head";
+        const excelTitle = document.createElement("strong");
+        excelTitle.textContent = `Paste Excel into ${selKey}`;
+        const excelCancel = makeBuilderButton("Cancel", () => {
+          pendingExcelImport = null;
+          excelPasteOpen = false;
+          showExcelStatus("");
+          showErr("");
+          renderActive();
+        });
+        excelHead.appendChild(excelTitle);
+        excelHead.appendChild(excelCancel);
+        excelPanel.appendChild(excelHead);
+
+        const pasteZone = document.createElement("div");
+        pasteZone.className = "template-excel-paste-zone";
+        pasteZone.tabIndex = 0;
+        pasteZone.textContent = "Click here, then press Ctrl+V";
+        pasteZone.addEventListener("paste", (event) => {
+          event.preventDefault();
+          const excel = runtime.services.templateExcel;
+          const info = tdef(selKey, false);
+          try {
+            pendingExcelImport = excel.parseClipboardPayload({
+              html: event.clipboardData ? event.clipboardData.getData("text/html") : "",
+              text: event.clipboardData ? event.clipboardData.getData("text/plain") : "",
+              currentOptions: info && info.def ? (info.def._options || info.def.options || {}) : {}
+            });
+            pendingExcelImport.targetKey = selKey;
+            showExcelStatus(
+              pendingExcelImport.warnings.length
+                ? "Excel preview created with warnings."
+                : "Excel preview created successfully.",
+              pendingExcelImport.warnings.length ? "warning" : "success"
+            );
+            showErr("");
+            renderActive();
+          } catch (error) {
+            pendingExcelImport = null;
+            showExcelStatus("");
+            showErr(error && error.message ? error.message : "Paste from Excel failed.");
+          }
+        });
+        excelPanel.appendChild(pasteZone);
+
+        if (pendingExcelImport && pendingExcelImport.targetKey === selKey) {
+          const summary = document.createElement("div");
+          summary.className = "template-excel-import-summary";
+          summary.textContent = `${pendingExcelImport.source.toUpperCase()} • ${pendingExcelImport.stats.rows} × ${pendingExcelImport.stats.cols} • ${pendingExcelImport.stats.ranges} ranges • ${pendingExcelImport.stats.merged} merges`;
+          excelPanel.appendChild(summary);
+          if (pendingExcelImport.warnings.length) {
+            const warnings = document.createElement("ul");
+            warnings.className = "template-excel-import-warnings";
+            pendingExcelImport.warnings.forEach((message) => {
+              const item = document.createElement("li");
+              item.textContent = message;
+              warnings.appendChild(item);
+            });
+            excelPanel.appendChild(warnings);
+          }
+          const preview = document.createElement("div");
+          preview.className = "template-excel-import-preview";
+          const previewPayload = runtime.services.templateExcel.buildClipboardPayload(selKey, {
+            ranges: pendingExcelImport.ranges
+          });
+          preview.innerHTML = previewPayload.html;
+          excelPanel.appendChild(preview);
+          const replaceButton = makeBuilderButton("Replace selected key", () => {
+            const info = tdef(selKey, true);
+            if (!info || !pendingExcelImport || pendingExcelImport.targetKey !== selKey) return;
+            const nextRanges = cloneJsonValue(pendingExcelImport.ranges) || {};
+            if (info.hasRanges) {
+              info.def.ranges = nextRanges;
+            } else {
+              const keptOptions = {};
+              Object.keys(info.def).forEach((key) => {
+                if (isOptionKey(key)) keptOptions[key] = info.def[key];
+              });
+              Object.keys(info.def).forEach((key) => delete info.def[key]);
+              Object.assign(info.def, keptOptions, nextRanges);
+            }
+            selRange = Object.keys(nextRanges)[0] || "A1";
+            pendingExcelImport = null;
+            excelPasteOpen = false;
+            showExcelStatus(`Replaced draft template "${selKey}". Click Apply to save.`, "success");
+            showErr("");
+            renderActive();
+          });
+          replaceButton.classList.add("primary");
+          excelPanel.appendChild(replaceButton);
+        }
+        root.appendChild(excelPanel);
+      }
 
       const optionRow = document.createElement("div");
       optionRow.className = "template-builder-options-row";
@@ -23126,7 +25349,8 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
           if (skipCells.has(cellKey)) {
             continue;
           }
-          const matched = getEntryForGridCell(row, col);
+          const matches = getEntriesForGridCell(row, col);
+          const matched = matches.length ? matches[matches.length - 1] : null;
           const td = document.createElement("td");
           td.tabIndex = 0;
           td.setAttribute("data-row", String(row));
@@ -23134,10 +25358,12 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
           let displayRange = { r1: row, c1: col, r2: row, c2: col };
           let cellConfig = null;
           if (matched) {
-            displayRange = matched.parsed;
-            cellConfig = matched.cell;
+            const mergeMatch = matches.find((entry) => entry.cell && entry.cell.merge === true);
+            const structuralMatch = mergeMatch || matched;
+            displayRange = structuralMatch.parsed;
+            cellConfig = Object.assign({}, ...matches.map((entry) => entry.cell || {}));
             td.setAttribute("data-range-key", normalizeRangeKeyForBuilder(matched.rangeKey));
-            if (cellConfig && cellConfig.merge === true) {
+            if (mergeMatch && cellConfig && cellConfig.merge === true) {
               td.rowSpan = Math.max(1, displayRange.r2 - displayRange.r1 + 1);
               td.colSpan = Math.max(1, displayRange.c2 - displayRange.c1 + 1);
               for (let rr = displayRange.r1; rr <= displayRange.r2; rr += 1) {
@@ -23157,7 +25383,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
           if (selection.r1 === row && selection.c1 === col) {
             td.classList.add("anchor");
           }
-          applyStyleToGridCell(td, cellConfig);
+          applyStyleToGridCell(td, cellConfig, matches, row, col);
           const text = cellConfig && Object.prototype.hasOwnProperty.call(cellConfig, "text") ? String(cellConfig.text || "") : "";
           renderBuilderCellContent(td, text);
           td.addEventListener("pointerdown", (ev) => {
@@ -24000,22 +26226,22 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     tabBar.style.marginBottom = "8px";
     modal.body.appendChild(tabBar);
 
-    const textTabBtn = document.createElement("button");
-    textTabBtn.type = "button";
-    textTabBtn.className = "secondary";
-    textTabBtn.textContent = "Template Text";
-    tabBar.appendChild(textTabBtn);
-
     const descTabBtn = document.createElement("button");
     descTabBtn.type = "button";
     descTabBtn.className = "secondary";
     descTabBtn.textContent = "Description";
     tabBar.appendChild(descTabBtn);
 
+    const textTabBtn = document.createElement("button");
+    textTabBtn.type = "button";
+    textTabBtn.className = "secondary";
+    textTabBtn.textContent = "Template Text";
+    tabBar.appendChild(textTabBtn);
+
     const tabContent = document.createElement("div");
     modal.body.appendChild(tabContent);
 
-    let activeTab = "text";
+    let activeTab = "desc";
     let textValue = currentText;
     let activeTextarea = null;
     let activeStructTextarea = null;
@@ -26193,7 +28419,7 @@ function start() {
 (function startAbapViewerApp(global) {
   const runtime = global.AbapViewerRuntime = global.AbapViewerRuntime || {};
   runtime.api = runtime.api || {};
-  const requiredServices = ["runtimeState", "output", "descriptions", "performSources", "template", "uiNavigation", "parserController", "bootstrap"];
+  const requiredServices = ["runtimeState", "output", "descriptions", "performSources", "templateExcel", "template", "uiNavigation", "parserController", "bootstrap"];
   const missing = requiredServices.filter((name) => !runtime.services || !runtime.services[name]);
   if (missing.length) {
     const message = "Viewer services missing: " + missing.join(", ") + ". Check script order in viewer/index.html.";

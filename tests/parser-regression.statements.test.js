@@ -8,10 +8,12 @@ const {
   findObject,
   findObjects,
   flattenObjects,
+  fs,
   getConfigFileNames,
   getValue,
   getValueEntry,
-  parse
+  parse,
+  path
 } = require("./helpers/parser-test-helpers");
 
 function testMultipleStatementsOnSingleLine() {
@@ -354,6 +356,150 @@ function testInlineDataReferenceInAssignment() {
   const importing = callMethod.extras.callMethod.importing || [];
   assert(importing.length > 0, "Expected at least one IMPORTING assignment.");
   assert.strictEqual(importing[0].valueRef, "lv");
+}
+
+function testInlineFieldSymbolAssigningBindsDecl() {
+  const code = [
+    "DATA gt_rows TYPE TABLE OF i.",
+    "READ TABLE gt_rows ASSIGNING FIELD-SYMBOL(<ls_row>) INDEX 1.",
+    "LOOP AT gt_rows ASSIGNING FIELD-SYMBOL(<ls_loop>).",
+    "ENDLOOP.",
+    "APPEND INITIAL LINE TO gt_rows ASSIGNING FIELD-SYMBOL(<ls_app>).",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+
+  const readTable = findObject(objects, "READ_TABLE");
+  const readAssigning = getValueEntry(readTable && readTable.values, "assigning");
+  assert(readAssigning, "Expected READ TABLE assigning value.");
+  assert.strictEqual(readAssigning.value, "FIELD-SYMBOL(<ls_row>)");
+  assert.strictEqual(readAssigning.declRef, "<ls_row>");
+  assert(readAssigning.decl, "Expected decl bind for inline FIELD-SYMBOL on READ TABLE.");
+  assert.strictEqual(readAssigning.decl.name, "<ls_row>");
+  assert.strictEqual(readAssigning.decl.objectType, "INLINE");
+
+  const loop = findObject(objects, "LOOP_AT_ITAB");
+  const loopAssigning = getValueEntry(loop && loop.values, "assigning");
+  assert(loopAssigning, "Expected LOOP ASSIGNING value.");
+  assert.strictEqual(loopAssigning.declRef, "<ls_loop>");
+  assert.strictEqual(loopAssigning.decl && loopAssigning.decl.name, "<ls_loop>");
+
+  const append = findObject(objects, "APPEND");
+  const appendAssigning = getValueEntry(append && append.values, "assigning");
+  assert(appendAssigning, "Expected APPEND ASSIGNING value.");
+  assert.strictEqual(appendAssigning.declRef, "<ls_app>");
+  assert.strictEqual(appendAssigning.decl && appendAssigning.decl.name, "<ls_app>");
+}
+
+function testSelectForAllEntriesCapturesItabAndDecl() {
+  const code = [
+    "DATA gt_flight_source TYPE TABLE OF sflight.",
+    "DATA gt_routes TYPE TABLE OF spfli.",
+    "SELECT carrid connid",
+    "  FROM spfli",
+    "  INTO TABLE gt_routes",
+    "  FOR ALL ENTRIES IN gt_flight_source",
+    "  WHERE carrid = gt_flight_source-carrid",
+    "    AND connid = gt_flight_source-connid.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+  const select = findObject(objects, "SELECT");
+  assert(select, "Expected SELECT object.");
+
+  const forAllEntries = getValueEntry(select.values, "forAllEntries");
+  assert(forAllEntries, "Expected values.forAllEntries from FOR ALL ENTRIES IN.");
+  assert.strictEqual(forAllEntries.value, "gt_flight_source");
+  assert.strictEqual(forAllEntries.declRef, "gt_flight_source");
+  assert(forAllEntries.decl, "Expected decl bind for FOR ALL ENTRIES itab.");
+  assert.strictEqual(forAllEntries.decl.name, "gt_flight_source");
+  assert.strictEqual(forAllEntries.decl.objectType, "DATA");
+
+  assert.strictEqual(getValue(select.values, "intoTable"), "gt_routes");
+  assert.strictEqual(getValue(select.values, "from"), "spfli");
+  assert(
+    select.keywords && select.keywords["for-all-entries-in"],
+    "Expected keyword phrase FOR ALL ENTRIES IN."
+  );
+}
+
+function testSelectForAllEntriesHostEscapeAndCorrespondingTable() {
+  const hostCode = [
+    "DATA gt_src TYPE TABLE OF i.",
+    "DATA gt_dst TYPE TABLE OF i.",
+    "SELECT table_line FROM dbtab INTO TABLE @gt_dst",
+    "  FOR ALL ENTRIES IN @gt_src",
+    "  WHERE table_line = @gt_src-table_line.",
+    ""
+  ].join("\n");
+
+  const hostResult = parse(hostCode);
+  const hostSelect = findObject(flattenObjects(hostResult.objects), "SELECT");
+  assert(hostSelect, "Expected SELECT with host escapes.");
+
+  const hostInto = getValueEntry(hostSelect.values, "intoTable");
+  assert.strictEqual(hostInto && hostInto.value, "@gt_dst");
+  assert.strictEqual(hostInto && hostInto.declRef, "gt_dst");
+  assert.strictEqual(hostInto && hostInto.decl && hostInto.decl.name, "gt_dst");
+
+  const hostFae = getValueEntry(hostSelect.values, "forAllEntries");
+  assert.strictEqual(hostFae && hostFae.value, "@gt_src");
+  assert.strictEqual(hostFae && hostFae.declRef, "gt_src");
+  assert.strictEqual(hostFae && hostFae.decl && hostFae.decl.name, "gt_src");
+
+  const whereConditions = hostSelect.extras
+    && hostSelect.extras.select
+    && Array.isArray(hostSelect.extras.select.whereConditions)
+    ? hostSelect.extras.select.whereConditions
+    : [];
+  assert.strictEqual(whereConditions.length, 1);
+  assert.strictEqual(whereConditions[0].rightOperand, "@gt_src-table_line");
+  assert.strictEqual(whereConditions[0].rightOperandRef, "gt_src-table_line");
+
+  const correspondingCode = [
+    "DATA gt_src TYPE TABLE OF i.",
+    "DATA gt_dst TYPE TABLE OF i.",
+    "SELECT carrid connid FROM spfli",
+    "  INTO CORRESPONDING FIELDS OF TABLE gt_dst",
+    "  FOR ALL ENTRIES IN gt_src",
+    "  WHERE carrid = gt_src-carrid.",
+    ""
+  ].join("\n");
+  const correspondingSelect = findObject(flattenObjects(parse(correspondingCode).objects), "SELECT");
+  assert(correspondingSelect, "Expected SELECT with INTO CORRESPONDING FIELDS OF TABLE.");
+  const correspondingInto = getValueEntry(correspondingSelect.values, "intoTable");
+  assert.strictEqual(correspondingInto && correspondingInto.value, "gt_dst");
+  assert.strictEqual(correspondingInto && correspondingInto.declRef, "gt_dst");
+  assert.strictEqual(getValue(correspondingSelect.values, "forAllEntries"), "gt_src");
+  assert(
+    correspondingSelect.keywords && correspondingSelect.keywords["into-corresponding-fields-of-table"],
+    "Expected keyword phrase INTO CORRESPONDING FIELDS OF TABLE."
+  );
+  assert.strictEqual(getValue(correspondingSelect.values, "into"), "");
+
+  const appendingCode = [
+    "DATA gt_src TYPE TABLE OF i.",
+    "DATA gt_dst TYPE TABLE OF i.",
+    "SELECT carrid FROM spfli",
+    "  APPENDING CORRESPONDING FIELDS OF TABLE @gt_dst",
+    "  FOR ALL ENTRIES IN @gt_src",
+    "  WHERE carrid = @gt_src-carrid.",
+    ""
+  ].join("\n");
+  const appendingSelect = findObject(flattenObjects(parse(appendingCode).objects), "SELECT");
+  assert(appendingSelect, "Expected SELECT with APPENDING CORRESPONDING FIELDS OF TABLE.");
+  const appendingTable = getValueEntry(appendingSelect.values, "appendingTable");
+  assert.strictEqual(appendingTable && appendingTable.value, "@gt_dst");
+  assert.strictEqual(appendingTable && appendingTable.declRef, "gt_dst");
+  assert.strictEqual(getValue(appendingSelect.values, "forAllEntries"), "@gt_src");
+  assert(
+    appendingSelect.keywords && appendingSelect.keywords["appending-corresponding-fields-of-table"],
+    "Expected keyword phrase APPENDING CORRESPONDING FIELDS OF TABLE."
+  );
 }
 
 function testCallMethodExpressionWithAssignmentReceiver() {
@@ -757,6 +903,154 @@ function testSupportedStatementSmokeMatrix() {
   );
 }
 
+function assertWhereClean(select, label) {
+  const where = getValue(select.values, "where");
+  const whereRaw = select.extras && select.extras.select ? String(select.extras.select.whereRaw || "") : "";
+  const text = `${where}\n${whereRaw}`;
+  assert(!/\bINTO\b/i.test(text), `${label} whereClean: where must not contain INTO. Got: ${text}`);
+  assert(!/\bAPPENDING\b/i.test(text), `${label} whereClean: where must not contain APPENDING. Got: ${text}`);
+  const conditions = select.extras && select.extras.select && Array.isArray(select.extras.select.whereConditions)
+    ? select.extras.select.whereConditions
+    : [];
+  for (const clause of conditions) {
+    const right = String(clause && clause.rightOperand || "");
+    assert(!/\bINTO\b/i.test(right), `${label} whereClean: rightOperand must not contain INTO. Got: ${right}`);
+  }
+}
+
+function testSelectOpenSqlFieldsWhereIntoFromDeepSample() {
+  const samplePath = path.join(__dirname, "..", "examples", "deep_form_demo.abap");
+  const sample = fs.readFileSync(samplePath, "utf8");
+  const selects = findObjects(flattenObjects(parse(sample).objects), "SELECT");
+  assert.ok(selects.length >= 5, `S*: Expected at least 5 SELECT objects from deep sample. Got ${selects.length}`);
+
+  const s1 = selects.find((obj) => /SELECT\s+SINGLE\s+FROM\s+scarr/i.test(String(obj.raw || "")));
+  assert(s1, "S1: Expected SELECT SINGLE FROM scarr.");
+  assert.strictEqual(getValue(s1.values, "fields"), "carrname", "S1 fieldsOK");
+  assertWhereClean(s1, "S1");
+  assert.strictEqual(getValue(s1.values, "into"), "@gv_default_carrier_name", "S1 intoOK");
+  assert(s1.keywords && s1.keywords.fields, "S1 kwFIELDS");
+  const s1Cond = s1.extras.select.whereConditions[0];
+  assert.strictEqual(String(s1Cond.rightOperand || ""), "@gs_request-carrid", "S1 rightOperand");
+
+  const cursorSelect = selects.find((obj) =>
+    /INNER\s+JOIN/i.test(String(obj.raw || ""))
+    && /FROM\s+sflight/i.test(String(obj.raw || ""))
+  );
+  if (cursorSelect) {
+    assert(
+      String(getValue(cursorSelect.values, "fields") || "").includes("f~carrid"),
+      "S2 fieldsOK"
+    );
+    assertWhereClean(cursorSelect, "S2");
+    assert(!/\bORDER\b/i.test(getValue(cursorSelect.values, "where")), "S2 where must not swallow ORDER");
+  }
+
+  const s3 = selects.find((obj) => /gt_sql_summary/i.test(String(obj.raw || "")));
+  assert(s3, "S3: Expected aggregate SELECT into gt_sql_summary.");
+  assert(
+    String(getValue(s3.values, "fields") || "").startsWith("carrid"),
+    `S3 fieldsOK. Got: ${getValue(s3.values, "fields")}`
+  );
+  assertWhereClean(s3, "S3");
+  assert(!/\bGROUP\b/i.test(getValue(s3.values, "where")), "S3 where must not swallow GROUP");
+  assert.strictEqual(getValue(s3.values, "having").replace(/\s+/g, " ").trim(), "COUNT( * ) > 0", "S3 havingClean");
+  assert.strictEqual(getValue(s3.values, "intoTable"), "@gt_sql_summary", "S3 intoOK");
+
+  const s4 = selects.find((obj) => /gt_planetypes/i.test(String(obj.raw || "")));
+  assert(s4, "S4: Expected DISTINCT planetype SELECT.");
+  assert(
+    String(getValue(s4.values, "fields") || "").includes("planetype"),
+    `S4 fieldsOK. Got: ${getValue(s4.values, "fields")}`
+  );
+  assertWhereClean(s4, "S4");
+  assert.strictEqual(getValue(s4.values, "intoTable"), "@gt_planetypes", "S4 intoOK");
+
+  const s5 = selects.find((obj) => /gt_active_carriers/i.test(String(obj.raw || "")));
+  assert(s5, "S5: Expected EXISTS outer SELECT.");
+  assert(
+    String(getValue(s5.values, "fields") || "").includes("c~carrid"),
+    `S5 fieldsOK. Got: ${getValue(s5.values, "fields")}`
+  );
+  assert(/\bEXISTS\b/i.test(getValue(s5.values, "where")), "S5 where contains EXISTS");
+  assertWhereClean(s5, "S5");
+  assert.strictEqual(getValue(s5.values, "intoTable"), "@gt_active_carriers", "S5 intoOK");
+
+  const nestedExists = selects.find((obj) =>
+    /FROM\s+sflight\s+AS\s+f/i.test(String(obj.raw || ""))
+    && /FIELDS\s+f~carrid/i.test(String(obj.raw || ""))
+    && !/gt_active_carriers/i.test(String(obj.raw || ""))
+  );
+  if (nestedExists) {
+    assert(String(getValue(nestedExists.values, "fields") || "").includes("f~carrid"), "S6 fieldsOK");
+    assertWhereClean(nestedExists, "S6");
+  }
+
+  const s7 = selects.find((obj) => /gt_union_carriers/i.test(String(obj.raw || "")) || /\bUNION\b/i.test(String(obj.raw || "")));
+  assert(s7, "S7: Expected UNION SELECT.");
+  assert.strictEqual(getValue(s7.values, "fields"), "carrid", "S7 fieldsOK");
+  assertWhereClean(s7, "S7");
+  assert(!/\bUNION\b/i.test(getValue(s7.values, "where")), "S7 where must stop before UNION");
+  assert.strictEqual(getValue(s7.values, "intoTable"), "@gt_union_carriers", "S7 intoOK");
+}
+
+function testSelectClassicSingleFieldsBeforeFrom() {
+  const code = [
+    "DATA gv_name TYPE scarr-carrname.",
+    "SELECT SINGLE carrname FROM scarr INTO @gv_name WHERE carrid = 'AA'."
+  ].join("\n");
+  const select = findObject(flattenObjects(parse(code).objects), "SELECT");
+  assert(select, "R2: Expected classic SELECT SINGLE.");
+  assert.strictEqual(getValue(select.values, "fields"), "carrname", "R2 fieldsOK");
+  assert.strictEqual(getValue(select.values, "into"), "@gv_name", "R2 intoOK");
+  assertWhereClean(select, "R2");
+}
+
+function testSelectClassicFieldsIntoTableWhere() {
+  const code = [
+    "DATA gt_rows TYPE TABLE OF t001.",
+    "SELECT bukrs butxt FROM t001 INTO TABLE gt_rows WHERE bukrs IN s_bukrs."
+  ].join("\n");
+  const select = findObject(flattenObjects(parse(code).objects), "SELECT");
+  assert(select, "R3: Expected classic SELECT.");
+  assert(String(getValue(select.values, "fields") || "").includes("bukrs"), "R3 fieldsOK");
+  assert.strictEqual(getValue(select.values, "intoTable"), "gt_rows", "R3 intoTable");
+  assertWhereClean(select, "R3");
+}
+
+function testSelectOpenSqlInlineIntoDataAndFieldSymbol() {
+  const i1 = findObject(flattenObjects(parse(
+    "SELECT SINGLE FROM scarr FIELDS carrname WHERE carrid = @lv_id INTO @DATA(lv_carrname)."
+  ).objects), "SELECT");
+  assert(i1, "I1: Expected SELECT with INTO @DATA.");
+  assert.strictEqual(getValue(i1.values, "fields"), "carrname", "I1 fieldsOK");
+  assertWhereClean(i1, "I1");
+  assert(!/DATA\(/i.test(getValue(i1.values, "where")), "I1 where must not contain DATA(");
+  assert.strictEqual(getValue(i1.values, "into"), "@DATA(lv_carrname)", "I1 intoOK");
+  const i1Decl = getValueEntry(i1.values, "into");
+  assert.strictEqual(String(i1Decl && i1Decl.decl && i1Decl.decl.name || ""), "lv_carrname", "I1 declOK name");
+
+  const i2 = findObject(flattenObjects(parse(
+    "SELECT FROM scarr FIELDS carrid, carrname WHERE carrid = @lv_id INTO TABLE @DATA(lt_carriers)."
+  ).objects), "SELECT");
+  assert(i2, "I2: Expected SELECT INTO TABLE @DATA.");
+  assert(String(getValue(i2.values, "fields") || "").includes("carrid"), "I2 fieldsOK");
+  assertWhereClean(i2, "I2");
+  assert.strictEqual(getValue(i2.values, "intoTable"), "@DATA(lt_carriers)", "I2 intoOK");
+  const i2Decl = getValueEntry(i2.values, "intoTable");
+  assert.strictEqual(String(i2Decl && i2Decl.decl && i2Decl.decl.name || ""), "lt_carriers", "I2 declOK name");
+
+  const i3 = findObject(flattenObjects(parse(
+    "SELECT SINGLE FROM scarr FIELDS carrname WHERE carrid = @lv_id INTO @FIELD-SYMBOL(<lv_carrname>)."
+  ).objects), "SELECT");
+  assert(i3, "I3: Expected SELECT with INTO @FIELD-SYMBOL.");
+  assert.strictEqual(getValue(i3.values, "fields"), "carrname", "I3 fieldsOK");
+  assertWhereClean(i3, "I3");
+  assert.strictEqual(getValue(i3.values, "into"), "@FIELD-SYMBOL(<lv_carrname>)", "I3 intoOK");
+  const i3Decl = getValueEntry(i3.values, "into");
+  assert.strictEqual(String(i3Decl && i3Decl.decl && i3Decl.decl.name || ""), "<lv_carrname>", "I3 declOK name");
+}
+
 defineFocusedTest(test, "parser statements regression", ["statements"], async (t) => {
   await t.test("multiple statements on single line", () => {
     testMultipleStatementsOnSingleLine();
@@ -836,6 +1130,34 @@ defineFocusedTest(test, "parser statements regression", ["statements"], async (t
 
   await t.test("inline data reference in assignment", () => {
     testInlineDataReferenceInAssignment();
+  });
+
+  await t.test("inline field-symbol assigning binds decl", () => {
+    testInlineFieldSymbolAssigningBindsDecl();
+  });
+
+  await t.test("select for all entries captures itab and decl", () => {
+    testSelectForAllEntriesCapturesItabAndDecl();
+  });
+
+  await t.test("select for all entries host escape and corresponding table", () => {
+    testSelectForAllEntriesHostEscapeAndCorrespondingTable();
+  });
+
+  await t.test("select open sql fields where into from deep sample", () => {
+    testSelectOpenSqlFieldsWhereIntoFromDeepSample();
+  });
+
+  await t.test("select classic single fields before from", () => {
+    testSelectClassicSingleFieldsBeforeFrom();
+  });
+
+  await t.test("select classic fields into table where", () => {
+    testSelectClassicFieldsIntoTableWhere();
+  });
+
+  await t.test("select open sql inline into data and field-symbol", () => {
+    testSelectOpenSqlInlineIntoDataAndFieldSymbol();
   });
 
   await t.test("call method expression with assignment receiver", () => {

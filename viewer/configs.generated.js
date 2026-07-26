@@ -1823,6 +1823,7 @@
         "SINGLE": "single",
         "DISTINCT": "distinct",
         "FROM": "from",
+        "FIELDS": "fields",
         "INTO": "into",
         "APPENDING": "appending",
         "TABLE": "table",
@@ -1836,8 +1837,11 @@
         "ROWS": "rows"
       },
       "keywordPhrases": {
+        "INTO CORRESPONDING FIELDS OF TABLE": "into-corresponding-fields-of-table",
+        "APPENDING CORRESPONDING FIELDS OF TABLE": "appending-corresponding-fields-of-table",
         "INTO TABLE": "into-table",
         "APPENDING TABLE": "appending-table",
+        "FOR ALL ENTRIES IN": "for-all-entries-in",
         "ORDER BY": "order-by",
         "GROUP BY": "group-by",
         "UP TO": "up-to"
@@ -1849,6 +1853,26 @@
           "label": "fields",
           "capture": "rest",
           "stopTokens": [
+            "FROM",
+            "SINGLE",
+            "DISTINCT"
+          ]
+        },
+        {
+          "after": "SINGLE",
+          "name": "fields",
+          "label": "fields",
+          "capture": "rest",
+          "stopTokens": [
+            "FROM"
+          ]
+        },
+        {
+          "after": "DISTINCT",
+          "name": "fields",
+          "label": "fields",
+          "capture": "rest",
+          "stopTokens": [
             "FROM"
           ]
         },
@@ -1856,6 +1880,34 @@
           "after": "FROM",
           "name": "from",
           "label": "from"
+        },
+        {
+          "after": "FIELDS",
+          "name": "fields",
+          "label": "fields",
+          "capture": "rest",
+          "stopTokens": [
+            "WHERE",
+            "INTO",
+            "APPENDING",
+            "ORDER",
+            "GROUP",
+            "HAVING",
+            "UP",
+            "FOR",
+            "UNION",
+            "OF"
+          ]
+        },
+        {
+          "after": "INTO CORRESPONDING FIELDS OF TABLE",
+          "name": "intoTable",
+          "label": "into-corresponding-table"
+        },
+        {
+          "after": "APPENDING CORRESPONDING FIELDS OF TABLE",
+          "name": "appendingTable",
+          "label": "appending-corresponding-table"
         },
         {
           "after": "INTO TABLE",
@@ -1873,6 +1925,12 @@
           "label": "into"
         },
         {
+          "after": "FOR ALL ENTRIES IN",
+          "name": "forAllEntries",
+          "label": "for-all-entries",
+          "descKey": "forAllEntries"
+        },
+        {
           "after": "WHERE",
           "name": "where",
           "label": "where",
@@ -1881,7 +1939,10 @@
             "ORDER",
             "GROUP",
             "HAVING",
-            "UP"
+            "UP",
+            "INTO",
+            "APPENDING",
+            "UNION"
           ]
         },
         {
@@ -1891,7 +1952,9 @@
           "capture": "rest",
           "stopTokens": [
             "ORDER",
-            "UP"
+            "UP",
+            "INTO",
+            "APPENDING"
           ]
         }
       ]

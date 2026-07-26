@@ -206,9 +206,11 @@ async function assertConditionListsExpandRows() {
   const readTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="READ_TABLE"]');
   assert.deepStrictEqual(getTemplateTableRows(readTable), [
     ["READ TABLE", "lt_rows"],
-    ["WITH KEY", "col1 = gv_a AND"],
-    ["WITH KEY", "col2 = gv_b"],
-    ["INTO", "ls_row"]
+    ["INTO", "ls_row"],
+    ["WITH KEY", "="],
+    ["Điều kiện trái", "Toán tử", "Điều kiện phải", "="],
+    ["col1", "=", "gv_a", "AND"],
+    ["col2", "=", "gv_b"]
   ]);
 
   const modifyTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="MODIFY_ITAB"]');
@@ -217,8 +219,10 @@ async function assertConditionListsExpandRows() {
     ["FROM", "ls_row"],
     ["TRANSPORTING", "col1"],
     ["TRANSPORTING", "col2"],
-    ["WHERE", "col1 = gv_a AND"],
-    ["WHERE", "col2 = gv_b"]
+    ["WHERE", "="],
+    ["Điều kiện trái", "Toán tử", "Điều kiện phải", "="],
+    ["col1", "=", "gv_a", "AND"],
+    ["col2", "=", "gv_b"]
   ]);
 
   const selectTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="SELECT"]');
@@ -227,10 +231,14 @@ async function assertConditionListsExpandRows() {
     ["SELECT", "col2"],
     ["FROM", "dbtab"],
     ["INTO TABLE", "@lt_rows"],
-    ["WHERE", "col1 = @gv_a AND"],
-    ["WHERE", "col2 = @gv_b"],
-    ["HAVING", "col3 = @gv_a OR"],
-    ["HAVING", "col4 = @gv_b"]
+    ["WHERE", "="],
+    ["Điều kiện trái", "Toán tử", "Điều kiện phải", "="],
+    ["col1", "=", "@gv_a", "AND"],
+    ["col2", "=", "@gv_b"],
+    ["HAVING", "="],
+    ["Điều kiện trái", "Toán tử", "Điều kiện phải", "="],
+    ["col3", "=", "@gv_a", "OR"],
+    ["col4", "=", "@gv_b"]
   ]);
 
   dom.window.close();
@@ -538,33 +546,79 @@ async function assertTemplatePerformSourceEditDoesNotBleedAcrossSources() {
 
 async function assertTemplateRowDescriptionTargetsExactConditionDecls() {
   const source = [
+    "DATA gv_a TYPE string. \"A",
+    "DATA gv_b TYPE string. \"B",
     "DATA lt_rows TYPE TABLE OF string.",
     "DATA ls_row TYPE string.",
-    "DATA lv_a TYPE string. \"A",
-    "DATA lv_b TYPE string. \"B",
-    "DATA lv_c TYPE string. \"C",
-    "DATA lv_d TYPE string. \"D",
-    "LOOP AT lt_rows INTO ls_row WHERE lv_a = lv_b AND lv_c = lv_d.",
-    "ENDLOOP."
+    "READ TABLE lt_rows WITH KEY rk1 = gv_a rk2 = gv_b INTO ls_row.",
+    "SELECT col1 FROM dbtab INTO TABLE @lt_rows WHERE wk1 = @gv_a AND wk2 = @gv_b."
   ].join("\n");
   const dom = await renderFixture(source);
   const { window } = dom;
-  const { els } = window.AbapViewerRuntime;
+  const { els, state } = window.AbapViewerRuntime;
 
   els.rightTabTemplateBtn.click();
   await waitForViewerUi(window);
 
-  let loopTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="LOOP_AT_ITAB"]');
-  assert(loopTable, "Expected the conditional LOOP template table.");
-  const modal = await openTemplateCellDescriptionTab(window, findTemplateCellByText(loopTable, "C = D"));
-  const targetLabels = Array.from(modal.querySelectorAll("select option"), (option) => String(option.textContent || ""));
-  assert(targetLabels.some((label) => label.includes("lv_c")), "Expected the second condition row to target lv_c.");
-  assert(targetLabels.some((label) => label.includes("lv_d")), "Expected the second condition row to target lv_d.");
-  assert(!targetLabels.some((label) => label.includes("lv_a") || label.includes("lv_b")), "Expected condition targets to stay isolated by rendered row.");
+  let readTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="READ_TABLE"]');
+  assert(readTable, "Expected the READ TABLE condition template.");
+  const readLeftRk2 = findTemplateCellByText(readTable, "rk2");
+  assert(readLeftRk2, "Expected READ TABLE second-clause left operand.");
+  assert.strictEqual(
+    readLeftRk2.__templateCellMeta && readLeftRk2.__templateCellMeta.sourcePath,
+    "extras.readTable.conditions[1].leftOperandDecl.finalDesc"
+  );
+  const readLeftRk1 = findTemplateCellByText(readTable, "rk1");
+  assert(readLeftRk1, "Expected READ TABLE first-clause left operand.");
+  const readKey1 = getDeclOverrideStorageKeyFromRuntime(window, readLeftRk1.__templateCellMeta.declCandidates[0]);
+  const readKey2 = getDeclOverrideStorageKeyFromRuntime(window, readLeftRk2.__templateCellMeta.declCandidates[0]);
+  assert.notStrictEqual(readKey1, readKey2, "Expected READ TABLE clause left operands to use distinct storage keys.");
 
-  await saveTemplateCellDescription(window, modal, "C edited");
-  loopTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="LOOP_AT_ITAB"]');
-  assert(findTemplateCellByText(loopTable, "C edited = D"), "Expected saving the selected condition target to refresh only that operand.");
+  const readModal = await openTemplateCellDescriptionTab(window, readLeftRk2);
+  const readModalText = String(readModal.textContent || "");
+  assert(readModalText.includes("rk2"), "Expected READ TABLE second row to target rk2.");
+  assert(!readModalText.includes("rk1"), "Expected READ TABLE second row not to target rk1.");
+  await saveTemplateCellDescription(window, readModal, "rk2 edited");
+  assert.strictEqual(String(state.descOverrides[readKey2] || ""), "rk2 edited");
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(state.descOverrides, readKey1), false);
+  readTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="READ_TABLE"]');
+  assert(findTemplateCellByText(readTable, "rk1"), "Expected READ TABLE first left operand unchanged.");
+  assert(findTemplateCellByText(readTable, "rk2 edited"), "Expected only READ TABLE second left operand refreshed.");
+
+  let selectTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="SELECT"]');
+  assert(selectTable, "Expected the SELECT condition template.");
+  const selectLeftWk2 = findTemplateCellByText(selectTable, "wk2");
+  assert(selectLeftWk2, "Expected SELECT second WHERE left operand.");
+  assert.strictEqual(
+    selectLeftWk2.__templateCellMeta && selectLeftWk2.__templateCellMeta.sourcePath,
+    "extras.select.whereConditions[1].leftOperandDecl.finalDesc"
+  );
+  const selectLeftWk1 = findTemplateCellByText(selectTable, "wk1");
+  assert(selectLeftWk1, "Expected SELECT first WHERE left operand.");
+  const selectKey1 = getDeclOverrideStorageKeyFromRuntime(window, selectLeftWk1.__templateCellMeta.declCandidates[0]);
+  const selectKey2 = getDeclOverrideStorageKeyFromRuntime(window, selectLeftWk2.__templateCellMeta.declCandidates[0]);
+  assert.notStrictEqual(selectKey1, selectKey2, "Expected SELECT WHERE clause left operands to use distinct storage keys.");
+  assert.notStrictEqual(selectKey2, readKey2, "Expected SELECT and READ synthetic condition keys to stay distinct.");
+
+  const selectModal = await openTemplateCellDescriptionTab(window, selectLeftWk2);
+  await saveTemplateCellDescription(window, selectModal, "wk2 edited");
+  assert.strictEqual(String(state.descOverrides[selectKey2] || ""), "wk2 edited");
+  assert.strictEqual(String(state.descOverrides[readKey2] || ""), "rk2 edited", "Expected READ override to stay isolated.");
+  selectTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="SELECT"]');
+  assert(findTemplateCellByText(selectTable, "wk1"), "Expected SELECT first WHERE left operand unchanged.");
+  assert(findTemplateCellByText(selectTable, "wk2 edited"), "Expected only SELECT second WHERE left operand refreshed.");
+
+  const selectRightB = findTemplateCellByText(selectTable, "@B");
+  assert(selectRightB, "Expected SELECT WHERE right operand for @gv_b.");
+  assert.strictEqual(
+    selectRightB.__templateCellMeta && selectRightB.__templateCellMeta.status,
+    "editable",
+    "Expected SELECT WHERE right operand to stay editable."
+  );
+  assert.strictEqual(
+    selectRightB.__templateCellMeta.sourcePath,
+    "extras.select.whereConditions[1].rightOperandDecl.finalDesc"
+  );
 
   dom.window.close();
 }
@@ -1313,6 +1367,7 @@ async function assertMessageAndWriteViewerContracts() {
     "WRITE AT /lv_column(lv_length) lv_output TO lv_destination NO-GAP CURRENCY lv_currency USING EDIT MASK '==XX'.",
     "WRITE 5(10) lv_output.",
     "WRITE 'literal output'.",
+    "WRITE / 'Carrier'.",
     ""
   ].join("\n");
   const dom = await renderFixture(source);
@@ -1323,7 +1378,7 @@ async function assertMessageAndWriteViewerContracts() {
   assert(state.templateConfig.templates.WRITE, "Expected an explicit WRITE default template.");
   const renderObjects = Array.isArray(state.renderObjects) ? state.renderObjects : [];
   assert.strictEqual(renderObjects.filter((obj) => obj && obj.objectType === "MESSAGE").length, 3);
-  assert.strictEqual(renderObjects.filter((obj) => obj && obj.objectType === "WRITE").length, 3);
+  assert.strictEqual(renderObjects.filter((obj) => obj && obj.objectType === "WRITE").length, 4);
 
   Object.defineProperty(els.templatePreviewOutput, "clientHeight", {
     configurable: true,
@@ -1337,7 +1392,7 @@ async function assertMessageAndWriteViewerContracts() {
   const messageTables = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="MESSAGE"]'));
   const writeTables = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="WRITE"]'));
   assert.strictEqual(messageTables.length, 3, "Expected dynamic, literal, and static-reference MESSAGE blocks.");
-  assert.strictEqual(writeTables.length, 3, "Expected positioned, numeric-position, and literal WRITE blocks.");
+  assert.strictEqual(writeTables.length, 4, "Expected positioned, numeric-position, literal, and newline-only WRITE blocks.");
 
   const messageRows = getTemplateTableRows(messageTables[0]);
   assert(messageRows.some((row) => row.includes("MESSAGE") && row.includes("Message text")), "MESSAGE primary row must map to values.message.");
@@ -1350,18 +1405,39 @@ async function assertMessageAndWriteViewerContracts() {
 
   const writeRows = getTemplateTableRows(writeTables[0]);
   assert(writeRows.some((row) => row.includes("WRITE") && row.includes("Output value")), "WRITE primary row must map to values.output.");
-  assert(writeRows.some((row) => row.includes("AT") && row.join(" ").includes("Column") && row.join(" ").includes("Length")), "WRITE position operands must retain both edit targets.");
+  assert(
+    writeRows.some((row) => (row.includes("/") || row.includes("AT")) && row.includes("Column") && !row.includes("Length")),
+    "WRITE column position must be its own editable row."
+  );
+  assert(
+    writeRows.some((row) => row.includes("LENGTH") && row.includes("Length") && !row.includes("Column")),
+    "WRITE length position must be a separate LENGTH row."
+  );
   assert(writeRows.some((row) => row.includes("TO") && row.includes("Destination")));
   assert(writeRows.some((row) => row.includes("NO-GAP")), "Flag formatting must stay visible.");
   assert(writeRows.some((row) => row.includes("CURRENCY") && row.includes("Currency")), "Formatting data operands must retain provenance.");
   assert(writeRows.some((row) => row.includes("USING EDIT MASK") && row.includes("'==XX'")), "Literal format operands must stay visible.");
   const numericPositionRows = getTemplateTableRows(writeTables[1]);
   assert(
-    numericPositionRows.some((row) => row.includes("AT") && row.includes("5(10)")),
-    "WRITE with an omitted AT keyword must still render its numeric position."
+    numericPositionRows.some((row) => (row.includes("AT") || row.includes("/")) && row.includes("5") && !row.includes("10")),
+    "WRITE numeric column must render on its own row."
+  );
+  assert(
+    numericPositionRows.some((row) => row.includes("LENGTH") && row.includes("10")),
+    "WRITE numeric length must render on a LENGTH row."
   );
   assert(numericPositionRows.some((row) => row.includes("WRITE") && row.includes("Output value")));
 
+  const newlineOnlyRows = getTemplateTableRows(writeTables[3]);
+  assert(newlineOnlyRows.some((row) => row.includes("WRITE") && row.includes("'Carrier'")));
+  assert(
+    newlineOnlyRows.some((row) => row[0] === "/" && (row.length === 1 || !row[1])),
+    "Newline-only WRITE must not duplicate '/' as the value."
+  );
+  assert(
+    !newlineOnlyRows.some((row) => row[0] === "/" && row[1] === "/"),
+    "Newline-only WRITE must not render ['/','/']."
+  );
   const messageCell = findTemplateCellByText(messageTables[0], "Message text");
   assert(messageCell, "Expected editable MESSAGE primary cell.");
   const messageCandidates = messageCell.__templateCellMeta && messageCell.__templateCellMeta.declCandidates;
@@ -1529,5 +1605,199 @@ assertViewerFixtureDirectoriesStayInSync();
 
   await t.test("message and write viewer contracts", async () => {
     await assertMessageAndWriteViewerContracts();
+  });
+});
+
+defineFocusedTest(test, "viewer template Excel round-trip contracts", ["template-excel-roundtrip"], async (t) => {
+  await t.test("raw placeholders and supported formatting survive HTML round-trip", async () => {
+    const dom = await renderFixture("DATA lv_target TYPE string.\nlv_target = 'X'.");
+    const { window } = dom;
+    const service = window.AbapViewerRuntime.services.templateExcel;
+    assert(service, "Expected the templateExcel service to be registered.");
+
+    const definition = {
+      ranges: {
+        "A1:B1": {
+          text: "{values.target.finalDesc}",
+          background: "#dbeef4",
+          "font color": "#112233",
+          font: "MS PGothic",
+          "font size": 11,
+          bold: true,
+          italic: true,
+          underline: true,
+          align: "center",
+          valign: "middle",
+          wrap: true,
+          border: "outside-thin",
+          merge: true
+        },
+        A2: { text: "Plain" }
+      },
+      _options: { hideEmptyRows: true }
+    };
+    const payload = service.buildClipboardPayload("READ_TABLE", definition);
+    assert(payload.html.includes("{values.target.finalDesc}"), "Expected raw placeholder text.");
+    assert(payload.html.includes("0.5pt solid"), "Expected the Excel border to be one step thinner.");
+
+    const parsed = service.parseClipboardPayload({
+      html: payload.html,
+      text: payload.text,
+      currentOptions: definition._options
+    });
+    assert.strictEqual(parsed.source, "html");
+    assert.strictEqual(parsed.stats.rows, 2);
+    assert.strictEqual(parsed.stats.cols, 2);
+    assert.strictEqual(JSON.stringify(parsed.options), JSON.stringify(definition._options));
+    assert.strictEqual(parsed.ranges["A1:B1"].text, "{values.target.finalDesc}");
+    assert.strictEqual(parsed.ranges["A1:B1"].merge, true);
+    assert.strictEqual(parsed.ranges["A1:B1"].border, "outside-thin");
+    assert.strictEqual(parsed.ranges.A2.border, undefined, "Expected plain cells to remain borderless.");
+  });
+
+  await t.test("text overlays do not shrink an enclosing border range during copy", async () => {
+    const dom = await renderFixture("WRITE 'X'.");
+    const service = dom.window.AbapViewerRuntime.services.templateExcel;
+    const payload = service.buildClipboardPayload("READ_TABLE", {
+      "A1:T1": {
+        background: "#dbeef4",
+        border: "outside-thin",
+        font: "MS PGothic"
+      },
+      A1: { text: "{rows.keyword}" }
+    });
+    const doc = new dom.window.DOMParser().parseFromString(payload.html, "text/html");
+    const firstCellStyle = doc.querySelector("td").style;
+    assert.notStrictEqual(firstCellStyle.borderTopStyle, "none");
+    assert.notStrictEqual(firstCellStyle.borderBottomStyle, "none");
+    assert.notStrictEqual(firstCellStyle.borderLeftStyle, "none");
+    assert.notStrictEqual(
+      firstCellStyle.borderRightStyle,
+      "solid",
+      "A1 must not become a separately boxed cell inside the A1:T1 outline."
+    );
+    const parsed = service.parseClipboardPayload({ html: payload.html, text: payload.text });
+    assert.strictEqual(parsed.ranges.A1.border, undefined);
+    assert.strictEqual(parsed.ranges["A1:T1"].border, "outside-thin");
+  });
+
+  await t.test("TSV fallback keeps text and reports lost formatting", async () => {
+    const dom = await renderFixture("WRITE 'X'.");
+    const service = dom.window.AbapViewerRuntime.services.templateExcel;
+    const parsed = service.parseClipboardPayload({
+      text: "A\t{values.message.finalDesc}\r\nC\tD",
+      currentOptions: { hideRowsWithoutValues: true }
+    });
+    assert.strictEqual(parsed.source, "tsv");
+    assert.strictEqual(parsed.ranges.B1.text, "{values.message.finalDesc}");
+    assert.strictEqual(JSON.stringify(parsed.options), JSON.stringify({ hideRowsWithoutValues: true }));
+    assert(parsed.warnings.some((warning) => /format|merge|border/i.test(warning)));
+  });
+
+  await t.test("Excel CSS specificity and ignored colspan are respected", async () => {
+    const dom = await renderFixture("WRITE 'X'.");
+    const service = dom.window.AbapViewerRuntime.services.templateExcel;
+    const parsed = service.parseClipboardPayload({
+      html: [
+        "<style>.excelCell { background-color:#abcdef; } td { background-color:#123456; }</style>",
+        "<table><tr>",
+        "<td class=\"excelCell\" colspan=\"2\" style=\"mso-ignore:colspan;border:none\">{values.name.finalDesc}</td>",
+        "<td style=\"border:none\">Plain</td>",
+        "</tr></table>"
+      ].join(""),
+      currentOptions: {}
+    });
+    assert.strictEqual(parsed.ranges["A1:B1"].background, "#abcdef");
+    assert.strictEqual(parsed.ranges["A1:B1"].merge, undefined, "Expected mso-ignore:colspan not to create a merge.");
+    assert.strictEqual(Object.values(parsed.ranges).some((config) => config.border === "outside-thin"), false);
+  });
+
+  await t.test("adjacent Excel outlines survive shared-edge border encoding", async () => {
+    const dom = await renderFixture("WRITE 'X'.");
+    const service = dom.window.AbapViewerRuntime.services.templateExcel;
+    const parsed = service.parseClipboardPayload({
+      html: [
+        "<table><tr>",
+        "<td style=\"border-top:1px solid;border-bottom:1px solid;border-left:1px solid\">A</td>",
+        "<td style=\"border-top:1px solid;border-bottom:1px solid;border-right:1px solid\">B</td>",
+        "<td style=\"border-top:1px solid;border-bottom:1px solid\">C</td>",
+        "<td style=\"border-top:1px solid;border-bottom:1px solid;border-right:1px solid\">D</td>",
+        "</tr></table>"
+      ].join("")
+    });
+    const borders = Object.entries(parsed.ranges)
+      .filter(([, config]) => config.border === "outside-thin")
+      .map(([range]) => range);
+    assert.deepStrictEqual(Array.from(borders), ["A1:B1", "C1:D1"]);
+  });
+
+  await t.test("benign CSS generated by Excel does not produce unsupported warnings", async () => {
+    const dom = await renderFixture("WRITE 'X'.");
+    const service = dom.window.AbapViewerRuntime.services.templateExcel;
+    const parsed = service.parseClipboardPayload({
+      html: [
+        "<table><tr><td style=\"",
+        "background-attachment:scroll;background-clip:border-box;background-image:none;",
+        "background-origin:padding-box;background-position-x:0%;background-position-y:0%;",
+        "background-repeat:repeat;background-size:auto;height:15pt;width:64pt;",
+        "padding-left:1px;padding-right:1px;padding-top:1px;",
+        "text-decoration-color:#000;text-decoration-style:solid;text-decoration-thickness:auto;",
+        "text-wrap-mode:wrap;white-space-collapse:preserve;",
+        "border:none\">Text</td></tr></table>"
+      ].join("")
+    });
+    assert.deepStrictEqual(Array.from(parsed.warnings), []);
+  });
+
+  await t.test("oversized clipboard is rejected before draft import", async () => {
+    const dom = await renderFixture("WRITE 'X'.");
+    const service = dom.window.AbapViewerRuntime.services.templateExcel;
+    assert.throws(
+      () => service.parseClipboardPayload({ html: `<table><!--${"x".repeat(2000001)}--></table>` }),
+      /safe limit/i
+    );
+  });
+
+  await t.test("repeated Excel cell formatting is compacted into ranges", async () => {
+    const dom = await renderFixture("WRITE 'X'.");
+    const service = dom.window.AbapViewerRuntime.services.templateExcel;
+    const cells = Array.from({ length: 8 }, (_, index) => (
+      `<td style="background-color:#dbeef4;font-weight:bold;border:none">${index < 2 ? `T${index + 1}` : ""}</td>`
+    ));
+    const parsed = service.parseClipboardPayload({
+      html: `<table><tr>${cells.slice(0, 4).join("")}</tr><tr>${cells.slice(4).join("")}</tr></table>`
+    });
+    assert(
+      Object.keys(parsed.ranges).length <= 3,
+      `Expected compact style and text overlays, got ${Object.keys(parsed.ranges).length} ranges.`
+    );
+    assert.strictEqual(parsed.ranges["A1:D2"].background, "#dbeef4");
+  });
+
+  await t.test("Template Form exposes staged Excel actions", async () => {
+    const dom = await renderFixture("WRITE 'X'.");
+    const { window } = dom;
+    window.AbapViewerRuntime.services.template.openTemplateConfigModal();
+    await waitForViewerUi(window);
+    const page = Array.from(window.document.querySelectorAll(".template-dynamic-page"))
+      .find((node) => String(node.textContent || "").includes("Template Form"));
+    assert(page, "Expected Template Form page.");
+    const labels = Array.from(page.querySelectorAll("button")).map((button) => String(button.textContent || "").trim());
+    assert(labels.includes("Copy to Excel"));
+    assert(labels.includes("Paste from Excel"));
+    assert(page.querySelector(".template-excel-status"), "Expected a dedicated Excel status message area.");
+
+    const keySelect = page.querySelector(".template-builder-key-field select");
+    keySelect.value = "READ_TABLE";
+    keySelect.dispatchEvent(new window.Event("change", { bubbles: true }));
+    await waitForViewerUi(window);
+    const getGridCell = (row, col) => page.querySelector(`.template-builder-grid td[data-row="${row}"][data-col="${col}"]`);
+    const a1 = getGridCell(1, 1);
+    const t1 = getGridCell(1, 20);
+    const u1 = getGridCell(1, 21);
+    assert.strictEqual(a1.style.borderTopStyle, "solid");
+    assert.notStrictEqual(a1.style.borderRightStyle, "solid", "A1 must not be boxed separately.");
+    assert.strictEqual(t1.style.borderRightStyle, "solid");
+    assert.strictEqual(u1.style.borderLeftStyle, "solid", "The second border range must remain visible.");
   });
 });

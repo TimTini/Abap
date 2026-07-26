@@ -17,10 +17,11 @@ function testDefaultFlightDemoContract() {
   const samplePath = path.resolve(__dirname, "..", "examples", "deep_form_demo.abap");
   const source = fs.readFileSync(samplePath, "utf8");
   const lineCount = source.split(/\r?\n/).length;
-  assert(lineCount >= 1400 && lineCount <= 1500, `Extended default demo must stay within 1400-1500 lines, got ${lineCount}.`);
+  assert(lineCount >= 1800 && lineCount <= 2000, `Extended default demo must stay within 1800-2000 lines, got ${lineCount}.`);
   assert.match(source, /^REPORT\s+zflight_operations_overview\b/im);
   for (const marker of [
     "Flight Operations Overview - extended ABAP statement coverage",
+    "Classic Open SQL SELECT syntax",
     "OPEN CURSOR",
     "OPEN DATASET",
     "ROLLBACK WORK",

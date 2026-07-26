@@ -25,7 +25,7 @@
   const isStructFieldDecl = runtime.requireServiceMethod("output", "isStructFieldDecl");
   const buildDeclTitle = runtime.requireServiceMethod("output", "buildDeclTitle");
   const el = runtime.requireServiceMethod("output", "el");
-  const selectPerformSourceCandidate = runtime.requireServiceMethod("performSources", "selectPerformSourceCandidate");
+  const createPerformSourcePicker = runtime.requireServiceMethod("performSources", "createPerformSourcePicker");
   const renderActiveRightPanel = runtime.requireServiceMethod("uiNavigation", "renderActiveRightPanel");
   const jumpInputToCodeRange = runtime.requireServiceMethod("uiNavigation", "jumpInputToCodeRange");
   const findDeclSegmentIndex = runtime.requireServiceMethod("uiNavigation", "findDeclSegmentIndex");
@@ -314,40 +314,18 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     if (!group || group.scopeType !== "FORM" || !group.scopeName) {
       return null;
     }
-    const registry = state.performSourceRegistry;
-    if (!registry || typeof registry.getActiveCandidates !== "function") {
-      return null;
-    }
     const formNameUpper = group.scopeName.toUpperCase();
-    const candidates = registry.getActiveCandidates(formNameUpper);
-    if (candidates.length < 2) {
+    const picker = createPerformSourcePicker(formNameUpper, {
+      formName: group.scopeName,
+      nativeSelectClassName: "data-perform-source-select",
+      selectionOptions: { originTab: "descriptions" }
+    });
+    if (!picker) {
       return null;
     }
-    const selected = registry.getSelectedCandidate(formNameUpper) || candidates[0];
     const control = el("div", { className: "data-decl-group-controls" });
     control.appendChild(el("span", { className: "muted", text: "PERFORM source" }));
-    const select = el("select", {
-      className: "data-perform-source-select",
-      attrs: {
-        "data-perform-form": formNameUpper,
-        "aria-label": `PERFORM source for ${group.scopeName}`
-      }
-    });
-    for (let index = 0; index < candidates.length; index += 1) {
-      const candidate = candidates[index];
-      const lineLabel = candidate.lineStart > 0 ? String(candidate.lineStart) : "?";
-      select.appendChild(el("option", {
-        text: `Source ${index + 1}/${candidates.length} · line ${lineLabel} · ${candidate.actualSummary || "no arguments"}`,
-        attrs: { value: candidate.key }
-      }));
-    }
-    select.value = selected.key;
-    select.addEventListener("click", (ev) => ev.stopPropagation());
-    select.addEventListener("change", (ev) => {
-      ev.stopPropagation();
-      selectPerformSourceCandidate(formNameUpper, select.value, { originTab: "descriptions" });
-    });
-    control.appendChild(select);
+    control.appendChild(picker);
     return control;
   }
 
@@ -1569,7 +1547,7 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
   }
 
   function extractIdentifierCandidate(text) {
-    const raw = String(text || "").trim();
+    let raw = String(text || "").trim();
     if (!raw) {
       return "";
     }
@@ -1580,18 +1558,20 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       return "";
     }
 
+    // Host escape must be stripped before field-path so @itab-field stays one path.
+    if (raw.startsWith("@")) {
+      raw = raw.slice(1).trim();
+      if (!raw) {
+        return "";
+      }
+    }
+
     const sysMatch = raw.match(/^SY-[A-Za-z_][A-Za-z0-9_]*/i);
     if (sysMatch) {
       return sysMatch[0].toUpperCase();
     }
 
-    const fieldPathMatch = raw.match(
-      /^(<[^>]+>|[A-Za-z_][A-Za-z0-9_]*)(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)+/
-    );
-    if (fieldPathMatch) {
-      return String(fieldPathMatch[0] || "").trim();
-    }
-
+    // Inline decls before field-path: FIELD-SYMBOL(<fs>) looks like path FIELD-SYMBOL.
     const inlinePatterns = [
       /@?DATA\s*\(\s*([^)]+)\s*\)/i,
       /@?FINAL\s*\(\s*([^)]+)\s*\)/i,
@@ -1606,6 +1586,13 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       if (candidate) {
         return candidate;
       }
+    }
+
+    const fieldPathMatch = raw.match(
+      /^(<[^>]+>|[A-Za-z_][A-Za-z0-9_]*)(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)+/
+    );
+    if (fieldPathMatch) {
+      return String(fieldPathMatch[0] || "").trim();
     }
 
     const genericMatch = raw.match(

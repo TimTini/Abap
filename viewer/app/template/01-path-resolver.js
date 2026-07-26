@@ -625,7 +625,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       MOVE: ["source", "to", "target"],
       "MOVE-CORRESPONDING": ["source", "to", "target"],
       READ_TABLE: ["itab", "into", "assigning", "refinto", "referenceinto", "reference-into", "index"],
-      SELECT: ["into", "intotable", "into-table", "appendingtable", "appending-table", "assigning", "refinto", "referenceinto", "reference-into"],
+      SELECT: ["into", "intotable", "into-table", "appendingtable", "appending-table", "forallentries", "for-all-entries", "assigning", "refinto", "referenceinto", "reference-into"],
       SORT_ITAB: ["itab"],
       WRITE: ["output", "destination"]
     };
@@ -1239,12 +1239,17 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     return "";
   }
 
-  function createTemplateExpandedRow(text, declCandidates, provenance) {
-    return {
+  function createTemplateExpandedRow(text, declCandidates, provenance, keywordOverride) {
+    const row = {
       text: String(text === undefined || text === null ? "" : text).trim(),
       declCandidates: dedupeTemplateDecls(declCandidates),
       provenance: provenance && typeof provenance === "object" ? { ...provenance } : null
     };
+    const keyword = String(keywordOverride || "").trim();
+    if (keyword) {
+      row.keyword = keyword;
+    }
+    return row;
   }
 
   function createTemplateKeywordRow(keyword, finalDesc, declCandidates, provenance) {
@@ -1447,7 +1452,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     )) : null;
   }
 
-  function buildTemplateWritePositionRow(sourceObj, write, ownerContext, objectIndexOneBased) {
+  function buildTemplateWritePositionRows(sourceObj, write, ownerContext, objectIndexOneBased) {
     if (!write || typeof write !== "object") {
       return null;
     }
@@ -1457,7 +1462,6 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       if (!value) {
         return createTemplateExpandedRow("", []);
       }
-      const capName = `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
       return buildTemplateSemanticValueRow({
         value,
         valueRef: position[`${name}Ref`],
@@ -1471,13 +1475,35 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     };
     const column = buildPart("column");
     const length = buildPart("length");
-    const prefix = write.newLine ? "/" : "";
-    const positionText = `${prefix}${column.text}${length.text ? `(${length.text})` : ""}`;
-    const declCandidates = dedupeTemplateDecls([...column.declCandidates, ...length.declCandidates]);
-    return createTemplateExpandedRow(positionText || prefix, declCandidates, {
-      status: declCandidates.length ? "editable" : "not_applicable",
-      reasonCode: declCandidates.length ? "" : getTemplateNoDeclReason(positionText || prefix, true, false)
-    });
+    const hasColumn = Boolean(String(column.text || "").trim());
+    const hasLength = Boolean(String(length.text || "").trim());
+    const rows = [];
+
+    // Newline-only WRITE / … → flag row with empty value (keyword text comes from synthetic "/").
+    if (!hasColumn && !hasLength) {
+      if (!write.newLine) {
+        return null;
+      }
+      rows.push(createTemplateExpandedRow("", [], {
+        status: "not_applicable",
+        reasonCode: "NON_DECL_SCHEMA_VALUE"
+      }));
+      return rows;
+    }
+
+    // Do not prefix "/" into values — newline is already the keyword when synthetic at text is "/".
+    if (hasColumn) {
+      rows.push(column);
+    }
+    if (hasLength) {
+      rows.push(createTemplateExpandedRow(
+        length.text,
+        length.declCandidates,
+        length.provenance,
+        "LENGTH"
+      ));
+    }
+    return rows.length ? rows : null;
   }
 
   function getTemplateSemanticSectionRows(sourceObj, keywordLabel, ownerContext, objectIndexOneBased) {
@@ -1499,8 +1525,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
 
     if (extras.write) {
       if (keywordLabel === "at") {
-        const positionRow = buildTemplateWritePositionRow(sourceObj, extras.write, ownerContext, objectIndexOneBased);
-        return positionRow ? [positionRow] : null;
+        return buildTemplateWritePositionRows(sourceObj, extras.write, ownerContext, objectIndexOneBased);
       }
       const format = Array.isArray(extras.write.format) ? extras.write.format : [];
       const formatEntry = format.find((entry) => (
@@ -1788,8 +1813,27 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     return null;
   }
 
+  function shouldSkipConditionKeywordInTemplateRows(objectType, keywordLabel) {
+    const type = String(objectType || "").trim().toUpperCase();
+    const label = normalizeTemplatePairToken(keywordLabel);
+    if (type === "SELECT" && (label === "where" || label === "having")) {
+      return true;
+    }
+    if (type === "READ_TABLE" && (label === "with-key" || label === "with-table-key")) {
+      return true;
+    }
+    if ((type === "LOOP_AT_ITAB" || type === "MODIFY_ITAB" || type === "DELETE_ITAB") && label === "where") {
+      return true;
+    }
+    return false;
+  }
+
   function getTemplateExpandedKeywordRows(sourceObj, keyword, valueEntry, ownerContext, objectIndexOneBased) {
     const keywordLabel = normalizeTemplatePairToken(keyword && keyword.label);
+    const objectType = String(sourceObj && sourceObj.objectType || "").trim().toUpperCase();
+    if (shouldSkipConditionKeywordInTemplateRows(objectType, keywordLabel)) {
+      return [];
+    }
     const semanticRows = getTemplateSemanticSectionRows(sourceObj, keywordLabel, ownerContext, objectIndexOneBased);
     if (Array.isArray(semanticRows) && semanticRows.length) {
       return semanticRows;
@@ -1826,6 +1870,9 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       if (!keywordText) {
         continue;
       }
+      if (shouldSkipConditionKeywordInTemplateRows(objectType, keyword && keyword.label)) {
+        continue;
+      }
       const valueEntry = findValueEntryForKeyword(keyword, valueEntries, objectType);
       const expandedRows = getTemplateExpandedKeywordRows(
         sourceObj,
@@ -1836,8 +1883,11 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       );
       if (Array.isArray(expandedRows) && expandedRows.length) {
         for (const expandedRow of expandedRows) {
+          const rowKeyword = expandedRow && typeof expandedRow === "object" && expandedRow.keyword
+            ? expandedRow.keyword
+            : keywordText;
           rows.push(createTemplateKeywordRow(
-            keywordText,
+            rowKeyword,
             expandedRow && typeof expandedRow === "object" ? expandedRow.text : expandedRow,
             expandedRow && typeof expandedRow === "object" ? expandedRow.declCandidates : [],
             expandedRow && typeof expandedRow === "object" && expandedRow.provenance
@@ -1856,6 +1906,9 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
                 }
           ));
         }
+        continue;
+      }
+      if (expandedRows && Array.isArray(expandedRows) && expandedRows.length === 0) {
         continue;
       }
       const canonicalValueEntry = valueEntry
@@ -6736,9 +6789,13 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
 
     const host = document.createElement("div");
     host.className = "template-config-editor-host";
+    const excelStatusEl = document.createElement("div");
+    excelStatusEl.className = "template-excel-status";
+    excelStatusEl.hidden = true;
     const errEl = document.createElement("div");
     errEl.className = "template-error";
     editorPane.appendChild(host);
+    editorPane.appendChild(excelStatusEl);
     editorPane.appendChild(errEl);
 
     const previewPane = document.createElement("section");
@@ -6912,6 +6969,13 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         setTemplateConfigError(t);
       }
     };
+    const showExcelStatus = (message, tone) => {
+      const text = String(message || "").trim();
+      excelStatusEl.textContent = text;
+      excelStatusEl.hidden = !text;
+      excelStatusEl.classList.toggle("is-success", tone === "success");
+      excelStatusEl.classList.toggle("is-warning", tone === "warning");
+    };
     const isOptionKey = (k) => (typeof isTemplateOptionConfigKey === "function")
       ? Boolean(isTemplateOptionConfigKey(k))
       : OPTION_KEYS.has(String(k || "").trim().toLowerCase());
@@ -6929,6 +6993,8 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     }
     let selKey = Object.keys(draft.templates)[0] || "DEFAULT";
     let selRange = "";
+    let pendingExcelImport = null;
+    let excelPasteOpen = false;
     els.templateConfigError = errEl;
     els.templateConfigJson = null;
     showErr("");
@@ -7680,24 +7746,28 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       cols = Math.max(cols, selection.c2);
       return { rows: Math.min(Math.max(rows + 1, 8), 40), cols: Math.min(Math.max(cols + 1, 8), 26) };
     };
-    const getEntryForGridCell = (row, col) => {
-      const matches = getTemplateGridEntries()
-        .filter((entry) => rangeContainsCellForBuilder(entry.parsed, row, col))
-        .sort((left, right) => left.area - right.area);
-      return matches[0] || null;
-    };
-    const applyStyleToGridCell = (td, cell) => {
+    const getEntriesForGridCell = (row, col) => getTemplateGridEntries()
+      .filter((entry) => rangeContainsCellForBuilder(entry.parsed, row, col))
+      .sort((left, right) => right.area - left.area);
+    const applyStyleToGridCell = (td, cell, matches, row, col) => {
       const cfg = cell && typeof cell === "object" ? cell : {};
       if (cfg.background) td.style.backgroundColor = String(cfg.background);
       if (cfg["font color"]) td.style.color = String(cfg["font color"]);
       if (cfg["font size"]) td.style.fontSize = `${Number(cfg["font size"]) || 10}pt`;
-      if (cfg.font) td.style.fontFamily = String(cfg.font);
+      if (cfg["font family"] || cfg.font) td.style.fontFamily = String(cfg["font family"] || cfg.font);
       if (cfg.align) td.style.textAlign = String(cfg.align);
       if (cfg.valign) td.style.verticalAlign = String(cfg.valign);
       if (cfg.bold) td.style.fontWeight = "700";
       if (cfg.italic) td.style.fontStyle = "italic";
       if (cfg.underline) td.style.textDecoration = "underline";
-      if (cfg.border) td.classList.add("has-border-token");
+      const borderLine = "2px solid #111111";
+      for (const entry of Array.isArray(matches) ? matches : []) {
+        if (!entry.cell || entry.cell.border !== "outside-thin") continue;
+        if (row === entry.parsed.r1) td.style.borderTop = borderLine;
+        if (col === entry.parsed.c2) td.style.borderRight = borderLine;
+        if (row === entry.parsed.r2) td.style.borderBottom = borderLine;
+        if (col === entry.parsed.c1) td.style.borderLeft = borderLine;
+      }
     };
     const insertPlaceholderIntoText = (text, placeholder) => {
       const raw = String(placeholder || "").trim();
@@ -7833,6 +7903,9 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       keySelect.addEventListener("change", () => {
         selKey = keySelect.value;
         selRange = listRanges(selKey)[0]?.rangeKey || "A1";
+        pendingExcelImport = null;
+        excelPasteOpen = false;
+        showExcelStatus("");
         showErr("");
         renderActive();
       });
@@ -7842,6 +7915,36 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
 
       const keyActions = document.createElement("div");
       keyActions.className = "template-builder-key-actions";
+      keyActions.appendChild(makeBuilderButton("Copy to Excel", async () => {
+        const excel = runtime.services.templateExcel;
+        const info = tdef(selKey, false);
+        if (!excel || !info) {
+          showErr("Excel template service is unavailable.");
+          return;
+        }
+        try {
+          const payload = excel.buildClipboardPayload(selKey, info.def);
+          const richCopy = await excel.writeClipboard(payload);
+          showErr("");
+          showExcelStatus(
+            richCopy
+              ? `Copied raw template "${selKey}" to Excel.`
+              : `Copied "${selKey}" as TSV because rich clipboard is unavailable.`,
+            richCopy ? "success" : "warning"
+          );
+        } catch (error) {
+          showExcelStatus("");
+          showErr(error && error.message ? error.message : "Copy to Excel failed.");
+        }
+      }));
+      keyActions.appendChild(makeBuilderButton("Paste from Excel", () => {
+        pendingExcelImport = null;
+        excelPasteOpen = true;
+        showExcelStatus("");
+        showErr("");
+        renderActive();
+        host.querySelector(".template-excel-paste-zone")?.focus();
+      }));
       keyActions.appendChild(makeBuilderButton("Add Key", () => {
         let i = 1;
         let key = "NEW_TEMPLATE";
@@ -7886,6 +7989,104 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         renderActive();
       }, "danger-lite"));
       topbar.appendChild(keyActions);
+
+      if (excelPasteOpen) {
+        const excelPanel = document.createElement("section");
+        excelPanel.className = "template-excel-import-panel";
+        const excelHead = document.createElement("div");
+        excelHead.className = "template-excel-import-head";
+        const excelTitle = document.createElement("strong");
+        excelTitle.textContent = `Paste Excel into ${selKey}`;
+        const excelCancel = makeBuilderButton("Cancel", () => {
+          pendingExcelImport = null;
+          excelPasteOpen = false;
+          showExcelStatus("");
+          showErr("");
+          renderActive();
+        });
+        excelHead.appendChild(excelTitle);
+        excelHead.appendChild(excelCancel);
+        excelPanel.appendChild(excelHead);
+
+        const pasteZone = document.createElement("div");
+        pasteZone.className = "template-excel-paste-zone";
+        pasteZone.tabIndex = 0;
+        pasteZone.textContent = "Click here, then press Ctrl+V";
+        pasteZone.addEventListener("paste", (event) => {
+          event.preventDefault();
+          const excel = runtime.services.templateExcel;
+          const info = tdef(selKey, false);
+          try {
+            pendingExcelImport = excel.parseClipboardPayload({
+              html: event.clipboardData ? event.clipboardData.getData("text/html") : "",
+              text: event.clipboardData ? event.clipboardData.getData("text/plain") : "",
+              currentOptions: info && info.def ? (info.def._options || info.def.options || {}) : {}
+            });
+            pendingExcelImport.targetKey = selKey;
+            showExcelStatus(
+              pendingExcelImport.warnings.length
+                ? "Excel preview created with warnings."
+                : "Excel preview created successfully.",
+              pendingExcelImport.warnings.length ? "warning" : "success"
+            );
+            showErr("");
+            renderActive();
+          } catch (error) {
+            pendingExcelImport = null;
+            showExcelStatus("");
+            showErr(error && error.message ? error.message : "Paste from Excel failed.");
+          }
+        });
+        excelPanel.appendChild(pasteZone);
+
+        if (pendingExcelImport && pendingExcelImport.targetKey === selKey) {
+          const summary = document.createElement("div");
+          summary.className = "template-excel-import-summary";
+          summary.textContent = `${pendingExcelImport.source.toUpperCase()} • ${pendingExcelImport.stats.rows} × ${pendingExcelImport.stats.cols} • ${pendingExcelImport.stats.ranges} ranges • ${pendingExcelImport.stats.merged} merges`;
+          excelPanel.appendChild(summary);
+          if (pendingExcelImport.warnings.length) {
+            const warnings = document.createElement("ul");
+            warnings.className = "template-excel-import-warnings";
+            pendingExcelImport.warnings.forEach((message) => {
+              const item = document.createElement("li");
+              item.textContent = message;
+              warnings.appendChild(item);
+            });
+            excelPanel.appendChild(warnings);
+          }
+          const preview = document.createElement("div");
+          preview.className = "template-excel-import-preview";
+          const previewPayload = runtime.services.templateExcel.buildClipboardPayload(selKey, {
+            ranges: pendingExcelImport.ranges
+          });
+          preview.innerHTML = previewPayload.html;
+          excelPanel.appendChild(preview);
+          const replaceButton = makeBuilderButton("Replace selected key", () => {
+            const info = tdef(selKey, true);
+            if (!info || !pendingExcelImport || pendingExcelImport.targetKey !== selKey) return;
+            const nextRanges = cloneJsonValue(pendingExcelImport.ranges) || {};
+            if (info.hasRanges) {
+              info.def.ranges = nextRanges;
+            } else {
+              const keptOptions = {};
+              Object.keys(info.def).forEach((key) => {
+                if (isOptionKey(key)) keptOptions[key] = info.def[key];
+              });
+              Object.keys(info.def).forEach((key) => delete info.def[key]);
+              Object.assign(info.def, keptOptions, nextRanges);
+            }
+            selRange = Object.keys(nextRanges)[0] || "A1";
+            pendingExcelImport = null;
+            excelPasteOpen = false;
+            showExcelStatus(`Replaced draft template "${selKey}". Click Apply to save.`, "success");
+            showErr("");
+            renderActive();
+          });
+          replaceButton.classList.add("primary");
+          excelPanel.appendChild(replaceButton);
+        }
+        root.appendChild(excelPanel);
+      }
 
       const optionRow = document.createElement("div");
       optionRow.className = "template-builder-options-row";
@@ -7986,7 +8187,8 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
           if (skipCells.has(cellKey)) {
             continue;
           }
-          const matched = getEntryForGridCell(row, col);
+          const matches = getEntriesForGridCell(row, col);
+          const matched = matches.length ? matches[matches.length - 1] : null;
           const td = document.createElement("td");
           td.tabIndex = 0;
           td.setAttribute("data-row", String(row));
@@ -7994,10 +8196,12 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
           let displayRange = { r1: row, c1: col, r2: row, c2: col };
           let cellConfig = null;
           if (matched) {
-            displayRange = matched.parsed;
-            cellConfig = matched.cell;
+            const mergeMatch = matches.find((entry) => entry.cell && entry.cell.merge === true);
+            const structuralMatch = mergeMatch || matched;
+            displayRange = structuralMatch.parsed;
+            cellConfig = Object.assign({}, ...matches.map((entry) => entry.cell || {}));
             td.setAttribute("data-range-key", normalizeRangeKeyForBuilder(matched.rangeKey));
-            if (cellConfig && cellConfig.merge === true) {
+            if (mergeMatch && cellConfig && cellConfig.merge === true) {
               td.rowSpan = Math.max(1, displayRange.r2 - displayRange.r1 + 1);
               td.colSpan = Math.max(1, displayRange.c2 - displayRange.c1 + 1);
               for (let rr = displayRange.r1; rr <= displayRange.r2; rr += 1) {
@@ -8017,7 +8221,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
           if (selection.r1 === row && selection.c1 === col) {
             td.classList.add("anchor");
           }
-          applyStyleToGridCell(td, cellConfig);
+          applyStyleToGridCell(td, cellConfig, matches, row, col);
           const text = cellConfig && Object.prototype.hasOwnProperty.call(cellConfig, "text") ? String(cellConfig.text || "") : "";
           renderBuilderCellContent(td, text);
           td.addEventListener("pointerdown", (ev) => {
@@ -8860,22 +9064,22 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     tabBar.style.marginBottom = "8px";
     modal.body.appendChild(tabBar);
 
-    const textTabBtn = document.createElement("button");
-    textTabBtn.type = "button";
-    textTabBtn.className = "secondary";
-    textTabBtn.textContent = "Template Text";
-    tabBar.appendChild(textTabBtn);
-
     const descTabBtn = document.createElement("button");
     descTabBtn.type = "button";
     descTabBtn.className = "secondary";
     descTabBtn.textContent = "Description";
     tabBar.appendChild(descTabBtn);
 
+    const textTabBtn = document.createElement("button");
+    textTabBtn.type = "button";
+    textTabBtn.className = "secondary";
+    textTabBtn.textContent = "Template Text";
+    tabBar.appendChild(textTabBtn);
+
     const tabContent = document.createElement("div");
     modal.body.appendChild(tabContent);
 
-    let activeTab = "text";
+    let activeTab = "desc";
     let textValue = currentText;
     let activeTextarea = null;
     let activeStructTextarea = null;

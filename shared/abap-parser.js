@@ -2531,7 +2531,14 @@
   }
 
   function normalizeIdentifierCandidate(raw) {
-    const trimmed = String(raw || "").trim();
+    let trimmed = String(raw || "").trim();
+    if (!trimmed) {
+      return "";
+    }
+    // ABAP SQL host escape: @lv_x / @lt_rows-field
+    if (trimmed.startsWith("@")) {
+      trimmed = trimmed.slice(1).trim();
+    }
     if (!trimmed) {
       return "";
     }
@@ -3009,7 +3016,7 @@
   }
 
   function extractFirstIdentifierFromExpression(expression) {
-    const text = String(expression || "").trim();
+    let text = String(expression || "").trim();
     if (!text) {
       return "";
     }
@@ -3020,19 +3027,28 @@
       return "";
     }
 
+    // Host escape must be stripped before field-path so @itab-field stays one path.
+    if (text.startsWith("@")) {
+      text = text.slice(1).trim();
+      if (!text) {
+        return "";
+      }
+    }
+
     const sysMatch = text.match(/^SY-[A-Za-z_][A-Za-z0-9_]*/i);
     if (sysMatch) {
       return sysMatch[0].toUpperCase();
     }
 
-    const fieldPath = extractFirstFieldPathFromExpression(text);
-    if (fieldPath) {
-      return fieldPath;
-    }
-
+    // Inline decls before field-path: FIELD-SYMBOL(<fs>) looks like path FIELD-SYMBOL.
     const inline = extractFirstInlineDeclaration(text);
     if (inline) {
       return inline;
+    }
+
+    const fieldPath = extractFirstFieldPathFromExpression(text);
+    if (fieldPath) {
+      return fieldPath;
     }
 
     const matches = text.matchAll(/<[^>]+>|[A-Za-z_][A-Za-z0-9_]*/g);
@@ -4015,6 +4031,11 @@
       const valueIndex = index + bestRule.afterTokens.length;
       if (valueIndex < tokens.length) {
         const captured = captureValue(tokens, valueIndex, bestRule);
+        // Empty rest captures must not win first-slot (e.g. SELECT SINGLE FROM … FIELDS …).
+        if (bestRule.capture === "rest" && !String(captured.raw || "").trim()) {
+          index += bestRule.afterTokens.length - 1;
+          continue;
+        }
         const userDesc = resolveUserDesc(descMap, bestRule.descKey, captured.upper);
 
         values.push({

@@ -3,7 +3,7 @@
 (function startAbapViewerApp(global) {
   const runtime = global.AbapViewerRuntime = global.AbapViewerRuntime || {};
   runtime.api = runtime.api || {};
-  const requiredServices = ["runtimeState", "output", "descriptions", "performSources", "template", "uiNavigation", "parserController", "bootstrap"];
+  const requiredServices = ["runtimeState", "output", "descriptions", "performSources", "templateExcel", "template", "uiNavigation", "parserController", "bootstrap"];
   const missing = requiredServices.filter((name) => !runtime.services || !runtime.services[name]);
   if (missing.length) {
     const message = "Viewer services missing: " + missing.join(", ") + ". Check script order in viewer/index.html.";

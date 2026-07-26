@@ -459,6 +459,8 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
     const candidatesByFormUpper = new Map();
     const candidateByKey = new Map();
     const selectedKeyByFormUpper = new Map();
+    const suggestionContextByFormUpper = new Map();
+    const treeHueByRootKey = new Map();
     const formOrder = [];
     const tools = createPerformBindingTools();
     let sourceOrder = 0;
@@ -469,6 +471,8 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
       candidatesByFormUpper,
       candidateByKey,
       selectedKeyByFormUpper,
+      suggestionContextByFormUpper,
+      treeHueByRootKey,
       formOrder,
       getActiveCandidates(formNameUpper) {
         const upper = String(formNameUpper || "").trim().toUpperCase();
@@ -491,6 +495,45 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
         const selectedKey = selectedKeyByFormUpper.get(upper);
         return selectedKey ? candidateByKey.get(selectedKey) || null : null;
       },
+      getSuggestedCandidates(formNameUpper, contextCandidateKey) {
+        const upper = String(formNameUpper || "").trim().toUpperCase();
+        const activeCandidates = this.getActiveCandidates(upper);
+        if (!activeCandidates.length) {
+          return [];
+        }
+        const selectedCandidate = this.getSelectedCandidate(upper);
+        const contextKey = String(
+          contextCandidateKey
+          || (selectedCandidate && selectedCandidate.parentCandidateKey)
+          || suggestionContextByFormUpper.get(upper)
+          || ""
+        ).trim();
+        const ranked = activeCandidates.map((candidate) => {
+          const ancestry = Array.isArray(candidate.ancestry) ? candidate.ancestry : [];
+          const contextIndex = contextKey ? ancestry.lastIndexOf(contextKey) : -1;
+          const directParent = Boolean(contextKey) && candidate.parentCandidateKey === contextKey;
+          return {
+            candidate,
+            related: directParent || contextIndex >= 0,
+            directParent,
+            callDistance: directParent
+              ? 0
+              : (contextIndex >= 0 ? ancestry.length - contextIndex : Number.MAX_SAFE_INTEGER)
+          };
+        });
+        const hasRelated = ranked.some((entry) => entry.related);
+        return ranked
+          .filter((entry) => !hasRelated || entry.related)
+          .sort((left, right) => (
+            Number(right.directParent) - Number(left.directParent)
+            || left.callDistance - right.callDistance
+            || left.candidate.depth - right.candidate.depth
+            || left.candidate.lineStart - right.candidate.lineStart
+            || left.candidate.sourceOrder - right.candidate.sourceOrder
+          ))
+          .slice(0, 3)
+          .map((entry) => entry.candidate);
+      },
       ensureSelections() {
         for (const formNameUpper of formOrder) {
           const activeCandidates = this.getActiveCandidates(formNameUpper);
@@ -499,7 +542,11 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
             continue;
           }
           if (activeCandidates.length) {
-            selectedKeyByFormUpper.set(formNameUpper, activeCandidates[0].key);
+            const suggestionContext = suggestionContextByFormUpper.get(formNameUpper);
+            const suggested = suggestionContext
+              ? this.getSuggestedCandidates(formNameUpper, suggestionContext)[0]
+              : null;
+            selectedKeyByFormUpper.set(formNameUpper, (suggested || activeCandidates[0]).key);
           } else {
             selectedKeyByFormUpper.delete(formNameUpper);
           }
@@ -528,7 +575,7 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
         selectedKeyByFormUpper.set(upper, nextKey);
         for (const descendantForm of descendantForms) {
           if (descendantForm !== upper) {
-            selectedKeyByFormUpper.delete(descendantForm);
+            suggestionContextByFormUpper.set(descendantForm, nextKey);
           }
         }
         this.ensureSelections();
@@ -631,6 +678,16 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
     };
     for (const candidates of candidatesByFormUpper.values()) {
       candidates.sort(compareCandidatesBySource);
+      for (const candidate of candidates) {
+        candidate.rootTreeKey = candidate.ancestry[0] || candidate.key;
+        candidate.depth = candidate.ancestry.length;
+        candidate.callChain = [...candidate.ancestry, candidate.key];
+        if (!treeHueByRootKey.has(candidate.rootTreeKey)) {
+          const treeIndex = treeHueByRootKey.size;
+          treeHueByRootKey.set(candidate.rootTreeKey, Number(((treeIndex * 137.508 + 211) % 360).toFixed(3)));
+        }
+        candidate.treeHue = treeHueByRootKey.get(candidate.rootTreeKey);
+      }
     }
     registry.ensureSelections();
     return registry;
@@ -654,15 +711,40 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
       return null;
     }
     const candidates = registry.getActiveCandidates(formNameUpper);
-    if (candidates.length < 2) {
+    const allCandidates = registry.candidatesByFormUpper.get(formNameUpper) || candidates;
+    if (allCandidates.length < 2) {
       return null;
     }
-    const selected = registry.getSelectedCandidate(formNameUpper) || candidates[0];
+    const selected = registry.getSelectedCandidate(formNameUpper) || candidates[0] || allCandidates[0];
     const formName = directFormName || selected.formName || formNameUpper;
     return {
       formName,
       formNameUpper,
       candidates,
+      allCandidates,
+      selectedKey: selected.key
+    };
+  }
+
+
+
+  function getPerformSourcePickerModel(formNameUpper, formName) {
+    const registry = state.performSourceRegistry;
+    const upper = String(formNameUpper || "").trim().toUpperCase();
+    if (!upper || !registry || typeof registry.getActiveCandidates !== "function") {
+      return null;
+    }
+    const candidates = registry.getActiveCandidates(upper);
+    const allCandidates = registry.candidatesByFormUpper.get(upper) || candidates;
+    if (allCandidates.length < 2) {
+      return null;
+    }
+    const selected = registry.getSelectedCandidate(upper) || candidates[0] || allCandidates[0];
+    return {
+      formName: String(formName || selected.formName || upper).trim(),
+      formNameUpper: upper,
+      candidates,
+      allCandidates,
       selectedKey: selected.key
     };
   }
@@ -677,9 +759,24 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
     const templateAnchor = typeof captureTemplateViewportAnchor === "function"
       ? captureTemplateViewportAnchor()
       : null;
-    if (!registry.selectCandidate(formNameUpper, candidateKey)) {
+    const upper = String(formNameUpper || "").trim().toUpperCase();
+    const nextKey = String(candidateKey || "").trim();
+    const targetCandidate = registry.candidateByKey && registry.candidateByKey.get(nextKey);
+    let selectionChanged = false;
+    if (targetCandidate && Array.isArray(targetCandidate.callChain)) {
+      for (const pathKey of targetCandidate.callChain) {
+        const pathCandidate = registry.candidateByKey.get(pathKey);
+        if (pathCandidate && registry.selectCandidate(pathCandidate.formNameUpper, pathKey)) {
+          selectionChanged = true;
+        }
+      }
+    } else if (registry.selectCandidate(upper, nextKey)) {
+      selectionChanged = true;
+    }
+    if (!selectionChanged) {
       return false;
     }
+    registry.suggestionContextByFormUpper.delete(upper);
 
     state.pendingTemplateViewportAnchor = templateAnchor;
     state.templatePreviewCache = null;
@@ -696,25 +793,96 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
 
 
 
-  function createPerformSourceControl(obj) {
-    const model = getPerformSourceControlModel(obj);
+  let performSourcePopupSequence = 0;
+  let openPerformSourcePopup = null;
+
+  document.addEventListener("click", (ev) => {
+    if (!openPerformSourcePopup || openPerformSourcePopup.root.contains(ev.target)) {
+      return;
+    }
+    openPerformSourcePopup.close();
+  });
+  global.addEventListener("resize", () => {
+    if (openPerformSourcePopup && typeof openPerformSourcePopup.reposition === "function") {
+      openPerformSourcePopup.reposition();
+    }
+  });
+
+
+
+  function createPerformSourcePicker(formNameUpper, options) {
+    const opts = options && typeof options === "object" ? options : {};
+    const model = opts.model || getPerformSourcePickerModel(formNameUpper, opts.formName);
     if (!model) {
       return null;
     }
     const attrs = { "data-perform-form": model.formNameUpper };
-    const control = el("div", { className: "perform-source-control", attrs });
+    const control = el("div", { className: "perform-source-picker perform-source-control", attrs });
     control.addEventListener("click", (ev) => ev.stopPropagation());
     control.appendChild(el("span", {
       className: "perform-source-badge",
-      text: `⇄ ${model.candidates.length} nguồn`,
+      text: `⇄ ${model.allCandidates.length} nguồn`,
       attrs
     }));
 
+    const registry = state.performSourceRegistry;
+    const selectedCandidate = registry.getSelectedCandidate(model.formNameUpper)
+      || model.candidates.find((candidate) => candidate.key === model.selectedKey)
+      || model.candidates[0]
+      || model.allCandidates[0];
+    const getCandidateChainEntries = (candidate) => (
+      (Array.isArray(candidate && candidate.callChain) ? candidate.callChain : [])
+        .map((key) => registry.candidateByKey.get(key))
+        .filter(Boolean)
+    );
+    const getCandidateBreadcrumb = (candidate) => (
+      getCandidateChainEntries(candidate)
+        .map((entry) => (
+          `${entry.formNameUpper} · line ${entry.lineStart || "?"} · ${entry.actualSummary || "không có đối số"}`
+        ))
+        .join(" › ")
+    );
+    performSourcePopupSequence += 1;
+    const popupId = `perform-source-popup-${performSourcePopupSequence}`;
+    const triggerLine = selectedCandidate.lineStart > 0 ? selectedCandidate.lineStart : "?";
+    const selectedIndex = Math.max(
+      0,
+      model.allCandidates.findIndex((candidate) => candidate.key === selectedCandidate.key)
+    );
+    const selectedAncestorSummary = getCandidateChainEntries(selectedCandidate)
+      .slice(0, -1)
+      .map((candidate) => candidate.actualSummary)
+      .filter(Boolean)
+      .join(" › ");
+    const triggerSummary = [
+      selectedAncestorSummary,
+      selectedCandidate.actualSummary
+    ].filter(Boolean).join(" · ");
+    const selectedBreadcrumb = getCandidateBreadcrumb(selectedCandidate);
+    const trigger = el("button", {
+      className: "perform-source-trigger",
+      text: `Nguồn ${selectedIndex + 1}/${model.allCandidates.length} · line ${triggerLine} · ${triggerSummary}`,
+      attrs: {
+        type: "button",
+        "aria-haspopup": "dialog",
+        "aria-expanded": "false",
+        "aria-controls": popupId,
+        "aria-label": `Nguồn mô tả FORM ${model.formName}: ${selectedBreadcrumb}`,
+        title: selectedBreadcrumb
+      }
+    });
+    control.appendChild(trigger);
+
     const select = el("select", {
-      className: "perform-source-select",
+      className: [
+        "perform-source-select",
+        opts.nativeSelectClassName || ""
+      ].filter(Boolean).join(" "),
       attrs: {
         ...attrs,
-        "aria-label": `Nguồn mô tả FORM ${model.formName}`
+        "aria-label": `Nguồn mô tả FORM ${model.formName}`,
+        "aria-hidden": "true",
+        tabindex: "-1"
       }
     });
     const appendSourceOption = (candidate, index) => {
@@ -752,10 +920,418 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
     select.disabled = model.candidates.length < 2;
     select.addEventListener("change", (ev) => {
       ev.stopPropagation();
-      selectPerformSourceCandidate(model.formNameUpper, select.value);
+      selectPerformSourceCandidate(model.formNameUpper, select.value, opts.selectionOptions);
     });
     control.appendChild(select);
+
+    const popup = el("div", {
+      className: "perform-source-popup",
+      attrs: {
+        id: popupId,
+        role: "dialog",
+        "aria-label": `Chọn nguồn PERFORM cho FORM ${model.formName}`,
+        hidden: ""
+      }
+    });
+    popup.hidden = true;
+    control.appendChild(popup);
+
+    let popupBuilt = false;
+    let searchInput = null;
+    let suggestionsContainer = null;
+    let treeContainer = null;
+    let candidateRows = [];
+    const candidateRowsByRoot = new Map();
+    const expandedRootKeys = new Set([selectedCandidate.rootTreeKey]);
+
+    const isElementVisible = (node) => {
+      if (!node || node.hidden || node.style.display === "none") {
+        return false;
+      }
+      let parent = node.parentElement;
+      while (parent && parent !== popup) {
+        if (parent.hidden || parent.style.display === "none") {
+          return false;
+        }
+        parent = parent.parentElement;
+      }
+      return true;
+    };
+
+    const getCandidateSearchText = (candidate) => {
+      const chainParts = (Array.isArray(candidate.callChain) ? candidate.callChain : [])
+        .map((key) => registry.candidateByKey.get(key))
+        .filter(Boolean)
+        .map((entry) => `${entry.formNameUpper} line ${entry.lineStart || "?"} ${entry.actualSummary || ""}`);
+      return [
+        candidate.formName,
+        candidate.formNameUpper,
+        `line ${candidate.lineStart || "?"}`,
+        candidate.lineStart,
+        candidate.actualSummary,
+        chainParts.join(" > ")
+      ].filter(Boolean).join("\n").toLowerCase();
+    };
+
+    const selectCandidateFromPicker = (candidate) => {
+      if (!candidate) {
+        return;
+      }
+      closePopup();
+      selectPerformSourceCandidate(model.formNameUpper, candidate.key, opts.selectionOptions);
+    };
+
+    const updateTreeVisibility = () => {
+      const query = String(searchInput && searchInput.value || "").trim().toLowerCase();
+      if (suggestionsContainer) {
+        suggestionsContainer.hidden = Boolean(query);
+      }
+      const rootSections = treeContainer
+        ? Array.from(treeContainer.querySelectorAll(".perform-source-root"))
+        : [];
+      for (const section of rootSections) {
+        const rootKey = section.getAttribute("data-root-tree-key") || "";
+        const sectionRows = candidateRowsByRoot.get(rootKey) || [];
+        let visibleCount = 0;
+        for (const entry of sectionRows) {
+          const matches = !query || entry.searchText.includes(query);
+          const visible = query ? matches : expandedRootKeys.has(rootKey);
+          entry.row.hidden = !visible;
+          entry.row.style.display = visible ? "" : "none";
+          if (visible) {
+            visibleCount += 1;
+          }
+        }
+        section.hidden = Boolean(query) && visibleCount === 0;
+        const toggle = section.querySelector(".perform-source-root-toggle");
+        if (toggle) {
+          const expanded = query ? visibleCount > 0 : expandedRootKeys.has(rootKey);
+          toggle.setAttribute("aria-expanded", String(expanded));
+          toggle.querySelector(".perform-source-root-marker").textContent = expanded ? "▼" : "▶";
+        }
+      }
+    };
+
+    const createCandidateButton = (candidate, className, reason) => {
+      const lineLabel = candidate.lineStart > 0 ? String(candidate.lineStart) : "?";
+      const isSelected = candidate.key === model.selectedKey;
+      const button = el("button", {
+        className: [
+          className,
+          isSelected ? "is-selected" : "",
+          reason ? "is-recommended" : ""
+        ].filter(Boolean).join(" "),
+        attrs: {
+          type: "button",
+          "data-candidate-key": candidate.key,
+          "data-root-tree-key": candidate.rootTreeKey,
+          ...(reason ? { "data-suggested": "true" } : {}),
+          "aria-selected": String(isSelected)
+        }
+      });
+      button.style.setProperty("--perform-source-tree-hue", String(candidate.treeHue));
+      button.style.setProperty("--perform-source-depth", String(candidate.depth));
+      button.style.setProperty("--perform-source-indent", `${Math.min(candidate.depth, 8) * 12}px`);
+      button.style.setProperty(
+        "--perform-source-tree-lightness",
+        `${52 + Math.min(candidate.depth, 6) * 4}%`
+      );
+      button.appendChild(el("span", {
+        className: "perform-source-row-status",
+        text: isSelected ? "✓ Đang chọn" : (reason ? "★ Gợi ý" : "Nguồn")
+      }));
+      button.appendChild(el("span", {
+        className: "perform-source-row-label",
+        text: `FORM ${candidate.formName || candidate.formNameUpper} · line ${lineLabel} · ${candidate.actualSummary}`
+      }));
+      button.appendChild(el("span", {
+        className: "perform-source-row-chain",
+        text: getCandidateBreadcrumb(candidate)
+      }));
+      if (reason) {
+        button.appendChild(el("span", { className: "perform-source-row-reason", text: reason }));
+      }
+      button.addEventListener("click", () => selectCandidateFromPicker(candidate));
+      return button;
+    };
+
+    const buildPopup = () => {
+      if (popupBuilt) {
+        return;
+      }
+      popupBuilt = true;
+
+      searchInput = el("input", {
+        className: "perform-source-search",
+        attrs: {
+          type: "search",
+          placeholder: "Tìm FORM, line, đối số hoặc chuỗi gọi…",
+          "aria-label": `Tìm nguồn PERFORM cho FORM ${model.formName}`
+        }
+      });
+      popup.appendChild(searchInput);
+
+      suggestionsContainer = el("div", {
+        className: "perform-source-suggestions",
+        attrs: { "aria-label": "Nguồn gợi ý" }
+      });
+      suggestionsContainer.appendChild(el("div", {
+        className: "perform-source-section-title",
+        text: "Gợi ý"
+      }));
+      const suggestedCandidates = registry.getSuggestedCandidates(model.formNameUpper);
+      const suggestionContext = selectedCandidate.parentCandidateKey
+        || registry.suggestionContextByFormUpper.get(model.formNameUpper)
+        || "";
+      for (const candidate of suggestedCandidates) {
+        let reason = "Gần nguồn đang chọn";
+        if (suggestionContext && candidate.parentCandidateKey === suggestionContext) {
+          reason = "Con trực tiếp của nguồn vừa chọn";
+        } else if (suggestionContext && candidate.ancestry.includes(suggestionContext)) {
+          reason = "Cùng chuỗi gọi với nguồn vừa chọn";
+        }
+        suggestionsContainer.appendChild(createCandidateButton(
+          candidate,
+          "perform-source-suggestion",
+          reason
+        ));
+      }
+      popup.appendChild(suggestionsContainer);
+
+      treeContainer = el("div", {
+        className: "perform-source-tree",
+        attrs: { role: "tree", "aria-label": "Cây nguồn PERFORM" }
+      });
+      treeContainer.appendChild(el("div", {
+        className: "perform-source-section-title",
+        text: "Tất cả cây nguồn"
+      }));
+
+      const candidatesByRoot = new Map();
+      for (const candidate of model.allCandidates) {
+        if (!candidatesByRoot.has(candidate.rootTreeKey)) {
+          candidatesByRoot.set(candidate.rootTreeKey, []);
+        }
+        candidatesByRoot.get(candidate.rootTreeKey).push(candidate);
+      }
+      for (const [rootKey, rootCandidates] of candidatesByRoot) {
+        const rootCandidate = registry.candidateByKey.get(rootKey) || rootCandidates[0];
+        const rootSection = el("section", {
+          className: "perform-source-root",
+          attrs: { "data-root-tree-key": rootKey }
+        });
+        rootSection.style.setProperty("--perform-source-tree-hue", String(rootCandidate.treeHue));
+        const rootToggle = el("button", {
+          className: "perform-source-root-toggle",
+          attrs: {
+            type: "button",
+            role: "treeitem",
+            "aria-level": "1",
+            "aria-expanded": String(expandedRootKeys.has(rootKey))
+          }
+        });
+        rootToggle.appendChild(el("span", {
+          className: "perform-source-root-marker",
+          text: expandedRootKeys.has(rootKey) ? "▼" : "▶"
+        }));
+        rootToggle.appendChild(el("span", {
+          text: `FORM ${rootCandidate.formName || rootCandidate.formNameUpper} · line ${rootCandidate.lineStart || "?"} · ${rootCandidate.actualSummary}`
+        }));
+        rootToggle.addEventListener("click", () => {
+          if (expandedRootKeys.has(rootKey)) {
+            expandedRootKeys.delete(rootKey);
+          } else {
+            expandedRootKeys.add(rootKey);
+          }
+          updateTreeVisibility();
+        });
+        rootSection.appendChild(rootToggle);
+
+        const rootGroup = el("div", {
+          className: "perform-source-root-group",
+          attrs: { role: "group" }
+        });
+        candidateRowsByRoot.set(rootKey, []);
+        for (const candidate of rootCandidates) {
+          const row = createCandidateButton(candidate, "perform-source-candidate-row", "");
+          row.setAttribute("role", "treeitem");
+          row.setAttribute("aria-level", String(candidate.depth + 2));
+          rootGroup.appendChild(row);
+          const rowEntry = {
+            candidate,
+            row,
+            searchText: getCandidateSearchText(candidate)
+          };
+          candidateRows.push(rowEntry);
+          candidateRowsByRoot.get(rootKey).push(rowEntry);
+        }
+        rootSection.appendChild(rootGroup);
+        treeContainer.appendChild(rootSection);
+      }
+      popup.appendChild(treeContainer);
+
+      searchInput.addEventListener("input", updateTreeVisibility);
+      searchInput.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") {
+          const firstVisible = candidateRows.find((entry) => isElementVisible(entry.row));
+          if (firstVisible) {
+            ev.preventDefault();
+            selectCandidateFromPicker(firstVisible.candidate);
+          }
+        } else if (ev.key === "ArrowDown") {
+          const firstVisible = candidateRows.find((entry) => isElementVisible(entry.row));
+          if (firstVisible) {
+            ev.preventDefault();
+            firstVisible.row.focus();
+          }
+        } else if (ev.key === "Escape") {
+          ev.preventDefault();
+          closePopup();
+          trigger.focus();
+        }
+      });
+      updateTreeVisibility();
+    };
+
+    const positionPopup = () => {
+      if (popup.hidden) {
+        return;
+      }
+      const viewportMargin = 12;
+      const viewportWidth = Math.max(
+        viewportMargin * 2 + 1,
+        Number(global.innerWidth) || document.documentElement.clientWidth || 1024
+      );
+      const viewportHeight = Math.max(
+        viewportMargin * 2 + 1,
+        Number(global.innerHeight) || document.documentElement.clientHeight || 768
+      );
+      const triggerRect = trigger.getBoundingClientRect();
+      const availableWidth = Math.max(1, viewportWidth - viewportMargin * 2);
+      const measuredPopupRect = popup.getBoundingClientRect();
+      const popupWidth = Math.min(
+        availableWidth,
+        Number(measuredPopupRect.width) || 720
+      );
+      const popupHeight = Math.min(
+        Math.max(1, viewportHeight - viewportMargin * 2),
+        Number(measuredPopupRect.height) || Number(popup.scrollHeight) || Math.min(620, viewportHeight * 0.7)
+      );
+      const maximumLeft = Math.max(viewportMargin, viewportWidth - popupWidth - viewportMargin);
+      const preferredLeft = Number(triggerRect.right) - popupWidth;
+      const left = Math.min(maximumLeft, Math.max(viewportMargin, preferredLeft));
+      const gap = 6;
+      const spaceBelow = viewportHeight - Number(triggerRect.bottom) - gap - viewportMargin;
+      const spaceAbove = Number(triggerRect.top) - gap - viewportMargin;
+      const openAbove = spaceBelow < popupHeight && spaceAbove > spaceBelow;
+      const preferredTop = openAbove
+        ? Number(triggerRect.top) - popupHeight - gap
+        : Number(triggerRect.bottom) + gap;
+      const maximumTop = Math.max(viewportMargin, viewportHeight - popupHeight - viewportMargin);
+      const top = Math.min(maximumTop, Math.max(viewportMargin, preferredTop));
+
+      popup.style.left = `${Math.round(left)}px`;
+      popup.style.top = `${Math.round(top)}px`;
+      popup.style.maxWidth = `${Math.round(availableWidth)}px`;
+      popup.style.maxHeight = `${Math.round(Math.max(1, viewportHeight - top - viewportMargin))}px`;
+    };
+
+    const closePopup = () => {
+      popup.hidden = true;
+      trigger.setAttribute("aria-expanded", "false");
+      if (openPerformSourcePopup && openPerformSourcePopup.root === control) {
+        openPerformSourcePopup = null;
+      }
+    };
+
+    const openPopup = () => {
+      if (openPerformSourcePopup && openPerformSourcePopup.root !== control) {
+        openPerformSourcePopup.close();
+      }
+      buildPopup();
+      popup.hidden = false;
+      trigger.setAttribute("aria-expanded", "true");
+      positionPopup();
+      openPerformSourcePopup = {
+        root: control,
+        close: closePopup,
+        reposition: positionPopup
+      };
+      searchInput.focus();
+    };
+
+    trigger.addEventListener("click", () => {
+      if (popup.hidden) {
+        openPopup();
+      } else {
+        closePopup();
+      }
+    });
+    trigger.addEventListener("keydown", (ev) => {
+      if (ev.key === "ArrowDown" || ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        openPopup();
+      } else if (ev.key === "Escape") {
+        closePopup();
+      }
+    });
+    popup.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape") {
+        ev.preventDefault();
+        closePopup();
+        trigger.focus();
+        return;
+      }
+      if (ev.target === searchInput || !["ArrowUp", "ArrowDown", "Home", "End", "ArrowLeft", "ArrowRight"].includes(ev.key)) {
+        return;
+      }
+      const controls = Array.from(popup.querySelectorAll(
+        ".perform-source-suggestion, .perform-source-root-toggle, .perform-source-candidate-row"
+      )).filter(isElementVisible);
+      const currentIndex = controls.indexOf(ev.target);
+      if (ev.key === "ArrowLeft" || ev.key === "ArrowRight") {
+        const rootSection = ev.target.closest(".perform-source-root");
+        if (rootSection) {
+          const rootKey = rootSection.getAttribute("data-root-tree-key") || "";
+          const rootToggle = rootSection.querySelector(".perform-source-root-toggle");
+          if (ev.key === "ArrowRight") {
+            expandedRootKeys.add(rootKey);
+          } else {
+            if (rootToggle && ev.target !== rootToggle) {
+              rootToggle.focus();
+            }
+            expandedRootKeys.delete(rootKey);
+          }
+          updateTreeVisibility();
+          ev.preventDefault();
+        }
+        return;
+      }
+      if (!controls.length) {
+        return;
+      }
+      let nextIndex = currentIndex;
+      if (ev.key === "Home") {
+        nextIndex = 0;
+      } else if (ev.key === "End") {
+        nextIndex = controls.length - 1;
+      } else if (ev.key === "ArrowDown") {
+        nextIndex = Math.min(controls.length - 1, Math.max(0, currentIndex + 1));
+      } else if (ev.key === "ArrowUp") {
+        nextIndex = Math.max(0, currentIndex < 0 ? 0 : currentIndex - 1);
+      }
+      controls[nextIndex].focus();
+      ev.preventDefault();
+    });
+
     return control;
+  }
+
+
+
+  function createPerformSourceControl(obj) {
+    const model = getPerformSourceControlModel(obj);
+    return model ? createPerformSourcePicker(model.formNameUpper, { model }) : null;
   }
 
 
@@ -870,6 +1446,7 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
   runtime.registerService("performSources", {
     buildPerformCallPathRegistry,
     selectPerformSourceCandidate,
+    createPerformSourcePicker,
     createPerformSourceControl,
     buildRenderableObjects
   });
