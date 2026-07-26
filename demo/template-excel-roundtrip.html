@@ -1,0 +1,1448 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Template ↔ Excel Round-trip Demo</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page: #eef3f8;
+      --panel: #ffffff;
+      --panel-soft: #f7f9fc;
+      --ink: #162033;
+      --muted: #607087;
+      --line: #ccd6e3;
+      --accent: #1769aa;
+      --accent-dark: #0e4d80;
+      --good: #16794a;
+      --warn: #a65b00;
+      --danger: #a53131;
+      --shadow: 0 16px 40px rgba(28, 48, 78, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background:
+        radial-gradient(circle at top right, rgba(55, 134, 195, 0.13), transparent 34rem),
+        var(--page);
+      color: var(--ink);
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+    }
+
+    button,
+    input,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      min-height: 38px;
+      padding: 8px 13px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--ink);
+      cursor: pointer;
+      font-weight: 650;
+    }
+
+    button:hover:not(:disabled) {
+      border-color: var(--accent);
+      color: var(--accent-dark);
+    }
+
+    button:focus-visible,
+    [tabindex]:focus-visible {
+      outline: 3px solid rgba(23, 105, 170, 0.25);
+      outline-offset: 2px;
+    }
+
+    button.primary {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #ffffff;
+    }
+
+    button.primary:hover:not(:disabled) {
+      background: var(--accent-dark);
+      color: #ffffff;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.48;
+    }
+
+    code {
+      font-family: "Cascadia Code", Consolas, monospace;
+    }
+
+    .app {
+      width: min(1500px, calc(100% - 32px));
+      margin: 24px auto 40px;
+    }
+
+    .hero {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: clamp(24px, 3vw, 38px);
+      line-height: 1.08;
+      letter-spacing: -0.035em;
+    }
+
+    .hero p {
+      max-width: 850px;
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .demo-badge {
+      flex: 0 0 auto;
+      padding: 7px 10px;
+      border: 1px solid #9bc3e2;
+      border-radius: 999px;
+      background: #e7f4ff;
+      color: #0e568d;
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .toolbar,
+    .paste-panel,
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .toolbar .divider {
+      width: 1px;
+      height: 28px;
+      margin: 0 3px;
+      background: var(--line);
+    }
+
+    .status {
+      flex: 1 1 260px;
+      min-height: 22px;
+      margin-left: 6px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status.is-good {
+      color: var(--good);
+    }
+
+    .status.is-warning {
+      color: var(--warn);
+    }
+
+    .status.is-error {
+      color: var(--danger);
+    }
+
+    .paste-panel {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.4fr);
+      gap: 12px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .paste-panel[hidden] {
+      display: none;
+    }
+
+    .paste-help {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .paste-help strong {
+      color: var(--ink);
+      font-size: 14px;
+    }
+
+    .paste-help-head {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 5px;
+    }
+
+    .paste-close {
+      min-height: 30px;
+      padding: 4px 9px;
+      font-size: 12px;
+    }
+
+    .paste-zone {
+      display: grid;
+      place-items: center;
+      min-height: 92px;
+      padding: 16px;
+      border: 2px dashed #77abd3;
+      border-radius: 10px;
+      background: #f0f8ff;
+      color: #175d92;
+      text-align: center;
+      cursor: text;
+    }
+
+    .paste-zone.is-ready {
+      border-color: var(--good);
+      background: #effaf4;
+      color: var(--good);
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      align-items: start;
+    }
+
+    .panel {
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-soft);
+    }
+
+    .panel-header h2 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .panel-meta {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .grid-host {
+      min-height: 230px;
+      padding: 16px;
+      overflow: auto;
+    }
+
+    .grid-placeholder {
+      display: grid;
+      min-height: 195px;
+      place-items: center;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .template-grid {
+      border-collapse: collapse;
+      table-layout: fixed;
+      min-width: 100%;
+      background: #ffffff;
+      color: #111111;
+      font-family: "MS PGothic", "MS UI Gothic", Meiryo, sans-serif;
+    }
+
+    .template-grid td {
+      min-width: 88px;
+      height: 38px;
+      padding: 5px 7px;
+      border: 1px solid #d6dce5;
+      overflow-wrap: anywhere;
+    }
+
+    .details {
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.75fr);
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .json {
+      min-height: 280px;
+      max-height: 440px;
+      margin: 0;
+      padding: 14px;
+      overflow: auto;
+      background: #0e1726;
+      color: #dce8f6;
+      font: 12px/1.5 "Cascadia Code", Consolas, monospace;
+      tab-size: 2;
+    }
+
+    .warnings {
+      min-height: 160px;
+      padding: 12px 16px 16px;
+    }
+
+    .warnings ul {
+      margin: 0;
+      padding-left: 19px;
+      color: var(--warn);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .warnings .empty {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .flow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px 12px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .flow span::after {
+      margin-left: 12px;
+      color: #8da1b8;
+      content: "→";
+    }
+
+    .flow span:last-child::after {
+      content: "";
+    }
+
+    @media (max-width: 920px) {
+      .workspace,
+      .details,
+      .paste-panel {
+        grid-template-columns: 1fr;
+      }
+
+      .hero {
+        flex-direction: column;
+        gap: 12px;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .app {
+        width: min(100% - 18px, 1500px);
+        margin-top: 12px;
+      }
+
+      .toolbar .divider {
+        display: none;
+      }
+
+      .toolbar button {
+        flex: 1 1 145px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="hero">
+      <div>
+        <h1>Template ↔ Excel round-trip</h1>
+        <p>
+          Prototype độc lập cho một template <code>DEMO</code>. Copy giữ nguyên text/placeholder và format;
+          paste từ Excel chỉ tạo bản xem trước cho đến khi bấm <strong>Apply to Demo</strong>.
+        </p>
+        <div class="flow" aria-label="Luồng thử nghiệm">
+          <span>Copy to Excel</span>
+          <span>Sửa trong Excel</span>
+          <span>Paste + Preview</span>
+          <span>Apply</span>
+        </div>
+      </div>
+      <div class="demo-badge">Standalone demo</div>
+    </header>
+
+    <section class="toolbar" aria-label="Thao tác demo">
+      <button type="button" id="copyExcelBtn" class="primary">Copy to Excel</button>
+      <button
+        type="button"
+        id="openPasteBtn"
+        aria-controls="pastePanel"
+        aria-expanded="false"
+      >Paste from Excel</button>
+      <span class="divider" aria-hidden="true"></span>
+      <button type="button" id="applyBtn" disabled>Apply to Demo</button>
+      <button type="button" id="resetBtn">Reset Sample</button>
+      <div id="status" class="status" role="status" aria-live="polite">
+        Sẵn sàng. Dữ liệu hiện chỉ tồn tại trong tab này.
+      </div>
+    </section>
+
+    <section id="pastePanel" class="paste-panel" hidden>
+      <div class="paste-help">
+        <div class="paste-help-head">
+          <strong>Paste bằng bàn phím</strong>
+          <button type="button" id="closePasteBtn" class="paste-close">Đóng</button>
+        </div>
+        Trong Excel, copy vùng đã sửa. Sau đó chọn khung bên phải và nhấn
+        <kbd>Ctrl</kbd> + <kbd>V</kbd>. HTML được ưu tiên; TSV chỉ giữ text.
+      </div>
+      <div
+        id="pasteZone"
+        class="paste-zone"
+        role="textbox"
+        aria-label="Vùng nhận dữ liệu Excel"
+        aria-multiline="true"
+        contenteditable="true"
+        tabindex="0"
+      >Bấm vào đây rồi nhấn Ctrl+V</div>
+    </section>
+
+    <section class="workspace">
+      <article class="panel">
+        <header class="panel-header">
+          <h2>Template hiện tại</h2>
+          <span id="currentMeta" class="panel-meta"></span>
+        </header>
+        <div id="currentGrid" class="grid-host"></div>
+      </article>
+
+      <article class="panel">
+        <header class="panel-header">
+          <h2>Preview từ Excel</h2>
+          <span id="previewMeta" class="panel-meta">Chưa paste</span>
+        </header>
+        <div id="previewGrid" class="grid-host">
+          <div class="grid-placeholder">Paste dữ liệu Excel để xem trước.</div>
+        </div>
+      </article>
+    </section>
+
+    <section class="details">
+      <article class="panel">
+        <header class="panel-header">
+          <h2>JSON template</h2>
+          <span id="jsonMeta" class="panel-meta">Applied state</span>
+        </header>
+        <pre id="templateJson" class="json"></pre>
+      </article>
+
+      <article class="panel">
+        <header class="panel-header">
+          <h2>Cảnh báo nhập</h2>
+          <span class="panel-meta">Format ngoài schema bị bỏ qua</span>
+        </header>
+        <div id="warnings" class="warnings">
+          <div class="empty">Không có cảnh báo.</div>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    "use strict";
+
+    (function initTemplateExcelDemo() {
+      const SAMPLE_TEMPLATE = {
+        key: "DEMO",
+        options: {
+          hideEmptyRows: false,
+          hideRowsWithoutValues: false,
+          expandMultilineRows: true,
+          squareCells: false,
+          squareCellSize: 18
+        },
+        ranges: {
+          "A1:F1": {
+            text: "ABAP TEMPLATE – EXCEL ROUND-TRIP",
+            background: "#1f4e78",
+            "font color": "#ffffff",
+            "font family": "MS PGothic",
+            "font size": 13,
+            bold: true,
+            align: "center",
+            valign: "middle",
+            wrap: true,
+            border: "outside-thin",
+            merge: true
+          },
+          "A2:B2": {
+            text: "Đích",
+            background: "#dbeef4",
+            "font color": "#111111",
+            "font family": "MS PGothic",
+            "font size": 10,
+            bold: true,
+            align: "left",
+            valign: "middle",
+            border: "outside-thin",
+            merge: true
+          },
+          "C2:F2": {
+            text: "{values.target.finalDesc}",
+            background: "#ffffff",
+            "font color": "#7030a0",
+            "font family": "MS PGothic",
+            "font size": 10,
+            italic: true,
+            align: "left",
+            valign: "middle",
+            wrap: true,
+            border: "outside-thin",
+            merge: true
+          },
+          "A3:B3": {
+            text: "Nguồn",
+            background: "#e2f0d9",
+            "font color": "#111111",
+            "font family": "MS PGothic",
+            "font size": 10,
+            bold: true,
+            align: "left",
+            valign: "middle",
+            border: "outside-thin",
+            merge: true
+          },
+          "C3:F3": {
+            text: "{values.expr.finalDesc}",
+            background: "#ffffff",
+            "font color": "#111111",
+            "font family": "MS PGothic",
+            "font size": 10,
+            underline: true,
+            align: "left",
+            valign: "middle",
+            wrap: true,
+            border: "outside-thin",
+            merge: true
+          },
+          "A4:B4": {
+            text: "Điều kiện trái",
+            background: "#fff2cc",
+            "font color": "#111111",
+            "font family": "MS PGothic",
+            "font size": 10,
+            bold: true,
+            align: "center",
+            valign: "middle",
+            border: "outside-thin",
+            merge: true
+          },
+          "C4:F4": {
+            text: "{extras.ifCondition.conditions.leftOperandDecl.finalDesc}",
+            background: "#fff9e7",
+            "font color": "#111111",
+            "font family": "MS PGothic",
+            "font size": 10,
+            align: "left",
+            valign: "top",
+            wrap: true,
+            border: "outside-thin",
+            merge: true
+          },
+          "A5:C5": {
+            text: "Ghi chú",
+            background: "#f2f2f2",
+            "font color": "#555555",
+            "font family": "MS PGothic",
+            "font size": 9,
+            italic: true,
+            align: "right",
+            valign: "middle",
+            border: "outside-thin",
+            merge: true
+          },
+          "D5:F5": {
+            text: "Sửa text, màu, font hoặc merge trong Excel rồi paste lại.",
+            background: "#ffffff",
+            "font color": "#555555",
+            "font family": "MS PGothic",
+            "font size": 9,
+            align: "left",
+            valign: "top",
+            wrap: true,
+            border: "outside-thin",
+            merge: true
+          }
+        }
+      };
+
+      const KNOWN_STYLE_PROPERTIES = new Set([
+        "background",
+        "background-color",
+        "color",
+        "font",
+        "font-family",
+        "font-size",
+        "font-style",
+        "font-weight",
+        "text-align",
+        "text-decoration",
+        "text-decoration-line",
+        "vertical-align",
+        "white-space",
+        "border",
+        "border-top",
+        "border-right",
+        "border-bottom",
+        "border-left",
+        "mso-number-format",
+        "mso-wrap-style"
+      ]);
+
+      const CLIPBOARD_LIMITS = Object.freeze({
+        htmlChars: 2000000,
+        styleChars: 250000,
+        styleRules: 5000,
+        rows: 500,
+        columns: 200,
+        cells: 20000
+      });
+
+      const els = {
+        copyExcelBtn: document.getElementById("copyExcelBtn"),
+        openPasteBtn: document.getElementById("openPasteBtn"),
+        closePasteBtn: document.getElementById("closePasteBtn"),
+        applyBtn: document.getElementById("applyBtn"),
+        resetBtn: document.getElementById("resetBtn"),
+        pastePanel: document.getElementById("pastePanel"),
+        pasteZone: document.getElementById("pasteZone"),
+        currentGrid: document.getElementById("currentGrid"),
+        previewGrid: document.getElementById("previewGrid"),
+        currentMeta: document.getElementById("currentMeta"),
+        previewMeta: document.getElementById("previewMeta"),
+        templateJson: document.getElementById("templateJson"),
+        jsonMeta: document.getElementById("jsonMeta"),
+        warnings: document.getElementById("warnings"),
+        status: document.getElementById("status")
+      };
+
+      const state = {
+        current: clone(SAMPLE_TEMPLATE),
+        pending: null,
+        lastPreview: null
+      };
+
+      function clone(value) {
+        return JSON.parse(JSON.stringify(value));
+      }
+
+      function columnLabelToNumber(label) {
+        const letters = String(label || "").trim().toUpperCase();
+        let value = 0;
+        for (let index = 0; index < letters.length; index += 1) {
+          value = (value * 26) + letters.charCodeAt(index) - 64;
+        }
+        return value;
+      }
+
+      function columnNumberToLabel(value) {
+        let number = Math.max(1, Math.floor(Number(value) || 1));
+        let label = "";
+        while (number > 0) {
+          const remainder = (number - 1) % 26;
+          label = String.fromCharCode(65 + remainder) + label;
+          number = Math.floor((number - 1) / 26);
+        }
+        return label;
+      }
+
+      function parseRangeKey(rangeKey) {
+        const parts = String(rangeKey || "").trim().toUpperCase().split(":");
+        const parseCell = (cellRef) => {
+          const match = /^([A-Z]+)([1-9][0-9]*)$/.exec(cellRef || "");
+          if (!match) {
+            throw new Error("Range không hợp lệ: " + rangeKey);
+          }
+          return { col: columnLabelToNumber(match[1]), row: Number(match[2]) };
+        };
+        const start = parseCell(parts[0]);
+        const end = parseCell(parts[1] || parts[0]);
+        return {
+          r1: Math.min(start.row, end.row),
+          c1: Math.min(start.col, end.col),
+          r2: Math.max(start.row, end.row),
+          c2: Math.max(start.col, end.col)
+        };
+      }
+
+      function makeRangeKey(r1, c1, r2, c2) {
+        const start = columnNumberToLabel(c1) + r1;
+        const end = columnNumberToLabel(c2) + r2;
+        return start === end ? start : start + ":" + end;
+      }
+
+      function getTemplateBounds(template) {
+        let rows = 1;
+        let cols = 1;
+        Object.keys(template && template.ranges || {}).forEach((rangeKey) => {
+          const range = parseRangeKey(rangeKey);
+          rows = Math.max(rows, range.r2);
+          cols = Math.max(cols, range.c2);
+        });
+        return { rows, cols };
+      }
+
+      function buildGridModel(template) {
+        const bounds = getTemplateBounds(template);
+        const matrix = Array.from({ length: bounds.rows }, (_, rowIndex) =>
+          Array.from({ length: bounds.cols }, (_, colIndex) => ({
+            row: rowIndex + 1,
+            col: colIndex + 1,
+            text: "",
+            config: {},
+            hidden: false,
+            rowspan: 1,
+            colspan: 1,
+            range: {
+              r1: rowIndex + 1,
+              c1: colIndex + 1,
+              r2: rowIndex + 1,
+              c2: colIndex + 1
+            },
+            rangeKey: makeRangeKey(rowIndex + 1, colIndex + 1, rowIndex + 1, colIndex + 1)
+          }))
+        );
+
+        Object.entries(template && template.ranges || {}).forEach(([rangeKey, rawConfig]) => {
+          const range = parseRangeKey(rangeKey);
+          const config = rawConfig && typeof rawConfig === "object" ? clone(rawConfig) : { text: String(rawConfig || "") };
+          for (let row = range.r1; row <= range.r2; row += 1) {
+            for (let col = range.c1; col <= range.c2; col += 1) {
+              const cell = matrix[row - 1][col - 1];
+              cell.config = { ...cell.config, ...config };
+              cell.range = range;
+              cell.rangeKey = rangeKey;
+            }
+          }
+          const anchor = matrix[range.r1 - 1][range.c1 - 1];
+          anchor.text = String(config.text === undefined || config.text === null ? "" : config.text);
+          if (config.merge === true && (range.r2 > range.r1 || range.c2 > range.c1)) {
+            anchor.rowspan = range.r2 - range.r1 + 1;
+            anchor.colspan = range.c2 - range.c1 + 1;
+            for (let row = range.r1; row <= range.r2; row += 1) {
+              for (let col = range.c1; col <= range.c2; col += 1) {
+                if (row !== range.r1 || col !== range.c1) {
+                  matrix[row - 1][col - 1].hidden = true;
+                }
+              }
+            }
+          }
+        });
+
+        return { matrix, rows: bounds.rows, cols: bounds.cols };
+      }
+
+      function isRangeEdge(cell, side) {
+        const range = cell.range;
+        if (side === "top") return cell.row === range.r1;
+        if (side === "right") return cell.col === range.c2;
+        if (side === "bottom") return cell.row === range.r2;
+        return cell.col === range.c1;
+      }
+
+      function applyConfigStyle(element, cell) {
+        const config = cell.config || {};
+        if (config.background) element.style.backgroundColor = config.background;
+        if (config["font color"]) element.style.color = config["font color"];
+        if (config["font family"]) element.style.fontFamily = config["font family"];
+        if (Number(config["font size"]) > 0) element.style.fontSize = Number(config["font size"]) + "pt";
+        if (config.bold === true) element.style.fontWeight = "700";
+        if (config.italic === true) element.style.fontStyle = "italic";
+        if (config.underline === true) element.style.textDecoration = "underline";
+        if (config.align) element.style.textAlign = config.align;
+        if (config.valign) element.style.verticalAlign = config.valign;
+        if (config.wrap === true) element.style.whiteSpace = "pre-wrap";
+        if (config.wrap === false) element.style.whiteSpace = "nowrap";
+
+        if (config.border === "outside-thin") {
+          const borderLine = "1px solid #000000";
+          if (config.merge === true) {
+            element.style.border = borderLine;
+          } else {
+            element.style.borderTop = isRangeEdge(cell, "top") ? borderLine : "none";
+            element.style.borderRight = isRangeEdge(cell, "right") ? borderLine : "none";
+            element.style.borderBottom = isRangeEdge(cell, "bottom") ? borderLine : "none";
+            element.style.borderLeft = isRangeEdge(cell, "left") ? borderLine : "none";
+          }
+        } else if (config.border) {
+          element.style.border = config.border;
+        }
+      }
+
+      function buildTable(template, options) {
+        const opts = options && typeof options === "object" ? options : {};
+        const model = buildGridModel(template);
+        const table = document.createElement("table");
+        table.className = "template-grid";
+        table.setAttribute("data-template-key", template.key || "DEMO");
+        table.style.borderCollapse = "collapse";
+        table.style.tableLayout = "fixed";
+
+        const tbody = document.createElement("tbody");
+        for (const row of model.matrix) {
+          const tr = document.createElement("tr");
+          for (const cell of row) {
+            if (cell.hidden) {
+              continue;
+            }
+            const td = document.createElement("td");
+            td.textContent = cell.text;
+            td.setAttribute("data-template-range", cell.rangeKey);
+            if (cell.rowspan > 1) td.rowSpan = cell.rowspan;
+            if (cell.colspan > 1) td.colSpan = cell.colspan;
+            applyConfigStyle(td, cell);
+            if (opts.forClipboard) {
+              td.style.setProperty("mso-number-format", "\\@");
+            }
+            tr.appendChild(td);
+          }
+          tbody.appendChild(tr);
+        }
+        table.appendChild(tbody);
+        return { table, model };
+      }
+
+      function buildPlainText(template) {
+        const model = buildGridModel(template);
+        const encodeCell = (value) => {
+          const text = String(value === undefined || value === null ? "" : value)
+            .replace(/\r\n?/g, "\n");
+          if (!/[\t\n"]/.test(text)) return text;
+          return '"' + text.replace(/"/g, '""') + '"';
+        };
+        return model.matrix.map((row) =>
+          row.map((cell) => encodeCell(cell.hidden ? "" : cell.text)).join("\t")
+        ).join("\r\n");
+      }
+
+      function buildClipboardPayload() {
+        const result = buildTable(state.current, { forClipboard: true });
+        return {
+          html: result.table.outerHTML,
+          text: buildPlainText(state.current)
+        };
+      }
+
+      function parseRgbColor(raw) {
+        const match = /^rgba?\(\s*([0-9.]+)[,\s]+([0-9.]+)[,\s]+([0-9.]+)(?:\s*[,/]\s*([0-9.]+))?\s*\)$/i.exec(raw);
+        if (!match) return "";
+        if (match[4] !== undefined && Number(match[4]) === 0) return "";
+        const toHex = (value) => Math.max(0, Math.min(255, Math.round(Number(value) || 0))).toString(16).padStart(2, "0");
+        return "#" + toHex(match[1]) + toHex(match[2]) + toHex(match[3]);
+      }
+
+      function normalizeColor(value) {
+        const raw = String(value || "").trim();
+        if (!raw || raw === "transparent" || raw === "rgba(0, 0, 0, 0)") return "";
+        if (/^#[0-9a-f]{6}$/i.test(raw)) return raw.toLowerCase();
+        if (/^#[0-9a-f]{3}$/i.test(raw)) {
+          return ("#" + raw.slice(1).split("").map((char) => char + char).join("")).toLowerCase();
+        }
+        const rgb = parseRgbColor(raw);
+        if (rgb) return rgb;
+
+        const probe = document.createElement("span");
+        probe.style.color = raw;
+        probe.style.position = "fixed";
+        probe.style.left = "-99999px";
+        document.body.appendChild(probe);
+        const computed = window.getComputedStyle(probe).color;
+        probe.remove();
+        return parseRgbColor(computed);
+      }
+
+      function parseFontSize(value) {
+        const raw = String(value || "").trim().toLowerCase();
+        if (!raw) return null;
+        const number = Number.parseFloat(raw);
+        if (!Number.isFinite(number) || number <= 0) return null;
+        if (raw.endsWith("px")) return Math.round(number * 0.75 * 100) / 100;
+        if (raw.endsWith("pt") || /^[0-9.]+$/.test(raw)) return Math.round(number * 100) / 100;
+        return null;
+      }
+
+      function collectClipboardCssRules(doc) {
+        const rules = [];
+        let styleChars = 0;
+        const styles = Array.from(doc.querySelectorAll("style"));
+        for (const styleElement of styles) {
+          const cssText = String(styleElement.textContent || "").replace(/\/\*[\s\S]*?\*\//g, "");
+          styleChars += cssText.length;
+          if (styleChars > CLIPBOARD_LIMITS.styleChars) {
+            throw new Error("CSS clipboard quá lớn để xử lý an toàn.");
+          }
+          const rulePattern = /([^{}]+)\{([^{}]*)\}/g;
+          let match = null;
+          while ((match = rulePattern.exec(cssText))) {
+            const selectors = match[1].split(",").map((selector) => selector.trim()).filter(Boolean);
+            if (!selectors.length) continue;
+            rules.push({ selectors, declaration: match[2] });
+            if (rules.length > CLIPBOARD_LIMITS.styleRules) {
+              throw new Error("Clipboard có quá nhiều CSS rule để xử lý an toàn.");
+            }
+          }
+        }
+        return rules;
+      }
+
+      function collectCellCss(cell, cssRules) {
+        const declarations = [];
+        for (const rule of cssRules) {
+          const applies = rule.selectors.some((selector) => {
+              try {
+                return cell.matches(selector);
+              } catch {
+                return false;
+              }
+            });
+          if (applies) declarations.push(rule.declaration);
+        }
+        declarations.push(String(cell.getAttribute("style") || ""));
+        const probe = document.createElement("span");
+        probe.style.cssText = declarations.join(";");
+        return probe.style;
+      }
+
+      function hasVisibleBorder(style) {
+        const values = [
+          style.getPropertyValue("border"),
+          style.getPropertyValue("border-top"),
+          style.getPropertyValue("border-right"),
+          style.getPropertyValue("border-bottom"),
+          style.getPropertyValue("border-left")
+        ].map((value) => String(value || "").trim().toLowerCase());
+        return values.some((value) => value && value !== "none" && !/^0(?:px|pt)?(?:\s|$)/.test(value));
+      }
+
+      function extractCellText(cell) {
+        const blockTags = new Set(["DIV", "P"]);
+        const readNode = (node) => {
+          if (node.nodeType === 3) return node.nodeValue || "";
+          if (node.nodeType !== 1) return "";
+          if (node.tagName === "BR") return "\n";
+          const text = Array.from(node.childNodes).map(readNode).join("");
+          return blockTags.has(node.tagName) ? text + "\n" : text;
+        };
+        return Array.from(cell.childNodes)
+          .map(readNode)
+          .join("")
+          .replace(/\u00a0/g, " ")
+          .replace(/\r\n?/g, "\n")
+          .replace(/\n+$/g, "");
+      }
+
+      function cellStyleToConfig(cell, warningsState, cssRules) {
+        const style = collectCellCss(cell, cssRules);
+        const config = {};
+        const background = normalizeColor(style.getPropertyValue("background-color") || cell.getAttribute("bgcolor"));
+        const fontColor = normalizeColor(style.getPropertyValue("color"));
+        const fontFamily = String(style.getPropertyValue("font-family") || "")
+          .split(",")[0]
+          .trim()
+          .replace(/^['"]|['"]$/g, "");
+        const fontSize = parseFontSize(style.getPropertyValue("font-size"));
+        const fontWeight = String(style.getPropertyValue("font-weight") || "").toLowerCase();
+        const fontStyle = String(style.getPropertyValue("font-style") || "").toLowerCase();
+        const textDecoration = String(
+          style.getPropertyValue("text-decoration-line")
+          || style.getPropertyValue("text-decoration")
+          || ""
+        ).toLowerCase();
+        const align = String(style.getPropertyValue("text-align") || cell.getAttribute("align") || "").toLowerCase();
+        const valign = String(style.getPropertyValue("vertical-align") || cell.getAttribute("valign") || "").toLowerCase();
+        const whiteSpace = String(style.getPropertyValue("white-space") || "").toLowerCase();
+
+        if (background) config.background = background;
+        if (fontColor) config["font color"] = fontColor;
+        if (fontFamily) config["font family"] = fontFamily;
+        if (fontSize !== null) config["font size"] = fontSize;
+        if (fontWeight === "bold" || Number.parseInt(fontWeight, 10) >= 600) config.bold = true;
+        if (fontStyle === "italic" || fontStyle === "oblique") config.italic = true;
+        if (textDecoration.includes("underline")) config.underline = true;
+        if (["left", "center", "right"].includes(align)) config.align = align;
+        if (["top", "middle", "bottom"].includes(valign)) config.valign = valign;
+        if (whiteSpace) config.wrap = whiteSpace !== "nowrap";
+        if (hasVisibleBorder(style)) config.border = "outside-thin";
+
+        for (let index = 0; index < style.length; index += 1) {
+          const property = String(style.item(index) || "").toLowerCase();
+          const isMappedShorthandDetail = property.startsWith("border-")
+            || property === "text-wrap-mode"
+            || property === "white-space-collapse";
+          if (
+            property
+            && !KNOWN_STYLE_PROPERTIES.has(property)
+            && !property.startsWith("mso-")
+            && !isMappedShorthandDetail
+          ) {
+            warningsState.unsupportedCss.add(property);
+          }
+        }
+        return config;
+      }
+
+      function parseClipboardHtml(html) {
+        const safeHtml = String(html || "");
+        if (safeHtml.length > CLIPBOARD_LIMITS.htmlChars) {
+          throw new Error("Clipboard HTML quá lớn để xử lý trong demo.");
+        }
+        const doc = new DOMParser().parseFromString(safeHtml, "text/html");
+        const tables = Array.from(doc.querySelectorAll("table"));
+        if (!tables.length) {
+          throw new Error("Clipboard HTML không chứa bảng.");
+        }
+
+        const warnings = [];
+        if (tables.length > 1) {
+          warnings.push("Clipboard có nhiều bảng; demo chỉ nhập bảng đầu tiên.");
+        }
+        const firstTable = tables[0];
+        if (firstTable.querySelector("img, svg, object, iframe")) {
+          warnings.push("Hình ảnh hoặc object trong Excel đã bị bỏ qua.");
+        }
+
+        const cssRules = collectClipboardCssRules(doc);
+        const warningState = { unsupportedCss: new Set() };
+        const occupied = new Set();
+        const ranges = {};
+        let cellCount = 0;
+        let maxRow = 0;
+        let maxCol = 0;
+        const rows = Array.from(firstTable.querySelectorAll("tr"));
+        if (rows.length > CLIPBOARD_LIMITS.rows) {
+          throw new Error("Bảng Excel vượt quá " + CLIPBOARD_LIMITS.rows + " hàng của demo.");
+        }
+        rows.forEach((rowElement, rowIndex) => {
+          const row = rowIndex + 1;
+          let col = 1;
+          const cells = Array.from(rowElement.children).filter((element) => /^(TD|TH)$/i.test(element.tagName));
+          cells.forEach((cell) => {
+            cellCount += 1;
+            if (cellCount > CLIPBOARD_LIMITS.cells) {
+              throw new Error("Bảng Excel có quá nhiều ô để xử lý trong demo.");
+            }
+            while (occupied.has(row + ":" + col)) col += 1;
+            const rowspan = Math.max(1, Number(cell.getAttribute("rowspan")) || 1);
+            const colspan = Math.max(1, Number(cell.getAttribute("colspan")) || 1);
+            const endRow = row + rowspan - 1;
+            const endCol = col + colspan - 1;
+            if (endRow > CLIPBOARD_LIMITS.rows || endCol > CLIPBOARD_LIMITS.columns) {
+              throw new Error(
+                "Bảng Excel vượt giới hạn "
+                + CLIPBOARD_LIMITS.rows + " hàng × "
+                + CLIPBOARD_LIMITS.columns + " cột của demo."
+              );
+            }
+            for (let occupiedRow = row; occupiedRow <= endRow; occupiedRow += 1) {
+              for (let occupiedCol = col; occupiedCol <= endCol; occupiedCol += 1) {
+                occupied.add(occupiedRow + ":" + occupiedCol);
+              }
+            }
+
+            const config = {
+              text: extractCellText(cell),
+              ...cellStyleToConfig(cell, warningState, cssRules)
+            };
+            if (rowspan > 1 || colspan > 1) config.merge = true;
+            const rangeKey = makeRangeKey(row, col, endRow, endCol);
+            ranges[rangeKey] = config;
+            maxRow = Math.max(maxRow, endRow);
+            maxCol = Math.max(maxCol, endCol);
+
+            const attrs = Array.from(cell.attributes).map((attribute) => attribute.name.toLowerCase());
+            if (attrs.some((name) => name.includes("formula") || name.includes("fmla"))) {
+              warningState.hasFormula = true;
+            }
+            col = endCol + 1;
+          });
+        });
+
+        if (!Object.keys(ranges).length) {
+          throw new Error("Bảng Excel không có ô để nhập.");
+        }
+        if (warningState.hasFormula) {
+          warnings.push("Công thức Excel không được nhập; demo chỉ dùng text đang hiển thị.");
+        }
+        if (warningState.unsupportedCss.size) {
+          warnings.push(
+            "Đã bỏ qua thuộc tính CSS ngoài schema: "
+            + Array.from(warningState.unsupportedCss).sort().join(", ")
+            + "."
+          );
+        }
+
+        return {
+          source: "html",
+          template: {
+            key: "DEMO",
+            options: clone(state.current.options || SAMPLE_TEMPLATE.options),
+            ranges
+          },
+          warnings,
+          stats: {
+            rows: maxRow,
+            cols: maxCol,
+            ranges: Object.keys(ranges).length,
+            merged: Object.values(ranges).filter((config) => config.merge === true).length
+          }
+        };
+      }
+
+      function parseTsvRows(text) {
+        const input = String(text || "");
+        const rows = [];
+        let row = [];
+        let field = "";
+        let inQuotes = false;
+        let endedWithRowBreak = false;
+
+        for (let index = 0; index < input.length; index += 1) {
+          const char = input[index];
+          if (char === '"') {
+            if (inQuotes && input[index + 1] === '"') {
+              field += '"';
+              index += 1;
+            } else if (inQuotes) {
+              inQuotes = false;
+            } else if (!field) {
+              inQuotes = true;
+            } else {
+              field += char;
+            }
+            endedWithRowBreak = false;
+            continue;
+          }
+
+          if (char === "\t" && !inQuotes) {
+            row.push(field);
+            field = "";
+            endedWithRowBreak = false;
+            continue;
+          }
+
+          if ((char === "\r" || char === "\n") && !inQuotes) {
+            if (char === "\r" && input[index + 1] === "\n") index += 1;
+            row.push(field);
+            rows.push(row);
+            row = [];
+            field = "";
+            endedWithRowBreak = true;
+            continue;
+          }
+
+          if ((char === "\r" || char === "\n") && inQuotes) {
+            if (char === "\r" && input[index + 1] === "\n") index += 1;
+            field += "\n";
+          } else {
+            field += char;
+          }
+          endedWithRowBreak = false;
+        }
+
+        if (inQuotes) {
+          throw new Error("TSV có ô quote chưa đóng.");
+        }
+        if (!endedWithRowBreak || row.length || field) {
+          row.push(field);
+          rows.push(row);
+        }
+        return rows;
+      }
+
+      function parseClipboardTsv(text) {
+        const rawText = String(text || "");
+        if (!rawText) {
+          throw new Error("Clipboard không có HTML hoặc text.");
+        }
+        const rows = parseTsvRows(rawText);
+        if (!rows.length) {
+          throw new Error("Clipboard TSV không có ô để nhập.");
+        }
+        const ranges = {};
+        let maxCols = 0;
+        rows.forEach((cells, rowIndex) => {
+          maxCols = Math.max(maxCols, cells.length);
+          cells.forEach((cellText, colIndex) => {
+            ranges[makeRangeKey(rowIndex + 1, colIndex + 1, rowIndex + 1, colIndex + 1)] = {
+              text: cellText
+            };
+          });
+        });
+        return {
+          source: "tsv",
+          template: {
+            key: "DEMO",
+            options: clone(state.current.options || SAMPLE_TEMPLATE.options),
+            ranges
+          },
+          warnings: ["Clipboard chỉ có TSV: text được nhập nhưng format và merge không thể khôi phục."],
+          stats: {
+            rows: rows.length,
+            cols: maxCols,
+            ranges: Object.keys(ranges).length,
+            merged: 0
+          }
+        };
+      }
+
+      function parseClipboardPayload(payload) {
+        const input = payload && typeof payload === "object" ? payload : {};
+        const html = String(input.html || "");
+        if (html && /<table[\s>]/i.test(html)) {
+          return parseClipboardHtml(html);
+        }
+        return parseClipboardTsv(String(input.text || ""));
+      }
+
+      function stageClipboardPayload(payload) {
+        const parsed = parseClipboardPayload(payload);
+        state.pending = clone(parsed);
+        state.lastPreview = clone(parsed);
+        render();
+        setStatus(
+          "Đã tạo preview từ " + parsed.source.toUpperCase()
+          + ". Kiểm tra rồi bấm Apply to Demo.",
+          parsed.warnings.length ? "warning" : "good"
+        );
+        return clone(parsed);
+      }
+
+      function applyPending() {
+        if (!state.pending) return false;
+        state.current = clone(state.pending.template);
+        state.lastPreview = clone(state.pending);
+        state.pending = null;
+        render();
+        setStatus("Đã áp dụng preview vào state của demo. Refresh hoặc Reset để hoàn tác.", "good");
+        return true;
+      }
+
+      function reset() {
+        state.current = clone(SAMPLE_TEMPLATE);
+        state.pending = null;
+        state.lastPreview = null;
+        closePastePanel(false);
+        render();
+        setStatus("Đã khôi phục template mẫu.", "good");
+        return clone(state.current);
+      }
+
+      function getSnapshot() {
+        return clone({
+          current: state.current,
+          pending: state.pending,
+          lastPreview: state.lastPreview
+        });
+      }
+
+      function renderTemplateInto(host, template) {
+        host.replaceChildren();
+        host.appendChild(buildTable(template).table);
+      }
+
+      function renderWarnings(warnings) {
+        const list = Array.isArray(warnings) ? warnings : [];
+        els.warnings.replaceChildren();
+        if (!list.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty";
+          empty.textContent = "Không có cảnh báo.";
+          els.warnings.appendChild(empty);
+          return;
+        }
+        const ul = document.createElement("ul");
+        list.forEach((warning) => {
+          const li = document.createElement("li");
+          li.textContent = warning;
+          ul.appendChild(li);
+        });
+        els.warnings.appendChild(ul);
+      }
+
+      function formatStats(stats) {
+        if (!stats) return "";
+        return stats.rows + " hàng × " + stats.cols + " cột · "
+          + stats.ranges + " range · " + stats.merged + " merge";
+      }
+
+      function render() {
+        renderTemplateInto(els.currentGrid, state.current);
+        const currentBounds = getTemplateBounds(state.current);
+        els.currentMeta.textContent = state.current.key + " · "
+          + currentBounds.rows + " hàng × " + currentBounds.cols + " cột";
+
+        const preview = state.pending || state.lastPreview;
+        if (preview) {
+          renderTemplateInto(els.previewGrid, preview.template);
+          els.previewMeta.textContent = (state.pending ? "Pending · " : "Last applied · ") + formatStats(preview.stats);
+          els.templateJson.textContent = JSON.stringify(preview.template, null, 2);
+          els.jsonMeta.textContent = state.pending ? "Pending preview" : "Last applied preview";
+          renderWarnings(preview.warnings);
+        } else {
+          els.previewGrid.innerHTML = '<div class="grid-placeholder">Paste dữ liệu Excel để xem trước.</div>';
+          els.previewMeta.textContent = "Chưa paste";
+          els.templateJson.textContent = JSON.stringify(state.current, null, 2);
+          els.jsonMeta.textContent = "Applied state";
+          renderWarnings([]);
+        }
+        els.applyBtn.disabled = !state.pending;
+        els.pasteZone.classList.toggle("is-ready", Boolean(state.pending));
+      }
+
+      function setStatus(message, tone) {
+        els.status.textContent = String(message || "");
+        els.status.className = "status" + (tone ? " is-" + tone : "");
+      }
+
+      async function copyPayloadToClipboard(payload) {
+        let clipboardError = null;
+        if (
+          navigator.clipboard
+          && typeof navigator.clipboard.write === "function"
+          && typeof window.ClipboardItem === "function"
+        ) {
+          try {
+            await navigator.clipboard.write([
+              new window.ClipboardItem({
+                "text/html": new Blob([payload.html], { type: "text/html" }),
+                "text/plain": new Blob([payload.text], { type: "text/plain" })
+              })
+            ]);
+            return "html";
+          } catch (error) {
+            clipboardError = error;
+          }
+        }
+
+        const holder = document.createElement("div");
+        holder.contentEditable = "true";
+        holder.style.position = "fixed";
+        holder.style.left = "-99999px";
+        holder.style.top = "0";
+        holder.innerHTML = payload.html;
+        document.body.appendChild(holder);
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(holder);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        let copied = false;
+        try {
+          copied = typeof document.execCommand === "function" && document.execCommand("copy");
+        } finally {
+          selection.removeAllRanges();
+          holder.remove();
+        }
+        if (!copied) {
+          throw clipboardError || new Error("Trình duyệt từ chối quyền ghi clipboard.");
+        }
+        return "selection";
+      }
+
+      function closePastePanel(returnFocus) {
+        els.pastePanel.hidden = true;
+        els.openPasteBtn.setAttribute("aria-expanded", "false");
+        els.pasteZone.textContent = "Bấm vào đây rồi nhấn Ctrl+V";
+        if (returnFocus !== false) els.openPasteBtn.focus();
+      }
+
+      els.copyExcelBtn.addEventListener("click", async () => {
+        els.copyExcelBtn.disabled = true;
+        try {
+          const method = await copyPayloadToClipboard(buildClipboardPayload());
+          setStatus(
+            method === "html"
+              ? "Đã copy HTML + TSV. Chuyển sang Excel và paste."
+              : "Đã copy bằng selection fallback. Chuyển sang Excel và paste.",
+            "good"
+          );
+        } catch (error) {
+          setStatus("Copy thất bại: " + (error && error.message ? error.message : error), "error");
+        } finally {
+          els.copyExcelBtn.disabled = false;
+        }
+      });
+
+      els.openPasteBtn.addEventListener("click", () => {
+        els.pastePanel.hidden = false;
+        els.openPasteBtn.setAttribute("aria-expanded", "true");
+        els.pasteZone.textContent = "Bấm vào đây rồi nhấn Ctrl+V";
+        els.pasteZone.focus();
+        setStatus("Đang chờ paste từ Excel.", "");
+      });
+
+      els.closePasteBtn.addEventListener("click", () => closePastePanel(true));
+
+      els.pasteZone.addEventListener("paste", (event) => {
+        event.preventDefault();
+        const clipboard = event.clipboardData;
+        try {
+          const parsed = stageClipboardPayload({
+            html: clipboard ? clipboard.getData("text/html") : "",
+            text: clipboard ? clipboard.getData("text/plain") : ""
+          });
+          els.pasteZone.textContent = parsed.source === "html"
+            ? "Đã nhận bảng HTML từ Excel"
+            : "Đã nhận TSV (không có format)";
+        } catch (error) {
+          state.pending = null;
+          render();
+          setStatus("Paste thất bại: " + (error && error.message ? error.message : error), "error");
+        }
+      });
+
+      els.pasteZone.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          closePastePanel(true);
+        }
+      });
+
+      els.applyBtn.addEventListener("click", applyPending);
+      els.resetBtn.addEventListener("click", reset);
+
+      window.TemplateExcelDemo = Object.freeze({
+        getSnapshot,
+        buildClipboardPayload,
+        parseClipboardPayload,
+        stageClipboardPayload,
+        applyPending,
+        reset
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>
