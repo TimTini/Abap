@@ -289,6 +289,23 @@
       overflow-wrap: anywhere;
     }
 
+    .template-grid.is-square {
+      width: max-content;
+      min-width: max-content;
+    }
+
+    .template-grid.is-square td {
+      width: var(--template-square-cell-size, 18px);
+      min-width: var(--template-square-cell-size, 18px);
+      max-width: var(--template-square-cell-size, 18px);
+      height: var(--template-square-cell-size, 18px);
+      min-height: var(--template-square-cell-size, 18px);
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+      white-space: nowrap;
+    }
+
     .details {
       display: grid;
       grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.75fr);
@@ -380,8 +397,9 @@
       <div>
         <h1>Template ↔ Excel round-trip</h1>
         <p>
-          Prototype độc lập cho một template <code>DEMO</code>. Copy giữ nguyên text/placeholder và format;
-          paste từ Excel chỉ tạo bản xem trước cho đến khi bấm <strong>Apply to Demo</strong>.
+          Prototype đọc trực tiếp template <code>READ_TABLE</code> từ runtime Viewer chính.
+          Copy giữ nguyên text/placeholder và format; paste từ Excel chỉ tạo bản xem trước
+          cho đến khi bấm <strong>Apply to Demo</strong>.
         </p>
         <div class="flow" aria-label="Luồng thử nghiệm">
           <span>Copy to Excel</span>
@@ -390,7 +408,7 @@
           <span>Apply</span>
         </div>
       </div>
-      <div class="demo-badge">Standalone demo</div>
+      <div class="demo-badge">READ_TABLE · main source</div>
     </header>
 
     <section class="toolbar" aria-label="Thao tác demo">
@@ -470,133 +488,14 @@
     </section>
   </main>
 
+  <script src="../viewer/app/core/00-service-registry.js"></script>
+  <script src="../viewer/app/core/01-runtime-state.js"></script>
   <script>
     "use strict";
 
     (function initTemplateExcelDemo() {
-      const SAMPLE_TEMPLATE = {
-        key: "DEMO",
-        options: {
-          hideEmptyRows: false,
-          hideRowsWithoutValues: false,
-          expandMultilineRows: true,
-          squareCells: false,
-          squareCellSize: 18
-        },
-        ranges: {
-          "A1:F1": {
-            text: "ABAP TEMPLATE – EXCEL ROUND-TRIP",
-            background: "#1f4e78",
-            "font color": "#ffffff",
-            "font family": "MS PGothic",
-            "font size": 13,
-            bold: true,
-            align: "center",
-            valign: "middle",
-            wrap: true,
-            border: "outside-thin",
-            merge: true
-          },
-          "A2:B2": {
-            text: "Đích",
-            background: "#dbeef4",
-            "font color": "#111111",
-            "font family": "MS PGothic",
-            "font size": 10,
-            bold: true,
-            align: "left",
-            valign: "middle",
-            border: "outside-thin",
-            merge: true
-          },
-          "C2:F2": {
-            text: "{values.target.finalDesc}",
-            background: "#ffffff",
-            "font color": "#7030a0",
-            "font family": "MS PGothic",
-            "font size": 10,
-            italic: true,
-            align: "left",
-            valign: "middle",
-            wrap: true,
-            border: "outside-thin",
-            merge: true
-          },
-          "A3:B3": {
-            text: "Nguồn",
-            background: "#e2f0d9",
-            "font color": "#111111",
-            "font family": "MS PGothic",
-            "font size": 10,
-            bold: true,
-            align: "left",
-            valign: "middle",
-            border: "outside-thin",
-            merge: true
-          },
-          "C3:F3": {
-            text: "{values.expr.finalDesc}",
-            background: "#ffffff",
-            "font color": "#111111",
-            "font family": "MS PGothic",
-            "font size": 10,
-            underline: true,
-            align: "left",
-            valign: "middle",
-            wrap: true,
-            border: "outside-thin",
-            merge: true
-          },
-          "A4:B4": {
-            text: "Điều kiện trái",
-            background: "#fff2cc",
-            "font color": "#111111",
-            "font family": "MS PGothic",
-            "font size": 10,
-            bold: true,
-            align: "center",
-            valign: "middle",
-            border: "outside-thin",
-            merge: true
-          },
-          "C4:F4": {
-            text: "{extras.ifCondition.conditions.leftOperandDecl.finalDesc}",
-            background: "#fff9e7",
-            "font color": "#111111",
-            "font family": "MS PGothic",
-            "font size": 10,
-            align: "left",
-            valign: "top",
-            wrap: true,
-            border: "outside-thin",
-            merge: true
-          },
-          "A5:C5": {
-            text: "Ghi chú",
-            background: "#f2f2f2",
-            "font color": "#555555",
-            "font family": "MS PGothic",
-            "font size": 9,
-            italic: true,
-            align: "right",
-            valign: "middle",
-            border: "outside-thin",
-            merge: true
-          },
-          "D5:F5": {
-            text: "Sửa text, màu, font hoặc merge trong Excel rồi paste lại.",
-            background: "#ffffff",
-            "font color": "#555555",
-            "font family": "MS PGothic",
-            "font size": 9,
-            align: "left",
-            valign: "top",
-            wrap: true,
-            border: "outside-thin",
-            merge: true
-          }
-        }
-      };
+      const SOURCE_TEMPLATE_KEY = "READ_TABLE";
+      const SOURCE_TEMPLATE = readMainTemplate();
 
       const KNOWN_STYLE_PROPERTIES = new Set([
         "background",
@@ -649,13 +548,43 @@
       };
 
       const state = {
-        current: clone(SAMPLE_TEMPLATE),
+        current: clone(SOURCE_TEMPLATE),
         pending: null,
         lastPreview: null
       };
 
       function clone(value) {
         return JSON.parse(JSON.stringify(value));
+      }
+
+      function readMainTemplate() {
+        const runtime = window.AbapViewerRuntime;
+        const templates = runtime
+          && runtime.constants
+          && runtime.constants.TEMPLATE_DEFAULT_CONFIG_V1
+          && runtime.constants.TEMPLATE_DEFAULT_CONFIG_V1.templates;
+        const source = templates && templates[SOURCE_TEMPLATE_KEY];
+        if (!source || typeof source !== "object" || Array.isArray(source)) {
+          throw new Error(
+            "Không đọc được TEMPLATE_DEFAULT_CONFIG_V1.templates."
+            + SOURCE_TEMPLATE_KEY
+            + " từ Viewer chính."
+          );
+        }
+
+        const rawRanges = source.ranges && typeof source.ranges === "object" && !Array.isArray(source.ranges)
+          ? source.ranges
+          : source;
+        const ranges = {};
+        Object.entries(rawRanges).forEach(([rangeKey, config]) => {
+          if (rangeKey === "_options" || rangeKey === "options" || rangeKey === "ranges") return;
+          ranges[rangeKey] = clone(config);
+        });
+        return {
+          key: SOURCE_TEMPLATE_KEY,
+          options: clone(source._options || source.options || {}),
+          ranges
+        };
       }
 
       function columnLabelToNumber(label) {
@@ -722,6 +651,7 @@
             col: colIndex + 1,
             text: "",
             config: {},
+            hasStyleRange: false,
             hidden: false,
             rowspan: 1,
             colspan: 1,
@@ -742,12 +672,18 @@
             for (let col = range.c1; col <= range.c2; col += 1) {
               const cell = matrix[row - 1][col - 1];
               cell.config = { ...cell.config, ...config };
-              cell.range = range;
-              cell.rangeKey = rangeKey;
+              const hasStyle = Object.keys(config).some((key) => key !== "text");
+              if (hasStyle || !cell.hasStyleRange) {
+                cell.range = range;
+                cell.rangeKey = rangeKey;
+              }
+              if (hasStyle) cell.hasStyleRange = true;
             }
           }
           const anchor = matrix[range.r1 - 1][range.c1 - 1];
-          anchor.text = String(config.text === undefined || config.text === null ? "" : config.text);
+          if (Object.prototype.hasOwnProperty.call(config, "text")) {
+            anchor.text = String(config.text === undefined || config.text === null ? "" : config.text);
+          }
           if (config.merge === true && (range.r2 > range.r1 || range.c2 > range.c1)) {
             anchor.rowspan = range.r2 - range.r1 + 1;
             anchor.colspan = range.c2 - range.c1 + 1;
@@ -776,7 +712,11 @@
         const config = cell.config || {};
         if (config.background) element.style.backgroundColor = config.background;
         if (config["font color"]) element.style.color = config["font color"];
-        if (config["font family"]) element.style.fontFamily = config["font family"];
+        const configuredFontFamily = String(config["font family"] || "").trim();
+        const fontFamily = configuredFontFamily && configuredFontFamily.toLowerCase() !== "default"
+          ? configuredFontFamily
+          : String(config.font || "").trim();
+        if (fontFamily) element.style.fontFamily = fontFamily;
         if (Number(config["font size"]) > 0) element.style.fontSize = Number(config["font size"]) + "pt";
         if (config.bold === true) element.style.fontWeight = "700";
         if (config.italic === true) element.style.fontStyle = "italic";
@@ -806,9 +746,18 @@
         const model = buildGridModel(template);
         const table = document.createElement("table");
         table.className = "template-grid";
-        table.setAttribute("data-template-key", template.key || "DEMO");
+        table.setAttribute("data-template-key", template.key || SOURCE_TEMPLATE_KEY);
         table.style.borderCollapse = "collapse";
         table.style.tableLayout = "fixed";
+        const squareCells = Boolean(template && template.options && template.options.squareCells !== false);
+        if (squareCells) {
+          const squareCellSize = Math.max(
+            16,
+            Math.min(240, Math.round(Number(template.options.squareCellSize) || 18))
+          );
+          table.classList.add("is-square");
+          table.style.setProperty("--template-square-cell-size", squareCellSize + "px");
+        }
 
         const tbody = document.createElement("tbody");
         for (const row of model.matrix) {
@@ -1106,8 +1055,8 @@
         return {
           source: "html",
           template: {
-            key: "DEMO",
-            options: clone(state.current.options || SAMPLE_TEMPLATE.options),
+            key: state.current.key || SOURCE_TEMPLATE_KEY,
+            options: clone(state.current.options || SOURCE_TEMPLATE.options),
             ranges
           },
           warnings,
@@ -1203,8 +1152,8 @@
         return {
           source: "tsv",
           template: {
-            key: "DEMO",
-            options: clone(state.current.options || SAMPLE_TEMPLATE.options),
+            key: state.current.key || SOURCE_TEMPLATE_KEY,
+            options: clone(state.current.options || SOURCE_TEMPLATE.options),
             ranges
           },
           warnings: ["Clipboard chỉ có TSV: text được nhập nhưng format và merge không thể khôi phục."],
@@ -1250,7 +1199,7 @@
       }
 
       function reset() {
-        state.current = clone(SAMPLE_TEMPLATE);
+        state.current = clone(SOURCE_TEMPLATE);
         state.pending = null;
         state.lastPreview = null;
         closePastePanel(false);
