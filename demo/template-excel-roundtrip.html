@@ -975,7 +975,37 @@
         }
       }
 
-      function extractClosedBorderRanges(borderGrid, maxRow, maxCol) {
+      function mirrorSharedBorderEdges(borderGrid, maxRow, maxCol) {
+        const ensureCell = (row, col) => {
+          const key = row + ":" + col;
+          if (!borderGrid.has(key)) {
+            borderGrid.set(key, { top: false, right: false, bottom: false, left: false });
+          }
+          return borderGrid.get(key);
+        };
+
+        for (let row = 1; row <= maxRow; row += 1) {
+          for (let col = 1; col <= maxCol; col += 1) {
+            const cell = ensureCell(row, col);
+            if (col < maxCol) {
+              const rightCell = ensureCell(row, col + 1);
+              if (cell.right || rightCell.left) {
+                cell.right = true;
+                rightCell.left = true;
+              }
+            }
+            if (row < maxRow) {
+              const bottomCell = ensureCell(row + 1, col);
+              if (cell.bottom || bottomCell.top) {
+                cell.bottom = true;
+                bottomCell.top = true;
+              }
+            }
+          }
+        }
+      }
+
+      function extractClosedBorderRanges(borderGrid, maxRow, maxCol, reportableEdges) {
         const working = new Map();
         borderGrid.forEach((sides, key) => {
           working.set(key, { ...sides });
@@ -1048,9 +1078,12 @@
         }
 
         let remainingEdges = 0;
-        working.forEach((sides) => {
+        working.forEach((sides, key) => {
           remainingEdges += ["top", "right", "bottom", "left"]
-            .filter((side) => sides[side])
+            .filter((side) =>
+              sides[side]
+              && (!reportableEdges || reportableEdges.has(key + ":" + side))
+            )
             .length;
         });
         return { ranges, remainingEdges };
@@ -1071,6 +1104,12 @@
           .replace(/\u00a0/g, " ")
           .replace(/\r\n?/g, "\n")
           .replace(/\n+$/g, "");
+      }
+
+      function hasExcelIgnoredColspan(cell) {
+        return /(?:^|;)\s*mso-ignore\s*:\s*colspan(?:\s*;|$)/i.test(
+          String(cell.getAttribute("style") || "")
+        );
       }
 
       function cellStyleToConfig(cell, warningsState, cssRules) {
@@ -1167,6 +1206,7 @@
             while (occupied.has(row + ":" + col)) col += 1;
             const rowspan = Math.max(1, Number(cell.getAttribute("rowspan")) || 1);
             const colspan = Math.max(1, Number(cell.getAttribute("colspan")) || 1);
+            const excelIgnoresColspan = colspan > 1 && hasExcelIgnoredColspan(cell);
             const endRow = row + rowspan - 1;
             const endCol = col + colspan - 1;
             if (endRow > CLIPBOARD_LIMITS.rows || endCol > CLIPBOARD_LIMITS.columns) {
@@ -1187,7 +1227,9 @@
               text: extractCellText(cell),
               ...parsedStyle.config
             };
-            if (rowspan > 1 || colspan > 1) config.merge = true;
+            if (rowspan > 1 || (colspan > 1 && !excelIgnoresColspan)) {
+              config.merge = true;
+            }
             const rangeKey = makeRangeKey(row, col, endRow, endCol);
             ranges[rangeKey] = config;
             addBorderSidesToGrid(
@@ -1209,7 +1251,19 @@
         if (!Object.keys(ranges).length) {
           throw new Error("Bảng Excel không có ô để nhập.");
         }
-        const importedBorders = extractClosedBorderRanges(borderGrid, maxRow, maxCol);
+        const originalBorderEdges = new Set();
+        borderGrid.forEach((sides, key) => {
+          ["top", "right", "bottom", "left"].forEach((side) => {
+            if (sides[side]) originalBorderEdges.add(key + ":" + side);
+          });
+        });
+        mirrorSharedBorderEdges(borderGrid, maxRow, maxCol);
+        const importedBorders = extractClosedBorderRanges(
+          borderGrid,
+          maxRow,
+          maxCol,
+          originalBorderEdges
+        );
         importedBorders.ranges.forEach((range) => {
           const rangeKey = makeRangeKey(range.r1, range.c1, range.r2, range.c2);
           ranges[rangeKey] = {
