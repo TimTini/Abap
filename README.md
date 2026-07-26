@@ -27,6 +27,7 @@ Workflow:
 - Guide: `RULES.md`
 - Object model and canonical path guide: `docs/ABAP_OBJECT_MODEL.md`
 - Parser coverage report for the default sample: `docs/ABAP_PARSER_GAP_REPORT.md`
+- Unsupported parser groups and implementation checklist: `TODO.md`
 
 ## AI / Agent notes
 - Local agent guide: `AGENTS.md`

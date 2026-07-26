@@ -225,3 +225,5 @@ Các statement này không nằm trong số 119 statement bị bỏ, nhưng hi�
 ## Kết luận
 
 Parser còn bỏ **119 logical statement** trong chương trình mẫu này. Ba việc nên làm trước là: bổ sung control-flow cơ bản; tách SQL DML khỏi internal-table DML; sau đó bổ sung event/selection-screen và dataset/cursor.
+
+Danh sách nhóm và checklist triển khai được lưu tại `TODO.md` ở thư mục gốc.
