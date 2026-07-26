@@ -708,8 +708,9 @@
         return cell.col === range.c1;
       }
 
-      function applyConfigStyle(element, cell) {
+      function applyConfigStyle(element, cell, options) {
         const config = cell.config || {};
+        const opts = options && typeof options === "object" ? options : {};
         if (config.background) element.style.backgroundColor = config.background;
         if (config["font color"]) element.style.color = config["font color"];
         const configuredFontFamily = String(config["font family"] || "").trim();
@@ -727,7 +728,9 @@
         if (config.wrap === false) element.style.whiteSpace = "nowrap";
 
         if (config.border === "outside-thin") {
-          const borderLine = "1px solid #000000";
+          const borderLine = opts.forClipboard
+            ? "0.5pt solid #000000"
+            : "1px solid #000000";
           if (config.merge === true) {
             element.style.border = borderLine;
           } else {
@@ -738,6 +741,8 @@
           }
         } else if (config.border) {
           element.style.border = config.border;
+        } else {
+          element.style.border = "none";
         }
       }
 
@@ -771,7 +776,7 @@
             td.setAttribute("data-template-range", cell.rangeKey);
             if (cell.rowspan > 1) td.rowSpan = cell.rowspan;
             if (cell.colspan > 1) td.colSpan = cell.colspan;
-            applyConfigStyle(td, cell);
+            applyConfigStyle(td, cell, opts);
             if (opts.forClipboard) {
               td.style.setProperty("mso-number-format", "\\@");
             }
@@ -868,31 +873,187 @@
 
       function collectCellCss(cell, cssRules) {
         const declarations = [];
-        for (const rule of cssRules) {
+        const matchedRules = [];
+        const selectorSpecificity = (selector) => {
+          const raw = String(selector || "").trim();
+          if (!raw) return [0, 0, 0, 0];
+          const ids = (raw.match(/#[\w-]+/g) || []).length;
+          const classes = (raw.match(/\.[\w-]+/g) || []).length
+            + (raw.match(/\[[^\]]+\]/g) || []).length
+            + (raw.match(/:(?!:)[\w-]+(?:\([^)]*\))?/g) || []).length;
+          const elements = raw.split(/[\s>+~]+/).reduce((total, token) => {
+            const trimmed = token.trim();
+            if (!trimmed || trimmed === "*" || trimmed.startsWith("#") || trimmed.startsWith(".") || trimmed.startsWith("[") || trimmed.startsWith(":")) {
+              return total;
+            }
+            return total + 1;
+          }, 0);
+          return [0, ids, classes, elements];
+        };
+        const compareSpecificity = (left, right) => {
+          for (let index = 0; index < 4; index += 1) {
+            const diff = (left[index] || 0) - (right[index] || 0);
+            if (diff) return diff;
+          }
+          return 0;
+        };
+        for (let ruleIndex = 0; ruleIndex < cssRules.length; ruleIndex += 1) {
+          const rule = cssRules[ruleIndex];
+          let bestSpecificity = null;
           const applies = rule.selectors.some((selector) => {
-              try {
-                return cell.matches(selector);
-              } catch {
-                return false;
-              }
-            });
-          if (applies) declarations.push(rule.declaration);
+            try {
+              if (!cell.matches(selector)) return false;
+            } catch {
+              return false;
+            }
+            const specificity = selectorSpecificity(selector);
+            if (!bestSpecificity || compareSpecificity(specificity, bestSpecificity) > 0) {
+              bestSpecificity = specificity;
+            }
+            return true;
+          });
+          if (applies && bestSpecificity) {
+            matchedRules.push({ declaration: rule.declaration, order: ruleIndex, specificity: bestSpecificity });
+          }
         }
+        matchedRules.sort((left, right) => compareSpecificity(left.specificity, right.specificity) || left.order - right.order);
+        for (const rule of matchedRules) declarations.push(rule.declaration);
         declarations.push(String(cell.getAttribute("style") || ""));
         const probe = document.createElement("span");
         probe.style.cssText = declarations.join(";");
         return probe.style;
       }
 
-      function hasVisibleBorder(style) {
-        const values = [
-          style.getPropertyValue("border"),
-          style.getPropertyValue("border-top"),
-          style.getPropertyValue("border-right"),
-          style.getPropertyValue("border-bottom"),
-          style.getPropertyValue("border-left")
-        ].map((value) => String(value || "").trim().toLowerCase());
-        return values.some((value) => value && value !== "none" && !/^0(?:px|pt)?(?:\s|$)/.test(value));
+      function getVisibleBorderSides(style) {
+        const sides = {};
+        ["top", "right", "bottom", "left"].forEach((side) => {
+          const lineStyle = String(
+            style.getPropertyValue("border-" + side + "-style") || ""
+          ).trim().toLowerCase();
+          const width = String(
+            style.getPropertyValue("border-" + side + "-width") || ""
+          ).trim().toLowerCase();
+          sides[side] = Boolean(
+            lineStyle
+            && lineStyle !== "none"
+            && lineStyle !== "hidden"
+            && width
+            && !/^0(?:px|pt|pc|in|cm|mm)?$/.test(width)
+          );
+        });
+        return sides;
+      }
+
+      function addBorderSidesToGrid(borderGrid, range, sides) {
+        const ensureCell = (row, col) => {
+          const key = row + ":" + col;
+          if (!borderGrid.has(key)) {
+            borderGrid.set(key, { top: false, right: false, bottom: false, left: false });
+          }
+          return borderGrid.get(key);
+        };
+
+        if (sides.top) {
+          for (let col = range.c1; col <= range.c2; col += 1) {
+            ensureCell(range.r1, col).top = true;
+          }
+        }
+        if (sides.right) {
+          for (let row = range.r1; row <= range.r2; row += 1) {
+            ensureCell(row, range.c2).right = true;
+          }
+        }
+        if (sides.bottom) {
+          for (let col = range.c1; col <= range.c2; col += 1) {
+            ensureCell(range.r2, col).bottom = true;
+          }
+        }
+        if (sides.left) {
+          for (let row = range.r1; row <= range.r2; row += 1) {
+            ensureCell(row, range.c1).left = true;
+          }
+        }
+      }
+
+      function extractClosedBorderRanges(borderGrid, maxRow, maxCol) {
+        const working = new Map();
+        borderGrid.forEach((sides, key) => {
+          working.set(key, { ...sides });
+        });
+        const hasEdge = (row, col, side) => {
+          const cell = working.get(row + ":" + col);
+          return Boolean(cell && cell[side]);
+        };
+        const clearEdge = (row, col, side) => {
+          const cell = working.get(row + ":" + col);
+          if (cell) cell[side] = false;
+        };
+        const isClosedRectangle = (r1, c1, r2, c2) => {
+          for (let col = c1; col <= c2; col += 1) {
+            if (!hasEdge(r1, col, "top") || !hasEdge(r2, col, "bottom")) {
+              return false;
+            }
+          }
+          for (let row = r1; row <= r2; row += 1) {
+            if (!hasEdge(row, c1, "left") || !hasEdge(row, c2, "right")) {
+              return false;
+            }
+          }
+          return true;
+        };
+        const consumeRectangle = (range) => {
+          for (let col = range.c1; col <= range.c2; col += 1) {
+            clearEdge(range.r1, col, "top");
+            clearEdge(range.r2, col, "bottom");
+          }
+          for (let row = range.r1; row <= range.r2; row += 1) {
+            clearEdge(row, range.c1, "left");
+            clearEdge(row, range.c2, "right");
+          }
+        };
+
+        const ranges = [];
+        for (let row = 1; row <= maxRow; row += 1) {
+          for (let col = 1; col <= maxCol; col += 1) {
+            if (!hasEdge(row, col, "top") || !hasEdge(row, col, "left")) {
+              continue;
+            }
+            let best = null;
+            findRectangle:
+            for (let endRow = row; endRow <= maxRow; endRow += 1) {
+              if (!hasEdge(endRow, col, "left") || !hasEdge(endRow, col, "bottom")) {
+                continue;
+              }
+              for (let endCol = col; endCol <= maxCol; endCol += 1) {
+                if (
+                  hasEdge(row, endCol, "top")
+                  && hasEdge(row, endCol, "right")
+                  && isClosedRectangle(row, col, endRow, endCol)
+                ) {
+                  best = {
+                    r1: row,
+                    c1: col,
+                    r2: endRow,
+                    c2: endCol
+                  };
+                  break findRectangle;
+                }
+              }
+            }
+            if (best) {
+              ranges.push({ r1: best.r1, c1: best.c1, r2: best.r2, c2: best.c2 });
+              consumeRectangle(best);
+            }
+          }
+        }
+
+        let remainingEdges = 0;
+        working.forEach((sides) => {
+          remainingEdges += ["top", "right", "bottom", "left"]
+            .filter((side) => sides[side])
+            .length;
+        });
+        return { ranges, remainingEdges };
       }
 
       function extractCellText(cell) {
@@ -915,6 +1076,7 @@
       function cellStyleToConfig(cell, warningsState, cssRules) {
         const style = collectCellCss(cell, cssRules);
         const config = {};
+        const borderSides = getVisibleBorderSides(style);
         const background = normalizeColor(style.getPropertyValue("background-color") || cell.getAttribute("bgcolor"));
         const fontColor = normalizeColor(style.getPropertyValue("color"));
         const fontFamily = String(style.getPropertyValue("font-family") || "")
@@ -943,7 +1105,6 @@
         if (["left", "center", "right"].includes(align)) config.align = align;
         if (["top", "middle", "bottom"].includes(valign)) config.valign = valign;
         if (whiteSpace) config.wrap = whiteSpace !== "nowrap";
-        if (hasVisibleBorder(style)) config.border = "outside-thin";
 
         for (let index = 0; index < style.length; index += 1) {
           const property = String(style.item(index) || "").toLowerCase();
@@ -959,7 +1120,7 @@
             warningsState.unsupportedCss.add(property);
           }
         }
-        return config;
+        return { config, borderSides };
       }
 
       function parseClipboardHtml(html) {
@@ -985,6 +1146,7 @@
         const cssRules = collectClipboardCssRules(doc);
         const warningState = { unsupportedCss: new Set() };
         const occupied = new Set();
+        const borderGrid = new Map();
         const ranges = {};
         let cellCount = 0;
         let maxRow = 0;
@@ -1020,13 +1182,19 @@
               }
             }
 
+            const parsedStyle = cellStyleToConfig(cell, warningState, cssRules);
             const config = {
               text: extractCellText(cell),
-              ...cellStyleToConfig(cell, warningState, cssRules)
+              ...parsedStyle.config
             };
             if (rowspan > 1 || colspan > 1) config.merge = true;
             const rangeKey = makeRangeKey(row, col, endRow, endCol);
             ranges[rangeKey] = config;
+            addBorderSidesToGrid(
+              borderGrid,
+              { r1: row, c1: col, r2: endRow, c2: endCol },
+              parsedStyle.borderSides
+            );
             maxRow = Math.max(maxRow, endRow);
             maxCol = Math.max(maxCol, endCol);
 
@@ -1040,6 +1208,21 @@
 
         if (!Object.keys(ranges).length) {
           throw new Error("Bảng Excel không có ô để nhập.");
+        }
+        const importedBorders = extractClosedBorderRanges(borderGrid, maxRow, maxCol);
+        importedBorders.ranges.forEach((range) => {
+          const rangeKey = makeRangeKey(range.r1, range.c1, range.r2, range.c2);
+          ranges[rangeKey] = {
+            ...(ranges[rangeKey] || {}),
+            border: "outside-thin"
+          };
+        });
+        if (importedBorders.remainingEdges) {
+          warnings.push(
+            "Đã bỏ qua "
+            + importedBorders.remainingEdges
+            + " cạnh border rời vì schema demo chỉ hỗ trợ border ngoài khép kín."
+          );
         }
         if (warningState.hasFormula) {
           warnings.push("Công thức Excel không được nhập; demo chỉ dùng text đang hiển thị.");
