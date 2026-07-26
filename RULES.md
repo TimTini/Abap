@@ -110,6 +110,7 @@ Nếu có:
 Parser sẽ:
 - Mở block khi gặp statement start (IF/FORM/CLASS/METHOD/…)
 - Đóng block khi token đầu của statement tiếp theo bằng `endKeyword`
+- `ELSE` đóng nhánh `IF` hiện tại, nằm cùng cấp với `IF`, rồi chứa các statement tiếp theo đến `ENDIF`.
 - Output object sẽ có `block.endRaw` và `block.lineEnd`.
 
 ## 6) `extras.type`: các struct `extras.*` có thể có

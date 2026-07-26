@@ -490,6 +490,30 @@ function testStatementCommentIgnoresLeadingCommentWithBlankGap() {
   assert.strictEqual(formEntry.codeDesc, "");
 }
 
+function testElseStartsSiblingBranch() {
+  const result = parse([
+    "IF lv_flag = abap_true.",
+    "  CLEAR lv_then.",
+    "ELSE.",
+    "  CLEAR lv_else.",
+    "ENDIF.",
+    "WRITE lv_done."
+  ].join("\n"));
+
+  assert.deepStrictEqual(
+    result.objects.map((obj) => obj.objectType),
+    ["IF", "ELSE", "WRITE"],
+    "ELSE must be a sibling of its IF."
+  );
+
+  const [ifObject, elseObject] = result.objects;
+  assert.deepStrictEqual(ifObject.children.map((obj) => obj.objectType), ["CLEAR"]);
+  assert.deepStrictEqual(elseObject.children.map((obj) => obj.objectType), ["CLEAR"]);
+  assert.strictEqual(ifObject.children[0].parent, ifObject.id);
+  assert.strictEqual(elseObject.children[0].parent, elseObject.id);
+  assert.strictEqual(elseObject.block.endRaw, "ENDIF.");
+}
+
 function testSupportedStatementSmokeMatrix() {
   const cases = [
     {
@@ -836,6 +860,10 @@ defineFocusedTest(test, "parser statements regression", ["statements"], async (t
 
   await t.test("statement comment ignores leading comment with blank gap", () => {
     testStatementCommentIgnoresLeadingCommentWithBlankGap();
+  });
+
+  await t.test("else starts sibling branch", () => {
+    testElseStartsSiblingBranch();
   });
 
   await t.test("supported statement smoke matrix", () => {

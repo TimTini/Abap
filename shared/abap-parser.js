@@ -469,7 +469,23 @@
 
     for (const statement of statements) {
       const statementStart = getStatementStartKeyword(statement.raw);
-      const currentFrame = stack.length ? stack[stack.length - 1] : null;
+      let currentFrame = stack.length ? stack[stack.length - 1] : null;
+      const startsElseSibling = Boolean(
+        statementStart === "ELSE"
+        && currentFrame
+        && currentFrame.endKeyword === "ENDIF"
+        && currentFrame.node
+        && currentFrame.node.objectType === "IF"
+      );
+
+      if (startsElseSibling) {
+        currentFrame.node.block.lineEnd = Math.max(
+          Number(currentFrame.node.lineStart || 0) || 0,
+          (Number(statement.lineStart || 0) || 0) - 1
+        );
+        stack.pop();
+        currentFrame = stack.length ? stack[stack.length - 1] : null;
+      }
 
       if (currentFrame && statementStart === currentFrame.endKeyword) {
         currentFrame.node.block.endRaw = statement.raw;
@@ -491,6 +507,13 @@
       for (const node of parsedList) {
         if (statementSegmentIndex !== null && node && typeof node === "object" && node.segmentIndex === undefined) {
           node.segmentIndex = statementSegmentIndex;
+        }
+        if (startsElseSibling && node.objectType === "ELSE" && !node.block) {
+          node.block = {
+            endKeyword: "ENDIF",
+            endRaw: "",
+            lineEnd: null
+          };
         }
         targetList.push(node);
         if (node.block && node.block.endKeyword) {
