@@ -23,7 +23,6 @@
       --layout-left-pane: 48%;
       --layout-splitter-size: 12px;
     }
-
     :root[data-theme="light"] {
       color-scheme: light;
       --bg: #f6f7f9;
@@ -1487,4 +1486,3 @@
         min-height: 200px;
       }
     }
-

@@ -4,11 +4,13 @@
   "version": "0.0.0-test",
   "scripts": {
     "build:baselines": "node tests/build-regression-baselines.js",
-    "test:parser": "node tests/parser-regression.js && node tests/parser-contracts.js",
-    "test:runtime": "node tests/runtime-bundle-contracts.js",
-    "test:viewer": "node tests/viewer-contracts.js",
-    "test:contracts": "node tests/parser-contracts.js && node tests/runtime-bundle-contracts.js && node tests/viewer-contracts.js",
-    "test:all": "npm run test:parser && npm run test:runtime && npm run test:viewer && node --check shared/abap-parser.js && node --check viewer/app.js"
+    "test": "node tests/run.js full",
+    "test:fast": "node tests/run.js fast",
+    "test:full": "node tests/run.js full",
+    "test:parser": "node tests/run.js parser",
+    "test:runtime": "node tests/run.js runtime",
+    "test:viewer": "node tests/run.js viewer",
+    "test:contracts": "node tests/run.js contracts"
   },
   "devDependencies": {
     "jsdom": "^24.1.3"

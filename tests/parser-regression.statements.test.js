@@ -1,0 +1,844 @@
+"use strict";
+
+const assert = require("assert");
+const { test } = require("node:test");
+const { defineFocusedTest } = require("./helpers/test-focus");
+const {
+  assertHasObjectTypes,
+  findObject,
+  findObjects,
+  flattenObjects,
+  getConfigFileNames,
+  getValue,
+  getValueEntry,
+  parse
+} = require("./helpers/parser-test-helpers");
+
+function testMultipleStatementsOnSingleLine() {
+  const result = parse("DATA lv_a TYPE i. DATA lv_b TYPE i. lv_a = 1. lv_b = 2.\n");
+  const objects = flattenObjects(result.objects);
+  const dataObjects = findObjects(objects, "DATA");
+  const assignmentObjects = findObjects(objects, "ASSIGNMENT");
+
+  assert.strictEqual(dataObjects.length, 2, "Expected two DATA objects from one-line statements.");
+  assert.strictEqual(assignmentObjects.length, 2, "Expected two ASSIGNMENT objects from one-line statements.");
+  assert.strictEqual(getValue(dataObjects[0].values, "name"), "lv_a");
+  assert.strictEqual(getValue(dataObjects[1].values, "name"), "lv_b");
+  assert.strictEqual(getValue(assignmentObjects[0].values, "target"), "lv_a");
+  assert.strictEqual(getValue(assignmentObjects[1].values, "target"), "lv_b");
+  assert.strictEqual(dataObjects[0].lineStart, 1, "First DATA statement should keep its source line.");
+  assert.strictEqual(dataObjects[1].lineStart, 1, "Second DATA statement should keep its source line.");
+  assert.strictEqual(assignmentObjects[0].lineStart, 1, "First assignment should keep its source line.");
+  assert.strictEqual(assignmentObjects[1].lineStart, 1, "Second assignment should keep its source line.");
+}
+
+function testSingleLineTrailingCommentAppliesToLastStatementOnly() {
+  const result = parse("DATA lv_a TYPE i. DATA lv_b TYPE i. \"last-data-comment\n");
+  const objects = flattenObjects(result.objects);
+  const dataObjects = findObjects(objects, "DATA");
+
+  assert.strictEqual(dataObjects.length, 2, "Expected two DATA objects from one-line statements with comment.");
+  assert.strictEqual(dataObjects[0].comment, "");
+  assert.strictEqual(dataObjects[1].comment, "last-data-comment");
+}
+
+function testDecimalLiteralDoesNotSplitStatement() {
+  const result = parse("DATA lv_total TYPE decfloat34.\nlv_total = 1.5.\n");
+  const objects = flattenObjects(result.objects);
+  const assignmentObjects = findObjects(objects, "ASSIGNMENT");
+
+  assert.strictEqual(assignmentObjects.length, 1, "Expected a single ASSIGNMENT for decimal literal.");
+  assert.strictEqual(assignmentObjects[0].raw, "lv_total = 1.5.");
+  assert.strictEqual(getValue(assignmentObjects[0].values, "expr"), "1.5");
+}
+
+function testChainedDataStatementSingleLine() {
+  const result = parse("DATA: lv_a TYPE i, lv_b TYPE i.\n");
+  const objects = flattenObjects(result.objects);
+  const dataObjects = findObjects(objects, "DATA");
+
+  assert.strictEqual(dataObjects.length, 2, "Expected chained DATA statement to split into two DATA objects.");
+  assert.strictEqual(getValue(dataObjects[0].values, "name"), "lv_a");
+  assert.strictEqual(getValue(dataObjects[1].values, "name"), "lv_b");
+}
+
+function testChainedDataStatementAcrossLines() {
+  const code = [
+    "DATA: lv_a TYPE i,",
+    "      lv_b TYPE i.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+  const dataObjects = findObjects(objects, "DATA");
+
+  assert.strictEqual(dataObjects.length, 2, "Expected multi-line chained DATA statement to split into two DATA objects.");
+  assert.strictEqual(getValue(dataObjects[0].values, "name"), "lv_a");
+  assert.strictEqual(getValue(dataObjects[1].values, "name"), "lv_b");
+}
+
+function testChainedDataStatementKeepsCommaInsideTemplateLiteral() {
+  const result = parse("DATA: lv_text TYPE string VALUE |A, B|, lv_other TYPE string VALUE |C|.\n");
+  const objects = flattenObjects(result.objects);
+  const dataObjects = findObjects(objects, "DATA");
+
+  assert.strictEqual(dataObjects.length, 2, "Expected commas inside template literals not to break chained DATA splitting.");
+  assert.strictEqual(getValue(dataObjects[0].values, "name"), "lv_text");
+  assert.strictEqual(getValue(dataObjects[0].values, "value"), "|A, B|");
+  assert.strictEqual(getValue(dataObjects[1].values, "name"), "lv_other");
+  assert.strictEqual(getValue(dataObjects[1].values, "value"), "|C|");
+}
+
+function testChainedConstantsKeepItemCommentsWithoutHeaderLeak() {
+  const code = [
+    "* Hằng số dùng chung",
+    "CONSTANTS: gc_true TYPE abap_bool VALUE abap_true,  \"Giá trị boolean đúng",
+    "  gc_status_empty TYPE string VALUE 'EMPTY'.    \"Trạng thái chưa có khách",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = findObjects(flattenObjects(result.objects), "CONSTANTS");
+
+  assert.strictEqual(objects.length, 2, "Expected two chained CONSTANTS objects.");
+  assert.strictEqual(objects[0].comment, "Giá trị boolean đúng");
+  assert.strictEqual(objects[1].comment, "Trạng thái chưa có khách");
+  assert.strictEqual(getValueEntry(objects[0].values, "name").codeDesc, "Giá trị boolean đúng");
+  assert.strictEqual(getValueEntry(objects[1].values, "name").codeDesc, "Trạng thái chưa có khách");
+}
+
+function testChainedConstantsUseSingleInternalCommentForNextItem() {
+  const code = [
+    "* Hằng số dùng chung",
+    "CONSTANTS:",
+    "* Giá trị boolean đúng",
+    "  gc_true TYPE abap_bool VALUE abap_true,",
+    "  gc_status_empty TYPE string VALUE 'EMPTY'.    \"Trạng thái chưa có khách",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = findObjects(flattenObjects(result.objects), "CONSTANTS");
+
+  assert.strictEqual(objects.length, 2, "Expected two chained CONSTANTS objects.");
+  assert.strictEqual(objects[0].comment, "Giá trị boolean đúng");
+  assert.strictEqual(objects[1].comment, "Trạng thái chưa có khách");
+  assert.strictEqual(getValueEntry(objects[0].values, "name").codeDesc, "Giá trị boolean đúng");
+  assert.strictEqual(getValueEntry(objects[1].values, "name").codeDesc, "Trạng thái chưa có khách");
+}
+
+function testConstantsCaptureCompleteInitializer() {
+  const code = [
+    "CONSTANTS: gc_initial TYPE string VALUE IS INITIAL,",
+    "  gc_text TYPE string VALUE 'READY'.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = findObjects(flattenObjects(result.objects), "CONSTANTS");
+
+  assert.strictEqual(objects.length, 2, "Expected both chained constants.");
+  assert.strictEqual(
+    getValue(objects[0].values, "value"),
+    "IS INITIAL",
+    "Expected the full multi-token constant initializer."
+  );
+  assert.strictEqual(getValue(objects[1].values, "value"), "'READY'");
+}
+
+function testGenericChainedStatementUsesPerItemComment() {
+  const code = [
+    "* Header must not describe a chained item",
+    "CLEAR:",
+    "* Clear first target",
+    "  lv_first,",
+    "  lv_second. \"Clear second target",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = findObjects(flattenObjects(result.objects), "CLEAR");
+
+  assert.strictEqual(objects.length, 2, "Expected CLEAR chain to use the generic chained splitter.");
+  assert.strictEqual(getValue(objects[0].values, "target"), "lv_first");
+  assert.strictEqual(getValue(objects[1].values, "target"), "lv_second");
+  assert.strictEqual(objects[0].comment, "Clear first target");
+  assert.strictEqual(objects[1].comment, "Clear second target");
+}
+
+function testChainedCommentsRejectBlocksGapsAndUnfinishedItems() {
+  const code = [
+    "DATA:",
+    "* block line one",
+    "* block line two",
+    "  lv_block TYPE i,",
+    "* separated comment",
+    "",
+    "  lv_gap TYPE i,",
+    "* separated by decoration",
+    "* -----------------------",
+    "  lv_decorated TYPE i,",
+    "  lv_unfinished TYPE",
+    "* comment inside unfinished item",
+    "    i.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = findObjects(flattenObjects(result.objects), "DATA");
+
+  assert.deepStrictEqual(
+    objects.map((obj) => obj.comment),
+    ["", "", "", ""],
+    "Comment blocks, gaps, decorative gaps, and comments inside an unfinished item must not describe chained items."
+  );
+}
+
+function testChainedStructCommentsUseSegmentMetadata() {
+  const code = [
+    "* DATA header must not become the root description",
+    "DATA:",
+    "* Data root description",
+    "  BEGIN OF ls_data,",
+    "  field_inline TYPE string, \"Inline data field",
+    "* Internal data field",
+    "  field_internal TYPE i,",
+    "  END OF ls_data.",
+    "* TYPES header must not become the root description",
+    "TYPES:",
+    "* Type root description",
+    "  BEGIN OF ty_data,",
+    "  field_inline TYPE string, \"Inline type field",
+    "* Internal type field",
+    "  field_internal TYPE i,",
+    "  END OF ty_data.",
+    "DATA ls_typed TYPE ty_data.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+  const dataObjects = findObjects(objects, "DATA");
+  const typeObjects = findObjects(objects, "TYPES");
+  const declByName = new Map(result.decls.map((decl) => [String(decl.name || "").toUpperCase(), decl]));
+
+  assert.strictEqual(dataObjects[0].comment, "Data root description");
+  assert.strictEqual(dataObjects[1].comment, "Inline data field");
+  assert.strictEqual(dataObjects[2].comment, "Internal data field");
+  assert.strictEqual(typeObjects[0].comment, "Type root description");
+  assert.strictEqual(typeObjects[1].comment, "Inline type field");
+  assert.strictEqual(typeObjects[2].comment, "Internal type field");
+  assert.strictEqual(declByName.get("LS_DATA").comment, "Data root description");
+  assert.strictEqual(declByName.get("LS_DATA-FIELD_INLINE").comment, "Inline data field");
+  assert.strictEqual(declByName.get("LS_DATA-FIELD_INTERNAL").comment, "Internal data field");
+  assert.strictEqual(declByName.get("TY_DATA").comment, "Type root description");
+  assert.strictEqual(declByName.get("LS_TYPED-FIELD_INLINE").comment, "Inline type field");
+  assert.strictEqual(declByName.get("LS_TYPED-FIELD_INTERNAL").comment, "Internal type field");
+}
+
+function testNonChainedStructKeepsSingleLeadingComment() {
+  const code = [
+    "* Non-chain data root description",
+    "DATA BEGIN OF ls_data,",
+    "  field_one TYPE string,",
+    "  END OF ls_data.",
+    "* Non-chain type root description",
+    "TYPES BEGIN OF ty_data,",
+    "  field_one TYPE string,",
+    "  END OF ty_data.",
+    "DATA ls_typed TYPE ty_data.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const declByName = new Map(result.decls.map((decl) => [String(decl.name || "").toUpperCase(), decl]));
+  const dataRoot = declByName.get("LS_DATA");
+  const dataField = declByName.get("LS_DATA-FIELD_ONE");
+  const typeRoot = declByName.get("TY_DATA");
+  const typedField = declByName.get("LS_TYPED-FIELD_ONE");
+
+  assert(dataRoot && dataField && typeRoot && typedField, "Expected non-chain DATA/TYPES struct declarations.");
+  assert.strictEqual(dataRoot.comment, "Non-chain data root description");
+  assert.strictEqual(dataField.structComment, "Non-chain data root description");
+  assert.strictEqual(typeRoot.comment, "Non-chain type root description");
+  assert.strictEqual(typedField.structTypeComment, "Non-chain type root description");
+}
+
+function testNonChainedStructKeepsLeadingCommentBlock() {
+  const code = [
+    "* Non-chain data root",
+    "* second documentation line",
+    "DATA BEGIN OF ls_data_block,",
+    "  field_one TYPE string,",
+    "  END OF ls_data_block.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const declByName = new Map(result.decls.map((decl) => [String(decl.name || "").toUpperCase(), decl]));
+  const dataRoot = declByName.get("LS_DATA_BLOCK");
+  const dataField = declByName.get("LS_DATA_BLOCK-FIELD_ONE");
+
+  assert(dataRoot && dataField, "Expected the non-chain struct declaration and field.");
+  assert.strictEqual(dataRoot.comment, "Non-chain data root second documentation line");
+  assert.strictEqual(dataField.structComment, "Non-chain data root second documentation line");
+}
+
+function testBacktickLiteralKeepsStatementAndInlineComment() {
+  const result = parse('DATA lv_text TYPE string VALUE `A.B "C`. DATA lv_other TYPE string.\n');
+  const objects = flattenObjects(result.objects);
+  const dataObjects = findObjects(objects, "DATA");
+
+  assert.strictEqual(dataObjects.length, 2, "Expected backtick literals to keep the statement intact.");
+  assert.strictEqual(getValue(dataObjects[0].values, "name"), "lv_text");
+  assert.strictEqual(getValue(dataObjects[0].values, "value"), '`A.B "C`');
+  assert.strictEqual(dataObjects[0].comment, "");
+  assert.strictEqual(getValue(dataObjects[1].values, "name"), "lv_other");
+}
+
+function testInlineCommentInsideSingleQuote() {
+  const result = parse("DATA lv TYPE string.\nlv = 'A\"B'.\n");
+  const objects = flattenObjects(result.objects);
+  const assignment = findObject(objects, "ASSIGNMENT");
+  assert(assignment, "Expected ASSIGNMENT object for string containing quote.");
+  assert.strictEqual(assignment.raw, "lv = 'A\"B'.");
+}
+
+function testInlineCommentInsideTemplate() {
+  const result = parse("DATA lv TYPE string.\nlv = |A \" B|.\n");
+  const objects = flattenObjects(result.objects);
+  const assignment = findObject(objects, "ASSIGNMENT");
+  assert(assignment, "Expected ASSIGNMENT object for template containing quote.");
+  assert.strictEqual(assignment.raw, "lv = |A \" B|.");
+}
+
+function testEscapedSingleQuoteTokenization() {
+  const result = parse("DATA lv TYPE string.\nlv = 'a''b'.\n");
+  const objects = flattenObjects(result.objects);
+  const assignment = findObject(objects, "ASSIGNMENT");
+  assert(assignment, "Expected ASSIGNMENT object for escaped quote.");
+  assert.strictEqual(getValue(assignment.values, "expr"), "'a''b'");
+}
+
+function testAssignmentKeepsFullExpression() {
+  const code = [
+    "DATA lo TYPE REF TO object.",
+    "CALL METHOD lo->m",
+    "  EXPORTING",
+    "    iv = VALUE string( 'A' ).",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+  const callMethod = findObject(objects, "CALL_METHOD");
+  assert(callMethod && callMethod.extras && callMethod.extras.callMethod, "Expected CALL_METHOD extras.");
+  const exporting = callMethod.extras.callMethod.exporting || [];
+  assert(exporting.length > 0, "Expected at least one EXPORTING assignment.");
+  assert.strictEqual(exporting[0].value, "VALUE string( 'A' )");
+}
+
+function testInlineDataReferenceInAssignment() {
+  const code = [
+    "CALL METHOD lo->m",
+    "  IMPORTING",
+    "    ev = DATA(lv).",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+  const callMethod = findObject(objects, "CALL_METHOD");
+  assert(callMethod && callMethod.extras && callMethod.extras.callMethod, "Expected CALL_METHOD extras.");
+  const importing = callMethod.extras.callMethod.importing || [];
+  assert(importing.length > 0, "Expected at least one IMPORTING assignment.");
+  assert.strictEqual(importing[0].valueRef, "lv");
+}
+
+function testCallMethodExpressionWithAssignmentReceiver() {
+  const code = [
+    "DATA lv_result TYPE syuname.",
+    "DATA p_user TYPE syuname.",
+    "lv_result = lcl_demo=>get_default( EXPORTING iv_user = p_user ).",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+  const callMethod = findObject(objects, "CALL_METHOD");
+  assert(callMethod && callMethod.extras && callMethod.extras.callMethod, "Expected CALL_METHOD object for expression call.");
+  assert.strictEqual(getValue(callMethod.values, "target"), "lcl_demo=>get_default");
+  assert.strictEqual(getValue(callMethod.values, "receivingRaw"), "result = lv_result");
+
+  const extras = callMethod.extras.callMethod;
+  assert.strictEqual(extras.target, "lcl_demo=>get_default");
+  assert.strictEqual(extras.exporting.length, 1);
+  assert.strictEqual(extras.exporting[0].name, "iv_user");
+  assert.strictEqual(extras.exporting[0].value, "p_user");
+  assert.strictEqual(extras.exporting[0].valueRef, "p_user");
+  assert(extras.exporting[0].valueDecl, "Expected decl for expression EXPORTING argument.");
+  assert.strictEqual(extras.exporting[0].valueDecl.name, "p_user");
+
+  assert.strictEqual(extras.receiving.length, 1);
+  assert.strictEqual(extras.receiving[0].value, "lv_result");
+  assert.strictEqual(extras.receiving[0].valueRef, "lv_result");
+  assert(extras.receiving[0].valueDecl, "Expected decl for expression receiving target.");
+  assert.strictEqual(extras.receiving[0].valueDecl.name, "lv_result");
+}
+
+function testCallMethodExpressionStandalone() {
+  const code = [
+    "DATA lo_demo TYPE REF TO object.",
+    "DATA p_user TYPE syuname.",
+    "lo_demo->do_something( EXPORTING iv_user = p_user ).",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+  const callMethod = findObject(objects, "CALL_METHOD");
+  assert(callMethod && callMethod.extras && callMethod.extras.callMethod, "Expected CALL_METHOD object for standalone expression call.");
+  assert.strictEqual(getValue(callMethod.values, "target"), "lo_demo->do_something");
+  assert.strictEqual(getValue(callMethod.values, "exportingRaw"), "iv_user = p_user");
+  assert.strictEqual(getValue(callMethod.values, "receivingRaw"), "");
+
+  const extras = callMethod.extras.callMethod;
+  assert.strictEqual(extras.target, "lo_demo->do_something");
+  assert.strictEqual(extras.exporting.length, 1);
+  assert.strictEqual(extras.exporting[0].name, "iv_user");
+  assert.strictEqual(extras.exporting[0].value, "p_user");
+  assert.strictEqual(extras.exporting[0].valueRef, "p_user");
+  assert(extras.exporting[0].valueDecl, "Expected decl for standalone expression EXPORTING argument.");
+  assert.strictEqual(extras.exporting[0].valueDecl.name, "p_user");
+  assert.strictEqual(extras.receiving.length, 0);
+}
+
+function testStatementCommentPrefersFirstInline() {
+  const code = [
+    "PERFORM main",
+    "  USING p_user \"first-inline",
+    "        p_flag \"second-inline",
+    "  CHANGING lv_text.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+  const perform = findObject(objects, "PERFORM");
+  assert(perform, "Expected PERFORM object.");
+  assert.strictEqual(perform.comment, "first-inline");
+
+  const formEntry = getValueEntry(perform.values, "form");
+  assert(formEntry, "Expected values.form entry.");
+  assert.strictEqual(formEntry.codeDesc, "first-inline");
+}
+
+function testStatementCommentFallsBackToSingleLeadingLine() {
+  const code = [
+    "\"leading-comment",
+    "PERFORM main USING p_user CHANGING lv_text.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+  const perform = findObject(objects, "PERFORM");
+  assert(perform, "Expected PERFORM object.");
+  assert.strictEqual(perform.comment, "leading-comment");
+
+  const formEntry = getValueEntry(perform.values, "form");
+  assert(formEntry, "Expected values.form entry.");
+  assert.strictEqual(formEntry.codeDesc, "leading-comment");
+}
+
+function testStatementCommentIgnoresLeadingCommentBlock() {
+  const code = [
+    "\"line-1",
+    "\"line-2",
+    "PERFORM main USING p_user CHANGING lv_text.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+  const perform = findObject(objects, "PERFORM");
+  assert(perform, "Expected PERFORM object.");
+  assert.strictEqual(perform.comment, "");
+
+  const formEntry = getValueEntry(perform.values, "form");
+  assert(formEntry, "Expected values.form entry.");
+  assert.strictEqual(formEntry.codeDesc, "");
+}
+
+function testStatementCommentIgnoresLeadingCommentWithBlankGap() {
+  const code = [
+    "\"leading-comment",
+    "",
+    "PERFORM main USING p_user CHANGING lv_text.",
+    ""
+  ].join("\n");
+
+  const result = parse(code);
+  const objects = flattenObjects(result.objects);
+  const perform = findObject(objects, "PERFORM");
+  assert(perform, "Expected PERFORM object.");
+  assert.strictEqual(perform.comment, "");
+
+  const formEntry = getValueEntry(perform.values, "form");
+  assert(formEntry, "Expected values.form entry.");
+  assert.strictEqual(formEntry.codeDesc, "");
+}
+
+function testSupportedStatementSmokeMatrix() {
+  const cases = [
+    {
+      name: "append",
+      covers: ["append.json"],
+      expectedTypes: ["APPEND"],
+      code: "APPEND ls_row TO lt_rows.\n"
+    },
+    {
+      name: "assignment",
+      covers: ["assignment.json"],
+      expectedTypes: ["ASSIGNMENT"],
+      code: "lv_total = gv_total + 1.\n"
+    },
+    {
+      name: "call-function",
+      covers: ["call-function.json"],
+      expectedTypes: ["CALL_FUNCTION"],
+      code: "CALL FUNCTION 'Z_DEMO' EXPORTING iv_user = p_user IMPORTING ev_text = lv_text.\n"
+    },
+    {
+      name: "call-method-expression",
+      covers: ["call-method-expression.json"],
+      expectedTypes: ["CALL_METHOD"],
+      code: "lv_result = lcl_demo=>get_default( EXPORTING iv_user = p_user ).\n"
+    },
+    {
+      name: "call-method-classic",
+      covers: ["call-method.json"],
+      expectedTypes: ["CALL_METHOD"],
+      code: "CALL METHOD lo_demo->run EXPORTING iv_user = p_user IMPORTING ev_text = lv_text.\n"
+    },
+    {
+      name: "call-transaction",
+      covers: ["call-transaction.json"],
+      expectedTypes: ["CALL_TRANSACTION"],
+      code: "CALL TRANSACTION 'SE38'.\n"
+    },
+    {
+      name: "case-when",
+      covers: ["case.json", "when.json"],
+      expectedTypes: ["CASE", "WHEN"],
+      code: "CASE lv_kind. WHEN 'A'. ENDCASE.\n"
+    },
+    {
+      name: "try-catch-cleanup",
+      covers: ["try.json", "catch.json", "cleanup.json"],
+      expectedTypes: ["TRY", "CATCH", "CLEANUP"],
+      code: "TRY. CATCH cx_root INTO DATA(lx_root). CLEANUP. ENDTRY.\n"
+    },
+    {
+      name: "class-data",
+      covers: ["class-data.json"],
+      expectedTypes: ["CLASS-DATA"],
+      code: "CLASS-DATA gv_count TYPE i.\n"
+    },
+    {
+      name: "class-methods",
+      covers: ["class-methods.json"],
+      expectedTypes: ["CLASS-METHODS"],
+      code: "CLASS-METHODS build RETURNING VALUE(rv_text) TYPE string.\n"
+    },
+    {
+      name: "class",
+      covers: ["class.json"],
+      expectedTypes: ["CLASS"],
+      code: "CLASS lcl_demo DEFINITION. ENDCLASS.\n"
+    },
+    {
+      name: "clear",
+      covers: ["clear.json"],
+      expectedTypes: ["CLEAR"],
+      code: "CLEAR lv_text.\n"
+    },
+    {
+      name: "constants",
+      covers: ["constants.json"],
+      expectedTypes: ["CONSTANTS"],
+      code: "CONSTANTS gc_flag TYPE abap_bool VALUE abap_true.\n"
+    },
+    {
+      name: "data",
+      covers: ["data.json"],
+      expectedTypes: ["DATA"],
+      code: "DATA lv_text TYPE string.\n"
+    },
+    {
+      name: "delete-itab",
+      covers: ["delete-itab.json"],
+      expectedTypes: ["DELETE_ITAB"],
+      code: "DELETE lt_rows WHERE id = lv_id.\n"
+    },
+    {
+      name: "do",
+      covers: ["do.json"],
+      expectedTypes: ["DO"],
+      code: "DO 2 TIMES. ENDDO.\n"
+    },
+    {
+      name: "if-elseif-else",
+      covers: ["if.json", "elseif.json", "else.json"],
+      expectedTypes: ["IF", "ELSEIF", "ELSE"],
+      code: "IF lv_kind = 'A'. ELSEIF lv_kind = 'B'. ELSE. ENDIF.\n"
+    },
+    {
+      name: "field-symbols",
+      covers: ["field-symbols.json"],
+      expectedTypes: ["FIELD-SYMBOLS"],
+      code: "FIELD-SYMBOLS <ls_row> TYPE any.\n"
+    },
+    {
+      name: "form",
+      covers: ["form.json"],
+      expectedTypes: ["FORM"],
+      code: "FORM main USING p_user TYPE syuname. ENDFORM.\n"
+    },
+    {
+      name: "insert-itab",
+      covers: ["insert-itab.json"],
+      expectedTypes: ["INSERT_ITAB"],
+      code: "INSERT ls_row INTO TABLE lt_rows.\n"
+    },
+    {
+      name: "loop-at-itab",
+      covers: ["loop-at-itab.json"],
+      expectedTypes: ["LOOP_AT_ITAB"],
+      code: "LOOP AT lt_rows INTO ls_row. ENDLOOP.\n"
+    },
+    {
+      name: "method",
+      covers: ["method.json"],
+      expectedTypes: ["METHOD"],
+      code: "METHOD run. ENDMETHOD.\n"
+    },
+    {
+      name: "methods",
+      covers: ["methods.json"],
+      expectedTypes: ["METHODS"],
+      code: "METHODS run IMPORTING iv_user TYPE syuname RETURNING VALUE(rv_text) TYPE string.\n"
+    },
+    {
+      name: "message",
+      covers: ["message.json"],
+      expectedTypes: ["MESSAGE"],
+      code: "MESSAGE 'Saved' TYPE 'S'.\n"
+    },
+    {
+      name: "modify-itab",
+      covers: ["modify-itab.json"],
+      expectedTypes: ["MODIFY_ITAB"],
+      code: "MODIFY lt_rows FROM ls_row TRANSPORTING name WHERE id = lv_id.\n"
+    },
+    {
+      name: "move-corresponding",
+      covers: ["move-corresponding.json"],
+      expectedTypes: ["MOVE-CORRESPONDING"],
+      code: "MOVE-CORRESPONDING ls_src TO ls_dst.\n"
+    },
+    {
+      name: "move",
+      covers: ["move.json"],
+      expectedTypes: ["MOVE"],
+      code: "MOVE lv_src TO lv_dst.\n"
+    },
+    {
+      name: "parameters",
+      covers: ["parameters.json"],
+      expectedTypes: ["PARAMETERS"],
+      code: "PARAMETERS p_user TYPE syuname.\n"
+    },
+    {
+      name: "perform",
+      covers: ["perform.json"],
+      expectedTypes: ["PERFORM"],
+      code: "PERFORM main USING p_user CHANGING lv_text.\n"
+    },
+    {
+      name: "ranges",
+      covers: ["ranges.json"],
+      expectedTypes: ["RANGES"],
+      code: "RANGES lr_user FOR sy-uname.\n"
+    },
+    {
+      name: "read-table",
+      covers: ["read-table.json"],
+      expectedTypes: ["READ_TABLE"],
+      code: "READ TABLE lt_rows WITH KEY id = lv_id INTO ls_row.\n"
+    },
+    {
+      name: "select-options",
+      covers: ["select-options.json"],
+      expectedTypes: ["SELECT-OPTIONS"],
+      code: "SELECT-OPTIONS s_user FOR sy-uname.\n"
+    },
+    {
+      name: "select",
+      covers: ["select.json"],
+      expectedTypes: ["SELECT"],
+      code: "SELECT * FROM usr02 INTO TABLE lt_users WHERE bname = p_user.\n"
+    },
+    {
+      name: "sort-itab",
+      covers: ["sort-itab.json"],
+      expectedTypes: ["SORT_ITAB"],
+      code: "SORT lt_rows BY id.\n"
+    },
+    {
+      name: "statics",
+      covers: ["statics.json"],
+      expectedTypes: ["STATICS"],
+      code: "STATICS sv_count TYPE i.\n"
+    },
+    {
+      name: "types",
+      covers: ["types.json"],
+      expectedTypes: ["TYPES"],
+      code: "TYPES ty_text TYPE string.\n"
+    },
+    {
+      name: "write",
+      covers: ["write.json"],
+      expectedTypes: ["WRITE"],
+      code: "WRITE 'Saved'.\n"
+    }
+  ];
+
+  const coveredConfigFiles = new Set();
+  for (const smokeCase of cases) {
+    for (const configFile of smokeCase.covers) {
+      coveredConfigFiles.add(configFile);
+    }
+    const result = parse(smokeCase.code);
+    const objects = flattenObjects(result.objects);
+    assertHasObjectTypes(objects, smokeCase.expectedTypes, smokeCase.name);
+  }
+
+  assert.deepStrictEqual(
+    Array.from(coveredConfigFiles).sort(),
+    getConfigFileNames(),
+    "Smoke matrix must cover every parser config file."
+  );
+}
+
+defineFocusedTest(test, "parser statements regression", ["statements"], async (t) => {
+  await t.test("multiple statements on single line", () => {
+    testMultipleStatementsOnSingleLine();
+  });
+
+  await t.test("single line trailing comment applies to last statement only", () => {
+    testSingleLineTrailingCommentAppliesToLastStatementOnly();
+  });
+
+  await t.test("decimal literal does not split statement", () => {
+    testDecimalLiteralDoesNotSplitStatement();
+  });
+
+  await t.test("chained data statement single line", () => {
+    testChainedDataStatementSingleLine();
+  });
+
+  await t.test("chained data statement across lines", () => {
+    testChainedDataStatementAcrossLines();
+  });
+
+  await t.test("chained data statement keeps comma inside template literal", () => {
+    testChainedDataStatementKeepsCommaInsideTemplateLiteral();
+  });
+
+  await t.test("chained constants keep item comments without header leak", () => {
+    testChainedConstantsKeepItemCommentsWithoutHeaderLeak();
+  });
+
+  await t.test("chained constants use single internal comment for next item", () => {
+    testChainedConstantsUseSingleInternalCommentForNextItem();
+  });
+
+  await t.test("constants capture complete initializer", () => {
+    testConstantsCaptureCompleteInitializer();
+  });
+
+  await t.test("generic chained statement uses per item comment", () => {
+    testGenericChainedStatementUsesPerItemComment();
+  });
+
+  await t.test("chained comments reject blocks gaps and unfinished items", () => {
+    testChainedCommentsRejectBlocksGapsAndUnfinishedItems();
+  });
+
+  await t.test("chained struct comments use segment metadata", () => {
+    testChainedStructCommentsUseSegmentMetadata();
+  });
+
+  await t.test("non chained struct keeps single leading comment", () => {
+    testNonChainedStructKeepsSingleLeadingComment();
+  });
+
+  await t.test("non chained struct keeps leading comment block", () => {
+    testNonChainedStructKeepsLeadingCommentBlock();
+  });
+
+  await t.test("backtick literal keeps statement and inline comment", () => {
+    testBacktickLiteralKeepsStatementAndInlineComment();
+  });
+
+  await t.test("inline comment inside single quote", () => {
+    testInlineCommentInsideSingleQuote();
+  });
+
+  await t.test("inline comment inside template", () => {
+    testInlineCommentInsideTemplate();
+  });
+
+  await t.test("escaped single quote tokenization", () => {
+    testEscapedSingleQuoteTokenization();
+  });
+
+  await t.test("assignment keeps full expression", () => {
+    testAssignmentKeepsFullExpression();
+  });
+
+  await t.test("inline data reference in assignment", () => {
+    testInlineDataReferenceInAssignment();
+  });
+
+  await t.test("call method expression with assignment receiver", () => {
+    testCallMethodExpressionWithAssignmentReceiver();
+  });
+
+  await t.test("call method expression standalone", () => {
+    testCallMethodExpressionStandalone();
+  });
+
+  await t.test("statement comment prefers first inline", () => {
+    testStatementCommentPrefersFirstInline();
+  });
+
+  await t.test("statement comment falls back to single leading line", () => {
+    testStatementCommentFallsBackToSingleLeadingLine();
+  });
+
+  await t.test("statement comment ignores leading comment block", () => {
+    testStatementCommentIgnoresLeadingCommentBlock();
+  });
+
+  await t.test("statement comment ignores leading comment with blank gap", () => {
+    testStatementCommentIgnoresLeadingCommentWithBlankGap();
+  });
+
+  await t.test("supported statement smoke matrix", () => {
+    testSupportedStatementSmokeMatrix();
+  });
+});

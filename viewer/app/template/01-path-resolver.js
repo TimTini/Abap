@@ -8,242 +8,73 @@
   const els = runtime.els;
   const constants = runtime.constants || {};
   const { DESC_STORAGE_KEY_V2, DESC_STORAGE_KEY_LEGACY_V1, SETTINGS_STORAGE_KEY_V1, TEMPLATE_CONFIG_STORAGE_KEY_V1, THEME_STORAGE_KEY_V1, LAYOUT_SPLIT_STORAGE_KEY_V1, LAYOUT_SPLIT_DEFAULT, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX, MOBILE_LAYOUT_QUERY, RENDER_TREE_OPTIONS, DECL_TYPE_OPTIONS, NAME_CODE_OPTIONS, DEFAULT_SETTINGS, TEMPLATE_DEFAULT_CONFIG_V1, SAMPLE_ABAP } = constants;
-  const createTemplateBaseStyle = runtime.requireServiceMethod("runtimeState", "createTemplateBaseStyle");
-  const createKeywordDescriptionTemplate = runtime.requireServiceMethod("runtimeState", "createKeywordDescriptionTemplate");
-  const createAppendLinesOfTemplate = runtime.requireServiceMethod("runtimeState", "createAppendLinesOfTemplate");
-  const createConditionRowTemplate = runtime.requireServiceMethod("runtimeState", "createConditionRowTemplate");
   const setError = runtime.requireServiceMethod("runtimeState", "setError");
-  const parseDateCandidate = runtime.requireServiceMethod("runtimeState", "parseDateCandidate");
-  const formatDateTime = runtime.requireServiceMethod("runtimeState", "formatDateTime");
-  const getMetaContent = runtime.requireServiceMethod("runtimeState", "getMetaContent");
-  const renderBuildInfo = runtime.requireServiceMethod("runtimeState", "renderBuildInfo");
-  const normalizeId = runtime.requireServiceMethod("runtimeState", "normalizeId");
-  const flattenEntryMap = runtime.requireServiceMethod("runtimeState", "flattenEntryMap");
   const getKeywordEntries = runtime.requireServiceMethod("runtimeState", "getKeywordEntries");
   const getValueEntries = runtime.requireServiceMethod("runtimeState", "getValueEntries");
-  const getFirstValueFromValues = runtime.requireServiceMethod("runtimeState", "getFirstValueFromValues");
-  const loadStorageObject = runtime.requireServiceMethod("runtimeState", "loadStorageObject");
-  const loadDescOverrides = runtime.requireServiceMethod("runtimeState", "loadDescOverrides");
-  const loadLegacyDescOverrides = runtime.requireServiceMethod("runtimeState", "loadLegacyDescOverrides");
   const saveDescOverrides = runtime.requireServiceMethod("runtimeState", "saveDescOverrides");
-  const loadStorageArray = runtime.requireServiceMethod("runtimeState", "loadStorageArray");
   const normalizeSettings = runtime.requireServiceMethod("runtimeState", "normalizeSettings");
   const loadSettings = runtime.requireServiceMethod("runtimeState", "loadSettings");
-  const saveSettings = runtime.requireServiceMethod("runtimeState", "saveSettings");
   const setTemplateConfigError = runtime.requireServiceMethod("runtimeState", "setTemplateConfigError");
   const setTemplatePreviewMessage = runtime.requireServiceMethod("runtimeState", "setTemplatePreviewMessage");
   const cloneJsonValue = runtime.requireServiceMethod("runtimeState", "cloneJsonValue");
   const getDefaultTemplateConfig = runtime.requireServiceMethod("runtimeState", "getDefaultTemplateConfig");
-  const templateDefinitionsEqual = runtime.requireServiceMethod("runtimeState", "templateDefinitionsEqual");
   const mergeMissingDefaultTemplatesInPlace = runtime.requireServiceMethod("runtimeState", "mergeMissingDefaultTemplatesInPlace");
   const normalizeTemplateAliasToken = runtime.requireServiceMethod("runtimeState", "normalizeTemplateAliasToken");
-  const parseCellRef = runtime.requireServiceMethod("runtimeState", "parseCellRef");
   const parseRangeKey = runtime.requireServiceMethod("runtimeState", "parseRangeKey");
   const isTemplateOptionConfigKey = runtime.requireServiceMethod("runtimeState", "isTemplateOptionConfigKey");
   const validateTemplateConfig = runtime.requireServiceMethod("runtimeState", "validateTemplateConfig");
-  const loadTemplateConfig = runtime.requireServiceMethod("runtimeState", "loadTemplateConfig");
   const saveTemplateConfig = runtime.requireServiceMethod("runtimeState", "saveTemplateConfig");
   const normalizeTheme = runtime.requireServiceMethod("runtimeState", "normalizeTheme");
-  const loadTheme = runtime.requireServiceMethod("runtimeState", "loadTheme");
   const applyTheme = runtime.requireServiceMethod("runtimeState", "applyTheme");
-  const clampNumber = runtime.requireServiceMethod("runtimeState", "clampNumber");
   const normalizeLayoutSplit = runtime.requireServiceMethod("runtimeState", "normalizeLayoutSplit");
-  const loadLayoutSplit = runtime.requireServiceMethod("runtimeState", "loadLayoutSplit");
-  const saveLayoutSplit = runtime.requireServiceMethod("runtimeState", "saveLayoutSplit");
-  const updateSplitterAria = runtime.requireServiceMethod("runtimeState", "updateSplitterAria");
   const applyLayoutSplit = runtime.requireServiceMethod("runtimeState", "applyLayoutSplit");
-  const isCompactLayout = runtime.requireServiceMethod("runtimeState", "isCompactLayout");
-  const setLayoutResizing = runtime.requireServiceMethod("runtimeState", "setLayoutResizing");
-  const initLayoutSplitter = runtime.requireServiceMethod("runtimeState", "initLayoutSplitter");
-  const applySplitFromClientX = runtime.requireServiceMethod("runtimeState", "applySplitFromClientX");
-  const onPointerMove = runtime.requireServiceMethod("runtimeState", "onPointerMove");
-  const stopDragging = runtime.requireServiceMethod("runtimeState", "stopDragging");
   const renderSettingsModalUi = runtime.requireServiceMethod("runtimeState", "renderSettingsModalUi");
-  const openSettingsModal = runtime.requireServiceMethod("runtimeState", "openSettingsModal");
-  const closeSettingsModal = runtime.requireServiceMethod("runtimeState", "closeSettingsModal");
-  const isValueLikeEntryObject = runtime.requireServiceMethod("output", "isValueLikeEntryObject");
-  const isAssignmentLikeEntryObject = runtime.requireServiceMethod("output", "isAssignmentLikeEntryObject");
-  const isConditionClauseLikeObject = runtime.requireServiceMethod("output", "isConditionClauseLikeObject");
-  const attachPathSyntheticDeclAliases = runtime.requireServiceMethod("output", "attachPathSyntheticDeclAliases");
   const normalizeEntryObjectForPath = runtime.requireServiceMethod("output", "normalizeEntryObjectForPath");
-  const walkObjects = runtime.requireServiceMethod("output", "walkObjects");
-  const computeLineOffsets = runtime.requireServiceMethod("output", "computeLineOffsets");
-  const getSelectionRangeForLines = runtime.requireServiceMethod("output", "getSelectionRangeForLines");
   const selectCodeLines = runtime.requireServiceMethod("output", "selectCodeLines");
-  const getContainerScrollScale = runtime.requireServiceMethod("output", "getContainerScrollScale");
-  const scrollElementInContainer = runtime.requireServiceMethod("output", "scrollElementInContainer");
   const getSelectedTemplateIndexSet = runtime.requireServiceMethod("output", "getSelectedTemplateIndexSet");
   const getSortedSelectedTemplateIndexes = runtime.requireServiceMethod("output", "getSortedSelectedTemplateIndexes");
-  const updateTemplateCopySelectedButton = runtime.requireServiceMethod("output", "updateTemplateCopySelectedButton");
   const syncRenderedTemplateSelection = runtime.requireServiceMethod("output", "syncRenderedTemplateSelection");
   const clearTemplateBlockSelection = runtime.requireServiceMethod("output", "clearTemplateBlockSelection");
   const pruneTemplateBlockSelection = runtime.requireServiceMethod("output", "pruneTemplateBlockSelection");
-  const chooseNearestSelectedTemplateIndex = runtime.requireServiceMethod("output", "chooseNearestSelectedTemplateIndex");
-  const updateTemplateBlockSelection = runtime.requireServiceMethod("output", "updateTemplateBlockSelection");
   const selectTemplateBlockFromInteraction = runtime.requireServiceMethod("output", "selectTemplateBlockFromInteraction");
-  const setSelectedDeclRow = runtime.requireServiceMethod("output", "setSelectedDeclRow");
-  const countInputLines = runtime.requireServiceMethod("output", "countInputLines");
-  const computeInputGutterTargetsForDescriptions = runtime.requireServiceMethod("output", "computeInputGutterTargetsForDescriptions");
   const refreshInputGutterTargets = runtime.requireServiceMethod("output", "refreshInputGutterTargets");
-  const onInputGutterClick = runtime.requireServiceMethod("output", "onInputGutterClick");
-  const openJsonModal = runtime.requireServiceMethod("output", "openJsonModal");
   const openTextModal = runtime.requireServiceMethod("output", "openTextModal");
-  const closeJsonModal = runtime.requireServiceMethod("output", "closeJsonModal");
-  const copyJsonToClipboard = runtime.requireServiceMethod("output", "copyJsonToClipboard");
-  const stringifyDecl = runtime.requireServiceMethod("output", "stringifyDecl");
   const getDeclTechName = runtime.requireServiceMethod("output", "getDeclTechName");
-  const stripAngleBrackets = runtime.requireServiceMethod("output", "stripAngleBrackets");
   const stripDeclCategoryPrefix = runtime.requireServiceMethod("output", "stripDeclCategoryPrefix");
   const isStructFieldDecl = runtime.requireServiceMethod("output", "isStructFieldDecl");
   const getDeclDisplayName = runtime.requireServiceMethod("output", "getDeclDisplayName");
-  const buildDeclTitle = runtime.requireServiceMethod("output", "buildDeclTitle");
   const el = runtime.requireServiceMethod("output", "el");
   const renderMeta = runtime.requireServiceMethod("output", "renderMeta");
   const getObjectLabel = runtime.requireServiceMethod("output", "getObjectLabel");
-  const normalizeParsedJson = runtime.requireServiceMethod("output", "normalizeParsedJson");
-  const getTemplateVirtualStateForGutter = runtime.requireServiceMethod("output", "getTemplateVirtualStateForGutter");
-  const ensureVirtualControlState = runtime.requireServiceMethod("output", "ensureVirtualControlState");
-  const getInputGutterVirtualState = runtime.requireServiceMethod("output", "getInputGutterVirtualState");
-  const cancelVirtualScrollAdjustment = runtime.requireServiceMethod("output", "cancelVirtualScrollAdjustment");
-  const beginVirtualScrollAdjustment = runtime.requireServiceMethod("output", "beginVirtualScrollAdjustment");
-  const queueVirtualScrollSync = runtime.requireServiceMethod("output", "queueVirtualScrollSync");
-  const finishVirtualScrollAdjustment = runtime.requireServiceMethod("output", "finishVirtualScrollAdjustment");
-  const alignVirtualTargetAfterRender = runtime.requireServiceMethod("output", "alignVirtualTargetAfterRender");
   const setSelectedTemplateBlock = runtime.requireServiceMethod("output", "setSelectedTemplateBlock");
-  const measureInputLineMetrics = runtime.requireServiceMethod("output", "measureInputLineMetrics");
-  const scheduleInputGutterVirtualRender = runtime.requireServiceMethod("output", "scheduleInputGutterVirtualRender");
-  const renderInputGutterWindow = runtime.requireServiceMethod("output", "renderInputGutterWindow");
-  const syncInputGutterScroll = runtime.requireServiceMethod("output", "syncInputGutterScroll");
-  const rebuildInputGutter = runtime.requireServiceMethod("output", "rebuildInputGutter");
-  const computeInputGutterTargetsForTemplate = runtime.requireServiceMethod("output", "computeInputGutterTargetsForTemplate");
-  const collectConditionDeclsFromClauses = runtime.requireServiceMethod("descriptions", "collectConditionDeclsFromClauses");
-  const getDeclCodeDesc = runtime.requireServiceMethod("descriptions", "getDeclCodeDesc");
-  const renderDeclDescCellLines = runtime.requireServiceMethod("descriptions", "renderDeclDescCellLines");
-  const isDataCatalogSourceDecl = runtime.requireServiceMethod("descriptions", "isDataCatalogSourceDecl");
-  const getDataCatalogSourceDecls = runtime.requireServiceMethod("descriptions", "getDataCatalogSourceDecls");
-  const getDataCatalogFilterType = runtime.requireServiceMethod("descriptions", "getDataCatalogFilterType");
-  const getDataCatalogPerformParamUpper = runtime.requireServiceMethod("descriptions", "getDataCatalogPerformParamUpper");
-  const dedupeDataCatalogDecls = runtime.requireServiceMethod("descriptions", "dedupeDataCatalogDecls");
-  const selectDataCatalogRootDecl = runtime.requireServiceMethod("descriptions", "selectDataCatalogRootDecl");
-  const buildDataCatalogTraceModel = runtime.requireServiceMethod("descriptions", "buildDataCatalogTraceModel");
-  const buildDataCatalogDescriptionModel = runtime.requireServiceMethod("descriptions", "buildDataCatalogDescriptionModel");
-  const buildDataCatalogRowModel = runtime.requireServiceMethod("descriptions", "buildDataCatalogRowModel");
-  const getDataCatalogGroupLabel = runtime.requireServiceMethod("descriptions", "getDataCatalogGroupLabel");
-  const createDataCatalogPerformSourceControl = runtime.requireServiceMethod("descriptions", "createDataCatalogPerformSourceControl");
   const renderDeclDescPanelUi = runtime.requireServiceMethod("descriptions", "renderDeclDescPanelUi");
-  const normalizeKeyToken = runtime.requireServiceMethod("descriptions", "normalizeKeyToken");
-  const getDeclFallbackKey = runtime.requireServiceMethod("descriptions", "getDeclFallbackKey");
   const getDeclKey = runtime.requireServiceMethod("descriptions", "getDeclKey");
-  const getLegacyDeclKey = runtime.requireServiceMethod("descriptions", "getLegacyDeclKey");
-  const isPathDeclForOverrideKey = runtime.requireServiceMethod("descriptions", "isPathDeclForOverrideKey");
-  const buildPathDeclOverrideKey = runtime.requireServiceMethod("descriptions", "buildPathDeclOverrideKey");
-  const getPathDeclOverrideLookupKeys = runtime.requireServiceMethod("descriptions", "getPathDeclOverrideLookupKeys");
   const getDeclOverrideLookupKeys = runtime.requireServiceMethod("descriptions", "getDeclOverrideLookupKeys");
-  const getPerformChainSourceScope = runtime.requireServiceMethod("descriptions", "getPerformChainSourceScope");
-  const getPerformFormalParamKey = runtime.requireServiceMethod("descriptions", "getPerformFormalParamKey");
-  const buildPerformChainOverrideKey = runtime.requireServiceMethod("descriptions", "buildPerformChainOverrideKey");
   const cloneDeclWithPerformChainOverride = runtime.requireServiceMethod("descriptions", "cloneDeclWithPerformChainOverride");
   const getDeclOverrideStorageKey = runtime.requireServiceMethod("descriptions", "getDeclOverrideStorageKey");
   const normalizeDescOverrideEntry = runtime.requireServiceMethod("descriptions", "normalizeDescOverrideEntry");
   const getDeclOverrideEntry = runtime.requireServiceMethod("descriptions", "getDeclOverrideEntry");
-  const getDeclOverrideDesc = runtime.requireServiceMethod("descriptions", "getDeclOverrideDesc");
-  const getDeclOverrideNoNormalize = runtime.requireServiceMethod("descriptions", "getDeclOverrideNoNormalize");
-  const getBaseDeclDesc = runtime.requireServiceMethod("descriptions", "getBaseDeclDesc");
-  const getSourceDeclDesc = runtime.requireServiceMethod("descriptions", "getSourceDeclDesc");
   const normalizeDeclDescText = runtime.requireServiceMethod("descriptions", "normalizeDeclDescText");
-  const stripDeclTemplateAffixes = runtime.requireServiceMethod("descriptions", "stripDeclTemplateAffixes");
-  const normalizeDeclDescByTemplate = runtime.requireServiceMethod("descriptions", "normalizeDeclDescByTemplate");
-  const getEffectiveDeclAtomicDesc = runtime.requireServiceMethod("descriptions", "getEffectiveDeclAtomicDesc");
   const getEffectiveDeclAtomicDescNormalized = runtime.requireServiceMethod("descriptions", "getEffectiveDeclAtomicDescNormalized");
-  const rebuildConstantInitializerIndex = runtime.requireServiceMethod("descriptions", "rebuildConstantInitializerIndex");
-  const getConstantInitializer = runtime.requireServiceMethod("descriptions", "getConstantInitializer");
-  const getFinalDeclAtomicDesc = runtime.requireServiceMethod("descriptions", "getFinalDeclAtomicDesc");
-  const getFinalDeclAtomicDescNormalized = runtime.requireServiceMethod("descriptions", "getFinalDeclAtomicDescNormalized");
   const buildStructDeclFromFieldDecl = runtime.requireServiceMethod("descriptions", "buildStructDeclFromFieldDecl");
-  const stripStructNamePrefixFromItemText = runtime.requireServiceMethod("descriptions", "stripStructNamePrefixFromItemText");
-  const hasStructCompositeMeta = runtime.requireServiceMethod("descriptions", "hasStructCompositeMeta");
-  const stripDeclCategoryPrefixDeep = runtime.requireServiceMethod("descriptions", "stripDeclCategoryPrefixDeep");
-  const sanitizeStructCompositeText = runtime.requireServiceMethod("descriptions", "sanitizeStructCompositeText");
-  const formatStructFieldDesc = runtime.requireServiceMethod("descriptions", "formatStructFieldDesc");
   const getEffectiveDeclDesc = runtime.requireServiceMethod("descriptions", "getEffectiveDeclDesc");
-  const formatStructFieldFinalDesc = runtime.requireServiceMethod("descriptions", "formatStructFieldFinalDesc");
   const getFinalDeclDesc = runtime.requireServiceMethod("descriptions", "getFinalDeclDesc");
-  const openEditModal = runtime.requireServiceMethod("descriptions", "openEditModal");
-  const closeEditModal = runtime.requireServiceMethod("descriptions", "closeEditModal");
-  const applyEditModal = runtime.requireServiceMethod("descriptions", "applyEditModal");
-  const editDeclDesc = runtime.requireServiceMethod("descriptions", "editDeclDesc");
-  const escapeSelectorValue = runtime.requireServiceMethod("descriptions", "escapeSelectorValue");
   const safeJson = runtime.requireServiceMethod("descriptions", "safeJson");
   const getArrayItemTagName = runtime.requireServiceMethod("descriptions", "getArrayItemTagName");
-  const isPlainObjectRecord = runtime.requireServiceMethod("descriptions", "isPlainObjectRecord");
   const isAbapStatementObject = runtime.requireServiceMethod("descriptions", "isAbapStatementObject");
-  const extractIdentifierCandidate = runtime.requireServiceMethod("descriptions", "extractIdentifierCandidate");
-  const resolveFallbackFieldId = runtime.requireServiceMethod("descriptions", "resolveFallbackFieldId");
-  const buildPathKeyFromParts = runtime.requireServiceMethod("descriptions", "buildPathKeyFromParts");
-  const normalizeSyntheticPathKey = runtime.requireServiceMethod("descriptions", "normalizeSyntheticPathKey");
-  const buildSyntheticDeclForPath = runtime.requireServiceMethod("descriptions", "buildSyntheticDeclForPath");
   const getDeclSourceContextFromObject = runtime.requireServiceMethod("descriptions", "getDeclSourceContextFromObject");
   const buildObjectPathBase = runtime.requireServiceMethod("descriptions", "buildObjectPathBase");
-  const hasAnyDecls = runtime.requireServiceMethod("descriptions", "hasAnyDecls");
   const ensureEntryDeclWithSynthetic = runtime.requireServiceMethod("descriptions", "ensureEntryDeclWithSynthetic");
   const ensureValueDeclWithSynthetic = runtime.requireServiceMethod("descriptions", "ensureValueDeclWithSynthetic");
   const ensureConditionClauseDeclsWithSynthetic = runtime.requireServiceMethod("descriptions", "ensureConditionClauseDeclsWithSynthetic");
   const isDeclLikeObject = runtime.requireServiceMethod("descriptions", "isDeclLikeObject");
   const hasValueLevelDescFields = runtime.requireServiceMethod("descriptions", "hasValueLevelDescFields");
-  const resolveValueLevelTechId = runtime.requireServiceMethod("descriptions", "resolveValueLevelTechId");
-  const normalizeValueIdentifierKey = runtime.requireServiceMethod("descriptions", "normalizeValueIdentifierKey");
-  const buildValueLevelDeclReplacementMap = runtime.requireServiceMethod("descriptions", "buildValueLevelDeclReplacementMap");
-  const replaceIdentifiersOutsideLiterals = runtime.requireServiceMethod("descriptions", "replaceIdentifiersOutsideLiterals");
   const resolveValueLevelFinalDesc = runtime.requireServiceMethod("descriptions", "resolveValueLevelFinalDesc");
-  const getFormNameFromNode = runtime.requireServiceMethod("performSources", "getFormNameFromNode");
-  const getPerformFormNameFromNode = runtime.requireServiceMethod("performSources", "getPerformFormNameFromNode");
-  const getPerformProgramFromNode = runtime.requireServiceMethod("performSources", "getPerformProgramFromNode");
-  const buildFormsByNameUpperFromRoots = runtime.requireServiceMethod("performSources", "buildFormsByNameUpperFromRoots");
-  const createPerformBindingTools = runtime.requireServiceMethod("performSources", "createPerformBindingTools");
-  const getPerformActualEntryText = runtime.requireServiceMethod("performSources", "getPerformActualEntryText");
-  const buildPerformActualSummary = runtime.requireServiceMethod("performSources", "buildPerformActualSummary");
-  const hashPerformSourceScope = runtime.requireServiceMethod("performSources", "hashPerformSourceScope");
-  const buildPerformSourceScope = runtime.requireServiceMethod("performSources", "buildPerformSourceScope");
-  const buildPerformCallPathRegistry = runtime.requireServiceMethod("performSources", "buildPerformCallPathRegistry");
-  const getPerformSourceControlModel = runtime.requireServiceMethod("performSources", "getPerformSourceControlModel");
-  const selectPerformSourceCandidate = runtime.requireServiceMethod("performSources", "selectPerformSourceCandidate");
   const createPerformSourceControl = runtime.requireServiceMethod("performSources", "createPerformSourceControl");
-  const buildRenderableObjects = runtime.requireServiceMethod("performSources", "buildRenderableObjects");
   const renderActiveRightPanel = runtime.requireServiceMethod("uiNavigation", "renderActiveRightPanel");
-  const setRightTab = runtime.requireServiceMethod("uiNavigation", "setRightTab");
-  const applySettingsFromModal = runtime.requireServiceMethod("uiNavigation", "applySettingsFromModal");
-  const resetSettingsToDefault = runtime.requireServiceMethod("uiNavigation", "resetSettingsToDefault");
-  const focusInputWithoutPageScroll = runtime.requireServiceMethod("uiNavigation", "focusInputWithoutPageScroll");
-  const navigateInputRange = runtime.requireServiceMethod("uiNavigation", "navigateInputRange");
   const jumpInputToCodeRange = runtime.requireServiceMethod("uiNavigation", "jumpInputToCodeRange");
-  const getInputGotoControls = runtime.requireServiceMethod("uiNavigation", "getInputGotoControls");
-  const getCurrentInputLineCount = runtime.requireServiceMethod("uiNavigation", "getCurrentInputLineCount");
-  const getInputLineText = runtime.requireServiceMethod("uiNavigation", "getInputLineText");
-  const getSegmentRangesForLineText = runtime.requireServiceMethod("uiNavigation", "getSegmentRangesForLineText");
-  const getSegmentRangeForLine = runtime.requireServiceMethod("uiNavigation", "getSegmentRangeForLine");
-  const findDeclSegmentIndex = runtime.requireServiceMethod("uiNavigation", "findDeclSegmentIndex");
-  const goToInputLine = runtime.requireServiceMethod("uiNavigation", "goToInputLine");
-  const submitInputGotoLine = runtime.requireServiceMethod("uiNavigation", "submitInputGotoLine");
-  const initInputGotoLineControls = runtime.requireServiceMethod("uiNavigation", "initInputGotoLineControls");
-  const isDeclLikeRecordForSynthetic = runtime.requireServiceMethod("parserController", "isDeclLikeRecordForSynthetic");
-  const normalizeDeclKeyTokenForSynthetic = runtime.requireServiceMethod("parserController", "normalizeDeclKeyTokenForSynthetic");
-  const makeDeclScopeNameKeyForSynthetic = runtime.requireServiceMethod("parserController", "makeDeclScopeNameKeyForSynthetic");
-  const extractStructFieldRefForSynthetic = runtime.requireServiceMethod("parserController", "extractStructFieldRefForSynthetic");
-  const collectScopeHintsFromObjectForSynthetic = runtime.requireServiceMethod("parserController", "collectScopeHintsFromObjectForSynthetic");
-  const sanitizeDeclSyntheticIdToken = runtime.requireServiceMethod("parserController", "sanitizeDeclSyntheticIdToken");
-  const pickStructBaseDeclForSynthetic = runtime.requireServiceMethod("parserController", "pickStructBaseDeclForSynthetic");
   const createSyntheticStructFieldDecl = runtime.requireServiceMethod("parserController", "createSyntheticStructFieldDecl");
-  const buildSyntheticDeclIndex = runtime.requireServiceMethod("parserController", "buildSyntheticDeclIndex");
-  const ensureSyntheticStructFieldDeclForEntry = runtime.requireServiceMethod("parserController", "ensureSyntheticStructFieldDeclForEntry");
-  const augmentSyntheticStructFieldDecls = runtime.requireServiceMethod("parserController", "augmentSyntheticStructFieldDecls");
-  const clearParsedResultAfterFailure = runtime.requireServiceMethod("parserController", "clearParsedResultAfterFailure");
-  const parseFromTextarea = runtime.requireServiceMethod("parserController", "parseFromTextarea");
   const start = runtime.requireServiceMethod("bootstrap", "start");
-  const isVirtualScrollKeyMain = runtime.requireServiceMethod("bootstrap", "isVirtualScrollKeyMain");
-  const isEditableVirtualScrollTargetMain = runtime.requireServiceMethod("bootstrap", "isEditableVirtualScrollTargetMain");
-  const addVirtualUserIntentListenersMain = runtime.requireServiceMethod("bootstrap", "addVirtualUserIntentListenersMain");
-  const scheduleVirtualGeometryRefreshMain = runtime.requireServiceMethod("bootstrap", "scheduleVirtualGeometryRefreshMain");
-  const init = runtime.requireServiceMethod("bootstrap", "init");
 const TEMPLATE_GUI_FILTER_STORAGE_KEY_V1 = "abap-parser-viewer.templateGuiHiddenObjectTypes.v1";
   const TEMPLATE_FORM_EDITOR_PCT_STORAGE_KEY_V1 = "abap-parser-viewer.templateFormEditorPct.v1";
   const VIEWER_CONFIG_KIND_V1 = "abap-viewer-config";
@@ -4350,14 +4181,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       if (!cellMeta || typeof cellMeta !== "object") {
         return;
       }
-      const openUnifiedEditorModal = (typeof openTemplateCellUnifiedEditModal === "function")
-        ? openTemplateCellUnifiedEditModal
-        : ((typeof window !== "undefined" && typeof window.openTemplateCellUnifiedEditModal === "function")
-          ? window.openTemplateCellUnifiedEditModal
-          : null);
-      if (!openUnifiedEditorModal) {
-        return;
-      }
+
 
       const templateKey = String(cellMeta.templateKey || resolved.key || "").trim();
       const rangeKey = String(cellMeta.rangeKey || "").trim();
@@ -4500,7 +4324,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         });
       }
 
-      openUnifiedEditorModal({
+      openTemplateCellUnifiedEditModal({
         metadata: {
           objectType: String(cellMeta.objectType || obj.objectType || ""),
           templateKey,
@@ -9625,225 +9449,35 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
 
     saveBtn.addEventListener("click", submit);
   }
-  window.openTemplateCellUnifiedEditModal = openTemplateCellUnifiedEditModal;
   runtime.registerService("template", {
-    toInlineCssText,
-    normalizeTemplateColorValue,
-    normalizeTemplateBorderValue,
-    normalizeTemplateAlignValue,
-    normalizeTemplateVAlignValue,
-    parseTemplatePathSegments,
-    isDeclLikePathSegment,
-    isTemplateDeclLikeValue,
-    resolveConditionOperandFinalDesc,
-    resolveTemplatePathValue,
-    buildTemplatePathCandidates,
-    getTemplateArrayItemTagName,
-    normalizeTemplateEntryForPath,
-    getTemplateDeclRenderKey,
-    dedupeTemplateDecls,
-    isTemplatePathDecl,
-    getTemplateDeclStorageKey,
     attachTemplateSyntheticDeclAliases,
-    warnTemplateProvenanceOnce,
-    isTemplateLiteralOrWildcard,
-    isTemplateStaticOperandToken,
-    isTemplateIdentifierOperand,
-    isTemplateDataValueEntry,
-    getTemplateCanonicalObjectPathBase,
-    ensureTemplateCanonicalValueEntry,
-    attachTemplateEntrySyntheticAliases,
-    ensureTemplateCanonicalExtrasValueEntry,
-    ensureTemplateCanonicalConditionClause,
-    getTemplateNoDeclReason,
-    getPerformSourceBindingContextForTemplate,
-    isPerformSourceTemplateTraceableDecl,
-    getPerformSourceTemplateParamUpper,
-    buildPerformSourceTemplateTraceDecl,
-    resolvePerformSourceTemplateTraceDecls,
-    selectPerformSourceTemplateRootDecl,
-    isTemplateOriginDeclPath,
-    isTemplateValueEntryLikeObject,
-    remapTemplateDeclForPerformSource,
-    flattenTemplateValueEntries,
-    normalizeTemplatePairToken,
-    labelToCamelName,
-    keywordPositionInRaw,
-    sortKeywordEntriesByRawPosition,
-    findValueEntryForKeyword,
-    flattenTemplateKeywordEntries,
-    resolveTemplateValueRowFinalDesc,
-    createTemplateExpandedRow,
-    createTemplateKeywordRow,
-    getTemplateKeywordRowProvenance,
-    collectTemplateTraceAwareDeclCandidates,
-    buildTemplateSemanticValueEntry,
-    buildTemplateSemanticValueRow,
-    formatTemplateAssignmentRow,
-    formatTemplateConditionRow,
-    getTemplateConditionRows,
-    buildTemplateWritePositionRow,
-    getTemplateSemanticSectionRows,
-    splitTemplateTopLevelText,
-    findTemplateTopLevelWord,
-    getTemplateSelectFieldSource,
-    isTemplateSafeSimpleListItem,
-    splitTemplateSafeSimpleList,
-    getTemplateSafeRawListRows,
-    getTemplateExpandedKeywordRows,
-    buildTemplateKeywordRows,
-    orderTemplateDeclCandidates,
-    getTemplateRowProvenanceByLine,
-    collectTemplateConcretePathRecords,
-    findTemplateRecordSourceObject,
-    getTemplateRecordOperandText,
-    isTemplateRecordDataOperand,
-    collectTemplateRecordDeclCandidates,
-    resolveTemplateTokenProvenance,
-    parseTemplatePlaceholderTokens,
-    combineTemplateLineProvenance,
-    buildTemplateCellDeclMeta,
-    buildTemplateContextObject,
-    stringifyTemplateResolvedValue,
-    collectTemplateDumpPaths,
-    formatTemplateDumpValue,
-    collectTemplateDumpPathValues,
-    openTemplatePathDump,
-    resolveTemplatePlaceholderValue,
-    resolveTemplateText,
-    parseSingleTemplatePlaceholderToken,
-    buildTemplateDeclTokenCandidates,
-    collectTemplateEditableDeclsFromResolvedValue,
-    getTemplateEditableDeclCandidatesFromResolvedValue,
-    resolveTemplateEditableDeclCandidatesFromToken,
-    createTemplateCellModel,
-    buildTemplateCellStyle,
-    parseTemplateOptionBoolean,
-    parseTemplateOptionNumber,
-    getTemplateOptionByPath,
-    readTemplateOptionValue,
-    normalizeTemplatePreviewOptions,
-    isTemplateRangeMetaKey,
-    resolveTemplateDefinitionForPreview,
-    splitTemplateTextLines,
-    getTemplateTextLine,
-    cloneTemplateCellMeta,
-    selectTemplateCellDeclCandidatesForLine,
-    cloneTemplateMatrixCell,
-    expandTemplateMatrixRows,
-    isTemplateRowBlank,
-    getTemplateRowPlaceholderState,
-    compactTemplateMatrixRows,
-    applyTemplatePreviewOptions,
-    buildTemplateGridModel,
-    getTemplateCellCoordinate,
-    moveTemplatePreviewCellFocus,
-    renderTemplateTable,
-    copyHtmlWithFallback,
-    resolveTemplateMapForObject,
-    buildTemplatePlainTextFromBlock,
-    isTemplateCopyTableOnlyEnabled,
-    buildTemplateCopyPayloadFromBlock,
     syncTemplateEditorFromState,
-    applyTemplateConfigObject,
     applyTemplateConfigFromEditor,
     resetTemplateConfig,
-    getTemplateVirtualState,
-    getTemplateVirtualConfig,
-    measureTemplateOuterHeight,
-    updateTemplateAverageHeight,
-    calibrateTemplateUnknownItemHeight,
-    buildTemplateLineTargetMap,
-    buildTemplateBlockElement,
-    buildTemplateBlockCopyPayload,
-    normalizeTemplateCopyIndexes,
     buildTemplateCollectionCopyPayload,
-    getTemplateEstimatedItemHeight,
-    getTemplateUnknownItemHeight,
-    ensureTemplateHeightCache,
-    rebuildTemplatePrefixOffsets,
-    getTemplateOffsetAtIndex,
-    findTemplateIndexAtOffset,
-    measureRenderedTemplateItems,
-    computeTemplateVirtualRangeFromScroll,
-    cancelTemplateVirtualAdjustment,
-    beginTemplateVirtualAdjustment,
-    finishTemplateVirtualAdjustment,
-    captureTemplateLogicalScrollAnchor,
-    ensureTemplateRangeContainsLogicalAnchor,
-    restoreTemplateLogicalScrollAnchor,
-    renderTemplateVirtualRangeReplace,
-    initTemplateVirtualWindow,
     ensureTemplateWindowContainsIndex,
-    processTemplateVirtualScrollFrame,
     scheduleTemplateVirtualScroll,
     handleTemplateVirtualScroll,
     handleTemplateVirtualUserIntent,
     resetTemplateVirtualState,
-    getTemplateAnchorNode,
     captureTemplateViewportAnchor,
-    restoreTemplateViewportAnchor,
     renderTemplatePreview,
     copyAllTemplateBlocks,
     isTemplateDynamicModalOpen,
     closeTemplateDynamicModal,
-    openTemplateDynamicModal,
-    setMainLayoutVisible,
-    setTemplateFormChromeHidden,
-    openTemplateDynamicPage,
-    normalizeTemplateObjectTypeToken,
-    ensureTemplateGuiFilterState,
-    loadTemplateGuiFilterState,
-    saveTemplateGuiFilterState,
-    getTemplateFilterControls,
-    collectTemplateObjectTypesFromTree,
     refreshTemplateGuiFilterTypes,
-    isTemplateObjectTypeVisibleForGui,
     resetTemplateSelectionStateMain,
-    rerenderTemplateForGuiFilterChange,
-    applyTemplateGuiFilterSelection,
-    renderTemplateGuiFilterControls,
     initTemplateGuiFilterControls,
-    buildTemplateFilterPanelElement,
     openTemplateFilterModal,
-    isViewerConfigPlainObject,
-    cloneViewerConfigValue,
-    normalizeTemplateFormEditorPct,
-    loadTemplateFormEditorPct,
-    applyTemplateFormEditorPct,
-    getSelectedViewerConfigSectionDefs,
-    canonicalizeDescriptionOverridesForViewerConfig,
-    getViewerConfigSectionValue,
     buildViewerConfigBundle,
     getViewerConfigExportFileName,
-    downloadViewerConfigBundle,
     openViewerConfigExportModal,
-    prepareViewerConfigDescriptionSettings,
-    prepareViewerConfigAppearance,
-    prepareViewerConfigTemplateUi,
-    prepareViewerConfigTemplates,
-    validateAndPrepareViewerConfigBundle,
-    getViewerConfigStorageSnapshot,
-    restoreViewerConfigStorageSnapshot,
-    getViewerConfigStateSnapshot,
-    rerenderViewerAfterConfigImport,
-    restoreViewerConfigStateSnapshot,
-    writePreparedViewerConfigSections,
-    applyPreparedViewerConfigSections,
     importViewerConfigObject,
-    isLegacyTemplateConfig,
     importViewerConfigFromFile,
     getRenderableObjectListForTemplate,
-    getTemplateCopyItemsAndConfig,
-    copyTemplateBlocksByIndexes,
     copySelectedTemplateBlocks,
-    writeTemplateConfigDraftToTextarea,
-    findRenderObjectById,
-    findTemplateObjectByIndex,
     interceptTemplateCodeButtonClick,
     normalizeTemplateConfigLegacyFieldsInPlace,
     openTemplateConfigModal,
-    openTemplateCellTextEditModal,
-    openTemplateCellUnifiedEditModal
   });
 })(window);

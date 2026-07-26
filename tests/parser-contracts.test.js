@@ -3,6 +3,7 @@
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
+const { test } = require("node:test");
 const { parseAbapText } = require("../shared/abap-parser");
 const { loadConfigs } = require("./helpers/config-loader");
 const {
@@ -14,6 +15,7 @@ const {
   normalizeParserResult,
   readJson
 } = require("./helpers/contracts");
+const { defineFocusedTest } = require("./helpers/test-focus");
 
 const repoRoot = path.resolve(__dirname, "..");
 const configs = loadConfigs(path.resolve(repoRoot, "configs"));
@@ -32,21 +34,9 @@ function assertMultiStatementSegmentIndexFixture() {
   const segmentIndexes = Array.from(dataObjects, (obj) => Number(obj && obj.segmentIndex));
   const lineStarts = Array.from(dataObjects, (obj) => Number(obj && obj.lineStart));
   const raws = Array.from(dataObjects, (obj) => String((obj && obj.raw) || "").trim());
-  assert.deepStrictEqual(
-    segmentIndexes,
-    [0, 1],
-    "Expected the parser to preserve segment indexes for both DATA statements on the same line."
-  );
-  assert.deepStrictEqual(
-    lineStarts,
-    [3, 3],
-    "Expected both DATA statements to stay on the same source line."
-  );
-  assert.deepStrictEqual(
-    raws,
-    ["DATA lv_a TYPE i.", "DATA lv_b TYPE i."],
-    "Expected the parser to split the two DATA statements into separate raw nodes."
-  );
+  assert.deepStrictEqual(segmentIndexes, [0, 1]);
+  assert.deepStrictEqual(lineStarts, [3, 3]);
+  assert.deepStrictEqual(raws, ["DATA lv_a TYPE i.", "DATA lv_b TYPE i."]);
 }
 
 function assertParserFixture(fileName) {
@@ -63,14 +53,23 @@ function assertParserFixture(fileName) {
   assert.deepStrictEqual(diffs, [], `${fileName}: parser contract mismatch.\n${JSON.stringify(diffs.slice(0, 20), null, 2)}`);
 }
 
-const fixtureFiles = listFixtureFiles(fixturesDir);
-assertJsonArtifactsMatchFixtures(baselineDir, fixtureFiles, "parser baseline");
-assertJsonArtifactsMatchFixtures(allowedDir, fixtureFiles, "parser allowed-delta", { optional: true });
+defineFocusedTest(test, "parser contracts", ["parser-contracts"], async (t) => {
+  const fixtureFiles = listFixtureFiles(fixturesDir);
 
-for (const fileName of fixtureFiles) {
-  assertParserFixture(fileName);
-}
+  await t.test("baseline and allowed-delta fixtures stay in sync", () => {
+    assertJsonArtifactsMatchFixtures(baselineDir, fixtureFiles, "parser baseline");
+    assertJsonArtifactsMatchFixtures(allowedDir, fixtureFiles, "parser allowed-delta", { optional: true });
+  });
 
-assertMultiStatementSegmentIndexFixture();
+  await t.test("every parser fixture matches its baseline contract", async (fixtureSuite) => {
+    for (const fileName of fixtureFiles) {
+      await fixtureSuite.test(`matches ${fileName}`, () => {
+        assertParserFixture(fileName);
+      });
+    }
+  });
 
-console.log("parser-contracts: ok");
+  await t.test("multi-statement segment index fixture stays stable", () => {
+    assertMultiStatementSegmentIndexFixture();
+  });
+});

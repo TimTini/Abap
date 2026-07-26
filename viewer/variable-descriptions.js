@@ -1,5 +1,10 @@
-(function () {
+(function registerVariableDescriptions(global) {
   "use strict";
+
+  const runtime = global.AbapViewerRuntime;
+  if (!runtime || !runtime.constants) {
+    throw new Error("ABAP Viewer service registry missing before variable descriptions load.");
+  }
 
   // Variable/system descriptions registry
   // - Mô tả dùng để hiển thị ở cột `declDesc` (nguồn khai báo).
@@ -17,7 +22,7 @@
   //       "FORM:MAIN:LV_B"
   //       "FORM:STEP_B:CV_OUT"
 
-  window.AbapVarDescriptions = {
+  runtime.constants.VARIABLE_DESCRIPTIONS = {
     system: {
       "SY-UNAME": "Current user name",
       "SY-REPID": "Current program name",
@@ -45,5 +50,4 @@
       // }
     }
   };
-})();
-
+})(window);

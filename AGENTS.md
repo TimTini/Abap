@@ -39,14 +39,15 @@ This file is the local source of truth for future AI/code agents working in this
 - If `configs/*.json` changed:
   - `node scripts/build-viewer-configs.js`
 - If the canonical parser changed (`shared/abap-parser.js`):
-  - Run `node tests/parser-regression.js`.
-- If `viewer/index.html` or `viewer/app.js` changed:
-  - `python scripts/build-inline-viewer.py`
-- If viewer part files changed (`viewer/app/core/*.js`, `viewer/app/output/*.js`, `viewer/app/descriptions/*.js`, `viewer/app/template/*.js`):
-  - Run `node scripts/build-viewer-configs.js`.
-  - Run `python scripts/build-inline-viewer.py`.
+  - Run `npm run test:parser`.
+- If Viewer source, style, or `viewer/index.html` changed:
+  - Run `uv run python scripts/build-inline-viewer.py`.
+- If `examples/deep_form_demo.abap` changed:
+  - Run `node scripts/sync-default-sample.js`.
 - Always run:
-  - `node tests/parser-regression.js`
+  - `npm run test:fast`
+- Before release:
+  - `npm test`
 - Recommended syntax checks:
   - `node --check shared/abap-parser.js`
   - `node --check viewer/app.js`
@@ -123,7 +124,7 @@ This file is the local source of truth for future AI/code agents working in this
     - `hideEmptyRows`
     - `hideRowsWithoutValues`
     - `expandMultilineRows`
-  - Backward aliases from VBA naming remain compatibility-only and should not be preferred in new committed defaults.
+  - Backward aliases from legacy naming remain compatibility-only and should not be preferred in new committed defaults.
 
 - Template coverage policy:
   - Keep explicit custom templates for high-priority statement types (currently includes `ASSIGNMENT`, `APPEND`, `READ_TABLE`, `MODIFY_ITAB`, `DELETE_ITAB`, `IF`, `ELSEIF`).
@@ -134,7 +135,7 @@ This file is the local source of truth for future AI/code agents working in this
 
 - Manual update metadata discipline:
   - Update `abap-viewer-updated-at` / `abap-viewer-updated-note` only after required build + checks pass.
-  - After metadata update in `viewer/index.html`, regenerate `viewer/index.inline.html` with `python scripts/build-inline-viewer.py`.
+  - After metadata update in `viewer/index.html`, regenerate `viewer/index.inline.html` with `uv run python scripts/build-inline-viewer.py`; use `--check` when you only want to verify freshness.
 
 ## 8) Release + Smoke Checklist (Required)
 
@@ -155,9 +156,14 @@ This file is the local source of truth for future AI/code agents working in this
 - Fast debug checklist for module-load/runtime errors:
   - If `Viewer services missing: ...`, check direct script order in `viewer/index.html`.
   - If `Identifier ... has already been declared`, check top-level declarations across canonical source files.
-  - Rebuild inline artifact: `python scripts/build-inline-viewer.py`.
+  - Rebuild inline artifact: `uv run python scripts/build-inline-viewer.py`.
   - Run checks:
-    - `node tests/parser-regression.js`
+    - `npm run test:parser`
+    - `npm run test:runtime`
+    - `npm run test:viewer`
+    - `node scripts/build-viewer-configs.js --check`
+    - `node scripts/sync-default-sample.js --check`
+    - `uv run python scripts/build-inline-viewer.py --check`
     - `node --check shared/abap-parser.js`
     - `node --check viewer/app.js`
 
@@ -165,7 +171,7 @@ This file is the local source of truth for future AI/code agents working in this
 
 - Entry + load order:
   - `viewer/index.html`: script order, UI shell, manual build metadata tags.
-  - `viewer/app.js`: module bootstrap + required-wrapper presence checks.
+  - `viewer/app.js`: required-service checks and bootstrap start.
   - `viewer/index.inline.html`: generated artifact from `scripts/build-inline-viewer.py` (do not hand-edit logic).
 
 - Runtime entry sources:
@@ -193,12 +199,13 @@ This file is the local source of truth for future AI/code agents working in this
   - Template path resolution, grid/style, preview render, copy/import/export.
 
 - Build/test scripts:
-  - `scripts/build-inline-viewer.py`: inline-build `viewer/index.inline.html` from split scripts.
+  - `scripts/build-inline-viewer.py`: build the self-contained `viewer/index.inline.html` from canonical source and style files.
   - `scripts/sync-default-sample.js`: sync `examples/deep_form_demo.abap` into `viewer/app/core/01-runtime-state.js` `SAMPLE_ABAP`.
   - `scripts/build-viewer-configs.js`: regenerate `viewer/configs.generated.js` from `configs/*.json`.
-  - `tests/parser-regression.js`: parser regression baseline check.
+  - `tests/run.js`: strict `node:test` suite/focus runner.
+  - `tests/parser-*.test.js`, `tests/runtime-*.test.js`, `tests/viewer-*.test.js`: domain tests.
 
 - Default sample source:
-  - Edit `examples/deep_form_demo.abap` first.
+  - Edit `examples/deep_form_demo.abap` first; use `examples/full.abap` for broader coverage.
   - Then run `node scripts/sync-default-sample.js`.
-  - If viewer parts changed, rebuild config bundle if needed and inline viewer afterward with `node scripts/build-viewer-configs.js` then `python scripts/build-inline-viewer.py`.
+  - If Viewer source changed, rebuild the inline viewer with `uv run python scripts/build-inline-viewer.py`.

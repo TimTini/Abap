@@ -2,7 +2,7 @@
 
 File này mô tả:
 - Cách tạo/chỉnh rule parse statement (config JSON)
-- Các field/struct có thể xuất hiện trong JSON/XML output
+- Các field/struct có thể xuất hiện trong JSON output
 
 Lưu ý:
 - `RULES.md` tập trung vào rule config và parse/output cơ bản.
@@ -14,10 +14,12 @@ Lưu ý:
 - Nguồn sự thật: `configs/*.json`
 - Sau khi sửa/thêm rule: chạy `node scripts/build-viewer-configs.js`
 - Viewer load `viewer/configs.generated.js` (auto-generate, **không sửa tay**).
+- Kiểm tra nhanh bundle generated: `node scripts/build-viewer-configs.js --check`
 
 ### Chỉnh rule trong Viewer
 - Viewer chỉ dùng **built-in** (`AbapParser.getConfigs()` từ `viewer/configs.generated.js`).
-- Muốn thêm/sửa rule: chỉnh `configs/*.json`, chạy `node scripts/build-viewer-configs.js`, rebuild viewer bundles nếu cần theo `AGENTS.md`.
+- Muốn thêm/sửa rule: chỉnh `configs/*.json`, chạy `node scripts/build-viewer-configs.js`, rồi rebuild inline Viewer theo `AGENTS.md`.
+- Khi chỉ muốn xác minh, dùng `node scripts/build-viewer-configs.js --check` và `uv run python scripts/build-inline-viewer.py --check`.
 
 ## 2) Rule config JSON: schema tổng quát
 
@@ -245,13 +247,15 @@ Mỗi object trong `objects[]` (cũng xuất hiện trong `children[]`):
 
 ## 8) `finalDesc` và template paths
 
-Viewer không còn **Export XML**. `finalDesc` vẫn dùng cho template placeholders (vd: `values.name.finalDesc`).
+`finalDesc` vẫn dùng cho template placeholders (vd: `values.name.finalDesc`).
 
 - `finalDesc` ưu tiên user desc (nếu có), fallback code desc, rồi technical id.
 - Normalize theo template rules; riêng user desc nếu bật `Skip normalization` khi edit thì giữ nguyên text user nhập.
+- Template config và description edit đều lưu local trong browser; viewer chạy offline.
 
 ## 9) Quy trình thêm rule mới (khuyến nghị)
 
 1) Tạo/sửa file `configs/<your-rule>.json`.
-2) Chạy `node scripts/build-viewer-configs.js`.
-3) Reload `viewer/index.html` và test lại.
+2) Chạy `node scripts/build-viewer-configs.js --check` để rà bundle generated, hoặc `node scripts/build-viewer-configs.js` để regenerate.
+3) Nếu viewer index hoặc inline file đổi, chạy `uv run python scripts/build-inline-viewer.py --check` rồi `uv run python scripts/build-inline-viewer.py` khi cần regenerate.
+4) Reload `viewer/index.html` và test lại với `examples/deep_form_demo.abap` hoặc `examples/full.abap`.

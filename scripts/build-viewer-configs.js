@@ -8,10 +8,8 @@ const repoRoot = path.resolve(__dirname, "..");
 const configsDir = path.join(repoRoot, "configs");
 const indexHtmlFile = path.join(repoRoot, "viewer", "index.html");
 const configBundleFile = path.join(repoRoot, "viewer", "configs.generated.js");
-const legacyConfigDir = path.join(repoRoot, "viewer", "configs.generated");
 
 const CONFIG_BUNDLE_REL_PATH = "viewer/configs.generated.js";
-const LEGACY_CONFIG_DIR_REL_PATH = "viewer/configs.generated";
 const START_MARKER = "<!-- abap-parser-configs:start -->";
 const END_MARKER = "<!-- abap-parser-configs:end -->";
 const GENERATED_SCRIPT_TAG = '<script src="./configs.generated.js" defer></script>';
@@ -128,17 +126,6 @@ function syncTextFile(filePath, nextText, options) {
   return { changed: true, stale: true };
 }
 
-function syncLegacyDirectory(options) {
-  if (!fs.existsSync(legacyConfigDir)) {
-    return { changed: false, stale: false };
-  }
-  if (options.checkOnly) {
-    return { changed: false, stale: true };
-  }
-  fs.rmSync(legacyConfigDir, { recursive: true, force: true });
-  return { changed: true, stale: true };
-}
-
 function buildExpectedArtifacts() {
   const configs = loadConfigsFromDisk();
   const indexHtml = fs.readFileSync(indexHtmlFile, "utf8");
@@ -164,7 +151,7 @@ function syncGeneratedArtifacts(options = {}) {
 
   const indexResult = syncTextFile(indexHtmlFile, nextIndexHtml, {
     checkOnly: Boolean(options.checkOnly),
-    forceLf: false
+    forceLf: true
   });
   if (indexResult.changed) {
     results.push(`updated ${path.relative(repoRoot, indexHtmlFile)}`);
@@ -172,16 +159,9 @@ function syncGeneratedArtifacts(options = {}) {
     results.push(`stale ${path.relative(repoRoot, indexHtmlFile)}`);
   }
 
-  const legacyResult = syncLegacyDirectory(options);
-  if (legacyResult.changed) {
-    results.push(`removed ${LEGACY_CONFIG_DIR_REL_PATH}`);
-  } else if (legacyResult.stale) {
-    results.push(`stale ${LEGACY_CONFIG_DIR_REL_PATH}`);
-  }
-
   return {
-    stale: bundleResult.stale || indexResult.stale || legacyResult.stale,
-    changed: bundleResult.changed || indexResult.changed || legacyResult.changed,
+    stale: bundleResult.stale || indexResult.stale,
+    changed: bundleResult.changed || indexResult.changed,
     results
   };
 }
@@ -238,7 +218,6 @@ module.exports = {
   CONFIG_BUNDLE_REL_PATH,
   END_MARKER,
   GENERATED_SCRIPT_TAG,
-  LEGACY_CONFIG_DIR_REL_PATH,
   START_MARKER,
   buildConfigBundleSource,
   buildExpectedArtifacts,
