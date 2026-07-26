@@ -26,6 +26,7 @@ Workflow:
 - Canonical parser source: `shared/abap-parser.js`
 - Guide: `RULES.md`
 - Object model and canonical path guide: `docs/ABAP_OBJECT_MODEL.md`
+- Parser coverage report for the default sample: `docs/ABAP_PARSER_GAP_REPORT.md`
 
 ## AI / Agent notes
 - Local agent guide: `AGENTS.md`
@@ -45,5 +46,5 @@ Workflow:
   - `node --check viewer/app.js`
 
 ## Examples
-- FORM / source-chain sample: `examples/deep_form_demo.abap`
+- Extended flight operations / source-chain sample: `examples/deep_form_demo.abap`
 - Full coverage sample: `examples/full.abap`

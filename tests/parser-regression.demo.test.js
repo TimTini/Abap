@@ -17,10 +17,16 @@ function testDefaultFlightDemoContract() {
   const samplePath = path.resolve(__dirname, "..", "examples", "deep_form_demo.abap");
   const source = fs.readFileSync(samplePath, "utf8");
   const lineCount = source.split(/\r?\n/).length;
-  assert(lineCount >= 500 && lineCount <= 700, `Default demo must stay within 500-700 lines, got ${lineCount}.`);
+  assert(lineCount >= 1400 && lineCount <= 1500, `Extended default demo must stay within 1400-1500 lines, got ${lineCount}.`);
   assert.match(source, /^REPORT\s+zflight_operations_overview\b/im);
-  for (const marker of ["frm_chk_", "CHECK CASE", "v\u00ed d\u1ee5", "deep_chain"]) {
-    assert(!source.toLowerCase().includes(marker.toLowerCase()), `Default demo must not contain artificial marker ${marker}.`);
+  for (const marker of [
+    "Flight Operations Overview - extended ABAP statement coverage",
+    "OPEN CURSOR",
+    "OPEN DATASET",
+    "ROLLBACK WORK",
+    "START-OF-SELECTION"
+  ]) {
+    assert(source.includes(marker), `Extended default demo must contain ${marker}.`);
   }
 
   const parsed = parseAbapText(source, configs, "deep_form_demo.abap");
@@ -29,24 +35,35 @@ function testDefaultFlightDemoContract() {
     "TYPES",
     "CONSTANTS",
     "DATA",
+    "FIELD-SYMBOLS",
+    "CLASS",
+    "CLASS-METHODS",
+    "METHODS",
+    "METHOD",
     "ASSIGNMENT",
     "SELECT",
+    "SELECT-OPTIONS",
+    "PARAMETERS",
     "READ_TABLE",
     "LOOP_AT_ITAB",
     "IF",
     "ELSEIF",
+    "ELSE",
     "CASE",
+    "WHEN",
     "PERFORM",
+    "FORM",
     "CALL_FUNCTION",
     "CALL_METHOD",
     "APPEND",
+    "INSERT_ITAB",
     "MODIFY_ITAB",
     "DELETE_ITAB",
     "SORT_ITAB",
-    "MOVE-CORRESPONDING",
     "CLEAR",
     "TRY",
     "CATCH",
+    "DO",
     "MESSAGE",
     "WRITE"
   ], "default flight demo");
@@ -55,16 +72,16 @@ function testDefaultFlightDemoContract() {
     String(obj && obj.extras && obj.extras.performCall && obj.extras.performCall.form || "").toLowerCase()
       === "frm_validate_request"
   ));
-  assert.strictEqual(validateCalls.length, 3, "Expected exactly three natural validation sources.");
+  assert.strictEqual(validateCalls.length, 2, "Expected the main and preview validation sources.");
   const validationRoots = validateCalls.map((obj) => String(obj.extras.performCall.using[0] && obj.extras.performCall.using[0].value || "").toLowerCase());
-  assert.deepStrictEqual(validationRoots, ["gs_request", "gs_preview_request", "gs_request"]);
+  assert.deepStrictEqual(validationRoots, ["gs_request", "gs_preview_request"]);
 
   const nestedFormCalls = new Set(findObjects(objects, "PERFORM").map((obj) => (
     String(obj && obj.extras && obj.extras.performCall && obj.extras.performCall.form || "").toLowerCase()
   )));
-  assert(nestedFormCalls.has("frm_enrich_flight"));
-  assert(nestedFormCalls.has("frm_calculate_availability"));
-  assert(nestedFormCalls.has("frm_determine_status"));
+  assert(nestedFormCalls.has("frm_load_flights_with_cursor"));
+  assert(nestedFormCalls.has("frm_export_dataset"));
+  assert(nestedFormCalls.has("frm_demo_database_dml_rollback"));
 
   const appendVariants = new Set(findObjects(objects, "APPEND").map((obj) => (
     String(obj && obj.extras && obj.extras.append && obj.extras.append.variant || "")
