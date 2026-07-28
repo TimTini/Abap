@@ -211,7 +211,15 @@ function installVirtualLayoutMock(window, container, kind, itemCount, getItemHei
   const clientHeight = 800;
   const opts = options && typeof options === "object" ? options : {};
   const visualScale = Math.max(0.5, Math.min(2, Number(opts.visualScale) || 1));
-  const outerMargin = isTemplate ? 10 : 12;
+  let outerMargin = isTemplate ? 10 : 12;
+  if (isTemplate) {
+    const sample = container.querySelector(rootSelector);
+    if (sample) {
+      const style = window.getComputedStyle(sample);
+      outerMargin = (Number.parseFloat(style.marginTop || "0") || 0)
+        + (Number.parseFloat(style.marginBottom || "0") || 0);
+    }
+  }
   const outerHeightAt = (index) => Math.max(1, Number(getItemHeight(index)) || 1) + outerMargin;
 
   Object.defineProperty(container, "clientHeight", {
