@@ -116,9 +116,370 @@ async function assertStructFieldFinalDescNormalizesParentOnly() {
       .includes(`#${tracedAssignment.id}`));
   assert(tracedBlock, "Expected Template block for traced structure-field assignment.");
   assert.deepStrictEqual(getTemplateTableRows(tracedBlock.querySelector("table.template-preview-table")), [
-    ["Đích", "Nguồn"],
-    ["lv_result", "PARENT[Đơn hàng]-Mặt hàng"]
+    ["Đích", "lv_result"],
+    ["Nguồn", "PARENT[Đơn hàng]-Mặt hàng"]
   ]);
+
+  dom.window.close();
+}
+
+async function assertPerformRemappedStructFieldKeepsItemCodeComment() {
+  const source = [
+    "TYPES: BEGIN OF ty_order,",
+    "         item TYPE string, \"Mat hang",
+    "         qty TYPE i, \"So luong",
+    "       END OF ty_order.",
+    "DATA lds_order TYPE ty_order. \"Don hang",
+    "PERFORM frm_outer USING lds_order.",
+    "FORM frm_outer USING ids_outer TYPE ty_order.",
+    "  WRITE ids_outer-item.",
+    "  WRITE ids_outer-qty.",
+    "ENDFORM."
+  ].join("\n");
+
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state, api } = runtime;
+  const decls = Array.isArray(state.data && state.data.decls) ? state.data.decls : [];
+  const catalogItem = decls.find((decl) => String(decl && decl.name || "") === "lds_order-item");
+  assert(catalogItem, "Expected catalog STRUCT_FIELD lds_order-item.");
+  assert.strictEqual(String(catalogItem.comment || ""), "Mat hang");
+  assert.match(String(api.getFinalDeclDesc(catalogItem) || ""), /Mat hang/);
+
+  const structFieldKeys = decls
+    .filter((decl) => String(decl && decl.objectType || "").trim().toUpperCase() === "STRUCT_FIELD")
+    .map((decl) => [
+      String(decl.scopeLabel || "").trim().toUpperCase(),
+      String(decl.name || "").trim().toUpperCase()
+    ].join("|"));
+  const duplicateStructFieldKeys = Array.from(
+    structFieldKeys.filter((key, index) => structFieldKeys.indexOf(key) !== index)
+  );
+  assert.deepStrictEqual(
+    duplicateStructFieldKeys,
+    [],
+    `Expected no duplicate catalog/synthetic STRUCT_FIELD rows. Got: ${duplicateStructFieldKeys.join(", ")}`
+  );
+
+  try {
+    Object.defineProperty(els.templatePreviewOutput, "clientHeight", { configurable: true, value: 100000 });
+  } catch {
+    // JSDOM viewport defaults are fine for this fixture.
+  }
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const writeItemBlock = Array.from(els.templatePreviewOutput.querySelectorAll(".template-block"))
+    .find((block) => {
+      const meta = String(block.querySelector(".template-block-meta")?.textContent || "");
+      return /line 8/i.test(meta);
+    });
+  assert(writeItemBlock, "Expected Template WRITE block for remapped ids_outer-item.");
+  const flat = getTemplateTableRows(writeItemBlock.querySelector("table.template-preview-table"))
+    .map((row) => row.join(" | "))
+    .join(" || ");
+  assert.match(
+    flat,
+    /Mat hang/,
+    `Expected remapped FORM WRITE template to keep item code comment. Got: ${flat}`
+  );
+  assert.doesNotMatch(
+    flat,
+    /Don hang-item\b/,
+    `Expected remapped template not to fall back to bare item id. Got: ${flat}`
+  );
+
+  dom.window.close();
+}
+
+async function assertSystemSyTabixEditableInLoopAndData() {
+  const source = [
+    "DATA lt_tab TYPE TABLE OF string.",
+    "DATA ls_row TYPE string.",
+    "DATA lv_i TYPE i.",
+    "LOOP AT lt_tab INTO ls_row FROM INDEX sy-tabix.",
+    "  lv_i = sy-tabix.",
+    "ENDLOOP."
+  ].join("\n");
+
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
+
+  try {
+    Object.defineProperty(els.templatePreviewOutput, "clientHeight", { configurable: true, value: 100000 });
+  } catch {
+    // JSDOM default viewport is fine.
+  }
+
+  const objects = Array.isArray(state.renderObjects) ? state.renderObjects : [];
+  const loopObj = objects.find((obj) => String(obj && obj.objectType || "") === "LOOP_AT_ITAB");
+  assert(loopObj, "Expected LOOP_AT_ITAB.");
+  assert.strictEqual(
+    String(loopObj.values && loopObj.values.from && loopObj.values.from.decl && loopObj.values.from.decl.name || ""),
+    "SY-TABIX",
+    "Expected FROM INDEX to bind SYSTEM SY-TABIX."
+  );
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const loopTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="LOOP_AT_ITAB"]');
+  assert(loopTable, "Expected LOOP template table.");
+  const fromCell = findTemplateCellByText(loopTable, "sy-tabix")
+    || findTemplateCellByText(loopTable, "SY-TABIX")
+    || findTemplateCellByText(loopTable, "Current table index");
+  assert(fromCell, "Expected Template cell for sy-tabix on LOOP FROM INDEX.");
+  assert(
+    Array.isArray(fromCell.__templateCellMeta && fromCell.__templateCellMeta.declCandidates)
+    && fromCell.__templateCellMeta.declCandidates.length > 0,
+    "Expected sy-tabix Template cell to expose decl candidates."
+  );
+
+  const systemKey = getDeclOverrideStorageKeyFromRuntime(window, fromCell.__templateCellMeta.declCandidates[0]);
+  assert.strictEqual(systemKey, "SYSTEM:SY-TABIX", `Expected SYSTEM storage key. Got: ${systemKey}`);
+
+  const modal = await openTemplateCellDescriptionTab(window, fromCell);
+  await saveTemplateCellDescription(window, modal, "Chi so bang");
+  assert.strictEqual(String(state.descOverrides[systemKey] || ""), "Chi so bang");
+
+  const refreshedLoop = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="LOOP_AT_ITAB"]');
+  assert(findTemplateCellByText(refreshedLoop, "Chi so bang"), "Expected Template to refresh SY-TABIX override.");
+
+  els.rightTabDescBtn.click();
+  await waitForViewerUi(window);
+  const catalogText = String(els.declDescTable && els.declDescTable.textContent || "");
+  assert(
+    /SY-TABIX/i.test(catalogText),
+    `Expected Data catalog to list SY-TABIX. Got: ${catalogText.slice(0, 400)}`
+  );
+  assert(
+    /Chi so bang/i.test(catalogText),
+    "Expected Data catalog to show SY-TABIX override."
+  );
+
+  dom.window.close();
+}
+
+async function assertConcatenateSourcesExpandToEditableRows() {
+  const source = [
+    "DATA lv_a TYPE string.",
+    "DATA lv_b TYPE string.",
+    "DATA lv_c TYPE string.",
+    "DATA lv_d TYPE string.",
+    "DATA lv_sep TYPE string.",
+    "CONCATENATE lv_a lv_b lv_c INTO lv_d SEPARATED BY lv_sep.",
+    "CONCATENATE lv_a 'x' INTO lv_d."
+  ].join("\n");
+
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+
+  try {
+    Object.defineProperty(els.templatePreviewOutput, "clientHeight", { configurable: true, value: 100000 });
+  } catch {
+    // JSDOM default viewport is fine.
+  }
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const objects = Array.isArray(state.renderObjects) ? state.renderObjects : [];
+  const multi = objects.find((obj) => /CONCATENATE lv_a lv_b lv_c INTO lv_d SEPARATED BY lv_sep\./i.test(String(obj && obj.raw || "")));
+  const withLiteral = objects.find((obj) => /CONCATENATE lv_a 'x' INTO lv_d\./i.test(String(obj && obj.raw || "")));
+  assert(multi && withLiteral, "Expected both CONCATENATE objects.");
+  assert.strictEqual(
+    String(multi.values && multi.values.sources && multi.values.sources.value || ""),
+    "lv_a lv_b lv_c",
+    "Expected parser values.sources to remain one string."
+  );
+
+  const findTable = (obj) => {
+    const idText = `#${String(obj && obj.id || "")}`;
+    const block = Array.from(els.templatePreviewOutput.querySelectorAll(".template-block"))
+      .find((candidate) => String(candidate.querySelector(".template-block-meta")?.textContent || "").includes(idText));
+    return block ? block.querySelector("table.template-preview-table") : null;
+  };
+
+  const multiTable = findTable(multi);
+  const multiRows = getTemplateTableRows(multiTable);
+  assert(
+    multiRows.some((row) => row[0] === "CONCATENATE" && row[1] === "lv_a"),
+    `Expected source row lv_a. Got: ${JSON.stringify(multiRows)}`
+  );
+  assert(
+    multiRows.some((row) => row[0] === "CONCATENATE" && row[1] === "lv_b"),
+    `Expected source row lv_b. Got: ${JSON.stringify(multiRows)}`
+  );
+  assert(
+    multiRows.some((row) => row[0] === "CONCATENATE" && row[1] === "lv_c"),
+    `Expected source row lv_c. Got: ${JSON.stringify(multiRows)}`
+  );
+  assert(
+    multiRows.some((row) => /INTO/i.test(String(row[0] || "")) && row[1] === "lv_d"),
+    `Expected INTO lv_d. Got: ${JSON.stringify(multiRows)}`
+  );
+  assert(
+    multiRows.some((row) => /SEPARATED/i.test(String(row[0] || "")) && row[1] === "lv_sep"),
+    `Expected SEPARATED BY lv_sep. Got: ${JSON.stringify(multiRows)}`
+  );
+
+  for (const name of ["lv_a", "lv_b", "lv_c", "lv_d", "lv_sep"]) {
+    const cell = findTemplateCellByText(multiTable, name);
+    assert(cell, `Expected cell for ${name}.`);
+    assert(
+      Array.isArray(cell.__templateCellMeta && cell.__templateCellMeta.declCandidates)
+      && cell.__templateCellMeta.declCandidates.length > 0,
+      `Expected ${name} editable decl candidates.`
+    );
+  }
+
+  const literalTable = findTable(withLiteral);
+  const literalCell = findTemplateCellByText(literalTable, "'x'");
+  assert.strictEqual(
+    literalCell && literalCell.__templateCellMeta && literalCell.__templateCellMeta.reasonCode,
+    "LITERAL_NO_DECL"
+  );
+  assert.deepStrictEqual(
+    Array.from((literalCell && literalCell.__templateCellMeta && literalCell.__templateCellMeta.declCandidates) || []),
+    [],
+    "Expected literal source not to create decl candidates."
+  );
+
+  dom.window.close();
+}
+
+async function assertAssignmentRhsOperandsExpandToEditableRows() {
+  const source = [
+    "DATA a TYPE i.",
+    "DATA b TYPE i.",
+    "DATA c TYPE i.",
+    "DATA d TYPE i.",
+    "DATA e TYPE i.",
+    "a = b + c + d + e.",
+    "a = b + 1."
+  ].join("\n");
+
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+
+  try {
+    Object.defineProperty(els.templatePreviewOutput, "clientHeight", { configurable: true, value: 100000 });
+  } catch {
+    // JSDOM default viewport is fine for this fixture.
+  }
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const objects = Array.isArray(state.renderObjects) ? state.renderObjects : [];
+  const multi = objects.find((obj) => String(obj && obj.raw || "").trim() === "a = b + c + d + e.");
+  const withLiteral = objects.find((obj) => String(obj && obj.raw || "").trim() === "a = b + 1.");
+  assert(multi && withLiteral, "Expected both ASSIGNMENT objects.");
+
+  const findTable = (obj) => {
+    const idText = `#${String(obj && obj.id || "")}`;
+    const block = Array.from(els.templatePreviewOutput.querySelectorAll(".template-block"))
+      .find((candidate) => String(candidate.querySelector(".template-block-meta")?.textContent || "").includes(idText));
+    return block ? block.querySelector("table.template-preview-table") : null;
+  };
+
+  const multiTable = findTable(multi);
+  const multiRows = getTemplateTableRows(multiTable);
+  assert.deepStrictEqual(multiRows, [
+    ["Đích", "a"],
+    ["Nguồn", "b"],
+    ["Nguồn", "c"],
+    ["Nguồn", "d"],
+    ["Nguồn", "e"]
+  ], `Expected one row per RHS operand. Got: ${JSON.stringify(multiRows)}`);
+
+  for (const name of ["a", "b", "c", "d", "e"]) {
+    const cell = findTemplateCellByText(multiTable, name);
+    assert(cell, `Expected cell for ${name}.`);
+    assert(
+      Array.isArray(cell.__templateCellMeta && cell.__templateCellMeta.declCandidates)
+      && cell.__templateCellMeta.declCandidates.length > 0,
+      `Expected ${name} to expose editable decl candidates.`
+    );
+  }
+
+  const literalTable = findTable(withLiteral);
+  const literalRows = getTemplateTableRows(literalTable);
+  assert.deepStrictEqual(literalRows, [
+    ["Đích", "a"],
+    ["Nguồn", "b"],
+    ["Nguồn", "1"]
+  ], `Expected literal to stay as its own display row. Got: ${JSON.stringify(literalRows)}`);
+
+  const literalOneCell = findTemplateCellByText(literalTable, "1");
+  assert.strictEqual(
+    literalOneCell && literalOneCell.__templateCellMeta && literalOneCell.__templateCellMeta.reasonCode,
+    "LITERAL_NO_DECL"
+  );
+  assert.deepStrictEqual(
+    Array.from((literalOneCell && literalOneCell.__templateCellMeta && literalOneCell.__templateCellMeta.declCandidates) || []),
+    [],
+    "Expected literal 1 not to create decl candidates."
+  );
+  const literalBCell = findTemplateCellByText(literalTable, "b");
+  assert(
+    Array.isArray(literalBCell && literalBCell.__templateCellMeta && literalBCell.__templateCellMeta.declCandidates)
+    && literalBCell.__templateCellMeta.declCandidates.length > 0,
+    "Expected b to remain editable beside literal 1."
+  );
+
+  const joined = multiRows.map((row) => row.join(" ")).join(" | ");
+  assert.strictEqual(
+    /b \+ c \+ d \+ e/.test(joined),
+    false,
+    "Expected RHS expression not to remain a single cell."
+  );
+
+  dom.window.close();
+}
+
+async function assertLoopFromIndexTemplatePairsFromOperand() {
+  const source = [
+    "DATA lt_tab TYPE TABLE OF string. \"Rows",
+    "DATA ls_row TYPE string. \"Row",
+    "DATA lv_from TYPE i. \"From index",
+    "DATA lv_to TYPE i. \"To index",
+    "LOOP AT lt_tab INTO ls_row FROM INDEX lv_from TO lv_to.",
+    "ENDLOOP."
+  ].join("\n");
+
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+
+  const objects = Array.isArray(state.renderObjects) ? state.renderObjects : [];
+  const loopObj = objects.find((obj) => String(obj && obj.objectType || "") === "LOOP_AT_ITAB");
+  assert(loopObj, "Expected LOOP_AT_ITAB object.");
+  assert(loopObj.keywords && loopObj.keywords["from-index"], "Expected from-index keyword label.");
+  assert.strictEqual(
+    String(loopObj.values && loopObj.values.from && loopObj.values.from.value || ""),
+    "lv_from",
+    "Expected values.from to keep the INDEX operand."
+  );
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const loopTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="LOOP_AT_ITAB"]');
+  assert(loopTable, "Expected LOOP_AT_ITAB template table.");
+  const rows = getTemplateTableRows(loopTable);
+  const fromIndexRow = rows.find((row) => /FROM\s+INDEX/i.test(String(row[0] || "")));
+  assert(fromIndexRow, `Expected a FROM INDEX template keyword row. Got: ${JSON.stringify(rows)}`);
+  assert.match(
+    String(fromIndexRow[1] || ""),
+    /From index|lv_from/i,
+    `Expected FROM INDEX row to pair the from operand. Got: ${JSON.stringify(fromIndexRow)}`
+  );
 
   dom.window.close();
 }
@@ -193,6 +554,8 @@ async function assertConditionListsExpandRows() {
     "DATA lt_rows TYPE TABLE OF string.",
     "DATA ls_row TYPE string.",
     "READ TABLE lt_rows WITH KEY col1 = gv_a col2 = gv_b INTO ls_row.",
+    "LOOP AT lt_rows INTO ls_row WHERE col1 = gv_a AND col2 = gv_b.",
+    "ENDLOOP.",
     "MODIFY lt_rows FROM ls_row TRANSPORTING col1 col2 WHERE col1 = gv_a AND col2 = gv_b.",
     "SELECT col1, col2 FROM dbtab INTO TABLE @lt_rows WHERE col1 = @gv_a AND col2 = @gv_b HAVING col3 = @gv_a OR col4 = @gv_b."
   ].join("\n");
@@ -209,9 +572,27 @@ async function assertConditionListsExpandRows() {
     ["INTO", "ls_row"],
     ["WITH KEY", "="],
     ["Điều kiện trái", "Toán tử", "Điều kiện phải", "="],
-    ["col1", "=", "gv_a", "AND"],
-    ["col2", "=", "gv_b"]
+    ["lt_rows-col1", "=", "gv_a", "AND"],
+    ["lt_rows-col2", "=", "gv_b"]
   ]);
+  const readLeftCol1 = findTemplateCellByText(readTable, "lt_rows-col1");
+  assert(readLeftCol1, "Expected READ WITH KEY left operand bound to itab component.");
+  assert.strictEqual(
+    readLeftCol1.__templateCellMeta && readLeftCol1.__templateCellMeta.declCandidates[0]
+      && readLeftCol1.__templateCellMeta.declCandidates[0].objectType,
+    "STRUCT_FIELD"
+  );
+  assert.strictEqual(
+    readLeftCol1.__templateCellMeta.declCandidates[0].name,
+    "lt_rows-col1"
+  );
+
+  const loopTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="LOOP_AT_ITAB"]');
+  assert(loopTable, "Expected LOOP AT template.");
+  const loopWhereCol1 = findTemplateCellByText(loopTable, "lt_rows-col1");
+  assert(loopWhereCol1, "Expected LOOP WHERE left operand bound to itab component.");
+  assert.strictEqual(loopWhereCol1.__templateCellMeta.declCandidates[0].objectType, "STRUCT_FIELD");
+  assert.strictEqual(loopWhereCol1.__templateCellMeta.declCandidates[0].name, "lt_rows-col1");
 
   const modifyTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="MODIFY_ITAB"]');
   assert.deepStrictEqual(getTemplateTableRows(modifyTable), [
@@ -221,9 +602,20 @@ async function assertConditionListsExpandRows() {
     ["TRANSPORTING", "col2"],
     ["WHERE", "="],
     ["Điều kiện trái", "Toán tử", "Điều kiện phải", "="],
-    ["col1", "=", "gv_a", "AND"],
-    ["col2", "=", "gv_b"]
+    ["lt_rows-col1", "=", "gv_a", "AND"],
+    ["lt_rows-col2", "=", "gv_b"]
   ]);
+  const modifyWhereCol1 = findTemplateCellByText(modifyTable, "lt_rows-col1");
+  assert(modifyWhereCol1, "Expected MODIFY WHERE left operand bound to itab component.");
+  assert.strictEqual(modifyWhereCol1.__templateCellMeta.declCandidates[0].objectType, "STRUCT_FIELD");
+  const modifyTransportCol1 = findTemplateCellByText(modifyTable, "col1");
+  assert(modifyTransportCol1, "Expected MODIFY TRANSPORTING component row.");
+  assert.strictEqual(
+    modifyTransportCol1.__templateCellMeta && modifyTransportCol1.__templateCellMeta.status,
+    "editable",
+    "Expected MODIFY TRANSPORTING component to be editable."
+  );
+  assert.strictEqual(modifyTransportCol1.__templateCellMeta.declCandidates[0].name, "lt_rows-col1");
 
   const selectTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="SELECT"]');
   assert.deepStrictEqual(getTemplateTableRows(selectTable), [
@@ -254,7 +646,7 @@ async function assertSafeRawListsExpandWithoutSplittingExpressions() {
   ].join("\n");
   const dom = await renderFixture(source);
   const { window } = dom;
-  const { els } = window.AbapViewerRuntime;
+  const { els, state } = window.AbapViewerRuntime;
 
   els.rightTabTemplateBtn.click();
   await waitForViewerUi(window);
@@ -274,6 +666,15 @@ async function assertSafeRawListsExpandWithoutSplittingExpressions() {
     ["BY", "col1"],
     ["BY", "col2"]
   ]);
+  const sortCol1 = findTemplateCellByText(sortTable, "col1");
+  assert(sortCol1, "Expected SORT BY col1 row.");
+  assert.strictEqual(
+    sortCol1.__templateCellMeta && sortCol1.__templateCellMeta.status,
+    "editable",
+    "Expected SORT BY component to be editable."
+  );
+  assert.strictEqual(sortCol1.__templateCellMeta.declCandidates[0].objectType, "STRUCT_FIELD");
+  assert.strictEqual(sortCol1.__templateCellMeta.declCandidates[0].name, "lt_rows-col1");
 
   const modifyTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="MODIFY_ITAB"]');
   assert.deepStrictEqual(getTemplateTableRows(modifyTable), [
@@ -282,6 +683,20 @@ async function assertSafeRawListsExpandWithoutSplittingExpressions() {
     ["TRANSPORTING", "col1"],
     ["TRANSPORTING", "col2"]
   ]);
+  const modifyCol2 = findTemplateCellByText(modifyTable, "col2");
+  assert(modifyCol2, "Expected MODIFY TRANSPORTING col2 row.");
+  assert.strictEqual(modifyCol2.__templateCellMeta && modifyCol2.__templateCellMeta.status, "editable");
+  assert.strictEqual(modifyCol2.__templateCellMeta.declCandidates[0].name, "lt_rows-col2");
+
+  const sortModal = await openTemplateCellDescriptionTab(window, sortCol1);
+  await saveTemplateCellDescription(window, sortModal, "Sort key 1");
+  const sortKey = getDeclOverrideStorageKeyFromRuntime(window, sortCol1.__templateCellMeta.declCandidates[0]);
+  assert.strictEqual(
+    typeof state.descOverrides[sortKey] === "object"
+      ? String(state.descOverrides[sortKey].text || "")
+      : String(state.descOverrides[sortKey] || ""),
+    "Sort key 1"
+  );
 
   dom.window.close();
 }
@@ -562,13 +977,15 @@ async function assertTemplateRowDescriptionTargetsExactConditionDecls() {
 
   let readTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="READ_TABLE"]');
   assert(readTable, "Expected the READ TABLE condition template.");
-  const readLeftRk2 = findTemplateCellByText(readTable, "rk2");
+  const readLeftRk2 = findTemplateCellByText(readTable, "lt_rows-rk2");
   assert(readLeftRk2, "Expected READ TABLE second-clause left operand.");
   assert.strictEqual(
     readLeftRk2.__templateCellMeta && readLeftRk2.__templateCellMeta.sourcePath,
     "extras.readTable.conditions[1].leftOperandDecl.finalDesc"
   );
-  const readLeftRk1 = findTemplateCellByText(readTable, "rk1");
+  assert.strictEqual(readLeftRk2.__templateCellMeta.declCandidates[0].objectType, "STRUCT_FIELD");
+  assert.strictEqual(readLeftRk2.__templateCellMeta.declCandidates[0].name, "lt_rows-rk2");
+  const readLeftRk1 = findTemplateCellByText(readTable, "lt_rows-rk1");
   assert(readLeftRk1, "Expected READ TABLE first-clause left operand.");
   const readKey1 = getDeclOverrideStorageKeyFromRuntime(window, readLeftRk1.__templateCellMeta.declCandidates[0]);
   const readKey2 = getDeclOverrideStorageKeyFromRuntime(window, readLeftRk2.__templateCellMeta.declCandidates[0]);
@@ -579,11 +996,20 @@ async function assertTemplateRowDescriptionTargetsExactConditionDecls() {
   assert(readModalText.includes("rk2"), "Expected READ TABLE second row to target rk2.");
   assert(!readModalText.includes("rk1"), "Expected READ TABLE second row not to target rk1.");
   await saveTemplateCellDescription(window, readModal, "rk2 edited");
-  assert.strictEqual(String(state.descOverrides[readKey2] || ""), "rk2 edited");
+  assert.strictEqual(
+    typeof state.descOverrides[readKey2] === "object"
+      ? String(state.descOverrides[readKey2].text || "")
+      : String(state.descOverrides[readKey2] || ""),
+    "rk2 edited"
+  );
   assert.strictEqual(Object.prototype.hasOwnProperty.call(state.descOverrides, readKey1), false);
   readTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="READ_TABLE"]');
-  assert(findTemplateCellByText(readTable, "rk1"), "Expected READ TABLE first left operand unchanged.");
-  assert(findTemplateCellByText(readTable, "rk2 edited"), "Expected only READ TABLE second left operand refreshed.");
+  assert(findTemplateCellByText(readTable, "lt_rows-rk1"), "Expected READ TABLE first left operand unchanged.");
+  assert(
+    findTemplateCellByText(readTable, "lt_rows-rk2 edited")
+      || findTemplateCellByText(readTable, "rk2 edited"),
+    "Expected only READ TABLE second left operand refreshed."
+  );
 
   let selectTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="SELECT"]');
   assert(selectTable, "Expected the SELECT condition template.");
@@ -602,8 +1028,19 @@ async function assertTemplateRowDescriptionTargetsExactConditionDecls() {
 
   const selectModal = await openTemplateCellDescriptionTab(window, selectLeftWk2);
   await saveTemplateCellDescription(window, selectModal, "wk2 edited");
-  assert.strictEqual(String(state.descOverrides[selectKey2] || ""), "wk2 edited");
-  assert.strictEqual(String(state.descOverrides[readKey2] || ""), "rk2 edited", "Expected READ override to stay isolated.");
+  assert.strictEqual(
+    typeof state.descOverrides[selectKey2] === "object"
+      ? String(state.descOverrides[selectKey2].text || "")
+      : String(state.descOverrides[selectKey2] || ""),
+    "wk2 edited"
+  );
+  assert.strictEqual(
+    typeof state.descOverrides[readKey2] === "object"
+      ? String(state.descOverrides[readKey2].text || "")
+      : String(state.descOverrides[readKey2] || ""),
+    "rk2 edited",
+    "Expected READ override to stay isolated."
+  );
   selectTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="SELECT"]');
   assert(findTemplateCellByText(selectTable, "wk1"), "Expected SELECT first WHERE left operand unchanged.");
   assert(findTemplateCellByText(selectTable, "wk2 edited"), "Expected only SELECT second WHERE left operand refreshed.");
@@ -1486,6 +1923,10 @@ assertViewerFixtureDirectoriesStayInSync();
   await t.test("struct field final desc normalizes parent only", async () => {
     await assertStructFieldFinalDescNormalizesParentOnly();
   });
+
+  await t.test("perform remapped struct field keeps item code comment", async () => {
+    await assertPerformRemappedStructFieldKeepsItemCodeComment();
+  });
 });
 
 defineFocusedTest(test, "viewer constant finalDesc contract", ["constant-finaldesc"], async (t) => {
@@ -1512,11 +1953,39 @@ assertViewerFixtureDirectoriesStayInSync();
   });
 });
 
+defineFocusedTest(test, "viewer system sy-tabix edit contract", ["system-sy-tabix-edit"], async (t) => {
+  assertViewerFixtureDirectoriesStayInSync();
+
+  await t.test("system sy-tabix editable in loop template and data catalog", async () => {
+    await assertSystemSyTabixEditableInLoopAndData();
+  });
+});
+
+defineFocusedTest(test, "viewer concatenate sources rows contract", ["concatenate-source-rows"], async (t) => {
+  assertViewerFixtureDirectoriesStayInSync();
+
+  await t.test("concatenate sources expand to editable rows", async () => {
+    await assertConcatenateSourcesExpandToEditableRows();
+  });
+});
+
+defineFocusedTest(test, "viewer assignment operand rows contract", ["assignment-operand-rows"], async (t) => {
+  assertViewerFixtureDirectoriesStayInSync();
+
+  await t.test("assignment rhs operands expand to editable rows", async () => {
+    await assertAssignmentRhsOperandsExpandToEditableRows();
+  });
+});
+
 defineFocusedTest(test, "viewer template row description loop contract", ["template-row-description-loop"], async (t) => {
 assertViewerFixtureDirectoriesStayInSync();
 
   await t.test("template row description edits local loop decl", async () => {
     await assertTemplateRowDescriptionEditsLocalLoopDecl();
+  });
+
+  await t.test("loop from index template pairs from operand", async () => {
+    await assertLoopFromIndexTemplatePairsFromOperand();
   });
 });
 

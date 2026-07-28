@@ -20,6 +20,27 @@ async function assertGroupedConfigExportIsDeterministic() {
   const { window } = dom;
   const runtime = window.AbapViewerRuntime;
   const { api, els, state } = runtime;
+  const removedLifecycleNames = {
+    state: ["descOverrides", "Legacy"].join(""),
+    constant: ["DESC_STORAGE_KEY", "LEGACY_V1"].join(""),
+    service: ["load", "LegacyDescOverrides"].join("")
+  };
+
+  assert.strictEqual(
+    Object.prototype.hasOwnProperty.call(state, removedLifecycleNames.state),
+    false,
+    "Expected state not to expose the removed name-only description lifecycle."
+  );
+  assert.strictEqual(
+    Object.prototype.hasOwnProperty.call(runtime.constants, removedLifecycleNames.constant),
+    false,
+    "Expected constants not to expose the removed name-only description storage key."
+  );
+  assert.strictEqual(
+    Object.prototype.hasOwnProperty.call(runtime.services.runtimeState, removedLifecycleNames.service),
+    false,
+    "Expected runtimeState not to expose the removed name-only description loader."
+  );
 
   assert.strictEqual(
     typeof api.buildViewerConfigBundle,
@@ -43,7 +64,6 @@ async function assertGroupedConfigExportIsDeterministic() {
     "input.abap|PROGRAM|Z_EXPORT|DATA|LV_EXPORT|1": "Manual override",
     "input.abap|PROGRAM|Z_EXPORT|DATA|LV_SKIP|2": { text: "Raw override", noNormalize: true }
   };
-  state.descOverridesLegacy = { "legacy-secret": "LEGACY_OVERRIDE_MARKER" };
   state.theme = "light";
   state.layoutLeftPane = 63;
   state.templateGuiHiddenTypes = new window.Set(["IF", "DATA"]);
@@ -78,7 +98,6 @@ async function assertGroupedConfigExportIsDeterministic() {
   assert.deepStrictEqual(Array.from(Object.keys(allBundle.sections)), VIEWER_CONFIG_SECTION_KEYS);
   assert.deepStrictEqual(cloneTestJson(allBundle.sections.descriptionOverrides), state.descOverrides);
   const allJson = JSON.stringify(allBundle);
-  assert(!allJson.includes("LEGACY_OVERRIDE_MARKER"), "Expected export to exclude legacy overrides.");
   assert(!allJson.includes("RUNTIME_SOURCE_MARKER"), "Expected export to exclude parsed source state.");
   assert(!allJson.includes("RUNTIME_TREE_MARKER"), "Expected export to exclude runtime render state.");
   assert(!allJson.includes("abap-parser-viewer."), "Expected export not to expose localStorage key names.");
@@ -155,15 +174,10 @@ async function assertGroupedConfigRoundTripsStateStorageAndDom() {
     nameTemplatesByCode: cloneTestJson(state.settings.nameTemplatesByCode)
   };
   state.descOverrides = { changed: "changed" };
-  state.descOverridesLegacy = { "roundtrip-key": "Stale legacy override" };
   state.templateGuiHiddenTypes = new window.Set();
   window.localStorage.setItem(VIEWER_CONFIG_STORAGE_KEYS.templates, JSON.stringify(state.templateConfig));
   window.localStorage.setItem(VIEWER_CONFIG_STORAGE_KEYS.descriptionSettings, JSON.stringify(state.settings));
   window.localStorage.setItem(VIEWER_CONFIG_STORAGE_KEYS.descriptionOverrides, JSON.stringify(state.descOverrides));
-  window.localStorage.setItem(
-    VIEWER_CONFIG_STORAGE_KEYS.legacyDescriptionOverrides,
-    JSON.stringify(state.descOverridesLegacy)
-  );
   window.localStorage.setItem(VIEWER_CONFIG_STORAGE_KEYS.hiddenObjectTypes, "[]");
   window.localStorage.setItem(VIEWER_CONFIG_STORAGE_KEYS.formEditorPct, "35");
   window.AbapViewerRuntime.services.runtimeState.applyTheme("dark");
@@ -196,7 +210,6 @@ async function assertGroupedConfigRoundTripsStateStorageAndDom() {
   assert.deepStrictEqual(Array.from(state.settings.declFilterTypes), ["DATA"]);
   assert.strictEqual(state.settings.nameTemplatesByCode.DS, "ROUNDTRIP[{{desc}}]");
   assert.deepStrictEqual(cloneTestJson(state.descOverrides), cloneTestJson(exported.sections.descriptionOverrides));
-  assert.deepStrictEqual(cloneTestJson(state.descOverridesLegacy), {});
   assert.strictEqual(state.theme, "light");
   assert.strictEqual(state.layoutLeftPane, 61);
   assert.deepStrictEqual(Array.from(state.templateGuiHiddenTypes.values()), ["DATA"]);
@@ -208,7 +221,6 @@ async function assertGroupedConfigRoundTripsStateStorageAndDom() {
     JSON.parse(window.localStorage.getItem(VIEWER_CONFIG_STORAGE_KEYS.descriptionOverrides)),
     cloneTestJson(exported.sections.descriptionOverrides)
   );
-  assert.strictEqual(window.localStorage.getItem(VIEWER_CONFIG_STORAGE_KEYS.legacyDescriptionOverrides), null);
   assert.deepStrictEqual(
     JSON.parse(window.localStorage.getItem(VIEWER_CONFIG_STORAGE_KEYS.hiddenObjectTypes)),
     ["DATA"]
@@ -363,16 +375,10 @@ async function assertGroupedConfigImportValidatesAndRollsBack() {
   );
 
   const originalOverrides = { "rollback-v2": "Original v2" };
-  const originalLegacyOverrides = { "rollback-v1": "Original legacy" };
   state.descOverrides = cloneTestJson(originalOverrides);
-  state.descOverridesLegacy = cloneTestJson(originalLegacyOverrides);
   window.localStorage.setItem(
     VIEWER_CONFIG_STORAGE_KEYS.descriptionOverrides,
     JSON.stringify(originalOverrides)
-  );
-  window.localStorage.setItem(
-    VIEWER_CONFIG_STORAGE_KEYS.legacyDescriptionOverrides,
-    JSON.stringify(originalLegacyOverrides)
   );
   const uiNavigation = window.AbapViewerRuntime && window.AbapViewerRuntime.services
     ? window.AbapViewerRuntime.services.uiNavigation
@@ -400,14 +406,9 @@ async function assertGroupedConfigImportValidatesAndRollsBack() {
   }
   assert.strictEqual(renderFailureInjected, true);
   assert.deepStrictEqual(cloneTestJson(state.descOverrides), originalOverrides);
-  assert.deepStrictEqual(cloneTestJson(state.descOverridesLegacy), originalLegacyOverrides);
   assert.deepStrictEqual(
     JSON.parse(window.localStorage.getItem(VIEWER_CONFIG_STORAGE_KEYS.descriptionOverrides)),
     originalOverrides
-  );
-  assert.deepStrictEqual(
-    JSON.parse(window.localStorage.getItem(VIEWER_CONFIG_STORAGE_KEYS.legacyDescriptionOverrides)),
-    originalLegacyOverrides
   );
 
   dom.window.close();
@@ -486,7 +487,7 @@ async function assertStatementSpecificTwentyCellTemplates() {
     );
   }
 
-  const genericKeys = STATEMENT_TEMPLATE_KEYS.filter((key) => !["ASSIGNMENT", "IF", "ELSEIF"].includes(key));
+  const genericKeys = STATEMENT_TEMPLATE_KEYS.filter((key) => !["IF", "ELSEIF"].includes(key));
   for (const templateKey of genericKeys) {
     const template = state.templateConfig.templates[templateKey];
     assert(template["A1:T1"], `Expected ${templateKey} keyword frame to span A:T.`);
@@ -503,11 +504,9 @@ async function assertStatementSpecificTwentyCellTemplates() {
   assert.strictEqual(appendLinesOf.U6.text, "{extras.append.target.finalDesc}");
 
   const assignment = state.templateConfig.templates.ASSIGNMENT;
-  assert.strictEqual(assignment.A1.text, "Đích");
-  assert.strictEqual(assignment.U1.text, "Nguồn");
-  assert.strictEqual(assignment.A2.text, "{values.target.finalDesc}");
-  assert.strictEqual(assignment.U2.text, "{values.expr.finalDesc}");
-  for (const rangeKey of ["A1:T1", "U1:AN1", "A2:T2", "U2:AN2"]) {
+  assert.strictEqual(assignment.A1.text, "{rows.keyword}");
+  assert.strictEqual(assignment.U1.text, "{rows.finalDesc}");
+  for (const rangeKey of ["A1:T1", "U1:AN1"]) {
     assert(assignment[rangeKey], `Expected ASSIGNMENT range ${rangeKey}.`);
   }
 
@@ -567,7 +566,7 @@ async function assertStatementSpecificTwentyCellTemplates() {
     ["INTO", "ls_row"],
     ["WITH KEY", "="],
     ["Điều kiện trái", "Toán tử", "Điều kiện phải", "="],
-    ["table_line", "=", "lv_a"]
+    ["lt_rows-table_line", "=", "lv_a"]
   ]);
 
   const appendTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="APPEND"]');

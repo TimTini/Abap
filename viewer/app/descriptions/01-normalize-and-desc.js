@@ -7,7 +7,7 @@
   const state = runtime.state;
   const els = runtime.els;
   const constants = runtime.constants || {};
-  const { DESC_STORAGE_KEY_V2, DESC_STORAGE_KEY_LEGACY_V1, SETTINGS_STORAGE_KEY_V1, TEMPLATE_CONFIG_STORAGE_KEY_V1, THEME_STORAGE_KEY_V1, LAYOUT_SPLIT_STORAGE_KEY_V1, LAYOUT_SPLIT_DEFAULT, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX, MOBILE_LAYOUT_QUERY, RENDER_TREE_OPTIONS, DECL_TYPE_OPTIONS, NAME_CODE_OPTIONS, DEFAULT_SETTINGS, TEMPLATE_DEFAULT_CONFIG_V1, SAMPLE_ABAP } = constants;
+  const { DESC_STORAGE_KEY_V2, SETTINGS_STORAGE_KEY_V1, TEMPLATE_CONFIG_STORAGE_KEY_V1, THEME_STORAGE_KEY_V1, LAYOUT_SPLIT_STORAGE_KEY_V1, LAYOUT_SPLIT_DEFAULT, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX, MOBILE_LAYOUT_QUERY, RENDER_TREE_OPTIONS, DECL_TYPE_OPTIONS, NAME_CODE_OPTIONS, DEFAULT_SETTINGS, TEMPLATE_DEFAULT_CONFIG_V1, SAMPLE_ABAP } = constants;
   const normalizeId = runtime.requireServiceMethod("runtimeState", "normalizeId");
   const getValueEntries = runtime.requireServiceMethod("runtimeState", "getValueEntries");
   const saveDescOverrides = runtime.requireServiceMethod("runtimeState", "saveDescOverrides");
@@ -42,6 +42,10 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
   }
 
   function getDeclCodeDesc(decl) {
+    const linkedTypeComponent = getLinkedTypeComponentDecl(decl);
+    if (linkedTypeComponent) {
+      return getDeclCodeDesc(linkedTypeComponent);
+    }
     const source = getSourceDeclDesc(decl);
     if (source) {
       return source;
@@ -70,8 +74,8 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     return wrap;
   }
 
-  const DATA_CATALOG_EXCLUDED_OBJECT_TYPES = new Set(["SYSTEM", "CONDITION", "PATH_DECL"]);
-  const DATA_CATALOG_EXCLUDED_SCOPE_TYPES = new Set(["SYSTEM", "PATH"]);
+  const DATA_CATALOG_EXCLUDED_OBJECT_TYPES = new Set(["CONDITION", "PATH_DECL"]);
+  const DATA_CATALOG_EXCLUDED_SCOPE_TYPES = new Set(["PATH"]);
 
   function isDataCatalogSourceDecl(decl) {
     if (!decl || typeof decl !== "object" || !decl.name || !decl.scopeLabel) {
@@ -79,6 +83,9 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     }
     const objectType = String(decl.objectType || "").trim().toUpperCase();
     const scopeType = String(decl.scopeType || "").trim().toUpperCase();
+    if (objectType === "SYSTEM" || scopeType === "SYSTEM") {
+      return true;
+    }
     return !DATA_CATALOG_EXCLUDED_OBJECT_TYPES.has(objectType)
       && !DATA_CATALOG_EXCLUDED_SCOPE_TYPES.has(scopeType);
   }
@@ -87,17 +94,71 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     const sourceDecls = state.data && Array.isArray(state.data.decls) ? state.data.decls : [];
     const rows = [];
     const seen = new Set();
-    for (const decl of sourceDecls) {
+    const pushDecl = (decl) => {
       if (!isDataCatalogSourceDecl(decl)) {
-        continue;
+        return;
       }
       const key = getDeclOverrideStorageKey(decl) || stringifyDecl(decl);
       if (!key || seen.has(key)) {
-        continue;
+        return;
       }
       seen.add(key);
       rows.push(decl);
+    };
+
+    for (const decl of sourceDecls) {
+      pushDecl(decl);
     }
+
+    // SYSTEM decls are bound on value entries but not always listed in data.decls.
+    const harvestSystemDecl = (value) => {
+      if (!value || typeof value !== "object") {
+        return;
+      }
+      for (const key of ["decl", "valueDecl", "leftOperandDecl", "rightOperandDecl"]) {
+        const candidate = value[key];
+        if (
+          candidate
+          && typeof candidate === "object"
+          && String(candidate.objectType || "").trim().toUpperCase() === "SYSTEM"
+        ) {
+          pushDecl(candidate);
+        }
+      }
+      if (Array.isArray(value.originDecls)) {
+        for (const origin of value.originDecls) {
+          if (origin && String(origin.objectType || "").trim().toUpperCase() === "SYSTEM") {
+            pushDecl(origin);
+          }
+        }
+      }
+    };
+
+    const walkValueBag = (node) => {
+      if (!node || typeof node !== "object") {
+        return;
+      }
+      if (Array.isArray(node)) {
+        for (const item of node) {
+          walkValueBag(item);
+        }
+        return;
+      }
+      harvestSystemDecl(node);
+      for (const child of Object.values(node)) {
+        if (child && typeof child === "object") {
+          walkValueBag(child);
+        }
+      }
+    };
+
+    const roots = Array.isArray(state.renderObjects) && state.renderObjects.length
+      ? state.renderObjects
+      : (state.data && Array.isArray(state.data.objects) ? state.data.objects : []);
+    for (const root of roots) {
+      walkValueBag(root);
+    }
+
     return rows;
   }
 
@@ -110,6 +171,16 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       return String(decl.structObjectType || objectType).trim().toUpperCase();
     }
     return objectType;
+  }
+
+  function getTypeComponentIdentity(decl) {
+    return normalizeKeyToken(decl && decl.typeComponentIdentity);
+  }
+
+  function getTypeUsageEntry(decl) {
+    const identity = getTypeComponentIdentity(decl);
+    const index = state.typeUsageIndex instanceof Map ? state.typeUsageIndex : null;
+    return identity && index ? index.get(identity) || null : null;
   }
 
   function getDataCatalogPerformParamUpper(decl) {
@@ -160,6 +231,22 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
   }
 
   function buildDataCatalogTraceModel(decl) {
+    const objectType = normalizeKeyToken(decl && decl.objectType);
+    const typeUsage = getTypeUsageEntry(decl);
+    if (objectType === "TYPE_COMPONENT" && typeUsage) {
+      const instanceCount = Array.isArray(typeUsage.instanceDecls) ? typeUsage.instanceDecls.length : 0;
+      return {
+        editDecl: decl,
+        traceText: `${getDeclTechName(decl) || decl.name} → ${instanceCount} instances`
+      };
+    }
+    if (objectType === "STRUCT_FIELD" && typeUsage && typeUsage.typeComponentDecl) {
+      return {
+        editDecl: decl,
+        traceText: `${getDeclTechName(decl) || decl.name} ← ${getDeclTechName(typeUsage.typeComponentDecl) || typeUsage.typeComponentDecl.name}`
+      };
+    }
+
     const localParamUpper = getDataCatalogPerformParamUpper(decl);
     const scopeType = String(decl && decl.scopeType || "").trim().toUpperCase();
     const scopeName = String(decl && decl.scopeName || "").trim();
@@ -261,12 +348,31 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     };
   }
 
+  function getDataCatalogScopeMeta(decl) {
+    const objectType = normalizeKeyToken(decl && decl.objectType);
+    const typeIdentity = normalizeKeyToken(decl && decl.typeIdentity);
+    if (objectType === "TYPE_COMPONENT" && decl && decl.dynamic && typeIdentity.startsWith("EXTERNAL:")) {
+      const typeName = String(decl.typeName || typeIdentity.slice("EXTERNAL:".length) || "").trim();
+      return {
+        scopeLabel: `EXTERNAL:${typeName}`,
+        scopeType: "EXTERNAL",
+        scopeName: typeName
+      };
+    }
+    return {
+      scopeLabel: String(decl && decl.scopeLabel || "").trim(),
+      scopeType: String(decl && decl.scopeType || "").trim().toUpperCase(),
+      scopeName: String(decl && decl.scopeName || "").trim()
+    };
+  }
+
   function buildDataCatalogRowModel(decl, settings) {
     const traceModel = buildDataCatalogTraceModel(decl);
     const descriptionModel = buildDataCatalogDescriptionModel(traceModel.editDecl, settings);
     const techName = String(getDeclTechName(decl) || decl.name || "").trim();
     const objectType = String(decl.objectType || "").trim().toUpperCase();
-    const scopeLabel = String(decl.scopeLabel || "").trim();
+    const scopeMeta = getDataCatalogScopeMeta(decl);
+    const scopeLabel = scopeMeta.scopeLabel;
     const traceText = traceModel.traceText || (getDataCatalogPerformParamUpper(decl) ? "No root binding" : "");
     return {
       decl,
@@ -275,8 +381,8 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       objectType,
       filterType: getDataCatalogFilterType(decl),
       scopeLabel,
-      scopeType: String(decl.scopeType || "").trim().toUpperCase(),
-      scopeName: String(decl.scopeName || "").trim(),
+      scopeType: scopeMeta.scopeType,
+      scopeName: scopeMeta.scopeName,
       techName,
       traceText,
       descriptionModel,
@@ -306,6 +412,9 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     }
     if (scopeType === "CLASS") {
       return `Class: ${scopeName || scopeLabel}`;
+    }
+    if (scopeType === "EXTERNAL") {
+      return `External type: ${scopeName || scopeLabel.replace(/^EXTERNAL:/i, "")}`;
     }
     return scopeLabel || "Other scope";
   }
@@ -603,22 +712,6 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     return String(value || "").trim().toUpperCase();
   }
 
-  function getDeclFallbackKey(decl) {
-    if (!decl || typeof decl !== "object") {
-      return "";
-    }
-
-    const name = normalizeKeyToken(decl.name);
-    if (!name) {
-      return "";
-    }
-
-    const objectType = normalizeKeyToken(decl.objectType);
-    const file = String(decl.file || "").trim();
-    const line = decl.lineStart ? String(decl.lineStart) : "";
-    return `FALLBACK:${objectType}|${name}|${file}|${line}`;
-  }
-
   function getDeclKey(decl) {
     if (!decl || typeof decl !== "object") {
       return "";
@@ -634,19 +727,25 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     return `${scope}:${name}`;
   }
 
-  function getLegacyDeclKey(decl) {
+  function getInlineDeclOverrideKey(decl) {
     if (!decl || typeof decl !== "object") {
       return "";
     }
-
-    const type = normalizeKeyToken(decl.objectType);
     const name = normalizeKeyToken(decl.name);
-
-    if (!type || !name) {
+    const scopePath = normalizeKeyToken(decl.declScopePath);
+    const visibleFromLine = Number(decl.visibleFromLine);
+    if (!name || !scopePath || !Number.isFinite(visibleFromLine) || visibleFromLine <= 0) {
       return "";
     }
+    return `INLINE:${encodeURIComponent(`${scopePath}|${Math.floor(visibleFromLine)}|${name}`)}`;
+  }
 
-    return `${type}:NAME:${name}`;
+  function getTypeComponentOverrideKey(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+    const typeComponentIdentity = getTypeComponentIdentity(decl);
+    return typeComponentIdentity ? `TYPE_COMPONENT:${typeComponentIdentity}` : "";
   }
 
   function isPathDeclForOverrideKey(decl) {
@@ -749,10 +848,16 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
         pushKey(key);
       }
     } else {
-      pushKey(getDeclKey(decl));
+      const objectType = normalizeKeyToken(decl && decl.objectType);
+      const lexicalOverrideKey = getInlineDeclOverrideKey(decl);
+      if (lexicalOverrideKey) {
+        pushKey(lexicalOverrideKey);
+      } else if (objectType === "TYPE_COMPONENT") {
+        pushKey(getTypeComponentOverrideKey(decl));
+      } else {
+        pushKey(getDeclKey(decl));
+      }
     }
-    pushKey(getLegacyDeclKey(decl));
-    pushKey(getDeclFallbackKey(decl));
     return keys;
   }
 
@@ -781,9 +886,12 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     const objectType = String(decl.objectType || "").trim().toUpperCase();
     let paramName = "";
     let fieldPath = "";
-    if (objectType === "FORM_PARAM") {
+    if (objectType === "FORM_PARAM" || objectType === "METHOD_PARAM") {
       paramName = String(decl.name || "").trim().toUpperCase();
-    } else if (objectType === "STRUCT_FIELD" && String(decl.structObjectType || "").trim().toUpperCase() === "FORM_PARAM") {
+    } else if (
+      objectType === "STRUCT_FIELD"
+      && ["FORM_PARAM", "METHOD_PARAM"].includes(String(decl.structObjectType || "").trim().toUpperCase())
+    ) {
       paramName = String(decl.structName || "").trim().toUpperCase();
       fieldPath = String(decl.fieldPath || "").trim().toUpperCase();
     }
@@ -803,7 +911,13 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     if (!sourceScope || !formalParamKey) {
       return "";
     }
-    return `PERFORM_CHAIN:${sourceScope}:${formalParamKey}`;
+    const bindingContext = ownerContext && ownerContext.__abapPerformTraceBinding;
+    const chainKind = normalizeKeyToken(
+      (ownerContext && ownerContext.chainKind)
+      || (bindingContext && bindingContext.chainKind)
+    );
+    const chainPrefix = chainKind === "METHOD" ? "METHOD_CHAIN" : "PERFORM_CHAIN";
+    return `${chainPrefix}:${sourceScope}:${formalParamKey}`;
   }
 
   function cloneDeclWithPerformChainOverride(decl, ownerContext, formalDecl) {
@@ -814,6 +928,7 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     if (!chainKey) {
       return decl;
     }
+    registerTypeUsageChainKey(decl, chainKey);
     const clone = { ...decl };
     try {
       Object.defineProperty(clone, "__abapPerformChainOverrideKey", {
@@ -863,11 +978,6 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       if (key && Object.prototype.hasOwnProperty.call(state.descOverrides || {}, key)) {
         return normalizeDescOverrideEntry(state.descOverrides[key]);
       }
-    }
-
-    const legacyKey = getLegacyDeclKey(decl);
-    if (legacyKey && Object.prototype.hasOwnProperty.call(state.descOverridesLegacy || {}, legacyKey)) {
-      return { text: String(state.descOverridesLegacy[legacyKey] || ""), noNormalize: false };
     }
 
     return { text: "", noNormalize: false };
@@ -922,7 +1032,11 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     }
 
     const globalMap = registry.customGlobal && typeof registry.customGlobal === "object" ? registry.customGlobal : null;
-    if (globalMap && Object.prototype.hasOwnProperty.call(globalMap, nameUpper)) {
+    const isTrueGlobalDecl = scopeLabel === "GLOBAL"
+      && scopeType === "GLOBAL"
+      && objectType !== "INLINE"
+      && normalizeKeyToken(decl.structObjectType) !== "INLINE";
+    if (isTrueGlobalDecl && globalMap && Object.prototype.hasOwnProperty.call(globalMap, nameUpper)) {
       return String(globalMap[nameUpper] || "");
     }
 
@@ -1007,6 +1121,14 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       return override;
     }
 
+    const linkedTypeComponentDesc = getLinkedTypeComponentItemDesc(decl, false);
+    if (linkedTypeComponentDesc) {
+      return linkedTypeComponentDesc;
+    }
+    if (getLinkedTypeComponentDecl(decl)) {
+      return getStructFieldItemTechnicalId(decl);
+    }
+
     const source = getSourceDeclDesc(decl);
     if (source) {
       return source;
@@ -1032,6 +1154,14 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       return normalizeDeclDescText(decl, overrideText);
     }
 
+    const linkedTypeComponentDesc = getLinkedTypeComponentItemDesc(decl, normalizeEnabled);
+    if (linkedTypeComponentDesc) {
+      return linkedTypeComponentDesc;
+    }
+    if (getLinkedTypeComponentDecl(decl)) {
+      return getStructFieldItemTechnicalId(decl);
+    }
+
     const source = getSourceDeclDesc(decl);
     if (source) {
       return normalizeEnabled ? normalizeDeclDescText(decl, source) : source;
@@ -1043,6 +1173,252 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     }
 
     return String(getDeclTechName(decl) || "").trim();
+  }
+
+  function getLinkedTypeComponentDecl(decl) {
+    if (normalizeKeyToken(decl && decl.objectType) !== "STRUCT_FIELD") {
+      return null;
+    }
+    const typeUsage = getTypeUsageEntry(decl);
+    return typeUsage && typeUsage.typeComponentDecl ? typeUsage.typeComponentDecl : null;
+  }
+
+  function getStructFieldItemTechnicalId(decl) {
+    return String(decl && decl.fieldPath || getDeclTechName(decl) || "").trim();
+  }
+
+  function getLinkedTypeComponentItemDesc(decl, normalizeOutput) {
+    const linkedTypeComponent = getLinkedTypeComponentDecl(decl);
+    if (!linkedTypeComponent) {
+      return "";
+    }
+
+    const overrideEntry = getDeclOverrideEntry(linkedTypeComponent);
+    const overrideText = overrideEntry.text ? String(overrideEntry.text) : "";
+    if (overrideText) {
+      if (!normalizeOutput || overrideEntry.noNormalize) {
+        return overrideText;
+      }
+      return normalizeDeclDescText(linkedTypeComponent, overrideText);
+    }
+
+    const codeDesc = getDeclCodeDesc(linkedTypeComponent);
+    if (!codeDesc) {
+      return "";
+    }
+    return normalizeOutput ? normalizeDeclDescText(linkedTypeComponent, codeDesc) : codeDesc;
+  }
+
+  function rebuildTypeUsageIndex(data) {
+    const index = new Map();
+    const decls = data && Array.isArray(data.decls) ? data.decls : [];
+    const ensureEntry = (typeComponentIdentity) => {
+      const identity = normalizeKeyToken(typeComponentIdentity);
+      if (!identity) {
+        return null;
+      }
+      if (!index.has(identity)) {
+        index.set(identity, {
+          typeComponentDecl: null,
+          instanceDecls: [],
+          chainKeysByInstanceKey: new Map()
+        });
+      }
+      return index.get(identity);
+    };
+
+    for (const decl of decls) {
+      if (!decl || typeof decl !== "object") {
+        continue;
+      }
+      const identity = getTypeComponentIdentity(decl);
+      const entry = ensureEntry(identity);
+      if (!entry) {
+        continue;
+      }
+      const objectType = normalizeKeyToken(decl.objectType);
+      if (objectType === "TYPE_COMPONENT") {
+        entry.typeComponentDecl = decl;
+        continue;
+      }
+      if (objectType !== "STRUCT_FIELD") {
+        continue;
+      }
+      const structObjectType = normalizeKeyToken(decl.structObjectType);
+      if (structObjectType !== "DATA" && structObjectType !== "FIELD-SYMBOLS") {
+        continue;
+      }
+      const instanceKey = getDeclOverrideStorageKey(decl) || `${identity}:${entry.instanceDecls.length}`;
+      const alreadyAdded = entry.instanceDecls.some((instanceDecl) => (
+        getDeclOverrideStorageKey(instanceDecl) === instanceKey
+      ));
+      if (!alreadyAdded) {
+        entry.instanceDecls.push(decl);
+      }
+    }
+
+    state.typeUsageIndex = index;
+    return index;
+  }
+
+  function registerTypeUsageChainKey(decl, chainKey) {
+    const key = String(chainKey || "").trim();
+    if (!key || !/^(?:PERFORM|METHOD)_CHAIN:/.test(key)) {
+      return;
+    }
+    const typeUsage = getTypeUsageEntry(decl);
+    if (!typeUsage || !(typeUsage.chainKeysByInstanceKey instanceof Map)) {
+      return;
+    }
+    const structObjectType = normalizeKeyToken(decl && decl.structObjectType);
+    if (structObjectType !== "DATA" && structObjectType !== "FIELD-SYMBOLS") {
+      return;
+    }
+    const unscopedDecl = { ...decl };
+    const instanceKey = getDeclOverrideStorageKey(unscopedDecl);
+    if (!instanceKey) {
+      return;
+    }
+    if (!typeUsage.chainKeysByInstanceKey.has(instanceKey)) {
+      typeUsage.chainKeysByInstanceKey.set(instanceKey, new Set());
+    }
+    typeUsage.chainKeysByInstanceKey.get(instanceKey).add(key);
+  }
+
+  function getStructFieldRootOverrideKey(decl) {
+    if (normalizeKeyToken(decl && decl.objectType) !== "STRUCT_FIELD") {
+      return getDeclOverrideStorageKey(decl);
+    }
+    const structId = decl && decl.structId;
+    if (structId !== undefined && structId !== null && state.data && Array.isArray(state.data.decls)) {
+      const rootDecl = state.data.decls.find((candidate) => (
+        candidate
+        && candidate.id === structId
+        && normalizeKeyToken(candidate.objectType) !== "STRUCT_FIELD"
+      ));
+      if (rootDecl) {
+        return getDeclOverrideStorageKey(rootDecl);
+      }
+    }
+    return getDeclOverrideStorageKey(buildStructDeclFromFieldDecl(decl));
+  }
+
+  function getFormalParamNameUpper(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+    const objectType = normalizeKeyToken(decl.objectType);
+    if (objectType === "FORM_PARAM" || objectType === "METHOD_PARAM") {
+      return normalizeKeyToken(decl.name);
+    }
+    if (
+      objectType === "STRUCT_FIELD"
+      && ["FORM_PARAM", "METHOD_PARAM"].includes(normalizeKeyToken(decl.structObjectType))
+    ) {
+      return normalizeKeyToken(decl.structName);
+    }
+    return "";
+  }
+
+  function collectCandidateFormalStructFields(candidate, registry) {
+    if (!candidate || !registry) {
+      return [];
+    }
+    let targetNode = null;
+    if (normalizeKeyToken(candidate.sourceKind) === "PERFORM") {
+      targetNode = registry.formsByNameUpper instanceof Map
+        ? registry.formsByNameUpper.get(candidate.formNameUpper) || null
+        : null;
+    } else if (normalizeKeyToken(candidate.sourceKind) === "METHOD" && registry.methodsByImplementationId instanceof Map) {
+      targetNode = Array.from(registry.methodsByImplementationId.values())
+        .find((node) => String(node && node.id || "") === String(candidate.formId || "")) || null;
+    }
+    if (!targetNode || typeof targetNode !== "object") {
+      return [];
+    }
+
+    const fields = [];
+    const seen = new Set();
+    const addField = (decl) => {
+      if (
+        normalizeKeyToken(decl && decl.objectType) !== "STRUCT_FIELD"
+        || !["FORM_PARAM", "METHOD_PARAM"].includes(normalizeKeyToken(decl && decl.structObjectType))
+      ) {
+        return;
+      }
+      const formalKey = getPerformFormalParamKey(decl);
+      if (formalKey && !seen.has(formalKey)) {
+        seen.add(formalKey);
+        fields.push(decl);
+      }
+    };
+    const visit = (node) => {
+      if (!node || typeof node !== "object") {
+        return;
+      }
+      const values = node.values && typeof node.values === "object" ? node.values : {};
+      for (const entryOrList of Object.values(values)) {
+        const entries = Array.isArray(entryOrList) ? entryOrList : [entryOrList];
+        for (const entry of entries) {
+          addField(entry && entry.decl);
+        }
+      }
+      for (const child of Array.isArray(node.children) ? node.children : []) {
+        visit(child);
+      }
+    };
+    visit(targetNode);
+    return fields;
+  }
+
+  function registerTypeUsageChainKeysForAllCandidates(typeUsage) {
+    if (!typeUsage || !Array.isArray(typeUsage.instanceDecls)) {
+      return;
+    }
+    const registry = state.performSourceRegistry;
+    const candidates = registry && registry.candidateByKey instanceof Map
+      ? Array.from(registry.candidateByKey.values())
+      : [];
+    if (!candidates.length) {
+      return;
+    }
+
+    const typeComponentFieldPath = normalizeKeyToken(
+      typeUsage.typeComponentDecl && typeUsage.typeComponentDecl.fieldPath
+    );
+    if (!typeComponentFieldPath) {
+      return;
+    }
+
+    for (const candidate of candidates) {
+      const bindingContext = candidate && candidate.bindingContext;
+      const formalFields = collectCandidateFormalStructFields(candidate, registry);
+      for (const formalField of formalFields) {
+        if (normalizeKeyToken(formalField.fieldPath) !== typeComponentFieldPath) {
+          continue;
+        }
+        const formalParamUpper = getFormalParamNameUpper(formalField);
+        if (!formalParamUpper) {
+          continue;
+        }
+        const tracedDecls = bindingContext && bindingContext.byParamUpper instanceof Map
+          ? bindingContext.byParamUpper.get(formalParamUpper)
+          : null;
+        const chainKey = buildPerformChainOverrideKey(bindingContext, formalField);
+        if (!chainKey || !Array.isArray(tracedDecls) || !tracedDecls.length) {
+          continue;
+        }
+        const tracedRootKeys = new Set(tracedDecls
+          .map((decl) => getStructFieldRootOverrideKey(decl))
+          .filter(Boolean));
+        for (const instanceDecl of typeUsage.instanceDecls) {
+          const instanceRootKey = getStructFieldRootOverrideKey(instanceDecl);
+          if (instanceRootKey && tracedRootKeys.has(instanceRootKey)) {
+            registerTypeUsageChainKey(instanceDecl, chainKey);
+          }
+        }
+      }
+    }
   }
 
   function rebuildConstantInitializerIndex(data) {
@@ -1091,6 +1467,14 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       return overrideText;
     }
 
+    const linkedTypeComponentDesc = getLinkedTypeComponentItemDesc(decl, false);
+    if (linkedTypeComponentDesc) {
+      return linkedTypeComponentDesc;
+    }
+    if (getLinkedTypeComponentDecl(decl)) {
+      return getStructFieldItemTechnicalId(decl);
+    }
+
     const constantInitializer = getConstantInitializer(decl);
     if (constantInitializer) {
       return constantInitializer;
@@ -1134,11 +1518,14 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       file: decl.file || "",
       lineStart: decl.structLineStart || null,
       raw: decl.structRaw || "",
-      comment: decl.structComment || decl.structTypeComment || "",
+      comment: decl.structComment || "",
       scopeId: decl.scopeId || 0,
       scopeLabel: decl.scopeLabel || "",
       scopeType: decl.scopeType || "",
-      scopeName: decl.scopeName || ""
+      scopeName: decl.scopeName || "",
+      declScopeId: decl.declScopeId == null ? null : decl.declScopeId,
+      declScopePath: String(decl.declScopePath || ""),
+      visibleFromLine: Number(decl.visibleFromLine || 0) || null
     };
   }
 
@@ -1287,7 +1674,97 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     return String(formatStructFieldFinalDesc(decl) || "").trim();
   }
 
-  function openEditModal({ mode, key, structKey, itemKey, label, hint, initialValue, structValue, itemValue, skipNormalize }) {
+  function applyDeclDescriptionOverride(options) {
+    const input = options && typeof options === "object" ? options : {};
+    const decl = input.decl;
+    const primaryKey = getDeclOverrideStorageKey(decl);
+    if (!decl || !primaryKey) {
+      return false;
+    }
+
+    if (!state.descOverrides || typeof state.descOverrides !== "object" || Array.isArray(state.descOverrides)) {
+      state.descOverrides = {};
+    }
+
+    const writeKeys = [primaryKey];
+    const purgeKeys = [];
+    const addWriteKey = (value) => {
+      const key = String(value || "").trim();
+      if (key && !writeKeys.includes(key)) {
+        writeKeys.push(key);
+      }
+    };
+    const addPurgeKey = (value) => {
+      const key = String(value || "").trim();
+      if (key && !writeKeys.includes(key) && !purgeKeys.includes(key)) {
+        purgeKeys.push(key);
+      }
+    };
+
+    if (primaryKey.startsWith("PATH:")) {
+      for (const aliasKey of getDeclOverrideLookupKeys(decl).slice(1)) {
+        addPurgeKey(aliasKey);
+      }
+    }
+
+    if (normalizeKeyToken(decl.objectType) === "TYPE_COMPONENT") {
+      const typeUsage = getTypeUsageEntry(decl);
+      registerTypeUsageChainKeysForAllCandidates(typeUsage);
+      const instances = typeUsage && Array.isArray(typeUsage.instanceDecls) ? typeUsage.instanceDecls : [];
+      for (const instanceDecl of instances) {
+        const instanceKey = getDeclOverrideStorageKey(instanceDecl);
+        addWriteKey(instanceKey);
+        const chainKeys = typeUsage.chainKeysByInstanceKey instanceof Map
+          ? typeUsage.chainKeysByInstanceKey.get(instanceKey)
+          : null;
+        if (chainKeys instanceof Set) {
+          for (const chainKey of chainKeys) {
+            addWriteKey(chainKey);
+          }
+        }
+      }
+    }
+
+    const affectedKeys = writeKeys.concat(purgeKeys);
+    const snapshot = new Map();
+    for (const key of affectedKeys) {
+      snapshot.set(key, {
+        exists: Object.prototype.hasOwnProperty.call(state.descOverrides, key),
+        value: state.descOverrides[key]
+      });
+    }
+
+    const clear = Boolean(input.clear);
+    const skipNormalize = Boolean(input.skipNormalize);
+    const trimmedText = clear ? "" : String(input.text || "").trim();
+    const storedText = skipNormalize ? trimmedText : stripDeclCategoryPrefix(trimmedText);
+    for (const key of writeKeys) {
+      if (!storedText) {
+        delete state.descOverrides[key];
+      } else {
+        state.descOverrides[key] = skipNormalize ? { text: storedText, noNormalize: true } : storedText;
+      }
+    }
+    for (const key of purgeKeys) {
+      delete state.descOverrides[key];
+    }
+
+    if (!saveDescOverrides()) {
+      for (const [key, previous] of snapshot.entries()) {
+        if (previous.exists) {
+          state.descOverrides[key] = previous.value;
+        } else {
+          delete state.descOverrides[key];
+        }
+      }
+      return false;
+    }
+    state.templatePreviewCache = null;
+    renderActiveRightPanel();
+    return { ok: true, affectedKeys };
+  }
+
+  function openEditModal({ mode, key, decl, structKey, itemKey, label, hint, initialValue, structValue, itemValue, skipNormalize }) {
     const editMode = mode === "structField" ? "structField" : "single";
 
     if (editMode === "single" && !key) {
@@ -1304,7 +1781,7 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
 
     state.activeEdit = editMode === "structField"
       ? { mode: "structField", structKey, itemKey }
-      : { mode: "single", key };
+      : { mode: "single", key, decl: decl || null };
     els.editLabel.textContent = label ? String(label) : "";
 
     const hintText = hint ? String(hint) : "";
@@ -1376,6 +1853,14 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       }
 
       const value = action === "clear" ? "" : String(els.editDesc.value || "");
+      if (state.activeEdit.decl) {
+        return applyDeclDescriptionOverride({
+          decl: state.activeEdit.decl,
+          text: value,
+          skipNormalize,
+          clear: action === "clear"
+        });
+      }
       const trimmed = value.trim();
       const stored = skipNormalize ? trimmed : stripDeclCategoryPrefix(trimmed);
 
@@ -1426,7 +1911,7 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     if (!key) {
       return;
     }
-    const isScopedPerformChain = String(key).startsWith("PERFORM_CHAIN:");
+    const isScopedPerformChain = /^(?:PERFORM|METHOD)_CHAIN:/.test(String(key));
     const isStructField = isStructFieldDecl(decl) && !isScopedPerformChain;
 
     const settings = state.settings || DEFAULT_SETTINGS;
@@ -1465,6 +1950,7 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       openEditModal({
         mode: "single",
         key,
+        decl,
         label: `${decl.objectType || "DECL"} ${getDeclTechName(decl)}`,
         hint: hintParts.join(" • "),
         initialValue: currentDisplay || effective,
@@ -2100,11 +2586,13 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     normalizeDeclDescText,
     stripDeclTemplateAffixes,
     getEffectiveDeclAtomicDescNormalized,
+    rebuildTypeUsageIndex,
     rebuildConstantInitializerIndex,
     buildStructDeclFromFieldDecl,
     getEffectiveDeclDesc,
     getFinalDeclDesc,
     closeEditModal,
+    applyDeclDescriptionOverride,
     applyEditModal,
     escapeSelectorValue,
     safeJson,

@@ -982,26 +982,6 @@
           "exporting": [
             {
               "name": "iv_user",
-              "originDecls": [
-                {
-                  "objectType": "PARAMETERS",
-                  "name": "p_user",
-                  "file": "legacy-core.abap",
-                  "lineStart": 3,
-                  "raw": "PARAMETERS p_user TYPE xubname.",
-                  "comment": "",
-                  "scopeLabel": "GLOBAL",
-                  "scopeType": "GLOBAL",
-                  "scopeName": "",
-                  "structName": "",
-                  "structObjectType": "",
-                  "structLineStart": 0,
-                  "fieldPath": "",
-                  "traceFile": "",
-                  "traceLineStart": 0,
-                  "synthetic": false
-                }
-              ],
               "value": "p_user",
               "valueDecl": {
                 "objectType": "PARAMETERS",
@@ -1028,26 +1008,6 @@
           "receiving": [
             {
               "name": "result",
-              "originDecls": [
-                {
-                  "objectType": "DATA",
-                  "name": "lv_result",
-                  "file": "legacy-core.abap",
-                  "lineStart": 14,
-                  "raw": "DATA lv_result TYPE string.",
-                  "comment": "",
-                  "scopeLabel": "GLOBAL",
-                  "scopeType": "GLOBAL",
-                  "scopeName": "",
-                  "structName": "",
-                  "structObjectType": "",
-                  "structLineStart": 0,
-                  "fieldPath": "",
-                  "traceFile": "",
-                  "traceLineStart": 0,
-                  "synthetic": false
-                }
-              ],
               "value": "lv_result )",
               "valueDecl": {
                 "objectType": "DATA",
@@ -1123,6 +1083,7 @@
       "extras": {
         "readTable": {
           "assigning": "",
+          "binarySearch": false,
           "conditions": [
             {
               "comparisonOperator": "=",
@@ -1217,6 +1178,8 @@
           "into": "gs_ctx",
           "itab": "gt_users",
           "refInto": "",
+          "transporting": "",
+          "transportingNoFields": false,
           "withKeyRaw": "uname = p_user active = p_flag",
           "withTableKeyRaw": ""
         }
@@ -1967,6 +1930,114 @@
       "structObjectType": "",
       "structLineStart": 0,
       "fieldPath": "",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "TYPE_COMPONENT",
+      "name": "ty_user-uname",
+      "file": "legacy-core.abap",
+      "lineStart": 7,
+      "raw": "uname TYPE xubname",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "uname",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "TYPE_COMPONENT",
+      "name": "ty_user-active",
+      "file": "legacy-core.abap",
+      "lineStart": 8,
+      "raw": "active TYPE abap_bool",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "active",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "TYPE_COMPONENT",
+      "name": "ty_user-city",
+      "file": "legacy-core.abap",
+      "lineStart": 9,
+      "raw": "city TYPE string",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "",
+      "structObjectType": "",
+      "structLineStart": 0,
+      "fieldPath": "city",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "STRUCT_FIELD",
+      "name": "gt_users-uname",
+      "file": "legacy-core.abap",
+      "lineStart": 7,
+      "raw": "uname TYPE xubname",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "gt_users",
+      "structObjectType": "DATA",
+      "structLineStart": 12,
+      "fieldPath": "uname",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "STRUCT_FIELD",
+      "name": "gt_users-active",
+      "file": "legacy-core.abap",
+      "lineStart": 8,
+      "raw": "active TYPE abap_bool",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "gt_users",
+      "structObjectType": "DATA",
+      "structLineStart": 12,
+      "fieldPath": "active",
+      "traceFile": "",
+      "traceLineStart": 0,
+      "synthetic": false
+    },
+    {
+      "objectType": "STRUCT_FIELD",
+      "name": "gt_users-city",
+      "file": "legacy-core.abap",
+      "lineStart": 9,
+      "raw": "city TYPE string",
+      "comment": "",
+      "scopeLabel": "GLOBAL",
+      "scopeType": "GLOBAL",
+      "scopeName": "",
+      "structName": "gt_users",
+      "structObjectType": "DATA",
+      "structLineStart": 12,
+      "fieldPath": "city",
       "traceFile": "",
       "traceLineStart": 0,
       "synthetic": false

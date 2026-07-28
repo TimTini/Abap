@@ -632,6 +632,69 @@
       ]
     },
     {
+      "_sourceFile": "concatenate.json",
+      "object": "CONCATENATE",
+      "match": {
+        "startKeyword": "CONCATENATE"
+      },
+      "keywordLabels": {
+        "CONCATENATE": "stmt",
+        "LINES": "lines",
+        "OF": "of",
+        "INTO": "into",
+        "IN": "in",
+        "CHARACTER": "character",
+        "BYTE": "byte",
+        "MODE": "mode",
+        "SEPARATED": "separated",
+        "BY": "by",
+        "RESPECTING": "respecting",
+        "BLANKS": "blanks"
+      },
+      "keywordPhrases": {
+        "LINES OF": "lines-of",
+        "SEPARATED BY": "separated-by",
+        "IN CHARACTER MODE": "in-character-mode",
+        "IN BYTE MODE": "in-byte-mode",
+        "RESPECTING BLANKS": "respecting-blanks"
+      },
+      "captureRules": [
+        {
+          "after": "CONCATENATE",
+          "name": "sources",
+          "label": "sources",
+          "capture": "rest",
+          "stopTokens": [
+            "INTO",
+            "LINES",
+            "SEPARATED",
+            "IN",
+            "RESPECTING"
+          ]
+        },
+        {
+          "after": "LINES OF",
+          "name": "linesOf",
+          "label": "lines-of"
+        },
+        {
+          "after": "INTO",
+          "name": "into",
+          "label": "into"
+        },
+        {
+          "after": "SEPARATED BY",
+          "name": "separatedBy",
+          "label": "separated-by",
+          "capture": "rest",
+          "stopTokens": [
+            "IN",
+            "RESPECTING"
+          ]
+        }
+      ]
+    },
+    {
       "_sourceFile": "constants.json",
       "object": "CONSTANTS",
       "match": {
@@ -1112,11 +1175,13 @@
         "REFERENCE": "reference",
         "WHERE": "where",
         "FROM": "from",
-        "TO": "to"
+        "TO": "to",
+        "INDEX": "index"
       },
       "keywordPhrases": {
         "LOOP AT": "loop-at",
-        "REFERENCE INTO": "reference-into"
+        "REFERENCE INTO": "reference-into",
+        "FROM INDEX": "from-index"
       },
       "captureRules": [
         {
@@ -1139,6 +1204,11 @@
           "after": "REFERENCE INTO",
           "name": "refInto",
           "label": "reference-into"
+        },
+        {
+          "after": "FROM INDEX",
+          "name": "from",
+          "label": "from"
         },
         {
           "after": "FROM",
@@ -1713,7 +1783,8 @@
             "ASSIGNING",
             "REFERENCE",
             "TRANSPORTING",
-            "BINARY"
+            "BINARY",
+            "COMPARING"
           ]
         },
         {
@@ -1726,7 +1797,8 @@
             "ASSIGNING",
             "REFERENCE",
             "TRANSPORTING",
-            "BINARY"
+            "BINARY",
+            "COMPARING"
           ]
         },
         {
@@ -1743,6 +1815,29 @@
           "after": "REFERENCE INTO",
           "name": "refInto",
           "label": "reference-into"
+        },
+        {
+          "after": "TRANSPORTING NO FIELDS",
+          "name": "transportingNoFields",
+          "label": "transporting-no-fields",
+          "capture": "flag"
+        },
+        {
+          "after": "TRANSPORTING",
+          "name": "transporting",
+          "label": "transporting",
+          "capture": "rest",
+          "stopTokens": [
+            "BINARY",
+            "COMPARING",
+            "WITH"
+          ]
+        },
+        {
+          "after": "BINARY SEARCH",
+          "name": "binarySearch",
+          "label": "binary-search",
+          "capture": "flag"
         }
       ]
     },
@@ -1991,8 +2086,6 @@
           "label": "by",
           "capture": "rest",
           "stopTokens": [
-            "ASCENDING",
-            "DESCENDING",
             "USING"
           ]
         },

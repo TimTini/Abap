@@ -65,7 +65,6 @@ const VIEWER_CONFIG_STORAGE_KEYS = {
   templates: "abap-parser-viewer.templateConfig.v1",
   descriptionSettings: "abap-parser-viewer.settings.v1",
   descriptionOverrides: "abap-parser-viewer.declDescOverrides.v2",
-  legacyDescriptionOverrides: "abap-parser-viewer.descOverrides.v1",
   theme: "abap-parser-viewer.theme.v1",
   layout: "abap-parser-viewer.layoutSplit.v1",
   hiddenObjectTypes: "abap-parser-viewer.templateGuiHiddenObjectTypes.v1",
@@ -115,8 +114,15 @@ async function openTemplateCellDescriptionTab(window, cell) {
 }
 
 async function saveTemplateCellDescription(window, modal, nextDescription) {
-  const textarea = modal.querySelector("textarea.template-config-json");
-  assert(textarea && !textarea.disabled, "Expected an editable Description textarea.");
+  const textareas = Array.from(modal.querySelectorAll("textarea.template-config-json"))
+    .filter((el) => !el.disabled);
+  assert(textareas.length > 0, "Expected an editable Description textarea.");
+  // STRUCT_FIELD Description tab exposes Struct + Item; edit the Item field.
+  const hasStructItemLabels = /Struct/i.test(String(modal.textContent || ""))
+    && /Item/i.test(String(modal.textContent || ""));
+  const textarea = hasStructItemLabels && textareas.length > 1
+    ? textareas[textareas.length - 1]
+    : textareas[0];
   textarea.value = String(nextDescription || "");
   textarea.dispatchEvent(new window.Event("input", { bubbles: true }));
 

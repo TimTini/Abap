@@ -1,0 +1,31 @@
+{
+  "object": "CONCATENATE",
+  "match": { "startKeyword": "CONCATENATE" },
+  "keywordLabels": {
+    "CONCATENATE": "stmt",
+    "LINES": "lines",
+    "OF": "of",
+    "INTO": "into",
+    "IN": "in",
+    "CHARACTER": "character",
+    "BYTE": "byte",
+    "MODE": "mode",
+    "SEPARATED": "separated",
+    "BY": "by",
+    "RESPECTING": "respecting",
+    "BLANKS": "blanks"
+  },
+  "keywordPhrases": {
+    "LINES OF": "lines-of",
+    "SEPARATED BY": "separated-by",
+    "IN CHARACTER MODE": "in-character-mode",
+    "IN BYTE MODE": "in-byte-mode",
+    "RESPECTING BLANKS": "respecting-blanks"
+  },
+  "captureRules": [
+    { "after": "CONCATENATE", "name": "sources", "label": "sources", "capture": "rest", "stopTokens": ["INTO", "LINES", "SEPARATED", "IN", "RESPECTING"] },
+    { "after": "LINES OF", "name": "linesOf", "label": "lines-of" },
+    { "after": "INTO", "name": "into", "label": "into" },
+    { "after": "SEPARATED BY", "name": "separatedBy", "label": "separated-by", "capture": "rest", "stopTokens": ["IN", "RESPECTING"] }
+  ]
+}

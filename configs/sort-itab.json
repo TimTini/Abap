@@ -17,7 +17,7 @@
   },
   "captureRules": [
     { "after": "SORT", "name": "itab", "label": "itab" },
-    { "after": "BY", "name": "by", "label": "by", "capture": "rest", "stopTokens": ["ASCENDING", "DESCENDING", "USING"] },
+    { "after": "BY", "name": "by", "label": "by", "capture": "rest", "stopTokens": ["USING"] },
     { "after": "USING KEY", "name": "usingKey", "label": "using-key" }
   ]
 }

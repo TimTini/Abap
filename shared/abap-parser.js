@@ -1056,6 +1056,8 @@
 
     const normalizedWithTableKey = normalizeReadTableKeyConditionSource(withTableKeyRaw);
     const conditionSource = withTableKeyRaw ? normalizedWithTableKey : withKeyRaw;
+    const binarySearch = Boolean(String(map.binarySearch || "").trim());
+    const transportingNoFields = Boolean(String(map.transportingNoFields || "").trim());
 
     return {
       readTable: {
@@ -1064,6 +1066,9 @@
         into: map.into || "",
         assigning: map.assigning || "",
         refInto: map.refInto || "",
+        transporting: map.transporting || "",
+        binarySearch,
+        transportingNoFields,
         withKeyRaw,
         withTableKeyRaw,
         conditions: parseConditionClauses(conditionSource, { allowImplicitAnd: true })
@@ -1458,6 +1463,8 @@
     const scopeInfoById = buildScopeInfoById({ idToObject });
 
     const declByScope = new Map();
+    const inlineDecls = [];
+    const inlineDeclsByScopeKey = new Map();
     ensureScopeMap(declByScope, 0);
 
     for (const obj of allObjects) {
@@ -1499,8 +1506,21 @@
 
       const scopeId = getStatementScopeId(statement.lineStart, procedureBlocks, classBlocks);
       const scopeInfo = scopeInfoById.get(scopeId) || buildFallbackScopeInfo(scopeId);
+      ensureScopeMap(declByScope, scopeId);
+      const lexicalScope = getLexicalScopeForLine(statement.lineStart, allObjects);
+      const lexicalScopeKey = lexicalScope.key;
+      if (!inlineDeclsByScopeKey.has(lexicalScopeKey)) {
+        inlineDeclsByScopeKey.set(lexicalScopeKey, new Map());
+      }
+      const inlineScopeMap = inlineDeclsByScopeKey.get(lexicalScopeKey);
       for (const name of inlineNames) {
-        addDecl(declByScope, scopeId, name, {
+        const upper = name.toUpperCase();
+        // Multiple inline declarations with the same name are valid in sibling branches.
+        // Keep the earliest declaration only within the same lexical scope.
+        if (inlineScopeMap.has(upper)) {
+          continue;
+        }
+        const decl = {
           id: null,
           objectType: "INLINE",
           name,
@@ -1511,8 +1531,13 @@
           scopeId,
           scopeLabel: scopeInfo.scopeLabel,
           scopeType: scopeInfo.scopeType,
-          scopeName: scopeInfo.scopeName
-        });
+          scopeName: scopeInfo.scopeName,
+          declScopeId: lexicalScope.id,
+          declScopePath: lexicalScope.path,
+          visibleFromLine: Number(statement.lineStart || 0) || null
+        };
+        inlineScopeMap.set(upper, decl);
+        inlineDecls.push(decl);
       }
     }
 
@@ -1537,16 +1562,36 @@
     });
 
     for (const obj of allObjects) {
-      const resolveContext = buildResolveContext(obj, idToObject, declByScope, classInfo);
+      const resolveContext = buildResolveContext(obj, idToObject, declByScope, classInfo, inlineDeclsByScopeKey);
       annotateValuesWithDecls(obj.values, resolveContext);
       annotateExtrasWithDecls(obj.extras, resolveContext);
     }
 
     attachPerformOriginDecls({ allObjects, formsByNameUpper: buildFormsByNameUpper(allObjects), scopeInfoById });
+    attachLocalMethodOriginDecls({ allObjects, classInfo });
 
     const decls = [];
-    for (const scopeMap of declByScope.values()) {
+    const emittedInlineDecls = new Set();
+    for (const [scopeId, scopeMap] of declByScope.entries()) {
+      const sourceDecls = [];
+      const derivedDecls = [];
       for (const decl of scopeMap.values()) {
+        if (["STRUCT_FIELD", "TYPE_COMPONENT"].includes(decl.objectType)) {
+          derivedDecls.push(decl);
+        } else {
+          sourceDecls.push(decl);
+        }
+      }
+      const scopeInlineDecls = inlineDecls.filter((decl) => decl.scopeId === scopeId);
+      for (const decl of scopeInlineDecls) {
+        emittedInlineDecls.add(decl);
+      }
+      sourceDecls.push(...scopeInlineDecls);
+      sourceDecls.sort((left, right) => Number(left.lineStart || 0) - Number(right.lineStart || 0));
+      decls.push(...sourceDecls, ...derivedDecls);
+    }
+    for (const decl of inlineDecls) {
+      if (!emittedInlineDecls.has(decl)) {
         decls.push(decl);
       }
     }
@@ -1816,6 +1861,64 @@
     return normalized || "";
   }
 
+  function getDeclaredTypeName(obj) {
+    const direct = getStructTypeCandidateFromDeclObject(obj);
+    if (direct && !["STANDARD", "SORTED", "HASHED", "ANY", "INDEX"].includes(direct.toUpperCase())) {
+      return direct;
+    }
+    const tableLineType = String(obj && obj.raw || "").match(/\b(?:TABLE|RANGE)\s+OF\s+([A-Za-z_][A-Za-z0-9_]*)/i);
+    return tableLineType ? tableLineType[1] : direct;
+  }
+
+  function buildTypeAliasesByScope(allObjects, idToObject, procedureBlocks, classBlocks) {
+    const aliasesByScope = new Map();
+    for (const obj of allObjects || []) {
+      if (!obj || obj.objectType !== "TYPES" || (obj.extras && obj.extras.structDef && obj.extras.structDef.isDecl === false)) {
+        continue;
+      }
+      const name = normalizeIdentifierCandidate(getFirstValue(obj.values, "name"));
+      const typeName = getDeclaredTypeName(obj);
+      if (!name || !typeName || name.toUpperCase() === typeName.toUpperCase()) {
+        continue;
+      }
+      const scopeId = getDeclarationScopeId(obj, idToObject, procedureBlocks, classBlocks);
+      ensureStructDefScopeMap(aliasesByScope, scopeId);
+      aliasesByScope.get(scopeId).set(name.toUpperCase(), typeName);
+    }
+    return aliasesByScope;
+  }
+
+  function resolveStructTypeForObject(obj, context, typeByScope, aliasesByScope) {
+    let typeName = getDeclaredTypeName(obj);
+    const visited = new Set();
+    while (typeName) {
+      const typeUpper = typeName.toUpperCase();
+      if (visited.has(typeUpper)) {
+        return null;
+      }
+      visited.add(typeUpper);
+      const definition = resolveStructDefByContext(typeUpper, context, typeByScope);
+      if (definition) {
+        return definition;
+      }
+      const aliasMaps = [
+        context && context.procId ? aliasesByScope.get(context.procId) : null,
+        context && context.classDefId ? aliasesByScope.get(context.classDefId) : null,
+        aliasesByScope.get(0)
+      ];
+      const aliasMap = aliasMaps.find((map) => map && map.has(typeUpper));
+      if (!aliasMap) {
+        return null;
+      }
+      typeName = aliasMap.get(typeUpper);
+    }
+    return null;
+  }
+
+  function getTypeIdentity(typeDef) {
+    return `LOCAL:${String(typeDef.scopeLabel || "GLOBAL").toUpperCase()}:${String(typeDef.nameUpper || typeDef.name || "").toUpperCase()}`;
+  }
+
   function patchDeclComment(declByScope, scopeId, nameUpper, comment) {
     const trimmed = String(comment || "").trim();
     if (!declByScope || !declByScope.has(scopeId)) {
@@ -1846,6 +1949,34 @@
   }) {
     const dataByScope = structDefs && structDefs.dataByScope ? structDefs.dataByScope : new Map();
     const typeByScope = structDefs && structDefs.typeByScope ? structDefs.typeByScope : new Map();
+    const typeAliasesByScope = buildTypeAliasesByScope(allObjects, idToObject, procedureBlocks, classBlocks);
+
+    for (const defsByName of typeByScope.values()) {
+      for (const typeDef of defsByName.values()) {
+        const typeIdentity = getTypeIdentity(typeDef);
+        const scopeInfo = scopeInfoById.get(typeDef.scopeId) || buildFallbackScopeInfo(typeDef.scopeId);
+        for (const field of typeDef.fields.values()) {
+          addTypeComponentDecl(declByScope, typeDef.scopeId, `${typeDef.name}-${field.path}`, {
+            id: null,
+            objectType: "TYPE_COMPONENT",
+            name: `${typeDef.name}-${field.path}`,
+            typeName: typeDef.name,
+            fieldPath: field.path,
+            typeIdentity,
+            typeComponentIdentity: `${typeIdentity}:${field.path.toUpperCase()}`,
+            dynamic: false,
+            file: fileName || "",
+            lineStart: field.lineStart || null,
+            raw: field.raw || "",
+            comment: field.comment || "",
+            scopeId: typeDef.scopeId,
+            scopeLabel: scopeInfo.scopeLabel,
+            scopeType: scopeInfo.scopeType,
+            scopeName: scopeInfo.scopeName
+          });
+        }
+      }
+    }
 
     // 1) DATA inline structs: create `${var}-${field}` decls with per-field comments.
     for (const [scopeId, defsByName] of dataByScope.entries()) {
@@ -1885,7 +2016,7 @@
 
     // 2) Typed declarations: `DATA ls_s TYPE ty_s.` -> create `ls_s-field` from `TYPES ... BEGIN OF ty_s`.
     for (const obj of allObjects || []) {
-      if (!obj || !obj.objectType || !obj.values) {
+      if (!obj || !["DATA", "FIELD-SYMBOLS"].includes(obj.objectType) || !obj.values) {
         continue;
       }
 
@@ -1909,19 +2040,20 @@
         continue;
       }
 
-      const typeName = getStructTypeCandidateFromDeclObject(obj);
-      if (!typeName) {
-        continue;
-      }
-
-      const typeUpper = typeName.toUpperCase();
       const context = buildResolveContext(obj, idToObject, declByScope, classInfo);
-      const typeDef = resolveStructDefByContext(typeUpper, context, typeByScope);
+      const typeDef = resolveStructTypeForObject(obj, context, typeByScope, typeAliasesByScope);
       if (!typeDef) {
         continue;
       }
+      const typeName = getDeclaredTypeName(obj);
+      const typeIdentity = getTypeIdentity(typeDef);
+      const rootDecl = resolveDecl(normalizedDeclName, context);
+      if (rootDecl) {
+        rootDecl.typeIdentity = typeIdentity;
+        rootDecl.typeName = typeDef.name;
+      }
 
-      patchDeclComment(declByScope, typeDef.scopeId || scopeId, typeUpper, typeDef.comment || "");
+      patchDeclComment(declByScope, typeDef.scopeId || scopeId, typeDef.nameUpper, typeDef.comment || "");
 
       for (const field of typeDef.fields.values()) {
         const fullName = `${normalizedDeclName}-${field.path}`;
@@ -1945,9 +2077,104 @@
           structRaw: obj.raw || "",
           structComment: obj.comment || "",
           structTypeName: typeDef.name || typeName,
+          typeIdentity,
+          typeComponentIdentity: `${typeIdentity}:${field.path.toUpperCase()}`,
           structTypeLineStart: typeDef.lineStart || null,
           structTypeRaw: typeDef.rawStart || "",
           structTypeComment: typeDef.comment || ""
+        });
+      }
+    }
+
+    // 3) Unknown (external) structure fields are materialized only after a real
+    // field usage. This intentionally does not guess DDIC definitions.
+    const externalInstances = [];
+    for (const obj of allObjects || []) {
+      if (!obj || !["DATA", "FIELD-SYMBOLS"].includes(obj.objectType)) {
+        continue;
+      }
+      const name = normalizeIdentifierCandidate(getFirstValue(obj.values, "name"));
+      const declaredType = getDeclaredTypeName(obj);
+      if (!name || !declaredType) {
+        continue;
+      }
+      const context = buildResolveContext(obj, idToObject, declByScope, classInfo);
+      if (resolveStructTypeForObject(obj, context, typeByScope, typeAliasesByScope)) {
+        continue;
+      }
+      const rootDecl = resolveDecl(name, context);
+      if (!rootDecl) {
+        continue;
+      }
+      const scopeId = getDeclarationScopeId(obj, idToObject, procedureBlocks, classBlocks);
+      const typeIdentity = `EXTERNAL:${declaredType.toUpperCase()}`;
+      externalInstances.push({ obj, name, rootDecl, scopeId, typeName: declaredType, typeIdentity });
+    }
+
+    const usedExternalComponents = new Map();
+    for (const obj of allObjects || []) {
+      const raw = String(obj && obj.raw || "");
+      const matches = raw.matchAll(/(<[^>]+>|[A-Za-z_][A-Za-z0-9_]*)-([A-Za-z_][A-Za-z0-9_]*(?:-[A-Za-z_][A-Za-z0-9_]*)*)/g);
+      for (const match of matches) {
+        const rootName = normalizeIdentifierCandidate(match[1]);
+        const fieldPath = normalizeIdentifierCandidate(`x-${match[2]}`)?.slice(2) || "";
+        if (!rootName || !fieldPath) {
+          continue;
+        }
+        const context = buildResolveContext(obj, idToObject, declByScope, classInfo);
+        const rootDecl = resolveDecl(rootName, context);
+        const instance = externalInstances.find((candidate) => candidate.rootDecl === rootDecl);
+        if (!instance) {
+          continue;
+        }
+        usedExternalComponents.set(`${instance.typeIdentity}:${fieldPath.toUpperCase()}`, { typeIdentity: instance.typeIdentity, typeName: instance.typeName, fieldPath });
+      }
+    }
+
+    for (const component of usedExternalComponents.values()) {
+      const componentIdentity = `${component.typeIdentity}:${component.fieldPath.toUpperCase()}`;
+      addTypeComponentDecl(declByScope, 0, `${component.typeName}-${component.fieldPath}`, {
+        id: null,
+        objectType: "TYPE_COMPONENT",
+        name: `${component.typeName}-${component.fieldPath}`,
+        typeName: component.typeName,
+        fieldPath: component.fieldPath,
+        typeIdentity: component.typeIdentity,
+        typeComponentIdentity: componentIdentity,
+        dynamic: true,
+        file: fileName || "",
+        lineStart: null,
+        raw: "",
+        comment: "",
+        scopeId: 0,
+        scopeLabel: "GLOBAL",
+        scopeType: "GLOBAL",
+        scopeName: ""
+      });
+      for (const instance of externalInstances.filter((candidate) => candidate.typeIdentity === component.typeIdentity)) {
+        instance.rootDecl.typeIdentity = component.typeIdentity;
+        instance.rootDecl.typeName = component.typeName;
+        const scopeInfo = scopeInfoById.get(instance.scopeId) || buildFallbackScopeInfo(instance.scopeId);
+        addDecl(declByScope, instance.scopeId, `${instance.name}-${component.fieldPath}`, {
+          id: null,
+          objectType: "STRUCT_FIELD",
+          name: `${instance.name}-${component.fieldPath}`,
+          file: instance.obj.file || fileName || "",
+          lineStart: instance.obj.lineStart || null,
+          raw: instance.obj.raw || "",
+          comment: instance.obj.comment || "",
+          scopeId: instance.scopeId,
+          scopeLabel: scopeInfo.scopeLabel,
+          scopeType: scopeInfo.scopeType,
+          scopeName: scopeInfo.scopeName,
+          structName: instance.name,
+          fieldPath: component.fieldPath,
+          structObjectType: instance.obj.objectType,
+          structId: instance.obj.id || null,
+          structTypeName: component.typeName,
+          typeIdentity: component.typeIdentity,
+          typeComponentIdentity: componentIdentity,
+          dynamic: true
         });
       }
     }
@@ -1998,6 +2225,8 @@
     }
 
     const methodParamsByClassAndName = new Map();
+    const ambiguousMethodKeys = new Set();
+    const methodCandidates = [];
     for (const [classNameUpper, entry] of byName.entries()) {
       const classDef = entry.definition;
       if (!classDef || !Array.isArray(classDef.children)) {
@@ -2026,6 +2255,7 @@
             id: child.id,
             objectType: "METHOD_PARAM",
             name: param.name,
+            section: param.section || "",
             file: child.file || "",
             lineStart: child.lineStart || null,
             raw: child.raw || "",
@@ -2037,19 +2267,46 @@
           });
         }
 
-        methodParamsByClassAndName.set(`${classNameUpper}:${methodName.toUpperCase()}`, {
+        const implementationMethod = findLocalMethodImplementation(entry.implementation, methodName);
+        const methodEntry = {
+          className: getFirstValue(classDef.values, "name") || classNameUpper,
           classNameUpper,
+          methodName,
           methodNameUpper: methodName.toUpperCase(),
+          methodKind: child.objectType === "CLASS-METHODS" ? "STATIC" : "INSTANCE",
           paramsByNameUpper,
-          signatureId: child.id
-        });
+          signatureId: child.id,
+          implementationId: implementationMethod ? implementationMethod.id || null : null
+        };
+        methodCandidates.push(methodEntry);
+        const methodKey = `${classNameUpper}:${methodName.toUpperCase()}`;
+        if (methodParamsByClassAndName.has(methodKey) || ambiguousMethodKeys.has(methodKey)) {
+          methodParamsByClassAndName.delete(methodKey);
+          ambiguousMethodKeys.add(methodKey);
+        } else {
+          methodParamsByClassAndName.set(methodKey, methodEntry);
+        }
       }
     }
 
     return {
       byName,
-      methodParamsByClassAndName
+      methodParamsByClassAndName,
+      methodCandidates
     };
+  }
+
+  function findLocalMethodImplementation(classImplementation, methodName) {
+    if (!classImplementation || !Array.isArray(classImplementation.children) || !methodName) {
+      return null;
+    }
+    const methodNameUpper = String(methodName).toUpperCase();
+    const matches = classImplementation.children.filter((child) => (
+      child
+      && child.objectType === "METHOD"
+      && String(getFirstValue(child.values, "name") || "").toUpperCase() === methodNameUpper
+    ));
+    return matches.length === 1 ? matches[0] : null;
   }
 
   function classifyClassBlock(raw) {
@@ -2109,6 +2366,19 @@
     }
   }
 
+  function addTypeComponentDecl(declByScope, scopeId, name, declInfo) {
+    const normalized = normalizeIdentifierCandidate(name);
+    if (!normalized) {
+      return;
+    }
+    ensureScopeMap(declByScope, scopeId);
+    const map = declByScope.get(scopeId);
+    const key = `TYPE_COMPONENT:${normalized.toUpperCase()}`;
+    if (!map.has(key)) {
+      map.set(key, declInfo);
+    }
+  }
+
   function getDeclarationScopeId(obj, idToObject, procedureBlocks, classBlocks) {
     if (!obj) {
       return 0;
@@ -2128,7 +2398,7 @@
       if (current.objectType === "FORM" || current.objectType === "METHOD") {
         return current.id || 0;
       }
-      current = current.parent ? idToObject.get(current.parent) : null;
+      current = current.parent && idToObject ? idToObject.get(current.parent) : null;
     }
     return 0;
   }
@@ -2143,6 +2413,102 @@
       return cls.id || 0;
     }
     return 0;
+  }
+
+  function getLexicalScopeForLine(lineStart, allObjects) {
+    const line = Number(lineStart || 0);
+    const idToObject = new Map((allObjects || []).filter((obj) => obj && obj.id).map((obj) => [obj.id, obj]));
+    const candidates = (allObjects || [])
+      .filter((obj) => obj && obj.id && obj.block && obj.block.lineEnd)
+      .filter((obj) => line >= Number(obj.lineStart || 0) && line <= Number(obj.block.lineEnd || 0))
+      .sort((left, right) => Number(left.block.lineEnd || 0) - Number(left.lineStart || 0) - (Number(right.block.lineEnd || 0) - Number(right.lineStart || 0)));
+    const blockScope = candidates[0] || null;
+    const branchScope = findLexicalBranchForLine(line, allObjects, idToObject);
+    const branchContainer = branchScope && branchScope.parent ? idToObject.get(branchScope.parent) : null;
+    const scope = branchScope && (!blockScope || blockScope === branchScope || blockScope === branchContainer)
+      ? branchScope
+      : blockScope;
+    const path = scope ? getLexicalScopePath(scope, idToObject, branchScope) : "GLOBAL";
+    return {
+      id: scope ? scope.id : 0,
+      key: scope ? `BLOCK:${scope.id}` : "GLOBAL",
+      path
+    };
+  }
+
+  function findLexicalBranchForLine(line, allObjects, idToObject) {
+    const candidates = [];
+    for (const obj of allObjects || []) {
+      if (!obj || !obj.id || !["ELSEIF", "ELSE", "WHEN"].includes(obj.objectType) || Number(obj.lineStart || 0) > line) {
+        continue;
+      }
+      if (obj.objectType === "ELSE") {
+        if (obj.block && obj.block.lineEnd && line <= Number(obj.block.lineEnd)) {
+          candidates.push(obj);
+        }
+        continue;
+      }
+      const container = obj.parent ? idToObject.get(obj.parent) : null;
+      if (container && container.block && container.block.lineEnd && line <= Number(container.block.lineEnd)) {
+        candidates.push(obj);
+      }
+    }
+    candidates.sort((left, right) => Number(right.lineStart || 0) - Number(left.lineStart || 0));
+    return candidates[0] || null;
+  }
+
+  function getLexicalScopePath(obj, idToObject, branchScope) {
+    return getLexicalScopeNodesForLine(obj.lineStart, Array.from(idToObject.values()), idToObject, obj, branchScope)
+      .slice()
+      .reverse()
+      .map((node) => `${node.objectType}:${node.id}`)
+      .join(">");
+  }
+
+  function getLexicalScopeNodesForLine(lineStart, allObjects, idToObject, knownScope, knownBranch) {
+    const line = Number(lineStart || 0);
+    const scope = knownScope || (() => {
+      const info = getLexicalScopeForLine(line, allObjects);
+      return info.id ? idToObject.get(info.id) : null;
+    })();
+    const branch = knownBranch || findLexicalBranchForLine(line, allObjects, idToObject);
+    const nodes = [];
+    if (scope) {
+      nodes.push(scope);
+    }
+    if (branch && (!scope || branch.id !== scope.id)) {
+      nodes.push(branch);
+    }
+
+    const branchContainer = branch && branch.parent ? idToObject.get(branch.parent) : null;
+    let current = scope && scope.parent ? idToObject.get(scope.parent) : null;
+    if (scope === branch) {
+      current = branchContainer;
+    }
+    while (current) {
+      if (current === branchContainer && branch && ["ELSEIF", "WHEN"].includes(branch.objectType)) {
+        current = current.parent ? idToObject.get(current.parent) : null;
+        continue;
+      }
+      if (current.id && current.block && !nodes.some((node) => node.id === current.id)) {
+        nodes.push(current);
+      }
+      current = current.parent ? idToObject.get(current.parent) : null;
+    }
+    return nodes;
+  }
+
+  function getLexicalScopeKeysForObject(obj, idToObject) {
+    const allObjects = idToObject ? Array.from(idToObject.values()) : [];
+    const keys = [];
+    const scopeInfo = getLexicalScopeForLine(obj && obj.lineStart, allObjects);
+    const scope = scopeInfo.id ? idToObject.get(scopeInfo.id) : null;
+    const branch = findLexicalBranchForLine(Number(obj && obj.lineStart || 0), allObjects, idToObject);
+    for (const node of getLexicalScopeNodesForLine(obj && obj.lineStart, allObjects, idToObject, scope, branch)) {
+      keys.push(`BLOCK:${node.id}`);
+    }
+    keys.push("GLOBAL");
+    return keys;
   }
 
   function findInnermostBlock(line, blocks) {
@@ -2483,26 +2849,96 @@
       }
     }
 
-    for (const obj of allObjects || []) {
-      if (!obj || !obj.extras) {
-        continue;
-      }
+  }
 
-      if (obj.extras.callFunction) {
-        for (const sectionName of ["exporting", "importing", "changing", "tables", "exceptions"]) {
-          const list = Array.isArray(obj.extras.callFunction[sectionName]) ? obj.extras.callFunction[sectionName] : [];
-          for (const entry of list) {
-            entry.originDecls = Array.from(originsFromValueDecl(entry.valueDecl).values());
+  function attachLocalMethodOriginDecls({ allObjects, classInfo }) {
+    if (!classInfo || !classInfo.methodParamsByClassAndName) {
+      return;
+    }
+
+    const methodOrigins = new Map();
+    for (const methodEntry of classInfo.methodParamsByClassAndName.values()) {
+      for (const nameUpper of methodEntry.paramsByNameUpper.keys()) {
+        methodOrigins.set(`${methodEntry.signatureId}:${nameUpper}`, new Map());
+      }
+    }
+
+    function originsFromDecl(decl) {
+      if (!decl) {
+        return new Map();
+      }
+      if (decl.objectType === "METHOD_PARAM" && decl.id) {
+        return new Map(methodOrigins.get(`${decl.id}:${String(decl.name || "").toUpperCase()}`) || []);
+      }
+      const key = declIdentityKey(decl);
+      return key ? new Map([[key, decl]]) : new Map();
+    }
+
+    function addOrigins(target, source) {
+      let changed = false;
+      for (const [key, decl] of source.entries()) {
+        if (!target.has(key)) {
+          target.set(key, decl);
+          changed = true;
+        }
+      }
+      return changed;
+    }
+
+    const calls = (allObjects || []).filter((obj) => (
+      obj && obj.extras && obj.extras.callMethod && obj.extras.callMethod.localTarget
+    ));
+    const formalSectionForCallSection = {
+      exporting: "IMPORTING",
+      importing: "EXPORTING",
+      changing: "CHANGING",
+      receiving: "RETURNING"
+    };
+
+    for (let iteration = 0; iteration < 50; iteration += 1) {
+      let changed = false;
+      for (const callObj of calls) {
+        const call = callObj.extras.callMethod;
+        const target = call.localTarget;
+        const methodEntry = classInfo.methodParamsByClassAndName.get(`${String(target.className).toUpperCase()}:${String(target.methodName).toUpperCase()}`);
+        if (!methodEntry) {
+          continue;
+        }
+        for (const [callSection, formalSection] of Object.entries(formalSectionForCallSection)) {
+          const actuals = Array.isArray(call[callSection]) ? call[callSection] : [];
+          const formals = Array.from(methodEntry.paramsByNameUpper.values())
+            .filter((formal) => String(formal.section || "").toUpperCase() === formalSection);
+          const formalsByNameUpper = new Map(formals.map((formal) => [String(formal.name || "").toUpperCase(), formal]));
+          for (const actual of actuals) {
+            const actualNameUpper = String(actual && actual.name || "").toUpperCase();
+            const formal = formalsByNameUpper.get(actualNameUpper) || (formals.length === 1 ? formals[0] : null);
+            if (!formal) {
+              continue;
+            }
+            const originMap = methodOrigins.get(`${methodEntry.signatureId}:${String(formal.name).toUpperCase()}`);
+            if (actual && originMap && addOrigins(originMap, originsFromDecl(actual.valueDecl))) {
+              changed = true;
+            }
           }
         }
       }
+      if (!changed) {
+        break;
+      }
+    }
 
-      if (obj.extras.callMethod) {
-        for (const sectionName of ["exporting", "importing", "changing", "receiving", "exceptions"]) {
-          const list = Array.isArray(obj.extras.callMethod[sectionName]) ? obj.extras.callMethod[sectionName] : [];
-          for (const entry of list) {
-            entry.originDecls = Array.from(originsFromValueDecl(entry.valueDecl).values());
-          }
+    for (const methodEntry of classInfo.methodParamsByClassAndName.values()) {
+      for (const [nameUpper, paramDecl] of methodEntry.paramsByNameUpper.entries()) {
+        const originMap = methodOrigins.get(`${methodEntry.signatureId}:${nameUpper}`);
+        paramDecl.originDecls = originMap ? Array.from(originMap.values()) : [];
+      }
+    }
+
+    for (const callObj of calls) {
+      const call = callObj.extras.callMethod;
+      for (const section of ["exporting", "importing", "changing", "receiving"]) {
+        for (const actual of Array.isArray(call[section]) ? call[section] : []) {
+          actual.originDecls = Array.from(originsFromDecl(actual.valueDecl).values());
         }
       }
     }
@@ -2557,7 +2993,7 @@
     return "";
   }
 
-  function buildResolveContext(obj, idToObject, declByScope, classInfo) {
+  function buildResolveContext(obj, idToObject, declByScope, classInfo, inlineDeclsByScopeKey) {
     const procId = getProcedureScopeId(obj, idToObject);
     const methodBlock = findAncestor(obj, idToObject, "METHOD");
     const classBlock = findAncestor(obj, idToObject, "CLASS");
@@ -2579,6 +3015,9 @@
       methodNameUpper,
       classDefId: classDef ? classDef.id : 0,
       declByScope,
+      inlineDeclsByScopeKey,
+      idToObject,
+      classInfo,
       methodParamsByNameUpper: methodParamsEntry ? methodParamsEntry.paramsByNameUpper : null
     };
   }
@@ -2800,6 +3239,78 @@
         entry.valueDecl = resolveDecl(ref, context);
       }
     }
+    annotateLocalCallMethodTarget(callMethod, context);
+  }
+
+  function annotateLocalCallMethodTarget(callMethod, context) {
+    if (!callMethod || !context || !context.classInfo) {
+      return;
+    }
+    const target = String(callMethod.target || "").trim();
+    const staticMatch = target.match(/^([A-Za-z_][A-Za-z0-9_]*)=>([A-Za-z_][A-Za-z0-9_]*)$/);
+    if (staticMatch) {
+      const classNameUpper = staticMatch[1].toUpperCase();
+      const methodNameUpper = staticMatch[2].toUpperCase();
+      const classEntry = context.classInfo.byName.get(classNameUpper);
+      const methodEntry = context.classInfo.methodParamsByClassAndName.get(`${classNameUpper}:${methodNameUpper}`);
+      if (classEntry && classEntry.definition && methodEntry && methodEntry.methodKind === "STATIC") {
+        setLocalCallMethodTarget(callMethod, methodEntry);
+      }
+      return;
+    }
+
+    const instanceMatch = target.match(/^([A-Za-z_][A-Za-z0-9_]*)->([A-Za-z_][A-Za-z0-9_]*)$/);
+    if (!instanceMatch || instanceMatch[1].toUpperCase() === "SUPER") {
+      return;
+    }
+    const receiverName = instanceMatch[1];
+    const methodNameUpper = instanceMatch[2].toUpperCase();
+    let classNameUpper = "";
+    let receiverTypeKnown = false;
+
+    if (receiverName.toUpperCase() === "ME") {
+      classNameUpper = context.classNameUpper || "";
+      receiverTypeKnown = true;
+    } else {
+      const receiverDecl = resolveDecl(receiverName, context);
+      const receiverType = getReferenceTypeNameFromDecl(receiverDecl);
+      if (receiverType) {
+        classNameUpper = receiverType.toUpperCase();
+        receiverTypeKnown = true;
+      }
+    }
+
+    let methodEntry = classNameUpper
+      ? context.classInfo.methodParamsByClassAndName.get(`${classNameUpper}:${methodNameUpper}`)
+      : null;
+    if (methodEntry && methodEntry.methodKind !== "INSTANCE") {
+      methodEntry = null;
+    }
+    if (!methodEntry && !receiverTypeKnown) {
+      const candidates = (context.classInfo.methodCandidates || [])
+        .filter((candidate) => candidate.methodKind === "INSTANCE" && candidate.methodNameUpper === methodNameUpper);
+      methodEntry = candidates.length === 1 ? candidates[0] : null;
+    }
+    if (methodEntry) {
+      setLocalCallMethodTarget(callMethod, methodEntry);
+    }
+  }
+
+  function getReferenceTypeNameFromDecl(decl) {
+    const match = String(decl && decl.raw || "").match(/\b(?:TYPE|LIKE)\s+REF\s+TO\s+([A-Za-z_][A-Za-z0-9_]*)/i);
+    return match ? match[1] : "";
+  }
+
+  function setLocalCallMethodTarget(callMethod, methodEntry) {
+    if (!methodEntry || !methodEntry.implementationId) {
+      return;
+    }
+    callMethod.localTarget = {
+      className: methodEntry.className,
+      methodName: methodEntry.methodName,
+      signatureId: methodEntry.signatureId || null,
+      implementationId: methodEntry.implementationId || null
+    };
   }
 
   function annotatePerformCallExtras(performCall, context) {
@@ -2949,6 +3460,15 @@
       return null;
     }
     const upper = normalized.toUpperCase();
+
+    const inlineScopeKeys = getLexicalScopeKeysForObject(context.obj, context.idToObject);
+    for (const scopeKey of inlineScopeKeys) {
+      const inlineScopeMap = context.inlineDeclsByScopeKey && context.inlineDeclsByScopeKey.get(scopeKey);
+      const inlineDecl = inlineScopeMap && inlineScopeMap.get(upper);
+      if (inlineDecl && (!inlineDecl.visibleFromLine || Number(inlineDecl.visibleFromLine) <= Number(context.obj.lineStart || 0))) {
+        return inlineDecl;
+      }
+    }
 
     const procMap = context.procId ? context.declByScope.get(context.procId) : null;
     if (procMap && procMap.has(upper)) {
@@ -4029,7 +4549,8 @@
       }
 
       const valueIndex = index + bestRule.afterTokens.length;
-      if (valueIndex < tokens.length) {
+      const canCaptureFlag = bestRule.capture === "flag";
+      if (canCaptureFlag || valueIndex < tokens.length) {
         const captured = captureValue(tokens, valueIndex, bestRule);
         // Empty rest captures must not win first-slot (e.g. SELECT SINGLE FROM … FIELDS …).
         if (bestRule.capture === "rest" && !String(captured.raw || "").trim()) {
@@ -4221,6 +4742,13 @@
   }
 
   function captureValue(tokens, startIndex, rule) {
+    if (rule.capture === "flag") {
+      const flagValue = rule.flagValue !== undefined && rule.flagValue !== null
+        ? String(rule.flagValue)
+        : "X";
+      return { raw: flagValue, upper: flagValue.toUpperCase() };
+    }
+
     if (rule.capture === "rest") {
       const stopTokens = rule.stopTokensUpper || [];
       const parts = [];

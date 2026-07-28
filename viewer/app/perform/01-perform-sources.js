@@ -7,7 +7,7 @@
   const state = runtime.state;
   const els = runtime.els;
   const constants = runtime.constants || {};
-  const { DESC_STORAGE_KEY_V2, DESC_STORAGE_KEY_LEGACY_V1, SETTINGS_STORAGE_KEY_V1, TEMPLATE_CONFIG_STORAGE_KEY_V1, THEME_STORAGE_KEY_V1, LAYOUT_SPLIT_STORAGE_KEY_V1, LAYOUT_SPLIT_DEFAULT, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX, MOBILE_LAYOUT_QUERY, RENDER_TREE_OPTIONS, DECL_TYPE_OPTIONS, NAME_CODE_OPTIONS, DEFAULT_SETTINGS, TEMPLATE_DEFAULT_CONFIG_V1, SAMPLE_ABAP } = constants;
+  const { DESC_STORAGE_KEY_V2, SETTINGS_STORAGE_KEY_V1, TEMPLATE_CONFIG_STORAGE_KEY_V1, THEME_STORAGE_KEY_V1, LAYOUT_SPLIT_STORAGE_KEY_V1, LAYOUT_SPLIT_DEFAULT, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX, MOBILE_LAYOUT_QUERY, RENDER_TREE_OPTIONS, DECL_TYPE_OPTIONS, NAME_CODE_OPTIONS, DEFAULT_SETTINGS, TEMPLATE_DEFAULT_CONFIG_V1, SAMPLE_ABAP } = constants;
   const getFirstValueFromValues = runtime.requireServiceMethod("runtimeState", "getFirstValueFromValues");
   const walkObjects = runtime.requireServiceMethod("output", "walkObjects");
   const refreshInputGutterTargets = runtime.requireServiceMethod("output", "refreshInputGutterTargets");
@@ -18,6 +18,7 @@
   const renderActiveRightPanel = runtime.requireServiceMethod("uiNavigation", "renderActiveRightPanel");
   const createSyntheticStructFieldDecl = runtime.requireServiceMethod("parserController", "createSyntheticStructFieldDecl");
 var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
+var PERFORM_SOURCE_KIND_META_KEY_DESC = "__abapPerformSourceKind";
 
 
   function getFormNameFromNode(node) {
@@ -77,6 +78,50 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
     return map;
   }
 
+  function buildMethodsByImplementationIdFromRoots(rawRoots) {
+    const map = new Map();
+    walkObjects(rawRoots, (obj) => {
+      if (!obj || obj.objectType !== "METHOD" || obj.id === undefined || obj.id === null) {
+        return;
+      }
+      map.set(String(obj.id), obj);
+    });
+    return map;
+  }
+
+  function buildMethodSignaturesByIdFromRoots(rawRoots) {
+    const map = new Map();
+    walkObjects(rawRoots, (obj) => {
+      if (!obj || !["METHODS", "CLASS-METHODS"].includes(obj.objectType) || obj.id === undefined || obj.id === null) {
+        return;
+      }
+      map.set(String(obj.id), obj);
+    });
+    return map;
+  }
+
+  function getCallMethodLocalTarget(node) {
+    const target = node && node.extras && node.extras.callMethod && node.extras.callMethod.localTarget;
+    if (!target || typeof target !== "object") {
+      return null;
+    }
+    const className = String(target.className || "").trim();
+    const methodName = String(target.methodName || "").trim();
+    const implementationId = target.implementationId === undefined || target.implementationId === null
+      ? ""
+      : String(target.implementationId).trim();
+    const signatureId = target.signatureId === undefined || target.signatureId === null
+      ? ""
+      : String(target.signatureId).trim();
+    return className && methodName && implementationId && signatureId
+      ? { className, methodName, implementationId, signatureId }
+      : null;
+  }
+
+  function buildMethodSourceTargetUpper(localTarget) {
+    return `METHOD:${String(localTarget && localTarget.className || "").trim().toUpperCase()}=>${String(localTarget && localTarget.methodName || "").trim().toUpperCase()}`;
+  }
+
 
 
   function createPerformBindingTools() {
@@ -117,7 +162,7 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
         return false;
       }
       return String(decl.objectType || "").toUpperCase() === "STRUCT_FIELD"
-        && String(decl.structObjectType || "").toUpperCase() === "FORM_PARAM"
+        && ["FORM_PARAM", "METHOD_PARAM"].includes(String(decl.structObjectType || "").toUpperCase())
         && String(decl.structName || "").trim() !== ""
         && String(decl.fieldPath || "").trim() !== "";
     };
@@ -128,6 +173,9 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
       }
       const objectType = String(decl.objectType || "").toUpperCase();
       if (objectType === "FORM_PARAM") {
+        return String(decl.name || "").trim().toUpperCase();
+      }
+      if (objectType === "METHOD_PARAM") {
         return String(decl.name || "").trim().toUpperCase();
       }
       if (isPerformTraceSyntheticStructFieldDecl(decl)) {
@@ -211,6 +259,45 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
       };
     };
 
+    const resolveScopedParamComponentActualDecls = (actualEntry, currentBindingContext) => {
+      if (!actualEntry || typeof actualEntry !== "object") {
+        return [];
+      }
+      const byParamUpper = currentBindingContext && currentBindingContext.byParamUpper instanceof Map
+        ? currentBindingContext.byParamUpper
+        : null;
+      if (!byParamUpper) {
+        return [];
+      }
+      const valueRef = String(
+        actualEntry.valueRef || actualEntry.declRef || actualEntry.value || ""
+      ).trim().replace(/^@+/, "");
+      const componentMatch = valueRef.match(
+        /^([A-Za-z_][A-Za-z0-9_]*)-([A-Za-z_][A-Za-z0-9_]*(?:-[A-Za-z_][A-Za-z0-9_]*)*)$/
+      );
+      if (!componentMatch) {
+        return [];
+      }
+      const paramUpper = componentMatch[1].toUpperCase();
+      const fieldPath = componentMatch[2];
+      const tracedRoots = byParamUpper.get(paramUpper);
+      if (!Array.isArray(tracedRoots) || !tracedRoots.length) {
+        return [];
+      }
+      const localFieldDecl = {
+        objectType: "STRUCT_FIELD",
+        structObjectType: currentBindingContext.chainKind === "METHOD" ? "METHOD_PARAM" : "FORM_PARAM",
+        structName: componentMatch[1],
+        fieldPath,
+        name: `${componentMatch[1]}-${fieldPath}`
+      };
+      return dedupeDeclList(
+        tracedRoots
+          .map((decl) => buildPerformTraceSyntheticStructFieldDecl(decl, localFieldDecl, actualEntry))
+          .filter(Boolean)
+      );
+    };
+
     const resolveActualTraceDecls = (actualEntry, currentBindingContext) => {
       if (!actualEntry || typeof actualEntry !== "object") {
         return [];
@@ -232,6 +319,10 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
         ? actualEntry.valueDecl
         : null;
       if (!valueDecl) {
+        const scopedComponentDecls = resolveScopedParamComponentActualDecls(actualEntry, currentBindingContext);
+        if (scopedComponentDecls.length) {
+          return scopedComponentDecls;
+        }
         pushList(actualEntry.originDecls);
         return dedupeDeclList(out);
       }
@@ -328,8 +419,59 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
       }
 
       return {
+        chainKind: "PERFORM",
         byParamUpper,
         bySection: bindingsBySection
+      };
+    };
+
+    const buildMethodBindingContext = (callNode, localTarget, signatureNode, currentBindingContext) => {
+      const call = callNode && callNode.extras && callNode.extras.callMethod
+        && typeof callNode.extras.callMethod === "object"
+        ? callNode.extras.callMethod
+        : null;
+      const signature = signatureNode && signatureNode.extras && signatureNode.extras.methodSignature
+        && typeof signatureNode.extras.methodSignature === "object"
+        ? signatureNode.extras.methodSignature
+        : null;
+      const params = signature && Array.isArray(signature.params) ? signature.params : [];
+      if (!call || !localTarget || !params.length) {
+        return null;
+      }
+
+      const formalByNameUpper = new Map();
+      for (const param of params) {
+        if (param && param.name) {
+          formalByNameUpper.set(String(param.name).trim().toUpperCase(), param);
+        }
+      }
+      const byParamUpper = new Map();
+      const bySection = { EXPORTING: [], IMPORTING: [], CHANGING: [], RECEIVING: [] };
+      const callSections = [
+        ["exporting", "IMPORTING"],
+        ["importing", "EXPORTING"],
+        ["changing", "CHANGING"],
+        ["receiving", "RETURNING"]
+      ];
+      for (const [callSection, formalSection] of callSections) {
+        const actualArgs = Array.isArray(call[callSection]) ? call[callSection] : [];
+        for (const actualArg of actualArgs) {
+          const formalName = String(actualArg && (actualArg.name || actualArg.formalName || actualArg.paramName) || "").trim();
+          const formalParam = formalByNameUpper.get(formalName.toUpperCase()) || null;
+          if (!formalParam || String(formalParam.section || "").trim().toUpperCase() !== formalSection) {
+            continue;
+          }
+          const traceDecls = resolveActualTraceDecls(actualArg, currentBindingContext);
+          bySection[callSection.toUpperCase()].push({ formalName, formalParam, actualArg, traceDecls });
+          if (traceDecls.length) {
+            byParamUpper.set(formalName.toUpperCase(), traceDecls);
+          }
+        }
+      }
+      return {
+        chainKind: "METHOD",
+        byParamUpper,
+        bySection
       };
     };
 
@@ -363,7 +505,7 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
       if (visited.has(value)) {
         return visited.get(value);
       }
-      if (getPerformFormalParamKey(value)) {
+      if (getPerformFormalParamKey(value) || String(value.objectType || "").toUpperCase() === "METHOD_PARAM") {
         return cloneDeclWithPerformChainOverride(value, bindingContext, value);
       }
       if (Array.isArray(value)) {
@@ -385,6 +527,7 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
     return {
       attachPerformBindingMetadata,
       buildPerformBindingContext,
+      buildMethodBindingContext,
       clonePerformScopedData
     };
   }
@@ -414,6 +557,26 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
       const values = (Array.isArray(call[section]) ? call[section] : [])
         .map((entry) => getPerformActualEntryText(entry))
         .filter(Boolean);
+      if (values.length) {
+        parts.push(`${section.toUpperCase()} ${values.join(" ")}`);
+      }
+    }
+    return parts.length ? parts.join(" · ") : "không có đối số";
+  }
+
+  function buildMethodActualSummary(callNode) {
+    const call = callNode && callNode.extras && callNode.extras.callMethod
+      && typeof callNode.extras.callMethod === "object"
+      ? callNode.extras.callMethod
+      : null;
+    if (!call) {
+      return "không có đối số";
+    }
+    const parts = [];
+    for (const section of ["exporting", "importing", "changing", "receiving"]) {
+      const values = (Array.isArray(call[section]) ? call[section] : [])
+        .map((entry) => `${String(entry && (entry.name || entry.formalName) || "").trim()} = ${getPerformActualEntryText(entry)}`.trim())
+        .filter((value) => !/^=$/.test(value));
       if (values.length) {
         parts.push(`${section.toUpperCase()} ${values.join(" ")}`);
       }
@@ -456,6 +619,8 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
   function buildPerformCallPathRegistry(rawRoots) {
     const roots = Array.isArray(rawRoots) ? rawRoots : [];
     const formsByNameUpper = buildFormsByNameUpperFromRoots(roots);
+    const methodsByImplementationId = buildMethodsByImplementationIdFromRoots(roots);
+    const methodSignaturesById = buildMethodSignaturesByIdFromRoots(roots);
     const candidatesByFormUpper = new Map();
     const candidateByKey = new Map();
     const selectedKeyByFormUpper = new Map();
@@ -468,6 +633,8 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
     const registry = {
       rawRoots: roots,
       formsByNameUpper,
+      methodsByImplementationId,
+      methodSignaturesById,
       candidatesByFormUpper,
       candidateByKey,
       selectedKeyByFormUpper,
@@ -583,81 +750,112 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
       }
     };
 
-    const registerCandidate = (performNode, resolvedForm, formName, formNameUpper, pathToken, ancestry, bindingContext) => {
+    const registerCandidate = (sourceNode, resolvedNode, sourceName, sourceTargetUpper, pathToken, ancestry, bindingContext, sourceKind) => {
       sourceOrder += 1;
-      const key = `PERFORM_SOURCE:${formNameUpper}:${pathToken}`;
-      const sourceScope = buildPerformSourceScope(performNode, formNameUpper, pathToken, ancestry);
+      const kind = String(sourceKind || "PERFORM").trim().toUpperCase();
+      const key = `${kind}_SOURCE:${sourceTargetUpper}:${pathToken}`;
+      const sourceScope = buildPerformSourceScope(sourceNode, sourceTargetUpper, pathToken, ancestry);
       if (bindingContext && typeof bindingContext === "object") {
         bindingContext.sourceScope = sourceScope;
       }
       const candidate = {
         key,
         sourceScope,
-        formId: resolvedForm.id === undefined || resolvedForm.id === null ? "" : String(resolvedForm.id),
-        formName,
-        formNameUpper,
-        performId: performNode.id === undefined || performNode.id === null ? "" : String(performNode.id),
-        lineStart: Number(performNode.lineStart) || 0,
+        formId: resolvedNode.id === undefined || resolvedNode.id === null ? "" : String(resolvedNode.id),
+        formName: sourceName,
+        formNameUpper: sourceTargetUpper,
+        sourceKind: kind,
+        performId: sourceNode.id === undefined || sourceNode.id === null ? "" : String(sourceNode.id),
+        lineStart: Number(sourceNode.lineStart) || 0,
         ancestry: ancestry.slice(),
         parentCandidateKey: ancestry.length ? ancestry[ancestry.length - 1] : "",
-        actualSummary: buildPerformActualSummary(performNode),
+        actualSummary: kind === "METHOD" ? buildMethodActualSummary(sourceNode) : buildPerformActualSummary(sourceNode),
         bindingContext,
         sourceOrder
       };
-      if (!candidatesByFormUpper.has(formNameUpper)) {
-        candidatesByFormUpper.set(formNameUpper, []);
-        formOrder.push(formNameUpper);
+      if (!candidatesByFormUpper.has(sourceTargetUpper)) {
+        candidatesByFormUpper.set(sourceTargetUpper, []);
+        formOrder.push(sourceTargetUpper);
       }
-      candidatesByFormUpper.get(formNameUpper).push(candidate);
+      candidatesByFormUpper.get(sourceTargetUpper).push(candidate);
       candidateByKey.set(key, candidate);
       return candidate;
     };
 
-    const visitNode = (sourceNode, pathToken, formCallStack, bindingContext, ancestry) => {
+    const visitNode = (sourceNode, pathToken, callStack, bindingContext, ancestry) => {
       if (!sourceNode || typeof sourceNode !== "object") {
+        return;
+      }
+      // FORM/METHOD definitions are rendered separately. Only traverse their bodies through a resolved local call.
+      if (["FORM", "METHOD"].includes(sourceNode.objectType) && !bindingContext && !ancestry.length) {
         return;
       }
 
       let callCandidate = null;
-      let resolvedForm = null;
+      let resolvedTarget = null;
       let nextBindingContext = bindingContext;
-      let nextFormCallStack = formCallStack;
+      let nextCallStack = callStack;
       if (sourceNode.objectType === "PERFORM") {
         const formName = getPerformFormNameFromNode(sourceNode);
         const programName = getPerformProgramFromNode(sourceNode);
         const formNameUpper = formName ? formName.toUpperCase() : "";
-        resolvedForm = !programName && formNameUpper ? formsByNameUpper.get(formNameUpper) : null;
-        const isRecursiveCall = Boolean(formNameUpper) && formCallStack.includes(formNameUpper);
-        if (resolvedForm && !isRecursiveCall) {
-          nextBindingContext = tools.buildPerformBindingContext(sourceNode, resolvedForm, bindingContext);
+        resolvedTarget = !programName && formNameUpper ? formsByNameUpper.get(formNameUpper) : null;
+        const recursiveKey = `PERFORM:${formNameUpper}`;
+        const isRecursiveCall = Boolean(formNameUpper) && callStack.includes(recursiveKey);
+        if (resolvedTarget && !isRecursiveCall) {
+          nextBindingContext = tools.buildPerformBindingContext(sourceNode, resolvedTarget, bindingContext);
           callCandidate = registerCandidate(
             sourceNode,
-            resolvedForm,
+            resolvedTarget,
             formName,
             formNameUpper,
             pathToken,
             ancestry,
-            nextBindingContext
+            nextBindingContext,
+            "PERFORM"
           );
-          nextFormCallStack = [...formCallStack, formNameUpper];
+          nextCallStack = [...callStack, recursiveKey];
+        }
+      } else if (sourceNode.objectType === "CALL_METHOD") {
+        const localTarget = getCallMethodLocalTarget(sourceNode);
+        const methodTargetUpper = localTarget ? buildMethodSourceTargetUpper(localTarget) : "";
+        const methodNode = localTarget ? methodsByImplementationId.get(localTarget.implementationId) : null;
+        const signatureNode = localTarget ? methodSignaturesById.get(localTarget.signatureId) : null;
+        const recursiveKey = `METHOD:${localTarget ? localTarget.implementationId : ""}`;
+        const isRecursiveCall = Boolean(localTarget) && callStack.includes(recursiveKey);
+        if (localTarget && methodTargetUpper && methodNode && signatureNode && !isRecursiveCall) {
+          resolvedTarget = methodNode;
+          nextBindingContext = tools.buildMethodBindingContext(sourceNode, localTarget, signatureNode, bindingContext);
+          callCandidate = registerCandidate(
+            sourceNode,
+            methodNode,
+            `${localTarget.className}=>${localTarget.methodName}`,
+            methodTargetUpper,
+            pathToken,
+            ancestry,
+            nextBindingContext,
+            "METHOD"
+          );
+          nextCallStack = [...callStack, recursiveKey];
         }
       }
 
       const sourceChildren = Array.isArray(sourceNode.children) ? sourceNode.children : [];
       for (let index = 0; index < sourceChildren.length; index += 1) {
-        visitNode(sourceChildren[index], `${pathToken}.C${index}`, formCallStack, bindingContext, ancestry);
+        visitNode(sourceChildren[index], `${pathToken}.C${index}`, callStack, bindingContext, ancestry);
       }
 
-      if (!callCandidate || !resolvedForm) {
+      if (!callCandidate || !resolvedTarget) {
         return;
       }
-      const formChildren = Array.isArray(resolvedForm.children) ? resolvedForm.children : [];
+      const targetChildren = Array.isArray(resolvedTarget.children) ? resolvedTarget.children : [];
       const nextAncestry = [...ancestry, callCandidate.key];
-      for (let index = 0; index < formChildren.length; index += 1) {
+      for (let index = 0; index < targetChildren.length; index += 1) {
+        const targetPathKind = callCandidate.sourceKind === "PERFORM" ? "FORM" : callCandidate.sourceKind;
         visitNode(
-          formChildren[index],
-          `${pathToken}.FORM:${callCandidate.formNameUpper}.C${index}`,
-          nextFormCallStack,
+          targetChildren[index],
+          `${pathToken}.${targetPathKind}:${callCandidate.formNameUpper}.C${index}`,
+          nextCallStack,
           nextBindingContext,
           nextAncestry
         );
@@ -666,7 +864,7 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
 
     for (let index = 0; index < roots.length; index += 1) {
       const root = roots[index];
-      if (!root || root.objectType === "FORM") {
+      if (!root || root.objectType === "FORM" || root.objectType === "METHOD") {
         continue;
       }
       visitNode(root, `ROOT${index}`, [], null, []);
@@ -704,8 +902,13 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
       return null;
     }
     const directFormName = obj.objectType === "FORM" ? getFormNameFromNode(obj) : "";
+    const directMethodTargetUpper = obj.objectType === "METHOD"
+      ? Array.from(registry.candidatesByFormUpper.entries()).find(([, candidates]) => (
+        candidates.some((candidate) => candidate.sourceKind === "METHOD" && candidate.formId === String(obj.id || ""))
+      ))?.[0] || ""
+      : "";
     const formNameUpper = String(
-      directFormName || obj[PERFORM_SOURCE_FORM_META_KEY_DESC] || ""
+      directFormName || directMethodTargetUpper || obj[PERFORM_SOURCE_FORM_META_KEY_DESC] || ""
     ).trim().toUpperCase();
     if (!formNameUpper) {
       return null;
@@ -1367,6 +1570,21 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
         nodeBindingContext = selectedCandidate && selectedCandidate.bindingContext
           ? selectedCandidate.bindingContext
           : null;
+      } else if (sourceNode.objectType === "METHOD") {
+        const methodTargetEntry = performSourceRegistry
+          ? Array.from(performSourceRegistry.candidatesByFormUpper.entries()).find(([, candidates]) => (
+            candidates.some((candidate) => candidate.sourceKind === "METHOD" && candidate.formId === String(sourceNode.id || ""))
+          ))
+          : null;
+        const methodTargetUpper = methodTargetEntry ? methodTargetEntry[0] : "";
+        const selectedCandidate = methodTargetUpper && performSourceRegistry
+          && typeof performSourceRegistry.getSelectedCandidate === "function"
+          ? performSourceRegistry.getSelectedCandidate(methodTargetUpper)
+          : null;
+        nodeSourceFormNameUpper = methodTargetUpper;
+        nodeBindingContext = selectedCandidate && selectedCandidate.bindingContext
+          ? selectedCandidate.bindingContext
+          : null;
       }
 
       const out = {};
@@ -1386,6 +1604,11 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
             configurable: true,
             enumerable: false,
             value: nodeSourceFormNameUpper
+          });
+          Object.defineProperty(out, PERFORM_SOURCE_KIND_META_KEY_DESC, {
+            configurable: true,
+            enumerable: false,
+            value: String(nodeBindingContext && nodeBindingContext.chainKind || "PERFORM").toUpperCase()
           });
         } catch {
           // Source selection is optional UI metadata; keep rendering if attachment fails.

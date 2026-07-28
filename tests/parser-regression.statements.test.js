@@ -735,6 +735,12 @@ function testSupportedStatementSmokeMatrix() {
       code: "CLEAR lv_text.\n"
     },
     {
+      name: "concatenate",
+      covers: ["concatenate.json"],
+      expectedTypes: ["CONCATENATE"],
+      code: "CONCATENATE lv_a lv_b INTO lv_c SEPARATED BY lv_sep.\n"
+    },
+    {
       name: "constants",
       covers: ["constants.json"],
       expectedTypes: ["CONSTANTS"],
@@ -1051,6 +1057,107 @@ function testSelectOpenSqlInlineIntoDataAndFieldSymbol() {
   assert.strictEqual(String(i3Decl && i3Decl.decl && i3Decl.decl.name || ""), "<lv_carrname>", "I3 declOK name");
 }
 
+function testReadTableBinarySearchTransportingNoFields() {
+  const bothOrders = [
+    "READ TABLE lt_tab WITH KEY id = lv_id TRANSPORTING NO FIELDS BINARY SEARCH.",
+    "READ TABLE lt_tab WITH KEY id = lv_id BINARY SEARCH TRANSPORTING NO FIELDS."
+  ];
+
+  for (const code of bothOrders) {
+    const obj = findObject(flattenObjects(parse(code).objects), "READ_TABLE");
+    assert(obj, `Expected READ_TABLE for: ${code}`);
+    assert.strictEqual(getValue(obj.values, "itab"), "lt_tab", `itab for: ${code}`);
+    assert.strictEqual(getValue(obj.values, "withKey"), "id = lv_id", `withKey must stop before flags for: ${code}`);
+    assert.strictEqual(getValue(obj.values, "binarySearch"), "X", `binarySearch flag for: ${code}`);
+    assert.strictEqual(
+      getValue(obj.values, "transportingNoFields"),
+      "X",
+      `transportingNoFields flag for: ${code}`
+    );
+    assert(obj.keywords && obj.keywords["binary-search"], `keyword binary-search for: ${code}`);
+    assert(
+      obj.keywords && obj.keywords["transporting-no-fields"],
+      `keyword transporting-no-fields for: ${code}`
+    );
+    assert.strictEqual(
+      obj.extras && obj.extras.readTable && obj.extras.readTable.binarySearch,
+      true,
+      `extras.binarySearch for: ${code}`
+    );
+    assert.strictEqual(
+      obj.extras && obj.extras.readTable && obj.extras.readTable.transportingNoFields,
+      true,
+      `extras.transportingNoFields for: ${code}`
+    );
+  }
+}
+
+function testLoopAtFromIndexCapturesIndexValue() {
+  const cases = [
+    {
+      code: "LOOP AT lt_tab INTO ls_row FROM INDEX lv_from.\nENDLOOP.\n",
+      from: "lv_from",
+      to: ""
+    },
+    {
+      code: "LOOP AT lt_tab INTO ls_row FROM INDEX lv_from TO lv_to.\nENDLOOP.\n",
+      from: "lv_from",
+      to: "lv_to"
+    },
+    {
+      code: "LOOP AT lt_tab FROM INDEX lv_from INTO ls_row.\nENDLOOP.\n",
+      from: "lv_from",
+      to: ""
+    }
+  ];
+
+  for (const item of cases) {
+    const obj = findObject(flattenObjects(parse(item.code).objects), "LOOP_AT_ITAB");
+    assert(obj, `Expected LOOP_AT_ITAB for: ${item.code}`);
+    assert.strictEqual(getValue(obj.values, "from"), item.from, `from for: ${item.code}`);
+    assert.notStrictEqual(getValue(obj.values, "from"), "INDEX", `from must not be INDEX keyword for: ${item.code}`);
+    if (item.to) {
+      assert.strictEqual(getValue(obj.values, "to"), item.to, `to for: ${item.code}`);
+    }
+    assert.strictEqual(
+      obj.extras && obj.extras.loopAtItab && obj.extras.loopAtItab.from,
+      item.from,
+      `extras.from for: ${item.code}`
+    );
+  }
+
+  const plainFrom = findObject(flattenObjects(parse(
+    "LOOP AT lt_tab INTO ls_row FROM lv_from TO lv_to.\nENDLOOP.\n"
+  ).objects), "LOOP_AT_ITAB");
+  assert(plainFrom, "Expected LOOP_AT_ITAB for plain FROM idx.");
+  assert.strictEqual(getValue(plainFrom.values, "from"), "lv_from");
+  assert.strictEqual(getValue(plainFrom.values, "to"), "lv_to");
+}
+
+function testConcatenateStatement() {
+  const basic = findObject(flattenObjects(parse(
+    "CONCATENATE lv_a lv_b INTO lv_c."
+  ).objects), "CONCATENATE");
+  assert(basic, "Expected CONCATENATE object.");
+  assert.strictEqual(getValue(basic.values, "sources"), "lv_a lv_b");
+  assert.strictEqual(getValue(basic.values, "into"), "lv_c");
+
+  const separated = findObject(flattenObjects(parse(
+    "CONCATENATE rs_flight-cityfrom rs_flight-cityto INTO rs_flight-route_text SEPARATED BY ' -> '."
+  ).objects), "CONCATENATE");
+  assert(separated, "Expected CONCATENATE with SEPARATED BY.");
+  assert.strictEqual(getValue(separated.values, "sources"), "rs_flight-cityfrom rs_flight-cityto");
+  assert.strictEqual(getValue(separated.values, "into"), "rs_flight-route_text");
+  assert.strictEqual(getValue(separated.values, "separatedBy"), "' -> '");
+
+  const linesOf = findObject(flattenObjects(parse(
+    "CONCATENATE LINES OF lt_parts INTO lv_text."
+  ).objects), "CONCATENATE");
+  assert(linesOf, "Expected CONCATENATE LINES OF.");
+  assert.strictEqual(getValue(linesOf.values, "linesOf"), "lt_parts");
+  assert.strictEqual(getValue(linesOf.values, "into"), "lv_text");
+}
+
 defineFocusedTest(test, "parser statements regression", ["statements"], async (t) => {
   await t.test("multiple statements on single line", () => {
     testMultipleStatementsOnSingleLine();
@@ -1186,6 +1293,18 @@ defineFocusedTest(test, "parser statements regression", ["statements"], async (t
 
   await t.test("else starts sibling branch", () => {
     testElseStartsSiblingBranch();
+  });
+
+  await t.test("read table binary search transporting no fields", () => {
+    testReadTableBinarySearchTransportingNoFields();
+  });
+
+  await t.test("loop at from index captures index value", () => {
+    testLoopAtFromIndexCapturesIndexValue();
+  });
+
+  await t.test("concatenate statement", () => {
+    testConcatenateStatement();
   });
 
   await t.test("supported statement smoke matrix", () => {

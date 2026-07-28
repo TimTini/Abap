@@ -7,6 +7,7 @@ const {
   assertViewerFixtureDirectoriesStayInSync,
   findDataDeclGroup,
   findDataDeclRow,
+  getDeclOverrideStorageKeyFromRuntime,
   getTemplateTableRows,
   renderFixture,
   settleViewerUi,
@@ -76,6 +77,308 @@ async function assertIfInitialUsesConditionTemplate() {
   );
 
   multiDom.window.close();
+}
+
+async function assertLocalMethodSourceSelectionUsesScopedChains() {
+  const source = [
+    "DATA gv_first TYPE string.",
+    "DATA gv_second TYPE string.",
+    "DATA gv_out_first TYPE string.",
+    "DATA gv_out_second TYPE string.",
+    "DATA gv_count_first TYPE i.",
+    "DATA gv_count_second TYPE i.",
+    "DATA gv_recv_first TYPE string.",
+    "DATA gv_recv_second TYPE string.",
+    "CLASS lcl_math DEFINITION.",
+    "  PUBLIC SECTION.",
+    "    CLASS-METHODS calculate",
+    "      IMPORTING iv_input TYPE string",
+    "      EXPORTING ev_output TYPE string",
+    "      CHANGING cv_count TYPE i",
+    "      RETURNING VALUE(rv_result) TYPE string.",
+    "ENDCLASS.",
+    "CLASS lcl_math IMPLEMENTATION.",
+    "  METHOD calculate.",
+    "    ev_output = iv_input.",
+    "    cv_count = cv_count + 1.",
+    "    rv_result = iv_input.",
+    "  ENDMETHOD.",
+    "ENDCLASS.",
+    "CALL METHOD lcl_math=>calculate",
+    "  EXPORTING iv_input = gv_first",
+    "  IMPORTING ev_output = gv_out_first",
+    "  CHANGING cv_count = gv_count_first",
+    "  RECEIVING rv_result = gv_recv_first.",
+    "CALL METHOD lcl_math=>calculate",
+    "  EXPORTING iv_input = gv_second",
+    "  IMPORTING ev_output = gv_out_second",
+    "  CHANGING cv_count = gv_count_second",
+    "  RECEIVING rv_result = gv_recv_second."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
+  const targetKey = "METHOD:LCL_MATH=>CALCULATE";
+  const registry = state.performSourceRegistry;
+  const candidates = registry && registry.candidatesByFormUpper.get(targetKey) || [];
+
+  assert.strictEqual(candidates.length, 2, "Expected one local METHOD source candidate per call site.");
+  assert(candidates.every((candidate) => candidate.bindingContext && candidate.bindingContext.chainKind === "METHOD"));
+  assert(candidates.every((candidate) => String(candidate.sourceScope || "").includes("CALCULATE")));
+
+  try {
+    Object.defineProperty(els.templatePreviewOutput, "clientHeight", { configurable: true, value: 100000 });
+  } catch {
+    // JSDOM default viewport is sufficient for this small fixture.
+  }
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const renderedMethods = [];
+  const collectMethods = (nodes) => {
+    for (const node of Array.isArray(nodes) ? nodes : []) {
+      if (String(node && node.objectType || "") === "METHOD") {
+        renderedMethods.push(node);
+      }
+      collectMethods(node && node.children);
+    }
+  };
+  collectMethods(state.renderObjects);
+  assert.strictEqual(renderedMethods.filter((node) => /calculate/i.test(String(node && node.raw || ""))).length, 1, "Expected the local METHOD implementation to render once.");
+  const sourceSelects = Array.from(els.templatePreviewOutput.querySelectorAll(
+    `.perform-source-select[data-perform-form="${targetKey}"]`
+  ));
+  assert(sourceSelects.length >= 1, "Expected local METHOD subtree to expose its shared source selector.");
+
+  const findAssignmentTable = (raw) => {
+    const matchingObject = [];
+    const collectMatching = (nodes) => {
+      for (const node of Array.isArray(nodes) ? nodes : []) {
+        if (String(node && node.raw || "").trim() === raw) {
+          matchingObject.push(node);
+        }
+        collectMatching(node && node.children);
+      }
+    };
+    collectMatching(state.renderObjects);
+    const objectId = matchingObject[0] && matchingObject[0].id;
+    const block = Array.from(els.templatePreviewOutput.querySelectorAll(".template-block"))
+      .find((candidate) => String(candidate.querySelector(".template-block-meta")?.textContent || "").includes(`#${String(objectId || "")}`));
+    return block ? block.querySelector("table.template-preview-table") : null;
+  };
+  const firstInputTable = findAssignmentTable("ev_output = iv_input.");
+  assert(firstInputTable, "Expected local METHOD assignment preview.");
+  assert.deepStrictEqual(getTemplateTableRows(firstInputTable), [
+    ["Đích", "gv_out_first"],
+    ["Nguồn", "gv_first"]
+  ]);
+
+  sourceSelects[0].value = candidates[1].key;
+  sourceSelects[0].dispatchEvent(new window.Event("change", { bubbles: true }));
+  await settleViewerUi(window, 4);
+  assert.strictEqual(registry.getSelectedCandidate(targetKey).key, candidates[1].key);
+  const secondInputTable = findAssignmentTable("ev_output = iv_input.");
+  assert.deepStrictEqual(getTemplateTableRows(secondInputTable), [
+    ["Đích", "gv_out_second"],
+    ["Nguồn", "gv_second"]
+  ]);
+
+  const selectedMethodParam = Array.from(secondInputTable.querySelectorAll("td"))
+    .find((cell) => String(cell.textContent || "").trim() === "gv_second");
+  const methodChainCandidate = selectedMethodParam && selectedMethodParam.__templateCellMeta
+    && Array.from(selectedMethodParam.__templateCellMeta.declCandidates || [])
+      .find((decl) => /^METHOD_CHAIN:/.test(String(getDeclOverrideStorageKeyFromRuntime(window, decl) || "")));
+  assert(methodChainCandidate, "Expected method parameter edits to expose a source-scoped METHOD_CHAIN key.");
+
+  dom.window.close();
+}
+
+async function assertNestedLocalMethodSourcesStayScopedAndMapStructComponents() {
+  const source = [
+    "TYPES: BEGIN OF ty_context,",
+    "         city TYPE string,",
+    "       END OF ty_context.",
+    "DATA gs_first TYPE ty_context.",
+    "DATA gs_second TYPE ty_context.",
+    "DATA gv_city TYPE string.",
+    "CLASS lcl_chain DEFINITION.",
+    "  PUBLIC SECTION.",
+    "    CLASS-METHODS outer IMPORTING is_context TYPE ty_context.",
+    "    CLASS-METHODS inner IMPORTING is_context TYPE ty_context.",
+    "ENDCLASS.",
+    "CLASS lcl_chain IMPLEMENTATION.",
+    "  METHOD outer.",
+    "    CALL METHOD lcl_chain=>inner EXPORTING is_context = is_context.",
+    "  ENDMETHOD.",
+    "  METHOD inner.",
+    "    gv_city = is_context-city.",
+    "  ENDMETHOD.",
+    "ENDCLASS.",
+    "CALL METHOD lcl_chain=>outer EXPORTING is_context = gs_first.",
+    "CALL METHOD lcl_chain=>outer EXPORTING is_context = gs_second."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+  const registry = state.performSourceRegistry;
+  const outerTarget = "METHOD:LCL_CHAIN=>OUTER";
+  const innerTarget = "METHOD:LCL_CHAIN=>INNER";
+  const outerCandidates = registry.candidatesByFormUpper.get(outerTarget) || [];
+  const innerCandidates = registry.candidatesByFormUpper.get(innerTarget) || [];
+
+  assert.strictEqual(outerCandidates.length, 2, "Expected two OUTER call-site candidates.");
+  assert.strictEqual(innerCandidates.length, 2, "Expected INNER only through the two scoped OUTER calls.");
+  assert(innerCandidates.every((candidate) => candidate.ancestry.length === 1), "Expected every INNER candidate to retain its OUTER ancestry.");
+  assert(innerCandidates.every((candidate) => candidate.parentCandidateKey), "Expected nested INNER candidates to have a parent source.");
+
+  try {
+    Object.defineProperty(els.templatePreviewOutput, "clientHeight", { configurable: true, value: 100000 });
+  } catch {
+    // JSDOM viewport defaults are sufficient for this fixture.
+  }
+  els.rightTabTemplateBtn.click();
+  await settleViewerUi(window, 3);
+
+  const innerSelect = els.templatePreviewOutput.querySelector(`.perform-source-select[data-perform-form="${innerTarget}"]`);
+  assert(innerSelect, "Expected INNER METHOD subtree to expose its source selector.");
+  assert.strictEqual(
+    window.AbapViewerRuntime.services.performSources.selectPerformSourceCandidate(innerTarget, innerCandidates[1].key),
+    true,
+    "Expected selecting a nested METHOD source to synchronize its OUTER call chain."
+  );
+  await settleViewerUi(window, 4);
+
+  const cityAssignment = [];
+  const collectAssignment = (nodes) => {
+    for (const node of Array.isArray(nodes) ? nodes : []) {
+      if (String(node && node.raw || "").trim() === "gv_city = is_context-city.") {
+        cityAssignment.push(node);
+      }
+      collectAssignment(node && node.children);
+    }
+  };
+  collectAssignment(state.renderObjects);
+  const cityObject = cityAssignment[0];
+  assert(cityObject, "Expected INNER structured-param assignment.");
+  const cityBlock = Array.from(els.templatePreviewOutput.querySelectorAll(".template-block"))
+    .find((block) => String(block.querySelector(".template-block-meta")?.textContent || "").includes(`#${String(cityObject.id)}`));
+  const cityTable = cityBlock && cityBlock.querySelector("table.template-preview-table");
+  assert(cityTable, "Expected INNER structured-param Template table.");
+  assert.deepStrictEqual(getTemplateTableRows(cityTable), [
+    ["Đích", "gv_city"],
+    ["Nguồn", "gs_second-city"]
+  ]);
+
+  dom.window.close();
+}
+
+async function assertNestedLocalMethodComponentActualUsesSelectedRoot() {
+  const source = [
+    "TYPES: BEGIN OF ty_context,",
+    "         name TYPE string,",
+    "       END OF ty_context.",
+    "DATA gs_first TYPE ty_context.",
+    "DATA gs_second TYPE ty_context.",
+    "DATA gv_name TYPE string.",
+    "CLASS lcl_chain DEFINITION.",
+    "  PUBLIC SECTION.",
+    "    CLASS-METHODS outer IMPORTING is_outer TYPE ty_context.",
+    "    CLASS-METHODS inner IMPORTING iv_name TYPE string.",
+    "ENDCLASS.",
+    "CLASS lcl_chain IMPLEMENTATION.",
+    "  METHOD outer.",
+    "    CALL METHOD lcl_chain=>inner EXPORTING iv_name = is_outer-name.",
+    "  ENDMETHOD.",
+    "  METHOD inner.",
+    "    gv_name = iv_name.",
+    "  ENDMETHOD.",
+    "ENDCLASS.",
+    "CALL METHOD lcl_chain=>outer EXPORTING is_outer = gs_first.",
+    "CALL METHOD lcl_chain=>outer EXPORTING is_outer = gs_second."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+  const registry = state.performSourceRegistry;
+  const innerTarget = "METHOD:LCL_CHAIN=>INNER";
+  const innerCandidates = registry.candidatesByFormUpper.get(innerTarget) || [];
+
+  assert.strictEqual(innerCandidates.length, 2, "Expected one scoped INNER candidate per OUTER root call.");
+  assert.deepStrictEqual(
+    Array.from(innerCandidates[0].bindingContext.byParamUpper.get("IV_NAME") || [], (decl) => String(decl && decl.name || "")),
+    ["gs_first-name"],
+    "Expected the first component actual to resolve through the first OUTER binding."
+  );
+  assert.deepStrictEqual(
+    Array.from(innerCandidates[1].bindingContext.byParamUpper.get("IV_NAME") || [], (decl) => String(decl && decl.name || "")),
+    ["gs_second-name"],
+    "Expected the second component actual to resolve through the second OUTER binding."
+  );
+
+  try {
+    Object.defineProperty(els.templatePreviewOutput, "clientHeight", { configurable: true, value: 100000 });
+  } catch {
+    // JSDOM viewport defaults are sufficient for this fixture.
+  }
+  els.rightTabTemplateBtn.click();
+  await settleViewerUi(window, 3);
+  assert.strictEqual(
+    window.AbapViewerRuntime.services.performSources.selectPerformSourceCandidate(innerTarget, innerCandidates[1].key),
+    true
+  );
+  await settleViewerUi(window, 4);
+
+  const assignments = [];
+  const collectAssignment = (nodes) => {
+    for (const node of Array.isArray(nodes) ? nodes : []) {
+      if (String(node && node.raw || "").trim() === "gv_name = iv_name.") {
+        assignments.push(node);
+      }
+      collectAssignment(node && node.children);
+    }
+  };
+  collectAssignment(state.renderObjects);
+  const assignment = assignments[0];
+  const block = Array.from(els.templatePreviewOutput.querySelectorAll(".template-block"))
+    .find((candidate) => String(candidate.querySelector(".template-block-meta")?.textContent || "").includes(`#${String(assignment && assignment.id || "")}`));
+  assert.deepStrictEqual(getTemplateTableRows(block.querySelector("table.template-preview-table")), [
+    ["Đích", "gv_name"],
+    ["Nguồn", "gs_second-name"]
+  ]);
+
+  dom.window.close();
+}
+
+async function assertTypedLocalInstanceMethodCreatesSourceChain() {
+  const source = [
+    "DATA gv_input TYPE string.",
+    "DATA gv_output TYPE string.",
+    "CLASS lcl_worker DEFINITION.",
+    "  PUBLIC SECTION.",
+    "    METHODS run IMPORTING iv_input TYPE string EXPORTING ev_output TYPE string.",
+    "ENDCLASS.",
+    "CLASS lcl_worker IMPLEMENTATION.",
+    "  METHOD run.",
+    "    ev_output = iv_input.",
+    "  ENDMETHOD.",
+    "ENDCLASS.",
+    "DATA lo_worker TYPE REF TO lcl_worker.",
+    "CALL METHOD lo_worker->run EXPORTING iv_input = gv_input IMPORTING ev_output = gv_output."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { state } = dom.window.AbapViewerRuntime;
+  const target = "METHOD:LCL_WORKER=>RUN";
+  const candidates = state.performSourceRegistry.candidatesByFormUpper.get(target) || [];
+
+  assert.strictEqual(candidates.length, 1, "Expected a typed local instance call to register a METHOD source.");
+  assert.deepStrictEqual(
+    Array.from(candidates[0].bindingContext.byParamUpper.get("IV_INPUT") || [], (decl) => String(decl && decl.name || "")),
+    ["gv_input"]
+  );
+  assert.strictEqual(candidates[0].bindingContext.chainKind, "METHOD");
+
+  dom.window.close();
 }
 
 async function assertFormSourceTraceUsesRootDeclarations() {
@@ -201,16 +504,17 @@ async function assertFormSourceTraceUsesRootDeclarations() {
   };
 
   assertTemplateRows(innerForm, "iv_inner = iv_inner && '-x'.", [
-    ["Đích", "Nguồn"],
-    ["gv_root", "gv_root && '-x'"]
+    ["Đích", "gv_root"],
+    ["Nguồn", "gv_root"],
+    ["Nguồn", "'-x'"]
   ]);
   assertTemplateRows(innerForm, "is_inner-city = is_inner-name.", [
-    ["Đích", "Nguồn"],
-    ["gs_root-city", "gs_root-name"]
+    ["Đích", "gs_root-city"],
+    ["Nguồn", "gs_root-name"]
   ]);
   assertTemplateRows(innerForm, "cv_inner = iv_inner.", [
-    ["Đích", "Nguồn"],
-    ["gv_change", "gv_root"]
+    ["Đích", "gv_change"],
+    ["Nguồn", "gv_root"]
   ]);
   assertTemplateRows(innerForm, "APPEND iv_inner TO tt_inner.", [
     ["APPEND", "gv_root"],
@@ -448,12 +752,12 @@ async function assertGlobalPerformSourceSelection() {
     return block ? block.querySelector("table.template-preview-table") : null;
   };
   assert.deepStrictEqual(getTemplateTableRows(findTemplateTable(firstLocalAssignment)), [
-    ["Đích", "Nguồn"],
-    ["lv_local", "gv_second"]
+    ["Đích", "lv_local"],
+    ["Nguồn", "gv_second"]
   ]);
   assert.deepStrictEqual(getTemplateTableRows(findTemplateTable(firstMissingAssignment)), [
-    ["Đích", "Nguồn"],
-    ["iv_missing", "gv_second"]
+    ["Đích", "iv_missing"],
+    ["Nguồn", "gv_second"]
   ]);
 
   let activeInnerCandidates = registry.getActiveCandidates("FRM_INNER");
@@ -1224,6 +1528,26 @@ assertViewerFixtureDirectoriesStayInSync();
 
   await t.test("form source trace uses root declarations", async () => {
     await assertFormSourceTraceUsesRootDeclarations();
+  });
+});
+
+defineFocusedTest(test, "viewer local method source chain contract", ["local-method-source-chain"], async (t) => {
+  assertViewerFixtureDirectoriesStayInSync();
+
+  await t.test("local method call sites use independent selected chains", async () => {
+    await assertLocalMethodSourceSelectionUsesScopedChains();
+  });
+
+  await t.test("nested local methods keep scoped sources and remap struct components", async () => {
+    await assertNestedLocalMethodSourcesStayScopedAndMapStructComponents();
+  });
+
+  await t.test("nested local method component actual follows selected root", async () => {
+    await assertNestedLocalMethodComponentActualUsesSelectedRoot();
+  });
+
+  await t.test("typed local instance method creates a source chain", async () => {
+    await assertTypedLocalInstanceMethodCreatesSourceChain();
   });
 });
 

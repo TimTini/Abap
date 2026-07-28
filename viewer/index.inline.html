@@ -9,9 +9,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.07.26-r80">
-  <meta name="abap-viewer-updated-at" content="2026-07-26 22:32:05">
-  <meta name="abap-viewer-updated-note" content="Excel imports now preserve adjacent outlines encoded through shared cell edges.">
+  <meta name="abap-viewer-version" content="v2026.07.28-r86">
+  <meta name="abap-viewer-updated-at" content="2026-07-28 15:18:11">
+  <meta name="abap-viewer-updated-note" content="Scope-safe description edits; TYPE items fan out to typed DATA/FIELD-SYMBOL items and exact local call chains only.">
   <title>ABAP Parser Viewer</title>
     <style>
 /* inlined from: ./styles/viewer.css */
@@ -80,7 +80,7 @@
       width: 100%;
       max-width: none;
       margin: 0;
-      padding: 16px clamp(12px, 2vw, 24px);
+      padding: 10px clamp(10px, 1.5vw, 16px);
       height: 100vh;
       display: flex;
       flex-direction: column;
@@ -101,42 +101,157 @@
       display: none !important;
     }
 
-    header {
-      margin-bottom: 20px;
+    header,
+    #appHeader {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
     }
 
-    header h1 {
-      margin: 0 0 6px 0;
-      font-size: 22px;
-    }
-
-    header p {
+    header h1,
+    #appHeader h1 {
       margin: 0;
-      color: var(--muted);
+      font-size: 18px;
     }
 
-    header .build-info {
-      margin-top: 6px;
-      font-size: 12px;
+    .header-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .header-actions > button {
+      border: none;
+      background: var(--accent);
+      color: #04101f;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .header-actions > button:hover {
+      filter: brightness(1.05);
+    }
+
+    .header-actions .toggle {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
       color: var(--muted);
-      font-family: Consolas, "Courier New", monospace;
+      font-size: 13px;
+      user-select: none;
+    }
+
+    .header-actions .secondary,
+    .goto-line-controls .secondary {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .header-actions .secondary:hover,
+    .goto-line-controls .secondary:hover {
+      background: var(--hover);
+    }
+
+    .header-actions .controls-secondary-menu > summary {
+      display: inline-block;
+    }
+
+    .header-actions .controls-secondary-body {
+      position: absolute;
+      right: 0;
+      z-index: 40;
+      min-width: 180px;
     }
 
     .controls {
       display: flex;
+      gap: 6px;
       flex-wrap: wrap;
-      gap: 12px;
       align-items: center;
-      margin-bottom: 16px;
+      margin-bottom: 6px;
+    }
+
+    .controls-primary {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .controls-secondary-menu,
+    .template-controls-secondary-menu {
+      position: relative;
+    }
+
+    .controls-secondary-menu > summary,
+    .template-controls-secondary-menu > summary {
+      list-style: none;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      background: var(--panel);
+      color: var(--text);
+      user-select: none;
+    }
+
+    .controls-secondary-menu > summary::-webkit-details-marker,
+    .template-controls-secondary-menu > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .controls-secondary-body,
+    .template-controls-secondary-body {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-top: 6px;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--panel) 92%, var(--hover));
+    }
+
+    .template-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      flex: 0 0 auto;
+    }
+
+    .template-controls-primary {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .template-key-mode {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
     }
 
     .controls button {
       border: none;
       background: var(--accent);
       color: #fff;
-      padding: 8px 16px;
+      padding: 6px 12px;
       border-radius: 6px;
       cursor: pointer;
+      font-size: 13px;
     }
 
     .controls input[type="search"],
@@ -280,8 +395,8 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 10px;
-      margin-bottom: 10px;
+      gap: 6px;
+      margin-bottom: 6px;
       flex-wrap: wrap;
     }
 
@@ -293,19 +408,33 @@
     .goto-line-controls {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       color: var(--muted);
       font-size: 12px;
     }
 
     .goto-line-controls input {
-      width: 110px;
+      width: 96px;
       border: 1px solid var(--border);
       background: var(--panel);
       color: var(--text);
-      padding: 6px 8px;
+      padding: 4px 8px;
       border-radius: 6px;
       font-size: 12px;
+    }
+
+    .goto-line-controls button {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .goto-line-controls button:hover {
+      background: var(--hover);
     }
 
     #inputText {
@@ -479,32 +608,16 @@
       flex: 1;
       min-height: 0;
       min-width: 0;
-      overflow: auto;
-      padding-right: 6px;
+      overflow: hidden;
+      padding-right: 4px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
     }
 
     #templatePreviewPanel[hidden],
     #declDescPanel[hidden] {
       display: none !important;
-    }
-
-    .template-controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
-    }
-
-    .template-key-mode {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 12px;
-      color: var(--muted);
-      margin-right: auto;
     }
 
     .template-copy-mode {
@@ -587,14 +700,15 @@
     }
 
     .template-preview-output {
-      flex: 1;
+      flex: 1 1 auto;
       min-height: 220px;
       min-width: 0;
+      max-width: 100%;
       overflow: auto;
       overflow-anchor: none;
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 10px;
+      padding: 8px;
       background: var(--code-bg);
     }
 
@@ -613,11 +727,13 @@
     .template-block {
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 10px;
-      margin-bottom: 10px;
+      padding: 8px;
+      margin-bottom: 8px;
       background: var(--panel);
       min-width: 0;
+      max-width: 100%;
       box-sizing: border-box;
+      overflow: hidden;
     }
 
     /* Keep selected template blocks visible beside scrollbars on narrow split panes. */
@@ -1780,16 +1896,54 @@
 
     @media (max-width: 980px) {
       .container {
-        padding: 12px;
+        padding: 8px;
+      }
+
+      header,
+      #appHeader {
+        margin-bottom: 4px;
+      }
+
+      header h1,
+      #appHeader h1 {
+        font-size: 16px;
+      }
+
+      .header-actions {
+        gap: 4px;
+      }
+
+      .controls {
+        gap: 6px;
+        margin-bottom: 6px;
+      }
+
+      .controls button {
+        padding: 5px 10px;
+        font-size: 12px;
+      }
+
+      .panel-heading-row h2,
+      .panel-header h2 {
+        font-size: 14px;
       }
 
       .layout {
         grid-template-columns: 1fr;
-        gap: 12px;
+        gap: 8px;
       }
 
       .splitter {
         display: none;
+      }
+
+      .template-controls {
+        gap: 4px;
+      }
+
+      .template-preview-output {
+        min-height: 180px;
+        padding: 6px;
       }
 
       .perform-source-picker {
@@ -1844,22 +1998,23 @@
   <div class="container">
     <header id="appHeader">
       <h1>ABAP Parser Viewer</h1>
-      <p>Paste ABAP code (or JSON output) and click Render.</p>
-      <p class="build-info" id="buildInfo">Updated: manual timestamp not set.</p>
+      <div class="header-actions">
+        <button type="button" id="parseBtn">Render</button>
+        <details class="controls-secondary-menu">
+          <summary>Config</summary>
+          <div class="controls-secondary-body">
+            <label class="toggle"><input type="checkbox" id="themeToggle" checked>dark</label>
+            <button type="button" id="descBtn" class="secondary">Data</button>
+            <button type="button" id="settingsBtn" class="secondary">Settings</button>
+          </div>
+        </details>
+      </div>
     </header>
-
-    <div class="controls" id="appControls">
-      <button type="button" id="parseBtn">Render</button>
-      <label class="toggle"><input type="checkbox" id="themeToggle" checked>dark</label>
-      <button type="button" id="descBtn" class="secondary">Data</button>
-      <button type="button" id="settingsBtn" class="secondary">Settings</button>
-      <span class="muted hint">Tip: use Template or Data to inspect parsed declarations and jump to source lines.</span>
-    </div>
 
     <div class="layout" id="mainLayout">
       <div class="panel">
         <div class="panel-heading-row">
-          <h2>Input (ABAP / JSON)</h2>
+          <h2>Input</h2>
           <div class="goto-line-controls">
             <label for="inputGotoLine">Goto line</label>
             <input type="number" id="inputGotoLine" min="1" step="1" placeholder="e.g. 120">
@@ -1893,21 +2048,28 @@
         </div>
         <div id="templatePreviewPanel">
           <div class="template-controls">
-            <span class="template-key-mode">
-              Template key mode
-              <span id="templateKeyMode" class="template-key-badge">AUTO: objectType -&gt; DEFAULT</span>
-            </span>
-            <label class="template-copy-mode">
-              <input type="checkbox" id="templateCopyTableOnly" checked>
-              Copy table only
-            </label>
-            <button type="button" id="templateCopySelectedBtn" class="secondary" disabled>Copy Selected (0)</button>
-            <button type="button" id="templateCopyAllBtn" class="secondary">Copy All</button>
-            <button type="button" id="templateResetBtn" class="secondary">Reset default</button>
-            <button type="button" id="templateExportBtn" class="secondary">Export config</button>
-            <button type="button" id="templateImportBtn" class="secondary">Import config</button>
-            <button type="button" id="templateApplyBtn" class="secondary">Template Form</button>
-            <button type="button" id="templateFilterModalBtn" class="secondary">Object Filter</button>
+            <div class="template-controls-primary">
+              <button type="button" id="templateCopySelectedBtn" class="secondary" disabled>Copy Selected (0)</button>
+              <button type="button" id="templateCopyAllBtn" class="secondary">Copy All</button>
+            </div>
+            <details class="template-controls-secondary-menu">
+              <summary>Template config</summary>
+              <div class="template-controls-secondary-body">
+                <span class="template-key-mode">
+                  Template key mode
+                  <span id="templateKeyMode" class="template-key-badge">AUTO: objectType -&gt; DEFAULT</span>
+                </span>
+                <label class="template-copy-mode">
+                  <input type="checkbox" id="templateCopyTableOnly" checked>
+                  Copy table only
+                </label>
+                <button type="button" id="templateResetBtn" class="secondary">Reset default</button>
+                <button type="button" id="templateExportBtn" class="secondary">Export config</button>
+                <button type="button" id="templateImportBtn" class="secondary">Import config</button>
+                <button type="button" id="templateApplyBtn" class="secondary">Template Form</button>
+                <button type="button" id="templateFilterModalBtn" class="secondary">Object Filter</button>
+              </div>
+            </details>
             <input type="file" id="templateImportInput" accept=".json,application/json,text/plain" hidden>
           </div>
           <div id="templateConfigError" class="template-error" role="alert" aria-live="polite"></div>
@@ -3074,6 +3236,8 @@
 
     const normalizedWithTableKey = normalizeReadTableKeyConditionSource(withTableKeyRaw);
     const conditionSource = withTableKeyRaw ? normalizedWithTableKey : withKeyRaw;
+    const binarySearch = Boolean(String(map.binarySearch || "").trim());
+    const transportingNoFields = Boolean(String(map.transportingNoFields || "").trim());
 
     return {
       readTable: {
@@ -3082,6 +3246,9 @@
         into: map.into || "",
         assigning: map.assigning || "",
         refInto: map.refInto || "",
+        transporting: map.transporting || "",
+        binarySearch,
+        transportingNoFields,
         withKeyRaw,
         withTableKeyRaw,
         conditions: parseConditionClauses(conditionSource, { allowImplicitAnd: true })
@@ -3476,6 +3643,8 @@
     const scopeInfoById = buildScopeInfoById({ idToObject });
 
     const declByScope = new Map();
+    const inlineDecls = [];
+    const inlineDeclsByScopeKey = new Map();
     ensureScopeMap(declByScope, 0);
 
     for (const obj of allObjects) {
@@ -3517,8 +3686,21 @@
 
       const scopeId = getStatementScopeId(statement.lineStart, procedureBlocks, classBlocks);
       const scopeInfo = scopeInfoById.get(scopeId) || buildFallbackScopeInfo(scopeId);
+      ensureScopeMap(declByScope, scopeId);
+      const lexicalScope = getLexicalScopeForLine(statement.lineStart, allObjects);
+      const lexicalScopeKey = lexicalScope.key;
+      if (!inlineDeclsByScopeKey.has(lexicalScopeKey)) {
+        inlineDeclsByScopeKey.set(lexicalScopeKey, new Map());
+      }
+      const inlineScopeMap = inlineDeclsByScopeKey.get(lexicalScopeKey);
       for (const name of inlineNames) {
-        addDecl(declByScope, scopeId, name, {
+        const upper = name.toUpperCase();
+        // Multiple inline declarations with the same name are valid in sibling branches.
+        // Keep the earliest declaration only within the same lexical scope.
+        if (inlineScopeMap.has(upper)) {
+          continue;
+        }
+        const decl = {
           id: null,
           objectType: "INLINE",
           name,
@@ -3529,8 +3711,13 @@
           scopeId,
           scopeLabel: scopeInfo.scopeLabel,
           scopeType: scopeInfo.scopeType,
-          scopeName: scopeInfo.scopeName
-        });
+          scopeName: scopeInfo.scopeName,
+          declScopeId: lexicalScope.id,
+          declScopePath: lexicalScope.path,
+          visibleFromLine: Number(statement.lineStart || 0) || null
+        };
+        inlineScopeMap.set(upper, decl);
+        inlineDecls.push(decl);
       }
     }
 
@@ -3555,16 +3742,36 @@
     });
 
     for (const obj of allObjects) {
-      const resolveContext = buildResolveContext(obj, idToObject, declByScope, classInfo);
+      const resolveContext = buildResolveContext(obj, idToObject, declByScope, classInfo, inlineDeclsByScopeKey);
       annotateValuesWithDecls(obj.values, resolveContext);
       annotateExtrasWithDecls(obj.extras, resolveContext);
     }
 
     attachPerformOriginDecls({ allObjects, formsByNameUpper: buildFormsByNameUpper(allObjects), scopeInfoById });
+    attachLocalMethodOriginDecls({ allObjects, classInfo });
 
     const decls = [];
-    for (const scopeMap of declByScope.values()) {
+    const emittedInlineDecls = new Set();
+    for (const [scopeId, scopeMap] of declByScope.entries()) {
+      const sourceDecls = [];
+      const derivedDecls = [];
       for (const decl of scopeMap.values()) {
+        if (["STRUCT_FIELD", "TYPE_COMPONENT"].includes(decl.objectType)) {
+          derivedDecls.push(decl);
+        } else {
+          sourceDecls.push(decl);
+        }
+      }
+      const scopeInlineDecls = inlineDecls.filter((decl) => decl.scopeId === scopeId);
+      for (const decl of scopeInlineDecls) {
+        emittedInlineDecls.add(decl);
+      }
+      sourceDecls.push(...scopeInlineDecls);
+      sourceDecls.sort((left, right) => Number(left.lineStart || 0) - Number(right.lineStart || 0));
+      decls.push(...sourceDecls, ...derivedDecls);
+    }
+    for (const decl of inlineDecls) {
+      if (!emittedInlineDecls.has(decl)) {
         decls.push(decl);
       }
     }
@@ -3834,6 +4041,64 @@
     return normalized || "";
   }
 
+  function getDeclaredTypeName(obj) {
+    const direct = getStructTypeCandidateFromDeclObject(obj);
+    if (direct && !["STANDARD", "SORTED", "HASHED", "ANY", "INDEX"].includes(direct.toUpperCase())) {
+      return direct;
+    }
+    const tableLineType = String(obj && obj.raw || "").match(/\b(?:TABLE|RANGE)\s+OF\s+([A-Za-z_][A-Za-z0-9_]*)/i);
+    return tableLineType ? tableLineType[1] : direct;
+  }
+
+  function buildTypeAliasesByScope(allObjects, idToObject, procedureBlocks, classBlocks) {
+    const aliasesByScope = new Map();
+    for (const obj of allObjects || []) {
+      if (!obj || obj.objectType !== "TYPES" || (obj.extras && obj.extras.structDef && obj.extras.structDef.isDecl === false)) {
+        continue;
+      }
+      const name = normalizeIdentifierCandidate(getFirstValue(obj.values, "name"));
+      const typeName = getDeclaredTypeName(obj);
+      if (!name || !typeName || name.toUpperCase() === typeName.toUpperCase()) {
+        continue;
+      }
+      const scopeId = getDeclarationScopeId(obj, idToObject, procedureBlocks, classBlocks);
+      ensureStructDefScopeMap(aliasesByScope, scopeId);
+      aliasesByScope.get(scopeId).set(name.toUpperCase(), typeName);
+    }
+    return aliasesByScope;
+  }
+
+  function resolveStructTypeForObject(obj, context, typeByScope, aliasesByScope) {
+    let typeName = getDeclaredTypeName(obj);
+    const visited = new Set();
+    while (typeName) {
+      const typeUpper = typeName.toUpperCase();
+      if (visited.has(typeUpper)) {
+        return null;
+      }
+      visited.add(typeUpper);
+      const definition = resolveStructDefByContext(typeUpper, context, typeByScope);
+      if (definition) {
+        return definition;
+      }
+      const aliasMaps = [
+        context && context.procId ? aliasesByScope.get(context.procId) : null,
+        context && context.classDefId ? aliasesByScope.get(context.classDefId) : null,
+        aliasesByScope.get(0)
+      ];
+      const aliasMap = aliasMaps.find((map) => map && map.has(typeUpper));
+      if (!aliasMap) {
+        return null;
+      }
+      typeName = aliasMap.get(typeUpper);
+    }
+    return null;
+  }
+
+  function getTypeIdentity(typeDef) {
+    return `LOCAL:${String(typeDef.scopeLabel || "GLOBAL").toUpperCase()}:${String(typeDef.nameUpper || typeDef.name || "").toUpperCase()}`;
+  }
+
   function patchDeclComment(declByScope, scopeId, nameUpper, comment) {
     const trimmed = String(comment || "").trim();
     if (!declByScope || !declByScope.has(scopeId)) {
@@ -3864,6 +4129,34 @@
   }) {
     const dataByScope = structDefs && structDefs.dataByScope ? structDefs.dataByScope : new Map();
     const typeByScope = structDefs && structDefs.typeByScope ? structDefs.typeByScope : new Map();
+    const typeAliasesByScope = buildTypeAliasesByScope(allObjects, idToObject, procedureBlocks, classBlocks);
+
+    for (const defsByName of typeByScope.values()) {
+      for (const typeDef of defsByName.values()) {
+        const typeIdentity = getTypeIdentity(typeDef);
+        const scopeInfo = scopeInfoById.get(typeDef.scopeId) || buildFallbackScopeInfo(typeDef.scopeId);
+        for (const field of typeDef.fields.values()) {
+          addTypeComponentDecl(declByScope, typeDef.scopeId, `${typeDef.name}-${field.path}`, {
+            id: null,
+            objectType: "TYPE_COMPONENT",
+            name: `${typeDef.name}-${field.path}`,
+            typeName: typeDef.name,
+            fieldPath: field.path,
+            typeIdentity,
+            typeComponentIdentity: `${typeIdentity}:${field.path.toUpperCase()}`,
+            dynamic: false,
+            file: fileName || "",
+            lineStart: field.lineStart || null,
+            raw: field.raw || "",
+            comment: field.comment || "",
+            scopeId: typeDef.scopeId,
+            scopeLabel: scopeInfo.scopeLabel,
+            scopeType: scopeInfo.scopeType,
+            scopeName: scopeInfo.scopeName
+          });
+        }
+      }
+    }
 
     // 1) DATA inline structs: create `${var}-${field}` decls with per-field comments.
     for (const [scopeId, defsByName] of dataByScope.entries()) {
@@ -3903,7 +4196,7 @@
 
     // 2) Typed declarations: `DATA ls_s TYPE ty_s.` -> create `ls_s-field` from `TYPES ... BEGIN OF ty_s`.
     for (const obj of allObjects || []) {
-      if (!obj || !obj.objectType || !obj.values) {
+      if (!obj || !["DATA", "FIELD-SYMBOLS"].includes(obj.objectType) || !obj.values) {
         continue;
       }
 
@@ -3927,19 +4220,20 @@
         continue;
       }
 
-      const typeName = getStructTypeCandidateFromDeclObject(obj);
-      if (!typeName) {
-        continue;
-      }
-
-      const typeUpper = typeName.toUpperCase();
       const context = buildResolveContext(obj, idToObject, declByScope, classInfo);
-      const typeDef = resolveStructDefByContext(typeUpper, context, typeByScope);
+      const typeDef = resolveStructTypeForObject(obj, context, typeByScope, typeAliasesByScope);
       if (!typeDef) {
         continue;
       }
+      const typeName = getDeclaredTypeName(obj);
+      const typeIdentity = getTypeIdentity(typeDef);
+      const rootDecl = resolveDecl(normalizedDeclName, context);
+      if (rootDecl) {
+        rootDecl.typeIdentity = typeIdentity;
+        rootDecl.typeName = typeDef.name;
+      }
 
-      patchDeclComment(declByScope, typeDef.scopeId || scopeId, typeUpper, typeDef.comment || "");
+      patchDeclComment(declByScope, typeDef.scopeId || scopeId, typeDef.nameUpper, typeDef.comment || "");
 
       for (const field of typeDef.fields.values()) {
         const fullName = `${normalizedDeclName}-${field.path}`;
@@ -3963,9 +4257,104 @@
           structRaw: obj.raw || "",
           structComment: obj.comment || "",
           structTypeName: typeDef.name || typeName,
+          typeIdentity,
+          typeComponentIdentity: `${typeIdentity}:${field.path.toUpperCase()}`,
           structTypeLineStart: typeDef.lineStart || null,
           structTypeRaw: typeDef.rawStart || "",
           structTypeComment: typeDef.comment || ""
+        });
+      }
+    }
+
+    // 3) Unknown (external) structure fields are materialized only after a real
+    // field usage. This intentionally does not guess DDIC definitions.
+    const externalInstances = [];
+    for (const obj of allObjects || []) {
+      if (!obj || !["DATA", "FIELD-SYMBOLS"].includes(obj.objectType)) {
+        continue;
+      }
+      const name = normalizeIdentifierCandidate(getFirstValue(obj.values, "name"));
+      const declaredType = getDeclaredTypeName(obj);
+      if (!name || !declaredType) {
+        continue;
+      }
+      const context = buildResolveContext(obj, idToObject, declByScope, classInfo);
+      if (resolveStructTypeForObject(obj, context, typeByScope, typeAliasesByScope)) {
+        continue;
+      }
+      const rootDecl = resolveDecl(name, context);
+      if (!rootDecl) {
+        continue;
+      }
+      const scopeId = getDeclarationScopeId(obj, idToObject, procedureBlocks, classBlocks);
+      const typeIdentity = `EXTERNAL:${declaredType.toUpperCase()}`;
+      externalInstances.push({ obj, name, rootDecl, scopeId, typeName: declaredType, typeIdentity });
+    }
+
+    const usedExternalComponents = new Map();
+    for (const obj of allObjects || []) {
+      const raw = String(obj && obj.raw || "");
+      const matches = raw.matchAll(/(<[^>]+>|[A-Za-z_][A-Za-z0-9_]*)-([A-Za-z_][A-Za-z0-9_]*(?:-[A-Za-z_][A-Za-z0-9_]*)*)/g);
+      for (const match of matches) {
+        const rootName = normalizeIdentifierCandidate(match[1]);
+        const fieldPath = normalizeIdentifierCandidate(`x-${match[2]}`)?.slice(2) || "";
+        if (!rootName || !fieldPath) {
+          continue;
+        }
+        const context = buildResolveContext(obj, idToObject, declByScope, classInfo);
+        const rootDecl = resolveDecl(rootName, context);
+        const instance = externalInstances.find((candidate) => candidate.rootDecl === rootDecl);
+        if (!instance) {
+          continue;
+        }
+        usedExternalComponents.set(`${instance.typeIdentity}:${fieldPath.toUpperCase()}`, { typeIdentity: instance.typeIdentity, typeName: instance.typeName, fieldPath });
+      }
+    }
+
+    for (const component of usedExternalComponents.values()) {
+      const componentIdentity = `${component.typeIdentity}:${component.fieldPath.toUpperCase()}`;
+      addTypeComponentDecl(declByScope, 0, `${component.typeName}-${component.fieldPath}`, {
+        id: null,
+        objectType: "TYPE_COMPONENT",
+        name: `${component.typeName}-${component.fieldPath}`,
+        typeName: component.typeName,
+        fieldPath: component.fieldPath,
+        typeIdentity: component.typeIdentity,
+        typeComponentIdentity: componentIdentity,
+        dynamic: true,
+        file: fileName || "",
+        lineStart: null,
+        raw: "",
+        comment: "",
+        scopeId: 0,
+        scopeLabel: "GLOBAL",
+        scopeType: "GLOBAL",
+        scopeName: ""
+      });
+      for (const instance of externalInstances.filter((candidate) => candidate.typeIdentity === component.typeIdentity)) {
+        instance.rootDecl.typeIdentity = component.typeIdentity;
+        instance.rootDecl.typeName = component.typeName;
+        const scopeInfo = scopeInfoById.get(instance.scopeId) || buildFallbackScopeInfo(instance.scopeId);
+        addDecl(declByScope, instance.scopeId, `${instance.name}-${component.fieldPath}`, {
+          id: null,
+          objectType: "STRUCT_FIELD",
+          name: `${instance.name}-${component.fieldPath}`,
+          file: instance.obj.file || fileName || "",
+          lineStart: instance.obj.lineStart || null,
+          raw: instance.obj.raw || "",
+          comment: instance.obj.comment || "",
+          scopeId: instance.scopeId,
+          scopeLabel: scopeInfo.scopeLabel,
+          scopeType: scopeInfo.scopeType,
+          scopeName: scopeInfo.scopeName,
+          structName: instance.name,
+          fieldPath: component.fieldPath,
+          structObjectType: instance.obj.objectType,
+          structId: instance.obj.id || null,
+          structTypeName: component.typeName,
+          typeIdentity: component.typeIdentity,
+          typeComponentIdentity: componentIdentity,
+          dynamic: true
         });
       }
     }
@@ -4016,6 +4405,8 @@
     }
 
     const methodParamsByClassAndName = new Map();
+    const ambiguousMethodKeys = new Set();
+    const methodCandidates = [];
     for (const [classNameUpper, entry] of byName.entries()) {
       const classDef = entry.definition;
       if (!classDef || !Array.isArray(classDef.children)) {
@@ -4044,6 +4435,7 @@
             id: child.id,
             objectType: "METHOD_PARAM",
             name: param.name,
+            section: param.section || "",
             file: child.file || "",
             lineStart: child.lineStart || null,
             raw: child.raw || "",
@@ -4055,19 +4447,46 @@
           });
         }
 
-        methodParamsByClassAndName.set(`${classNameUpper}:${methodName.toUpperCase()}`, {
+        const implementationMethod = findLocalMethodImplementation(entry.implementation, methodName);
+        const methodEntry = {
+          className: getFirstValue(classDef.values, "name") || classNameUpper,
           classNameUpper,
+          methodName,
           methodNameUpper: methodName.toUpperCase(),
+          methodKind: child.objectType === "CLASS-METHODS" ? "STATIC" : "INSTANCE",
           paramsByNameUpper,
-          signatureId: child.id
-        });
+          signatureId: child.id,
+          implementationId: implementationMethod ? implementationMethod.id || null : null
+        };
+        methodCandidates.push(methodEntry);
+        const methodKey = `${classNameUpper}:${methodName.toUpperCase()}`;
+        if (methodParamsByClassAndName.has(methodKey) || ambiguousMethodKeys.has(methodKey)) {
+          methodParamsByClassAndName.delete(methodKey);
+          ambiguousMethodKeys.add(methodKey);
+        } else {
+          methodParamsByClassAndName.set(methodKey, methodEntry);
+        }
       }
     }
 
     return {
       byName,
-      methodParamsByClassAndName
+      methodParamsByClassAndName,
+      methodCandidates
     };
+  }
+
+  function findLocalMethodImplementation(classImplementation, methodName) {
+    if (!classImplementation || !Array.isArray(classImplementation.children) || !methodName) {
+      return null;
+    }
+    const methodNameUpper = String(methodName).toUpperCase();
+    const matches = classImplementation.children.filter((child) => (
+      child
+      && child.objectType === "METHOD"
+      && String(getFirstValue(child.values, "name") || "").toUpperCase() === methodNameUpper
+    ));
+    return matches.length === 1 ? matches[0] : null;
   }
 
   function classifyClassBlock(raw) {
@@ -4127,6 +4546,19 @@
     }
   }
 
+  function addTypeComponentDecl(declByScope, scopeId, name, declInfo) {
+    const normalized = normalizeIdentifierCandidate(name);
+    if (!normalized) {
+      return;
+    }
+    ensureScopeMap(declByScope, scopeId);
+    const map = declByScope.get(scopeId);
+    const key = `TYPE_COMPONENT:${normalized.toUpperCase()}`;
+    if (!map.has(key)) {
+      map.set(key, declInfo);
+    }
+  }
+
   function getDeclarationScopeId(obj, idToObject, procedureBlocks, classBlocks) {
     if (!obj) {
       return 0;
@@ -4146,7 +4578,7 @@
       if (current.objectType === "FORM" || current.objectType === "METHOD") {
         return current.id || 0;
       }
-      current = current.parent ? idToObject.get(current.parent) : null;
+      current = current.parent && idToObject ? idToObject.get(current.parent) : null;
     }
     return 0;
   }
@@ -4161,6 +4593,102 @@
       return cls.id || 0;
     }
     return 0;
+  }
+
+  function getLexicalScopeForLine(lineStart, allObjects) {
+    const line = Number(lineStart || 0);
+    const idToObject = new Map((allObjects || []).filter((obj) => obj && obj.id).map((obj) => [obj.id, obj]));
+    const candidates = (allObjects || [])
+      .filter((obj) => obj && obj.id && obj.block && obj.block.lineEnd)
+      .filter((obj) => line >= Number(obj.lineStart || 0) && line <= Number(obj.block.lineEnd || 0))
+      .sort((left, right) => Number(left.block.lineEnd || 0) - Number(left.lineStart || 0) - (Number(right.block.lineEnd || 0) - Number(right.lineStart || 0)));
+    const blockScope = candidates[0] || null;
+    const branchScope = findLexicalBranchForLine(line, allObjects, idToObject);
+    const branchContainer = branchScope && branchScope.parent ? idToObject.get(branchScope.parent) : null;
+    const scope = branchScope && (!blockScope || blockScope === branchScope || blockScope === branchContainer)
+      ? branchScope
+      : blockScope;
+    const path = scope ? getLexicalScopePath(scope, idToObject, branchScope) : "GLOBAL";
+    return {
+      id: scope ? scope.id : 0,
+      key: scope ? `BLOCK:${scope.id}` : "GLOBAL",
+      path
+    };
+  }
+
+  function findLexicalBranchForLine(line, allObjects, idToObject) {
+    const candidates = [];
+    for (const obj of allObjects || []) {
+      if (!obj || !obj.id || !["ELSEIF", "ELSE", "WHEN"].includes(obj.objectType) || Number(obj.lineStart || 0) > line) {
+        continue;
+      }
+      if (obj.objectType === "ELSE") {
+        if (obj.block && obj.block.lineEnd && line <= Number(obj.block.lineEnd)) {
+          candidates.push(obj);
+        }
+        continue;
+      }
+      const container = obj.parent ? idToObject.get(obj.parent) : null;
+      if (container && container.block && container.block.lineEnd && line <= Number(container.block.lineEnd)) {
+        candidates.push(obj);
+      }
+    }
+    candidates.sort((left, right) => Number(right.lineStart || 0) - Number(left.lineStart || 0));
+    return candidates[0] || null;
+  }
+
+  function getLexicalScopePath(obj, idToObject, branchScope) {
+    return getLexicalScopeNodesForLine(obj.lineStart, Array.from(idToObject.values()), idToObject, obj, branchScope)
+      .slice()
+      .reverse()
+      .map((node) => `${node.objectType}:${node.id}`)
+      .join(">");
+  }
+
+  function getLexicalScopeNodesForLine(lineStart, allObjects, idToObject, knownScope, knownBranch) {
+    const line = Number(lineStart || 0);
+    const scope = knownScope || (() => {
+      const info = getLexicalScopeForLine(line, allObjects);
+      return info.id ? idToObject.get(info.id) : null;
+    })();
+    const branch = knownBranch || findLexicalBranchForLine(line, allObjects, idToObject);
+    const nodes = [];
+    if (scope) {
+      nodes.push(scope);
+    }
+    if (branch && (!scope || branch.id !== scope.id)) {
+      nodes.push(branch);
+    }
+
+    const branchContainer = branch && branch.parent ? idToObject.get(branch.parent) : null;
+    let current = scope && scope.parent ? idToObject.get(scope.parent) : null;
+    if (scope === branch) {
+      current = branchContainer;
+    }
+    while (current) {
+      if (current === branchContainer && branch && ["ELSEIF", "WHEN"].includes(branch.objectType)) {
+        current = current.parent ? idToObject.get(current.parent) : null;
+        continue;
+      }
+      if (current.id && current.block && !nodes.some((node) => node.id === current.id)) {
+        nodes.push(current);
+      }
+      current = current.parent ? idToObject.get(current.parent) : null;
+    }
+    return nodes;
+  }
+
+  function getLexicalScopeKeysForObject(obj, idToObject) {
+    const allObjects = idToObject ? Array.from(idToObject.values()) : [];
+    const keys = [];
+    const scopeInfo = getLexicalScopeForLine(obj && obj.lineStart, allObjects);
+    const scope = scopeInfo.id ? idToObject.get(scopeInfo.id) : null;
+    const branch = findLexicalBranchForLine(Number(obj && obj.lineStart || 0), allObjects, idToObject);
+    for (const node of getLexicalScopeNodesForLine(obj && obj.lineStart, allObjects, idToObject, scope, branch)) {
+      keys.push(`BLOCK:${node.id}`);
+    }
+    keys.push("GLOBAL");
+    return keys;
   }
 
   function findInnermostBlock(line, blocks) {
@@ -4501,26 +5029,96 @@
       }
     }
 
-    for (const obj of allObjects || []) {
-      if (!obj || !obj.extras) {
-        continue;
-      }
+  }
 
-      if (obj.extras.callFunction) {
-        for (const sectionName of ["exporting", "importing", "changing", "tables", "exceptions"]) {
-          const list = Array.isArray(obj.extras.callFunction[sectionName]) ? obj.extras.callFunction[sectionName] : [];
-          for (const entry of list) {
-            entry.originDecls = Array.from(originsFromValueDecl(entry.valueDecl).values());
+  function attachLocalMethodOriginDecls({ allObjects, classInfo }) {
+    if (!classInfo || !classInfo.methodParamsByClassAndName) {
+      return;
+    }
+
+    const methodOrigins = new Map();
+    for (const methodEntry of classInfo.methodParamsByClassAndName.values()) {
+      for (const nameUpper of methodEntry.paramsByNameUpper.keys()) {
+        methodOrigins.set(`${methodEntry.signatureId}:${nameUpper}`, new Map());
+      }
+    }
+
+    function originsFromDecl(decl) {
+      if (!decl) {
+        return new Map();
+      }
+      if (decl.objectType === "METHOD_PARAM" && decl.id) {
+        return new Map(methodOrigins.get(`${decl.id}:${String(decl.name || "").toUpperCase()}`) || []);
+      }
+      const key = declIdentityKey(decl);
+      return key ? new Map([[key, decl]]) : new Map();
+    }
+
+    function addOrigins(target, source) {
+      let changed = false;
+      for (const [key, decl] of source.entries()) {
+        if (!target.has(key)) {
+          target.set(key, decl);
+          changed = true;
+        }
+      }
+      return changed;
+    }
+
+    const calls = (allObjects || []).filter((obj) => (
+      obj && obj.extras && obj.extras.callMethod && obj.extras.callMethod.localTarget
+    ));
+    const formalSectionForCallSection = {
+      exporting: "IMPORTING",
+      importing: "EXPORTING",
+      changing: "CHANGING",
+      receiving: "RETURNING"
+    };
+
+    for (let iteration = 0; iteration < 50; iteration += 1) {
+      let changed = false;
+      for (const callObj of calls) {
+        const call = callObj.extras.callMethod;
+        const target = call.localTarget;
+        const methodEntry = classInfo.methodParamsByClassAndName.get(`${String(target.className).toUpperCase()}:${String(target.methodName).toUpperCase()}`);
+        if (!methodEntry) {
+          continue;
+        }
+        for (const [callSection, formalSection] of Object.entries(formalSectionForCallSection)) {
+          const actuals = Array.isArray(call[callSection]) ? call[callSection] : [];
+          const formals = Array.from(methodEntry.paramsByNameUpper.values())
+            .filter((formal) => String(formal.section || "").toUpperCase() === formalSection);
+          const formalsByNameUpper = new Map(formals.map((formal) => [String(formal.name || "").toUpperCase(), formal]));
+          for (const actual of actuals) {
+            const actualNameUpper = String(actual && actual.name || "").toUpperCase();
+            const formal = formalsByNameUpper.get(actualNameUpper) || (formals.length === 1 ? formals[0] : null);
+            if (!formal) {
+              continue;
+            }
+            const originMap = methodOrigins.get(`${methodEntry.signatureId}:${String(formal.name).toUpperCase()}`);
+            if (actual && originMap && addOrigins(originMap, originsFromDecl(actual.valueDecl))) {
+              changed = true;
+            }
           }
         }
       }
+      if (!changed) {
+        break;
+      }
+    }
 
-      if (obj.extras.callMethod) {
-        for (const sectionName of ["exporting", "importing", "changing", "receiving", "exceptions"]) {
-          const list = Array.isArray(obj.extras.callMethod[sectionName]) ? obj.extras.callMethod[sectionName] : [];
-          for (const entry of list) {
-            entry.originDecls = Array.from(originsFromValueDecl(entry.valueDecl).values());
-          }
+    for (const methodEntry of classInfo.methodParamsByClassAndName.values()) {
+      for (const [nameUpper, paramDecl] of methodEntry.paramsByNameUpper.entries()) {
+        const originMap = methodOrigins.get(`${methodEntry.signatureId}:${nameUpper}`);
+        paramDecl.originDecls = originMap ? Array.from(originMap.values()) : [];
+      }
+    }
+
+    for (const callObj of calls) {
+      const call = callObj.extras.callMethod;
+      for (const section of ["exporting", "importing", "changing", "receiving"]) {
+        for (const actual of Array.isArray(call[section]) ? call[section] : []) {
+          actual.originDecls = Array.from(originsFromDecl(actual.valueDecl).values());
         }
       }
     }
@@ -4575,7 +5173,7 @@
     return "";
   }
 
-  function buildResolveContext(obj, idToObject, declByScope, classInfo) {
+  function buildResolveContext(obj, idToObject, declByScope, classInfo, inlineDeclsByScopeKey) {
     const procId = getProcedureScopeId(obj, idToObject);
     const methodBlock = findAncestor(obj, idToObject, "METHOD");
     const classBlock = findAncestor(obj, idToObject, "CLASS");
@@ -4597,6 +5195,9 @@
       methodNameUpper,
       classDefId: classDef ? classDef.id : 0,
       declByScope,
+      inlineDeclsByScopeKey,
+      idToObject,
+      classInfo,
       methodParamsByNameUpper: methodParamsEntry ? methodParamsEntry.paramsByNameUpper : null
     };
   }
@@ -4818,6 +5419,78 @@
         entry.valueDecl = resolveDecl(ref, context);
       }
     }
+    annotateLocalCallMethodTarget(callMethod, context);
+  }
+
+  function annotateLocalCallMethodTarget(callMethod, context) {
+    if (!callMethod || !context || !context.classInfo) {
+      return;
+    }
+    const target = String(callMethod.target || "").trim();
+    const staticMatch = target.match(/^([A-Za-z_][A-Za-z0-9_]*)=>([A-Za-z_][A-Za-z0-9_]*)$/);
+    if (staticMatch) {
+      const classNameUpper = staticMatch[1].toUpperCase();
+      const methodNameUpper = staticMatch[2].toUpperCase();
+      const classEntry = context.classInfo.byName.get(classNameUpper);
+      const methodEntry = context.classInfo.methodParamsByClassAndName.get(`${classNameUpper}:${methodNameUpper}`);
+      if (classEntry && classEntry.definition && methodEntry && methodEntry.methodKind === "STATIC") {
+        setLocalCallMethodTarget(callMethod, methodEntry);
+      }
+      return;
+    }
+
+    const instanceMatch = target.match(/^([A-Za-z_][A-Za-z0-9_]*)->([A-Za-z_][A-Za-z0-9_]*)$/);
+    if (!instanceMatch || instanceMatch[1].toUpperCase() === "SUPER") {
+      return;
+    }
+    const receiverName = instanceMatch[1];
+    const methodNameUpper = instanceMatch[2].toUpperCase();
+    let classNameUpper = "";
+    let receiverTypeKnown = false;
+
+    if (receiverName.toUpperCase() === "ME") {
+      classNameUpper = context.classNameUpper || "";
+      receiverTypeKnown = true;
+    } else {
+      const receiverDecl = resolveDecl(receiverName, context);
+      const receiverType = getReferenceTypeNameFromDecl(receiverDecl);
+      if (receiverType) {
+        classNameUpper = receiverType.toUpperCase();
+        receiverTypeKnown = true;
+      }
+    }
+
+    let methodEntry = classNameUpper
+      ? context.classInfo.methodParamsByClassAndName.get(`${classNameUpper}:${methodNameUpper}`)
+      : null;
+    if (methodEntry && methodEntry.methodKind !== "INSTANCE") {
+      methodEntry = null;
+    }
+    if (!methodEntry && !receiverTypeKnown) {
+      const candidates = (context.classInfo.methodCandidates || [])
+        .filter((candidate) => candidate.methodKind === "INSTANCE" && candidate.methodNameUpper === methodNameUpper);
+      methodEntry = candidates.length === 1 ? candidates[0] : null;
+    }
+    if (methodEntry) {
+      setLocalCallMethodTarget(callMethod, methodEntry);
+    }
+  }
+
+  function getReferenceTypeNameFromDecl(decl) {
+    const match = String(decl && decl.raw || "").match(/\b(?:TYPE|LIKE)\s+REF\s+TO\s+([A-Za-z_][A-Za-z0-9_]*)/i);
+    return match ? match[1] : "";
+  }
+
+  function setLocalCallMethodTarget(callMethod, methodEntry) {
+    if (!methodEntry || !methodEntry.implementationId) {
+      return;
+    }
+    callMethod.localTarget = {
+      className: methodEntry.className,
+      methodName: methodEntry.methodName,
+      signatureId: methodEntry.signatureId || null,
+      implementationId: methodEntry.implementationId || null
+    };
   }
 
   function annotatePerformCallExtras(performCall, context) {
@@ -4967,6 +5640,15 @@
       return null;
     }
     const upper = normalized.toUpperCase();
+
+    const inlineScopeKeys = getLexicalScopeKeysForObject(context.obj, context.idToObject);
+    for (const scopeKey of inlineScopeKeys) {
+      const inlineScopeMap = context.inlineDeclsByScopeKey && context.inlineDeclsByScopeKey.get(scopeKey);
+      const inlineDecl = inlineScopeMap && inlineScopeMap.get(upper);
+      if (inlineDecl && (!inlineDecl.visibleFromLine || Number(inlineDecl.visibleFromLine) <= Number(context.obj.lineStart || 0))) {
+        return inlineDecl;
+      }
+    }
 
     const procMap = context.procId ? context.declByScope.get(context.procId) : null;
     if (procMap && procMap.has(upper)) {
@@ -6047,7 +6729,8 @@
       }
 
       const valueIndex = index + bestRule.afterTokens.length;
-      if (valueIndex < tokens.length) {
+      const canCaptureFlag = bestRule.capture === "flag";
+      if (canCaptureFlag || valueIndex < tokens.length) {
         const captured = captureValue(tokens, valueIndex, bestRule);
         // Empty rest captures must not win first-slot (e.g. SELECT SINGLE FROM … FIELDS …).
         if (bestRule.capture === "rest" && !String(captured.raw || "").trim()) {
@@ -6239,6 +6922,13 @@
   }
 
   function captureValue(tokens, startIndex, rule) {
+    if (rule.capture === "flag") {
+      const flagValue = rule.flagValue !== undefined && rule.flagValue !== null
+        ? String(rule.flagValue)
+        : "X";
+      return { raw: flagValue, upper: flagValue.toUpperCase() };
+    }
+
     if (rule.capture === "rest") {
       const stopTokens = rule.stopTokensUpper || [];
       const parts = [];
@@ -6929,6 +7619,69 @@
       ]
     },
     {
+      "_sourceFile": "concatenate.json",
+      "object": "CONCATENATE",
+      "match": {
+        "startKeyword": "CONCATENATE"
+      },
+      "keywordLabels": {
+        "CONCATENATE": "stmt",
+        "LINES": "lines",
+        "OF": "of",
+        "INTO": "into",
+        "IN": "in",
+        "CHARACTER": "character",
+        "BYTE": "byte",
+        "MODE": "mode",
+        "SEPARATED": "separated",
+        "BY": "by",
+        "RESPECTING": "respecting",
+        "BLANKS": "blanks"
+      },
+      "keywordPhrases": {
+        "LINES OF": "lines-of",
+        "SEPARATED BY": "separated-by",
+        "IN CHARACTER MODE": "in-character-mode",
+        "IN BYTE MODE": "in-byte-mode",
+        "RESPECTING BLANKS": "respecting-blanks"
+      },
+      "captureRules": [
+        {
+          "after": "CONCATENATE",
+          "name": "sources",
+          "label": "sources",
+          "capture": "rest",
+          "stopTokens": [
+            "INTO",
+            "LINES",
+            "SEPARATED",
+            "IN",
+            "RESPECTING"
+          ]
+        },
+        {
+          "after": "LINES OF",
+          "name": "linesOf",
+          "label": "lines-of"
+        },
+        {
+          "after": "INTO",
+          "name": "into",
+          "label": "into"
+        },
+        {
+          "after": "SEPARATED BY",
+          "name": "separatedBy",
+          "label": "separated-by",
+          "capture": "rest",
+          "stopTokens": [
+            "IN",
+            "RESPECTING"
+          ]
+        }
+      ]
+    },
+    {
       "_sourceFile": "constants.json",
       "object": "CONSTANTS",
       "match": {
@@ -7409,11 +8162,13 @@
         "REFERENCE": "reference",
         "WHERE": "where",
         "FROM": "from",
-        "TO": "to"
+        "TO": "to",
+        "INDEX": "index"
       },
       "keywordPhrases": {
         "LOOP AT": "loop-at",
-        "REFERENCE INTO": "reference-into"
+        "REFERENCE INTO": "reference-into",
+        "FROM INDEX": "from-index"
       },
       "captureRules": [
         {
@@ -7436,6 +8191,11 @@
           "after": "REFERENCE INTO",
           "name": "refInto",
           "label": "reference-into"
+        },
+        {
+          "after": "FROM INDEX",
+          "name": "from",
+          "label": "from"
         },
         {
           "after": "FROM",
@@ -8010,7 +8770,8 @@
             "ASSIGNING",
             "REFERENCE",
             "TRANSPORTING",
-            "BINARY"
+            "BINARY",
+            "COMPARING"
           ]
         },
         {
@@ -8023,7 +8784,8 @@
             "ASSIGNING",
             "REFERENCE",
             "TRANSPORTING",
-            "BINARY"
+            "BINARY",
+            "COMPARING"
           ]
         },
         {
@@ -8040,6 +8802,29 @@
           "after": "REFERENCE INTO",
           "name": "refInto",
           "label": "reference-into"
+        },
+        {
+          "after": "TRANSPORTING NO FIELDS",
+          "name": "transportingNoFields",
+          "label": "transporting-no-fields",
+          "capture": "flag"
+        },
+        {
+          "after": "TRANSPORTING",
+          "name": "transporting",
+          "label": "transporting",
+          "capture": "rest",
+          "stopTokens": [
+            "BINARY",
+            "COMPARING",
+            "WITH"
+          ]
+        },
+        {
+          "after": "BINARY SEARCH",
+          "name": "binarySearch",
+          "label": "binary-search",
+          "capture": "flag"
         }
       ]
     },
@@ -8288,8 +9073,6 @@
           "label": "by",
           "capture": "rest",
           "stopTokens": [
-            "ASCENDING",
-            "DESCENDING",
             "USING"
           ]
         },
@@ -8695,7 +9478,7 @@ const els = {
     templateSelectionAnchorIndex: "",
     selectedDeclKey: "",
     descOverrides: {},
-    descOverridesLegacy: {},
+    typeUsageIndex: new Map(),
     constantInitializers: new Map(),
     activeEdit: null,
     inputLineOffsets: [],
@@ -8736,7 +9519,6 @@ const els = {
   };
 
   const DESC_STORAGE_KEY_V2 = "abap-parser-viewer.declDescOverrides.v2";
-  const DESC_STORAGE_KEY_LEGACY_V1 = "abap-parser-viewer.descOverrides.v1";
   const SETTINGS_STORAGE_KEY_V1 = "abap-parser-viewer.settings.v1";
   const TEMPLATE_CONFIG_STORAGE_KEY_V1 = "abap-parser-viewer.templateConfig.v1";
   const THEME_STORAGE_KEY_V1 = "abap-parser-viewer.theme.v1";
@@ -8763,7 +9545,8 @@ const els = {
     "CLASS-DATA",
     "FIELD-SYMBOLS",
     "FORM_PARAM",
-    "METHOD_PARAM"
+    "METHOD_PARAM",
+    "TYPE_COMPONENT"
   ];
 
   const NAME_CODE_OPTIONS = [
@@ -8790,7 +9573,8 @@ const els = {
       "CLASS-DATA",
       "FIELD-SYMBOLS",
       "FORM_PARAM",
-      "METHOD_PARAM"
+      "METHOD_PARAM",
+      "TYPE_COMPONENT"
     ],
     structDescTemplate: "{{struct}}-{{item}}",
     nameTemplatesByCode: {
@@ -10883,7 +11667,7 @@ const els = {
       DEFAULT: UNIFIED_KEYWORD_ROW_TEMPLATE_V1,
       APPEND: createKeywordDescriptionTemplate(),
       APPEND_LINES_OF: createAppendLinesOfTemplate(),
-      ASSIGNMENT: ASSIGNMENT_ROW_TEMPLATE_V1,
+      ASSIGNMENT: createKeywordDescriptionTemplate(),
       CALL_FUNCTION: createKeywordDescriptionTemplate(),
       CASE: createKeywordDescriptionTemplate(),
       CLEAR: createKeywordDescriptionTemplate(),
@@ -11092,15 +11876,12 @@ const els = {
     return loadStorageObject(DESC_STORAGE_KEY_V2);
   }
 
-  function loadLegacyDescOverrides() {
-    return loadStorageObject(DESC_STORAGE_KEY_LEGACY_V1);
-  }
-
   function saveDescOverrides() {
     try {
       localStorage.setItem(DESC_STORAGE_KEY_V2, JSON.stringify(state.descOverrides || {}));
+      return true;
     } catch {
-      // ignore
+      return false;
     }
   }
 
@@ -11726,7 +12507,6 @@ const els = {
   const runtimeConstants = {
     ...(runtime.constants || {}),
     DESC_STORAGE_KEY_V2,
-    DESC_STORAGE_KEY_LEGACY_V1,
     SETTINGS_STORAGE_KEY_V1,
     TEMPLATE_CONFIG_STORAGE_KEY_V1,
     THEME_STORAGE_KEY_V1,
@@ -11753,7 +12533,6 @@ const els = {
     getValueEntries,
     getFirstValueFromValues,
     loadDescOverrides,
-    loadLegacyDescOverrides,
     saveDescOverrides,
     normalizeSettings,
     loadSettings,
@@ -11792,7 +12571,7 @@ const els = {
   const state = runtime.state;
   const els = runtime.els;
   const constants = runtime.constants || {};
-  const { DESC_STORAGE_KEY_V2, DESC_STORAGE_KEY_LEGACY_V1, SETTINGS_STORAGE_KEY_V1, TEMPLATE_CONFIG_STORAGE_KEY_V1, THEME_STORAGE_KEY_V1, LAYOUT_SPLIT_STORAGE_KEY_V1, LAYOUT_SPLIT_DEFAULT, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX, MOBILE_LAYOUT_QUERY, RENDER_TREE_OPTIONS, DECL_TYPE_OPTIONS, NAME_CODE_OPTIONS, DEFAULT_SETTINGS, TEMPLATE_DEFAULT_CONFIG_V1, SAMPLE_ABAP } = constants;
+  const { DESC_STORAGE_KEY_V2, SETTINGS_STORAGE_KEY_V1, TEMPLATE_CONFIG_STORAGE_KEY_V1, THEME_STORAGE_KEY_V1, LAYOUT_SPLIT_STORAGE_KEY_V1, LAYOUT_SPLIT_DEFAULT, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX, MOBILE_LAYOUT_QUERY, RENDER_TREE_OPTIONS, DECL_TYPE_OPTIONS, NAME_CODE_OPTIONS, DEFAULT_SETTINGS, TEMPLATE_DEFAULT_CONFIG_V1, SAMPLE_ABAP } = constants;
   const getFirstValueFromValues = runtime.requireServiceMethod("runtimeState", "getFirstValueFromValues");
   const stripDeclTemplateAffixes = runtime.requireServiceMethod("descriptions", "stripDeclTemplateAffixes");
   const getEffectiveDeclDesc = runtime.requireServiceMethod("descriptions", "getEffectiveDeclDesc");
@@ -13014,7 +13793,7 @@ function isValueLikeEntryObject(value) {
   const state = runtime.state;
   const els = runtime.els;
   const constants = runtime.constants || {};
-  const { DESC_STORAGE_KEY_V2, DESC_STORAGE_KEY_LEGACY_V1, SETTINGS_STORAGE_KEY_V1, TEMPLATE_CONFIG_STORAGE_KEY_V1, THEME_STORAGE_KEY_V1, LAYOUT_SPLIT_STORAGE_KEY_V1, LAYOUT_SPLIT_DEFAULT, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX, MOBILE_LAYOUT_QUERY, RENDER_TREE_OPTIONS, DECL_TYPE_OPTIONS, NAME_CODE_OPTIONS, DEFAULT_SETTINGS, TEMPLATE_DEFAULT_CONFIG_V1, SAMPLE_ABAP } = constants;
+  const { DESC_STORAGE_KEY_V2, SETTINGS_STORAGE_KEY_V1, TEMPLATE_CONFIG_STORAGE_KEY_V1, THEME_STORAGE_KEY_V1, LAYOUT_SPLIT_STORAGE_KEY_V1, LAYOUT_SPLIT_DEFAULT, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX, MOBILE_LAYOUT_QUERY, RENDER_TREE_OPTIONS, DECL_TYPE_OPTIONS, NAME_CODE_OPTIONS, DEFAULT_SETTINGS, TEMPLATE_DEFAULT_CONFIG_V1, SAMPLE_ABAP } = constants;
   const normalizeId = runtime.requireServiceMethod("runtimeState", "normalizeId");
   const getValueEntries = runtime.requireServiceMethod("runtimeState", "getValueEntries");
   const saveDescOverrides = runtime.requireServiceMethod("runtimeState", "saveDescOverrides");
@@ -13049,6 +13828,10 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
   }
 
   function getDeclCodeDesc(decl) {
+    const linkedTypeComponent = getLinkedTypeComponentDecl(decl);
+    if (linkedTypeComponent) {
+      return getDeclCodeDesc(linkedTypeComponent);
+    }
     const source = getSourceDeclDesc(decl);
     if (source) {
       return source;
@@ -13077,8 +13860,8 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     return wrap;
   }
 
-  const DATA_CATALOG_EXCLUDED_OBJECT_TYPES = new Set(["SYSTEM", "CONDITION", "PATH_DECL"]);
-  const DATA_CATALOG_EXCLUDED_SCOPE_TYPES = new Set(["SYSTEM", "PATH"]);
+  const DATA_CATALOG_EXCLUDED_OBJECT_TYPES = new Set(["CONDITION", "PATH_DECL"]);
+  const DATA_CATALOG_EXCLUDED_SCOPE_TYPES = new Set(["PATH"]);
 
   function isDataCatalogSourceDecl(decl) {
     if (!decl || typeof decl !== "object" || !decl.name || !decl.scopeLabel) {
@@ -13086,6 +13869,9 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     }
     const objectType = String(decl.objectType || "").trim().toUpperCase();
     const scopeType = String(decl.scopeType || "").trim().toUpperCase();
+    if (objectType === "SYSTEM" || scopeType === "SYSTEM") {
+      return true;
+    }
     return !DATA_CATALOG_EXCLUDED_OBJECT_TYPES.has(objectType)
       && !DATA_CATALOG_EXCLUDED_SCOPE_TYPES.has(scopeType);
   }
@@ -13094,17 +13880,71 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     const sourceDecls = state.data && Array.isArray(state.data.decls) ? state.data.decls : [];
     const rows = [];
     const seen = new Set();
-    for (const decl of sourceDecls) {
+    const pushDecl = (decl) => {
       if (!isDataCatalogSourceDecl(decl)) {
-        continue;
+        return;
       }
       const key = getDeclOverrideStorageKey(decl) || stringifyDecl(decl);
       if (!key || seen.has(key)) {
-        continue;
+        return;
       }
       seen.add(key);
       rows.push(decl);
+    };
+
+    for (const decl of sourceDecls) {
+      pushDecl(decl);
     }
+
+    // SYSTEM decls are bound on value entries but not always listed in data.decls.
+    const harvestSystemDecl = (value) => {
+      if (!value || typeof value !== "object") {
+        return;
+      }
+      for (const key of ["decl", "valueDecl", "leftOperandDecl", "rightOperandDecl"]) {
+        const candidate = value[key];
+        if (
+          candidate
+          && typeof candidate === "object"
+          && String(candidate.objectType || "").trim().toUpperCase() === "SYSTEM"
+        ) {
+          pushDecl(candidate);
+        }
+      }
+      if (Array.isArray(value.originDecls)) {
+        for (const origin of value.originDecls) {
+          if (origin && String(origin.objectType || "").trim().toUpperCase() === "SYSTEM") {
+            pushDecl(origin);
+          }
+        }
+      }
+    };
+
+    const walkValueBag = (node) => {
+      if (!node || typeof node !== "object") {
+        return;
+      }
+      if (Array.isArray(node)) {
+        for (const item of node) {
+          walkValueBag(item);
+        }
+        return;
+      }
+      harvestSystemDecl(node);
+      for (const child of Object.values(node)) {
+        if (child && typeof child === "object") {
+          walkValueBag(child);
+        }
+      }
+    };
+
+    const roots = Array.isArray(state.renderObjects) && state.renderObjects.length
+      ? state.renderObjects
+      : (state.data && Array.isArray(state.data.objects) ? state.data.objects : []);
+    for (const root of roots) {
+      walkValueBag(root);
+    }
+
     return rows;
   }
 
@@ -13117,6 +13957,16 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       return String(decl.structObjectType || objectType).trim().toUpperCase();
     }
     return objectType;
+  }
+
+  function getTypeComponentIdentity(decl) {
+    return normalizeKeyToken(decl && decl.typeComponentIdentity);
+  }
+
+  function getTypeUsageEntry(decl) {
+    const identity = getTypeComponentIdentity(decl);
+    const index = state.typeUsageIndex instanceof Map ? state.typeUsageIndex : null;
+    return identity && index ? index.get(identity) || null : null;
   }
 
   function getDataCatalogPerformParamUpper(decl) {
@@ -13167,6 +14017,22 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
   }
 
   function buildDataCatalogTraceModel(decl) {
+    const objectType = normalizeKeyToken(decl && decl.objectType);
+    const typeUsage = getTypeUsageEntry(decl);
+    if (objectType === "TYPE_COMPONENT" && typeUsage) {
+      const instanceCount = Array.isArray(typeUsage.instanceDecls) ? typeUsage.instanceDecls.length : 0;
+      return {
+        editDecl: decl,
+        traceText: `${getDeclTechName(decl) || decl.name} → ${instanceCount} instances`
+      };
+    }
+    if (objectType === "STRUCT_FIELD" && typeUsage && typeUsage.typeComponentDecl) {
+      return {
+        editDecl: decl,
+        traceText: `${getDeclTechName(decl) || decl.name} ← ${getDeclTechName(typeUsage.typeComponentDecl) || typeUsage.typeComponentDecl.name}`
+      };
+    }
+
     const localParamUpper = getDataCatalogPerformParamUpper(decl);
     const scopeType = String(decl && decl.scopeType || "").trim().toUpperCase();
     const scopeName = String(decl && decl.scopeName || "").trim();
@@ -13268,12 +14134,31 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     };
   }
 
+  function getDataCatalogScopeMeta(decl) {
+    const objectType = normalizeKeyToken(decl && decl.objectType);
+    const typeIdentity = normalizeKeyToken(decl && decl.typeIdentity);
+    if (objectType === "TYPE_COMPONENT" && decl && decl.dynamic && typeIdentity.startsWith("EXTERNAL:")) {
+      const typeName = String(decl.typeName || typeIdentity.slice("EXTERNAL:".length) || "").trim();
+      return {
+        scopeLabel: `EXTERNAL:${typeName}`,
+        scopeType: "EXTERNAL",
+        scopeName: typeName
+      };
+    }
+    return {
+      scopeLabel: String(decl && decl.scopeLabel || "").trim(),
+      scopeType: String(decl && decl.scopeType || "").trim().toUpperCase(),
+      scopeName: String(decl && decl.scopeName || "").trim()
+    };
+  }
+
   function buildDataCatalogRowModel(decl, settings) {
     const traceModel = buildDataCatalogTraceModel(decl);
     const descriptionModel = buildDataCatalogDescriptionModel(traceModel.editDecl, settings);
     const techName = String(getDeclTechName(decl) || decl.name || "").trim();
     const objectType = String(decl.objectType || "").trim().toUpperCase();
-    const scopeLabel = String(decl.scopeLabel || "").trim();
+    const scopeMeta = getDataCatalogScopeMeta(decl);
+    const scopeLabel = scopeMeta.scopeLabel;
     const traceText = traceModel.traceText || (getDataCatalogPerformParamUpper(decl) ? "No root binding" : "");
     return {
       decl,
@@ -13282,8 +14167,8 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       objectType,
       filterType: getDataCatalogFilterType(decl),
       scopeLabel,
-      scopeType: String(decl.scopeType || "").trim().toUpperCase(),
-      scopeName: String(decl.scopeName || "").trim(),
+      scopeType: scopeMeta.scopeType,
+      scopeName: scopeMeta.scopeName,
       techName,
       traceText,
       descriptionModel,
@@ -13313,6 +14198,9 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     }
     if (scopeType === "CLASS") {
       return `Class: ${scopeName || scopeLabel}`;
+    }
+    if (scopeType === "EXTERNAL") {
+      return `External type: ${scopeName || scopeLabel.replace(/^EXTERNAL:/i, "")}`;
     }
     return scopeLabel || "Other scope";
   }
@@ -13610,22 +14498,6 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     return String(value || "").trim().toUpperCase();
   }
 
-  function getDeclFallbackKey(decl) {
-    if (!decl || typeof decl !== "object") {
-      return "";
-    }
-
-    const name = normalizeKeyToken(decl.name);
-    if (!name) {
-      return "";
-    }
-
-    const objectType = normalizeKeyToken(decl.objectType);
-    const file = String(decl.file || "").trim();
-    const line = decl.lineStart ? String(decl.lineStart) : "";
-    return `FALLBACK:${objectType}|${name}|${file}|${line}`;
-  }
-
   function getDeclKey(decl) {
     if (!decl || typeof decl !== "object") {
       return "";
@@ -13641,19 +14513,25 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     return `${scope}:${name}`;
   }
 
-  function getLegacyDeclKey(decl) {
+  function getInlineDeclOverrideKey(decl) {
     if (!decl || typeof decl !== "object") {
       return "";
     }
-
-    const type = normalizeKeyToken(decl.objectType);
     const name = normalizeKeyToken(decl.name);
-
-    if (!type || !name) {
+    const scopePath = normalizeKeyToken(decl.declScopePath);
+    const visibleFromLine = Number(decl.visibleFromLine);
+    if (!name || !scopePath || !Number.isFinite(visibleFromLine) || visibleFromLine <= 0) {
       return "";
     }
+    return `INLINE:${encodeURIComponent(`${scopePath}|${Math.floor(visibleFromLine)}|${name}`)}`;
+  }
 
-    return `${type}:NAME:${name}`;
+  function getTypeComponentOverrideKey(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+    const typeComponentIdentity = getTypeComponentIdentity(decl);
+    return typeComponentIdentity ? `TYPE_COMPONENT:${typeComponentIdentity}` : "";
   }
 
   function isPathDeclForOverrideKey(decl) {
@@ -13756,10 +14634,16 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
         pushKey(key);
       }
     } else {
-      pushKey(getDeclKey(decl));
+      const objectType = normalizeKeyToken(decl && decl.objectType);
+      const lexicalOverrideKey = getInlineDeclOverrideKey(decl);
+      if (lexicalOverrideKey) {
+        pushKey(lexicalOverrideKey);
+      } else if (objectType === "TYPE_COMPONENT") {
+        pushKey(getTypeComponentOverrideKey(decl));
+      } else {
+        pushKey(getDeclKey(decl));
+      }
     }
-    pushKey(getLegacyDeclKey(decl));
-    pushKey(getDeclFallbackKey(decl));
     return keys;
   }
 
@@ -13788,9 +14672,12 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     const objectType = String(decl.objectType || "").trim().toUpperCase();
     let paramName = "";
     let fieldPath = "";
-    if (objectType === "FORM_PARAM") {
+    if (objectType === "FORM_PARAM" || objectType === "METHOD_PARAM") {
       paramName = String(decl.name || "").trim().toUpperCase();
-    } else if (objectType === "STRUCT_FIELD" && String(decl.structObjectType || "").trim().toUpperCase() === "FORM_PARAM") {
+    } else if (
+      objectType === "STRUCT_FIELD"
+      && ["FORM_PARAM", "METHOD_PARAM"].includes(String(decl.structObjectType || "").trim().toUpperCase())
+    ) {
       paramName = String(decl.structName || "").trim().toUpperCase();
       fieldPath = String(decl.fieldPath || "").trim().toUpperCase();
     }
@@ -13810,7 +14697,13 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     if (!sourceScope || !formalParamKey) {
       return "";
     }
-    return `PERFORM_CHAIN:${sourceScope}:${formalParamKey}`;
+    const bindingContext = ownerContext && ownerContext.__abapPerformTraceBinding;
+    const chainKind = normalizeKeyToken(
+      (ownerContext && ownerContext.chainKind)
+      || (bindingContext && bindingContext.chainKind)
+    );
+    const chainPrefix = chainKind === "METHOD" ? "METHOD_CHAIN" : "PERFORM_CHAIN";
+    return `${chainPrefix}:${sourceScope}:${formalParamKey}`;
   }
 
   function cloneDeclWithPerformChainOverride(decl, ownerContext, formalDecl) {
@@ -13821,6 +14714,7 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     if (!chainKey) {
       return decl;
     }
+    registerTypeUsageChainKey(decl, chainKey);
     const clone = { ...decl };
     try {
       Object.defineProperty(clone, "__abapPerformChainOverrideKey", {
@@ -13870,11 +14764,6 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       if (key && Object.prototype.hasOwnProperty.call(state.descOverrides || {}, key)) {
         return normalizeDescOverrideEntry(state.descOverrides[key]);
       }
-    }
-
-    const legacyKey = getLegacyDeclKey(decl);
-    if (legacyKey && Object.prototype.hasOwnProperty.call(state.descOverridesLegacy || {}, legacyKey)) {
-      return { text: String(state.descOverridesLegacy[legacyKey] || ""), noNormalize: false };
     }
 
     return { text: "", noNormalize: false };
@@ -13929,7 +14818,11 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     }
 
     const globalMap = registry.customGlobal && typeof registry.customGlobal === "object" ? registry.customGlobal : null;
-    if (globalMap && Object.prototype.hasOwnProperty.call(globalMap, nameUpper)) {
+    const isTrueGlobalDecl = scopeLabel === "GLOBAL"
+      && scopeType === "GLOBAL"
+      && objectType !== "INLINE"
+      && normalizeKeyToken(decl.structObjectType) !== "INLINE";
+    if (isTrueGlobalDecl && globalMap && Object.prototype.hasOwnProperty.call(globalMap, nameUpper)) {
       return String(globalMap[nameUpper] || "");
     }
 
@@ -14014,6 +14907,14 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       return override;
     }
 
+    const linkedTypeComponentDesc = getLinkedTypeComponentItemDesc(decl, false);
+    if (linkedTypeComponentDesc) {
+      return linkedTypeComponentDesc;
+    }
+    if (getLinkedTypeComponentDecl(decl)) {
+      return getStructFieldItemTechnicalId(decl);
+    }
+
     const source = getSourceDeclDesc(decl);
     if (source) {
       return source;
@@ -14039,6 +14940,14 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       return normalizeDeclDescText(decl, overrideText);
     }
 
+    const linkedTypeComponentDesc = getLinkedTypeComponentItemDesc(decl, normalizeEnabled);
+    if (linkedTypeComponentDesc) {
+      return linkedTypeComponentDesc;
+    }
+    if (getLinkedTypeComponentDecl(decl)) {
+      return getStructFieldItemTechnicalId(decl);
+    }
+
     const source = getSourceDeclDesc(decl);
     if (source) {
       return normalizeEnabled ? normalizeDeclDescText(decl, source) : source;
@@ -14050,6 +14959,252 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     }
 
     return String(getDeclTechName(decl) || "").trim();
+  }
+
+  function getLinkedTypeComponentDecl(decl) {
+    if (normalizeKeyToken(decl && decl.objectType) !== "STRUCT_FIELD") {
+      return null;
+    }
+    const typeUsage = getTypeUsageEntry(decl);
+    return typeUsage && typeUsage.typeComponentDecl ? typeUsage.typeComponentDecl : null;
+  }
+
+  function getStructFieldItemTechnicalId(decl) {
+    return String(decl && decl.fieldPath || getDeclTechName(decl) || "").trim();
+  }
+
+  function getLinkedTypeComponentItemDesc(decl, normalizeOutput) {
+    const linkedTypeComponent = getLinkedTypeComponentDecl(decl);
+    if (!linkedTypeComponent) {
+      return "";
+    }
+
+    const overrideEntry = getDeclOverrideEntry(linkedTypeComponent);
+    const overrideText = overrideEntry.text ? String(overrideEntry.text) : "";
+    if (overrideText) {
+      if (!normalizeOutput || overrideEntry.noNormalize) {
+        return overrideText;
+      }
+      return normalizeDeclDescText(linkedTypeComponent, overrideText);
+    }
+
+    const codeDesc = getDeclCodeDesc(linkedTypeComponent);
+    if (!codeDesc) {
+      return "";
+    }
+    return normalizeOutput ? normalizeDeclDescText(linkedTypeComponent, codeDesc) : codeDesc;
+  }
+
+  function rebuildTypeUsageIndex(data) {
+    const index = new Map();
+    const decls = data && Array.isArray(data.decls) ? data.decls : [];
+    const ensureEntry = (typeComponentIdentity) => {
+      const identity = normalizeKeyToken(typeComponentIdentity);
+      if (!identity) {
+        return null;
+      }
+      if (!index.has(identity)) {
+        index.set(identity, {
+          typeComponentDecl: null,
+          instanceDecls: [],
+          chainKeysByInstanceKey: new Map()
+        });
+      }
+      return index.get(identity);
+    };
+
+    for (const decl of decls) {
+      if (!decl || typeof decl !== "object") {
+        continue;
+      }
+      const identity = getTypeComponentIdentity(decl);
+      const entry = ensureEntry(identity);
+      if (!entry) {
+        continue;
+      }
+      const objectType = normalizeKeyToken(decl.objectType);
+      if (objectType === "TYPE_COMPONENT") {
+        entry.typeComponentDecl = decl;
+        continue;
+      }
+      if (objectType !== "STRUCT_FIELD") {
+        continue;
+      }
+      const structObjectType = normalizeKeyToken(decl.structObjectType);
+      if (structObjectType !== "DATA" && structObjectType !== "FIELD-SYMBOLS") {
+        continue;
+      }
+      const instanceKey = getDeclOverrideStorageKey(decl) || `${identity}:${entry.instanceDecls.length}`;
+      const alreadyAdded = entry.instanceDecls.some((instanceDecl) => (
+        getDeclOverrideStorageKey(instanceDecl) === instanceKey
+      ));
+      if (!alreadyAdded) {
+        entry.instanceDecls.push(decl);
+      }
+    }
+
+    state.typeUsageIndex = index;
+    return index;
+  }
+
+  function registerTypeUsageChainKey(decl, chainKey) {
+    const key = String(chainKey || "").trim();
+    if (!key || !/^(?:PERFORM|METHOD)_CHAIN:/.test(key)) {
+      return;
+    }
+    const typeUsage = getTypeUsageEntry(decl);
+    if (!typeUsage || !(typeUsage.chainKeysByInstanceKey instanceof Map)) {
+      return;
+    }
+    const structObjectType = normalizeKeyToken(decl && decl.structObjectType);
+    if (structObjectType !== "DATA" && structObjectType !== "FIELD-SYMBOLS") {
+      return;
+    }
+    const unscopedDecl = { ...decl };
+    const instanceKey = getDeclOverrideStorageKey(unscopedDecl);
+    if (!instanceKey) {
+      return;
+    }
+    if (!typeUsage.chainKeysByInstanceKey.has(instanceKey)) {
+      typeUsage.chainKeysByInstanceKey.set(instanceKey, new Set());
+    }
+    typeUsage.chainKeysByInstanceKey.get(instanceKey).add(key);
+  }
+
+  function getStructFieldRootOverrideKey(decl) {
+    if (normalizeKeyToken(decl && decl.objectType) !== "STRUCT_FIELD") {
+      return getDeclOverrideStorageKey(decl);
+    }
+    const structId = decl && decl.structId;
+    if (structId !== undefined && structId !== null && state.data && Array.isArray(state.data.decls)) {
+      const rootDecl = state.data.decls.find((candidate) => (
+        candidate
+        && candidate.id === structId
+        && normalizeKeyToken(candidate.objectType) !== "STRUCT_FIELD"
+      ));
+      if (rootDecl) {
+        return getDeclOverrideStorageKey(rootDecl);
+      }
+    }
+    return getDeclOverrideStorageKey(buildStructDeclFromFieldDecl(decl));
+  }
+
+  function getFormalParamNameUpper(decl) {
+    if (!decl || typeof decl !== "object") {
+      return "";
+    }
+    const objectType = normalizeKeyToken(decl.objectType);
+    if (objectType === "FORM_PARAM" || objectType === "METHOD_PARAM") {
+      return normalizeKeyToken(decl.name);
+    }
+    if (
+      objectType === "STRUCT_FIELD"
+      && ["FORM_PARAM", "METHOD_PARAM"].includes(normalizeKeyToken(decl.structObjectType))
+    ) {
+      return normalizeKeyToken(decl.structName);
+    }
+    return "";
+  }
+
+  function collectCandidateFormalStructFields(candidate, registry) {
+    if (!candidate || !registry) {
+      return [];
+    }
+    let targetNode = null;
+    if (normalizeKeyToken(candidate.sourceKind) === "PERFORM") {
+      targetNode = registry.formsByNameUpper instanceof Map
+        ? registry.formsByNameUpper.get(candidate.formNameUpper) || null
+        : null;
+    } else if (normalizeKeyToken(candidate.sourceKind) === "METHOD" && registry.methodsByImplementationId instanceof Map) {
+      targetNode = Array.from(registry.methodsByImplementationId.values())
+        .find((node) => String(node && node.id || "") === String(candidate.formId || "")) || null;
+    }
+    if (!targetNode || typeof targetNode !== "object") {
+      return [];
+    }
+
+    const fields = [];
+    const seen = new Set();
+    const addField = (decl) => {
+      if (
+        normalizeKeyToken(decl && decl.objectType) !== "STRUCT_FIELD"
+        || !["FORM_PARAM", "METHOD_PARAM"].includes(normalizeKeyToken(decl && decl.structObjectType))
+      ) {
+        return;
+      }
+      const formalKey = getPerformFormalParamKey(decl);
+      if (formalKey && !seen.has(formalKey)) {
+        seen.add(formalKey);
+        fields.push(decl);
+      }
+    };
+    const visit = (node) => {
+      if (!node || typeof node !== "object") {
+        return;
+      }
+      const values = node.values && typeof node.values === "object" ? node.values : {};
+      for (const entryOrList of Object.values(values)) {
+        const entries = Array.isArray(entryOrList) ? entryOrList : [entryOrList];
+        for (const entry of entries) {
+          addField(entry && entry.decl);
+        }
+      }
+      for (const child of Array.isArray(node.children) ? node.children : []) {
+        visit(child);
+      }
+    };
+    visit(targetNode);
+    return fields;
+  }
+
+  function registerTypeUsageChainKeysForAllCandidates(typeUsage) {
+    if (!typeUsage || !Array.isArray(typeUsage.instanceDecls)) {
+      return;
+    }
+    const registry = state.performSourceRegistry;
+    const candidates = registry && registry.candidateByKey instanceof Map
+      ? Array.from(registry.candidateByKey.values())
+      : [];
+    if (!candidates.length) {
+      return;
+    }
+
+    const typeComponentFieldPath = normalizeKeyToken(
+      typeUsage.typeComponentDecl && typeUsage.typeComponentDecl.fieldPath
+    );
+    if (!typeComponentFieldPath) {
+      return;
+    }
+
+    for (const candidate of candidates) {
+      const bindingContext = candidate && candidate.bindingContext;
+      const formalFields = collectCandidateFormalStructFields(candidate, registry);
+      for (const formalField of formalFields) {
+        if (normalizeKeyToken(formalField.fieldPath) !== typeComponentFieldPath) {
+          continue;
+        }
+        const formalParamUpper = getFormalParamNameUpper(formalField);
+        if (!formalParamUpper) {
+          continue;
+        }
+        const tracedDecls = bindingContext && bindingContext.byParamUpper instanceof Map
+          ? bindingContext.byParamUpper.get(formalParamUpper)
+          : null;
+        const chainKey = buildPerformChainOverrideKey(bindingContext, formalField);
+        if (!chainKey || !Array.isArray(tracedDecls) || !tracedDecls.length) {
+          continue;
+        }
+        const tracedRootKeys = new Set(tracedDecls
+          .map((decl) => getStructFieldRootOverrideKey(decl))
+          .filter(Boolean));
+        for (const instanceDecl of typeUsage.instanceDecls) {
+          const instanceRootKey = getStructFieldRootOverrideKey(instanceDecl);
+          if (instanceRootKey && tracedRootKeys.has(instanceRootKey)) {
+            registerTypeUsageChainKey(instanceDecl, chainKey);
+          }
+        }
+      }
+    }
   }
 
   function rebuildConstantInitializerIndex(data) {
@@ -14098,6 +15253,14 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       return overrideText;
     }
 
+    const linkedTypeComponentDesc = getLinkedTypeComponentItemDesc(decl, false);
+    if (linkedTypeComponentDesc) {
+      return linkedTypeComponentDesc;
+    }
+    if (getLinkedTypeComponentDecl(decl)) {
+      return getStructFieldItemTechnicalId(decl);
+    }
+
     const constantInitializer = getConstantInitializer(decl);
     if (constantInitializer) {
       return constantInitializer;
@@ -14141,11 +15304,14 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       file: decl.file || "",
       lineStart: decl.structLineStart || null,
       raw: decl.structRaw || "",
-      comment: decl.structComment || decl.structTypeComment || "",
+      comment: decl.structComment || "",
       scopeId: decl.scopeId || 0,
       scopeLabel: decl.scopeLabel || "",
       scopeType: decl.scopeType || "",
-      scopeName: decl.scopeName || ""
+      scopeName: decl.scopeName || "",
+      declScopeId: decl.declScopeId == null ? null : decl.declScopeId,
+      declScopePath: String(decl.declScopePath || ""),
+      visibleFromLine: Number(decl.visibleFromLine || 0) || null
     };
   }
 
@@ -14294,7 +15460,97 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     return String(formatStructFieldFinalDesc(decl) || "").trim();
   }
 
-  function openEditModal({ mode, key, structKey, itemKey, label, hint, initialValue, structValue, itemValue, skipNormalize }) {
+  function applyDeclDescriptionOverride(options) {
+    const input = options && typeof options === "object" ? options : {};
+    const decl = input.decl;
+    const primaryKey = getDeclOverrideStorageKey(decl);
+    if (!decl || !primaryKey) {
+      return false;
+    }
+
+    if (!state.descOverrides || typeof state.descOverrides !== "object" || Array.isArray(state.descOverrides)) {
+      state.descOverrides = {};
+    }
+
+    const writeKeys = [primaryKey];
+    const purgeKeys = [];
+    const addWriteKey = (value) => {
+      const key = String(value || "").trim();
+      if (key && !writeKeys.includes(key)) {
+        writeKeys.push(key);
+      }
+    };
+    const addPurgeKey = (value) => {
+      const key = String(value || "").trim();
+      if (key && !writeKeys.includes(key) && !purgeKeys.includes(key)) {
+        purgeKeys.push(key);
+      }
+    };
+
+    if (primaryKey.startsWith("PATH:")) {
+      for (const aliasKey of getDeclOverrideLookupKeys(decl).slice(1)) {
+        addPurgeKey(aliasKey);
+      }
+    }
+
+    if (normalizeKeyToken(decl.objectType) === "TYPE_COMPONENT") {
+      const typeUsage = getTypeUsageEntry(decl);
+      registerTypeUsageChainKeysForAllCandidates(typeUsage);
+      const instances = typeUsage && Array.isArray(typeUsage.instanceDecls) ? typeUsage.instanceDecls : [];
+      for (const instanceDecl of instances) {
+        const instanceKey = getDeclOverrideStorageKey(instanceDecl);
+        addWriteKey(instanceKey);
+        const chainKeys = typeUsage.chainKeysByInstanceKey instanceof Map
+          ? typeUsage.chainKeysByInstanceKey.get(instanceKey)
+          : null;
+        if (chainKeys instanceof Set) {
+          for (const chainKey of chainKeys) {
+            addWriteKey(chainKey);
+          }
+        }
+      }
+    }
+
+    const affectedKeys = writeKeys.concat(purgeKeys);
+    const snapshot = new Map();
+    for (const key of affectedKeys) {
+      snapshot.set(key, {
+        exists: Object.prototype.hasOwnProperty.call(state.descOverrides, key),
+        value: state.descOverrides[key]
+      });
+    }
+
+    const clear = Boolean(input.clear);
+    const skipNormalize = Boolean(input.skipNormalize);
+    const trimmedText = clear ? "" : String(input.text || "").trim();
+    const storedText = skipNormalize ? trimmedText : stripDeclCategoryPrefix(trimmedText);
+    for (const key of writeKeys) {
+      if (!storedText) {
+        delete state.descOverrides[key];
+      } else {
+        state.descOverrides[key] = skipNormalize ? { text: storedText, noNormalize: true } : storedText;
+      }
+    }
+    for (const key of purgeKeys) {
+      delete state.descOverrides[key];
+    }
+
+    if (!saveDescOverrides()) {
+      for (const [key, previous] of snapshot.entries()) {
+        if (previous.exists) {
+          state.descOverrides[key] = previous.value;
+        } else {
+          delete state.descOverrides[key];
+        }
+      }
+      return false;
+    }
+    state.templatePreviewCache = null;
+    renderActiveRightPanel();
+    return { ok: true, affectedKeys };
+  }
+
+  function openEditModal({ mode, key, decl, structKey, itemKey, label, hint, initialValue, structValue, itemValue, skipNormalize }) {
     const editMode = mode === "structField" ? "structField" : "single";
 
     if (editMode === "single" && !key) {
@@ -14311,7 +15567,7 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
 
     state.activeEdit = editMode === "structField"
       ? { mode: "structField", structKey, itemKey }
-      : { mode: "single", key };
+      : { mode: "single", key, decl: decl || null };
     els.editLabel.textContent = label ? String(label) : "";
 
     const hintText = hint ? String(hint) : "";
@@ -14383,6 +15639,14 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       }
 
       const value = action === "clear" ? "" : String(els.editDesc.value || "");
+      if (state.activeEdit.decl) {
+        return applyDeclDescriptionOverride({
+          decl: state.activeEdit.decl,
+          text: value,
+          skipNormalize,
+          clear: action === "clear"
+        });
+      }
       const trimmed = value.trim();
       const stored = skipNormalize ? trimmed : stripDeclCategoryPrefix(trimmed);
 
@@ -14433,7 +15697,7 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     if (!key) {
       return;
     }
-    const isScopedPerformChain = String(key).startsWith("PERFORM_CHAIN:");
+    const isScopedPerformChain = /^(?:PERFORM|METHOD)_CHAIN:/.test(String(key));
     const isStructField = isStructFieldDecl(decl) && !isScopedPerformChain;
 
     const settings = state.settings || DEFAULT_SETTINGS;
@@ -14472,6 +15736,7 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       openEditModal({
         mode: "single",
         key,
+        decl,
         label: `${decl.objectType || "DECL"} ${getDeclTechName(decl)}`,
         hint: hintParts.join(" • "),
         initialValue: currentDisplay || effective,
@@ -15107,11 +16372,13 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     normalizeDeclDescText,
     stripDeclTemplateAffixes,
     getEffectiveDeclAtomicDescNormalized,
+    rebuildTypeUsageIndex,
     rebuildConstantInitializerIndex,
     buildStructDeclFromFieldDecl,
     getEffectiveDeclDesc,
     getFinalDeclDesc,
     closeEditModal,
+    applyDeclDescriptionOverride,
     applyEditModal,
     escapeSelectorValue,
     safeJson,
@@ -15141,7 +16408,7 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
   const state = runtime.state;
   const els = runtime.els;
   const constants = runtime.constants || {};
-  const { DESC_STORAGE_KEY_V2, DESC_STORAGE_KEY_LEGACY_V1, SETTINGS_STORAGE_KEY_V1, TEMPLATE_CONFIG_STORAGE_KEY_V1, THEME_STORAGE_KEY_V1, LAYOUT_SPLIT_STORAGE_KEY_V1, LAYOUT_SPLIT_DEFAULT, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX, MOBILE_LAYOUT_QUERY, RENDER_TREE_OPTIONS, DECL_TYPE_OPTIONS, NAME_CODE_OPTIONS, DEFAULT_SETTINGS, TEMPLATE_DEFAULT_CONFIG_V1, SAMPLE_ABAP } = constants;
+  const { DESC_STORAGE_KEY_V2, SETTINGS_STORAGE_KEY_V1, TEMPLATE_CONFIG_STORAGE_KEY_V1, THEME_STORAGE_KEY_V1, LAYOUT_SPLIT_STORAGE_KEY_V1, LAYOUT_SPLIT_DEFAULT, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX, MOBILE_LAYOUT_QUERY, RENDER_TREE_OPTIONS, DECL_TYPE_OPTIONS, NAME_CODE_OPTIONS, DEFAULT_SETTINGS, TEMPLATE_DEFAULT_CONFIG_V1, SAMPLE_ABAP } = constants;
   const getFirstValueFromValues = runtime.requireServiceMethod("runtimeState", "getFirstValueFromValues");
   const walkObjects = runtime.requireServiceMethod("output", "walkObjects");
   const refreshInputGutterTargets = runtime.requireServiceMethod("output", "refreshInputGutterTargets");
@@ -15152,6 +16419,7 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
   const renderActiveRightPanel = runtime.requireServiceMethod("uiNavigation", "renderActiveRightPanel");
   const createSyntheticStructFieldDecl = runtime.requireServiceMethod("parserController", "createSyntheticStructFieldDecl");
 var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
+var PERFORM_SOURCE_KIND_META_KEY_DESC = "__abapPerformSourceKind";
 
 
   function getFormNameFromNode(node) {
@@ -15211,6 +16479,50 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
     return map;
   }
 
+  function buildMethodsByImplementationIdFromRoots(rawRoots) {
+    const map = new Map();
+    walkObjects(rawRoots, (obj) => {
+      if (!obj || obj.objectType !== "METHOD" || obj.id === undefined || obj.id === null) {
+        return;
+      }
+      map.set(String(obj.id), obj);
+    });
+    return map;
+  }
+
+  function buildMethodSignaturesByIdFromRoots(rawRoots) {
+    const map = new Map();
+    walkObjects(rawRoots, (obj) => {
+      if (!obj || !["METHODS", "CLASS-METHODS"].includes(obj.objectType) || obj.id === undefined || obj.id === null) {
+        return;
+      }
+      map.set(String(obj.id), obj);
+    });
+    return map;
+  }
+
+  function getCallMethodLocalTarget(node) {
+    const target = node && node.extras && node.extras.callMethod && node.extras.callMethod.localTarget;
+    if (!target || typeof target !== "object") {
+      return null;
+    }
+    const className = String(target.className || "").trim();
+    const methodName = String(target.methodName || "").trim();
+    const implementationId = target.implementationId === undefined || target.implementationId === null
+      ? ""
+      : String(target.implementationId).trim();
+    const signatureId = target.signatureId === undefined || target.signatureId === null
+      ? ""
+      : String(target.signatureId).trim();
+    return className && methodName && implementationId && signatureId
+      ? { className, methodName, implementationId, signatureId }
+      : null;
+  }
+
+  function buildMethodSourceTargetUpper(localTarget) {
+    return `METHOD:${String(localTarget && localTarget.className || "").trim().toUpperCase()}=>${String(localTarget && localTarget.methodName || "").trim().toUpperCase()}`;
+  }
+
 
 
   function createPerformBindingTools() {
@@ -15251,7 +16563,7 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
         return false;
       }
       return String(decl.objectType || "").toUpperCase() === "STRUCT_FIELD"
-        && String(decl.structObjectType || "").toUpperCase() === "FORM_PARAM"
+        && ["FORM_PARAM", "METHOD_PARAM"].includes(String(decl.structObjectType || "").toUpperCase())
         && String(decl.structName || "").trim() !== ""
         && String(decl.fieldPath || "").trim() !== "";
     };
@@ -15262,6 +16574,9 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
       }
       const objectType = String(decl.objectType || "").toUpperCase();
       if (objectType === "FORM_PARAM") {
+        return String(decl.name || "").trim().toUpperCase();
+      }
+      if (objectType === "METHOD_PARAM") {
         return String(decl.name || "").trim().toUpperCase();
       }
       if (isPerformTraceSyntheticStructFieldDecl(decl)) {
@@ -15345,6 +16660,45 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
       };
     };
 
+    const resolveScopedParamComponentActualDecls = (actualEntry, currentBindingContext) => {
+      if (!actualEntry || typeof actualEntry !== "object") {
+        return [];
+      }
+      const byParamUpper = currentBindingContext && currentBindingContext.byParamUpper instanceof Map
+        ? currentBindingContext.byParamUpper
+        : null;
+      if (!byParamUpper) {
+        return [];
+      }
+      const valueRef = String(
+        actualEntry.valueRef || actualEntry.declRef || actualEntry.value || ""
+      ).trim().replace(/^@+/, "");
+      const componentMatch = valueRef.match(
+        /^([A-Za-z_][A-Za-z0-9_]*)-([A-Za-z_][A-Za-z0-9_]*(?:-[A-Za-z_][A-Za-z0-9_]*)*)$/
+      );
+      if (!componentMatch) {
+        return [];
+      }
+      const paramUpper = componentMatch[1].toUpperCase();
+      const fieldPath = componentMatch[2];
+      const tracedRoots = byParamUpper.get(paramUpper);
+      if (!Array.isArray(tracedRoots) || !tracedRoots.length) {
+        return [];
+      }
+      const localFieldDecl = {
+        objectType: "STRUCT_FIELD",
+        structObjectType: currentBindingContext.chainKind === "METHOD" ? "METHOD_PARAM" : "FORM_PARAM",
+        structName: componentMatch[1],
+        fieldPath,
+        name: `${componentMatch[1]}-${fieldPath}`
+      };
+      return dedupeDeclList(
+        tracedRoots
+          .map((decl) => buildPerformTraceSyntheticStructFieldDecl(decl, localFieldDecl, actualEntry))
+          .filter(Boolean)
+      );
+    };
+
     const resolveActualTraceDecls = (actualEntry, currentBindingContext) => {
       if (!actualEntry || typeof actualEntry !== "object") {
         return [];
@@ -15366,6 +16720,10 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
         ? actualEntry.valueDecl
         : null;
       if (!valueDecl) {
+        const scopedComponentDecls = resolveScopedParamComponentActualDecls(actualEntry, currentBindingContext);
+        if (scopedComponentDecls.length) {
+          return scopedComponentDecls;
+        }
         pushList(actualEntry.originDecls);
         return dedupeDeclList(out);
       }
@@ -15462,8 +16820,59 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
       }
 
       return {
+        chainKind: "PERFORM",
         byParamUpper,
         bySection: bindingsBySection
+      };
+    };
+
+    const buildMethodBindingContext = (callNode, localTarget, signatureNode, currentBindingContext) => {
+      const call = callNode && callNode.extras && callNode.extras.callMethod
+        && typeof callNode.extras.callMethod === "object"
+        ? callNode.extras.callMethod
+        : null;
+      const signature = signatureNode && signatureNode.extras && signatureNode.extras.methodSignature
+        && typeof signatureNode.extras.methodSignature === "object"
+        ? signatureNode.extras.methodSignature
+        : null;
+      const params = signature && Array.isArray(signature.params) ? signature.params : [];
+      if (!call || !localTarget || !params.length) {
+        return null;
+      }
+
+      const formalByNameUpper = new Map();
+      for (const param of params) {
+        if (param && param.name) {
+          formalByNameUpper.set(String(param.name).trim().toUpperCase(), param);
+        }
+      }
+      const byParamUpper = new Map();
+      const bySection = { EXPORTING: [], IMPORTING: [], CHANGING: [], RECEIVING: [] };
+      const callSections = [
+        ["exporting", "IMPORTING"],
+        ["importing", "EXPORTING"],
+        ["changing", "CHANGING"],
+        ["receiving", "RETURNING"]
+      ];
+      for (const [callSection, formalSection] of callSections) {
+        const actualArgs = Array.isArray(call[callSection]) ? call[callSection] : [];
+        for (const actualArg of actualArgs) {
+          const formalName = String(actualArg && (actualArg.name || actualArg.formalName || actualArg.paramName) || "").trim();
+          const formalParam = formalByNameUpper.get(formalName.toUpperCase()) || null;
+          if (!formalParam || String(formalParam.section || "").trim().toUpperCase() !== formalSection) {
+            continue;
+          }
+          const traceDecls = resolveActualTraceDecls(actualArg, currentBindingContext);
+          bySection[callSection.toUpperCase()].push({ formalName, formalParam, actualArg, traceDecls });
+          if (traceDecls.length) {
+            byParamUpper.set(formalName.toUpperCase(), traceDecls);
+          }
+        }
+      }
+      return {
+        chainKind: "METHOD",
+        byParamUpper,
+        bySection
       };
     };
 
@@ -15497,7 +16906,7 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
       if (visited.has(value)) {
         return visited.get(value);
       }
-      if (getPerformFormalParamKey(value)) {
+      if (getPerformFormalParamKey(value) || String(value.objectType || "").toUpperCase() === "METHOD_PARAM") {
         return cloneDeclWithPerformChainOverride(value, bindingContext, value);
       }
       if (Array.isArray(value)) {
@@ -15519,6 +16928,7 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
     return {
       attachPerformBindingMetadata,
       buildPerformBindingContext,
+      buildMethodBindingContext,
       clonePerformScopedData
     };
   }
@@ -15548,6 +16958,26 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
       const values = (Array.isArray(call[section]) ? call[section] : [])
         .map((entry) => getPerformActualEntryText(entry))
         .filter(Boolean);
+      if (values.length) {
+        parts.push(`${section.toUpperCase()} ${values.join(" ")}`);
+      }
+    }
+    return parts.length ? parts.join(" · ") : "không có đối số";
+  }
+
+  function buildMethodActualSummary(callNode) {
+    const call = callNode && callNode.extras && callNode.extras.callMethod
+      && typeof callNode.extras.callMethod === "object"
+      ? callNode.extras.callMethod
+      : null;
+    if (!call) {
+      return "không có đối số";
+    }
+    const parts = [];
+    for (const section of ["exporting", "importing", "changing", "receiving"]) {
+      const values = (Array.isArray(call[section]) ? call[section] : [])
+        .map((entry) => `${String(entry && (entry.name || entry.formalName) || "").trim()} = ${getPerformActualEntryText(entry)}`.trim())
+        .filter((value) => !/^=$/.test(value));
       if (values.length) {
         parts.push(`${section.toUpperCase()} ${values.join(" ")}`);
       }
@@ -15590,6 +17020,8 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
   function buildPerformCallPathRegistry(rawRoots) {
     const roots = Array.isArray(rawRoots) ? rawRoots : [];
     const formsByNameUpper = buildFormsByNameUpperFromRoots(roots);
+    const methodsByImplementationId = buildMethodsByImplementationIdFromRoots(roots);
+    const methodSignaturesById = buildMethodSignaturesByIdFromRoots(roots);
     const candidatesByFormUpper = new Map();
     const candidateByKey = new Map();
     const selectedKeyByFormUpper = new Map();
@@ -15602,6 +17034,8 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
     const registry = {
       rawRoots: roots,
       formsByNameUpper,
+      methodsByImplementationId,
+      methodSignaturesById,
       candidatesByFormUpper,
       candidateByKey,
       selectedKeyByFormUpper,
@@ -15717,81 +17151,112 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
       }
     };
 
-    const registerCandidate = (performNode, resolvedForm, formName, formNameUpper, pathToken, ancestry, bindingContext) => {
+    const registerCandidate = (sourceNode, resolvedNode, sourceName, sourceTargetUpper, pathToken, ancestry, bindingContext, sourceKind) => {
       sourceOrder += 1;
-      const key = `PERFORM_SOURCE:${formNameUpper}:${pathToken}`;
-      const sourceScope = buildPerformSourceScope(performNode, formNameUpper, pathToken, ancestry);
+      const kind = String(sourceKind || "PERFORM").trim().toUpperCase();
+      const key = `${kind}_SOURCE:${sourceTargetUpper}:${pathToken}`;
+      const sourceScope = buildPerformSourceScope(sourceNode, sourceTargetUpper, pathToken, ancestry);
       if (bindingContext && typeof bindingContext === "object") {
         bindingContext.sourceScope = sourceScope;
       }
       const candidate = {
         key,
         sourceScope,
-        formId: resolvedForm.id === undefined || resolvedForm.id === null ? "" : String(resolvedForm.id),
-        formName,
-        formNameUpper,
-        performId: performNode.id === undefined || performNode.id === null ? "" : String(performNode.id),
-        lineStart: Number(performNode.lineStart) || 0,
+        formId: resolvedNode.id === undefined || resolvedNode.id === null ? "" : String(resolvedNode.id),
+        formName: sourceName,
+        formNameUpper: sourceTargetUpper,
+        sourceKind: kind,
+        performId: sourceNode.id === undefined || sourceNode.id === null ? "" : String(sourceNode.id),
+        lineStart: Number(sourceNode.lineStart) || 0,
         ancestry: ancestry.slice(),
         parentCandidateKey: ancestry.length ? ancestry[ancestry.length - 1] : "",
-        actualSummary: buildPerformActualSummary(performNode),
+        actualSummary: kind === "METHOD" ? buildMethodActualSummary(sourceNode) : buildPerformActualSummary(sourceNode),
         bindingContext,
         sourceOrder
       };
-      if (!candidatesByFormUpper.has(formNameUpper)) {
-        candidatesByFormUpper.set(formNameUpper, []);
-        formOrder.push(formNameUpper);
+      if (!candidatesByFormUpper.has(sourceTargetUpper)) {
+        candidatesByFormUpper.set(sourceTargetUpper, []);
+        formOrder.push(sourceTargetUpper);
       }
-      candidatesByFormUpper.get(formNameUpper).push(candidate);
+      candidatesByFormUpper.get(sourceTargetUpper).push(candidate);
       candidateByKey.set(key, candidate);
       return candidate;
     };
 
-    const visitNode = (sourceNode, pathToken, formCallStack, bindingContext, ancestry) => {
+    const visitNode = (sourceNode, pathToken, callStack, bindingContext, ancestry) => {
       if (!sourceNode || typeof sourceNode !== "object") {
+        return;
+      }
+      // FORM/METHOD definitions are rendered separately. Only traverse their bodies through a resolved local call.
+      if (["FORM", "METHOD"].includes(sourceNode.objectType) && !bindingContext && !ancestry.length) {
         return;
       }
 
       let callCandidate = null;
-      let resolvedForm = null;
+      let resolvedTarget = null;
       let nextBindingContext = bindingContext;
-      let nextFormCallStack = formCallStack;
+      let nextCallStack = callStack;
       if (sourceNode.objectType === "PERFORM") {
         const formName = getPerformFormNameFromNode(sourceNode);
         const programName = getPerformProgramFromNode(sourceNode);
         const formNameUpper = formName ? formName.toUpperCase() : "";
-        resolvedForm = !programName && formNameUpper ? formsByNameUpper.get(formNameUpper) : null;
-        const isRecursiveCall = Boolean(formNameUpper) && formCallStack.includes(formNameUpper);
-        if (resolvedForm && !isRecursiveCall) {
-          nextBindingContext = tools.buildPerformBindingContext(sourceNode, resolvedForm, bindingContext);
+        resolvedTarget = !programName && formNameUpper ? formsByNameUpper.get(formNameUpper) : null;
+        const recursiveKey = `PERFORM:${formNameUpper}`;
+        const isRecursiveCall = Boolean(formNameUpper) && callStack.includes(recursiveKey);
+        if (resolvedTarget && !isRecursiveCall) {
+          nextBindingContext = tools.buildPerformBindingContext(sourceNode, resolvedTarget, bindingContext);
           callCandidate = registerCandidate(
             sourceNode,
-            resolvedForm,
+            resolvedTarget,
             formName,
             formNameUpper,
             pathToken,
             ancestry,
-            nextBindingContext
+            nextBindingContext,
+            "PERFORM"
           );
-          nextFormCallStack = [...formCallStack, formNameUpper];
+          nextCallStack = [...callStack, recursiveKey];
+        }
+      } else if (sourceNode.objectType === "CALL_METHOD") {
+        const localTarget = getCallMethodLocalTarget(sourceNode);
+        const methodTargetUpper = localTarget ? buildMethodSourceTargetUpper(localTarget) : "";
+        const methodNode = localTarget ? methodsByImplementationId.get(localTarget.implementationId) : null;
+        const signatureNode = localTarget ? methodSignaturesById.get(localTarget.signatureId) : null;
+        const recursiveKey = `METHOD:${localTarget ? localTarget.implementationId : ""}`;
+        const isRecursiveCall = Boolean(localTarget) && callStack.includes(recursiveKey);
+        if (localTarget && methodTargetUpper && methodNode && signatureNode && !isRecursiveCall) {
+          resolvedTarget = methodNode;
+          nextBindingContext = tools.buildMethodBindingContext(sourceNode, localTarget, signatureNode, bindingContext);
+          callCandidate = registerCandidate(
+            sourceNode,
+            methodNode,
+            `${localTarget.className}=>${localTarget.methodName}`,
+            methodTargetUpper,
+            pathToken,
+            ancestry,
+            nextBindingContext,
+            "METHOD"
+          );
+          nextCallStack = [...callStack, recursiveKey];
         }
       }
 
       const sourceChildren = Array.isArray(sourceNode.children) ? sourceNode.children : [];
       for (let index = 0; index < sourceChildren.length; index += 1) {
-        visitNode(sourceChildren[index], `${pathToken}.C${index}`, formCallStack, bindingContext, ancestry);
+        visitNode(sourceChildren[index], `${pathToken}.C${index}`, callStack, bindingContext, ancestry);
       }
 
-      if (!callCandidate || !resolvedForm) {
+      if (!callCandidate || !resolvedTarget) {
         return;
       }
-      const formChildren = Array.isArray(resolvedForm.children) ? resolvedForm.children : [];
+      const targetChildren = Array.isArray(resolvedTarget.children) ? resolvedTarget.children : [];
       const nextAncestry = [...ancestry, callCandidate.key];
-      for (let index = 0; index < formChildren.length; index += 1) {
+      for (let index = 0; index < targetChildren.length; index += 1) {
+        const targetPathKind = callCandidate.sourceKind === "PERFORM" ? "FORM" : callCandidate.sourceKind;
         visitNode(
-          formChildren[index],
-          `${pathToken}.FORM:${callCandidate.formNameUpper}.C${index}`,
-          nextFormCallStack,
+          targetChildren[index],
+          `${pathToken}.${targetPathKind}:${callCandidate.formNameUpper}.C${index}`,
+          nextCallStack,
           nextBindingContext,
           nextAncestry
         );
@@ -15800,7 +17265,7 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
 
     for (let index = 0; index < roots.length; index += 1) {
       const root = roots[index];
-      if (!root || root.objectType === "FORM") {
+      if (!root || root.objectType === "FORM" || root.objectType === "METHOD") {
         continue;
       }
       visitNode(root, `ROOT${index}`, [], null, []);
@@ -15838,8 +17303,13 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
       return null;
     }
     const directFormName = obj.objectType === "FORM" ? getFormNameFromNode(obj) : "";
+    const directMethodTargetUpper = obj.objectType === "METHOD"
+      ? Array.from(registry.candidatesByFormUpper.entries()).find(([, candidates]) => (
+        candidates.some((candidate) => candidate.sourceKind === "METHOD" && candidate.formId === String(obj.id || ""))
+      ))?.[0] || ""
+      : "";
     const formNameUpper = String(
-      directFormName || obj[PERFORM_SOURCE_FORM_META_KEY_DESC] || ""
+      directFormName || directMethodTargetUpper || obj[PERFORM_SOURCE_FORM_META_KEY_DESC] || ""
     ).trim().toUpperCase();
     if (!formNameUpper) {
       return null;
@@ -16501,6 +17971,21 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
         nodeBindingContext = selectedCandidate && selectedCandidate.bindingContext
           ? selectedCandidate.bindingContext
           : null;
+      } else if (sourceNode.objectType === "METHOD") {
+        const methodTargetEntry = performSourceRegistry
+          ? Array.from(performSourceRegistry.candidatesByFormUpper.entries()).find(([, candidates]) => (
+            candidates.some((candidate) => candidate.sourceKind === "METHOD" && candidate.formId === String(sourceNode.id || ""))
+          ))
+          : null;
+        const methodTargetUpper = methodTargetEntry ? methodTargetEntry[0] : "";
+        const selectedCandidate = methodTargetUpper && performSourceRegistry
+          && typeof performSourceRegistry.getSelectedCandidate === "function"
+          ? performSourceRegistry.getSelectedCandidate(methodTargetUpper)
+          : null;
+        nodeSourceFormNameUpper = methodTargetUpper;
+        nodeBindingContext = selectedCandidate && selectedCandidate.bindingContext
+          ? selectedCandidate.bindingContext
+          : null;
       }
 
       const out = {};
@@ -16520,6 +18005,11 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
             configurable: true,
             enumerable: false,
             value: nodeSourceFormNameUpper
+          });
+          Object.defineProperty(out, PERFORM_SOURCE_KIND_META_KEY_DESC, {
+            configurable: true,
+            enumerable: false,
+            value: String(nodeBindingContext && nodeBindingContext.chainKind || "PERFORM").toUpperCase()
           });
         } catch {
           // Source selection is optional UI metadata; keep rendering if attachment fails.
@@ -17169,7 +18659,7 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
   const state = runtime.state;
   const els = runtime.els;
   const constants = runtime.constants || {};
-  const { DESC_STORAGE_KEY_V2, DESC_STORAGE_KEY_LEGACY_V1, SETTINGS_STORAGE_KEY_V1, TEMPLATE_CONFIG_STORAGE_KEY_V1, THEME_STORAGE_KEY_V1, LAYOUT_SPLIT_STORAGE_KEY_V1, LAYOUT_SPLIT_DEFAULT, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX, MOBILE_LAYOUT_QUERY, RENDER_TREE_OPTIONS, DECL_TYPE_OPTIONS, NAME_CODE_OPTIONS, DEFAULT_SETTINGS, TEMPLATE_DEFAULT_CONFIG_V1, SAMPLE_ABAP } = constants;
+  const { DESC_STORAGE_KEY_V2, SETTINGS_STORAGE_KEY_V1, TEMPLATE_CONFIG_STORAGE_KEY_V1, THEME_STORAGE_KEY_V1, LAYOUT_SPLIT_STORAGE_KEY_V1, LAYOUT_SPLIT_DEFAULT, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX, MOBILE_LAYOUT_QUERY, RENDER_TREE_OPTIONS, DECL_TYPE_OPTIONS, NAME_CODE_OPTIONS, DEFAULT_SETTINGS, TEMPLATE_DEFAULT_CONFIG_V1, SAMPLE_ABAP } = constants;
   const setError = runtime.requireServiceMethod("runtimeState", "setError");
   const getKeywordEntries = runtime.requireServiceMethod("runtimeState", "getKeywordEntries");
   const getValueEntries = runtime.requireServiceMethod("runtimeState", "getValueEntries");
@@ -17214,6 +18704,7 @@ var PERFORM_SOURCE_FORM_META_KEY_DESC = "__abapPerformSourceFormUpper";
   const getDeclOverrideLookupKeys = runtime.requireServiceMethod("descriptions", "getDeclOverrideLookupKeys");
   const cloneDeclWithPerformChainOverride = runtime.requireServiceMethod("descriptions", "cloneDeclWithPerformChainOverride");
   const getDeclOverrideStorageKey = runtime.requireServiceMethod("descriptions", "getDeclOverrideStorageKey");
+  const applyDeclDescriptionOverride = runtime.requireServiceMethod("descriptions", "applyDeclDescriptionOverride");
   const normalizeDescOverrideEntry = runtime.requireServiceMethod("descriptions", "normalizeDescOverrideEntry");
   const getDeclOverrideEntry = runtime.requireServiceMethod("descriptions", "getDeclOverrideEntry");
   const normalizeDeclDescText = runtime.requireServiceMethod("descriptions", "normalizeDeclDescText");
@@ -17789,7 +19280,8 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       READ_TABLE: ["itab", "into", "assigning", "refinto", "referenceinto", "reference-into", "index"],
       SELECT: ["into", "intotable", "into-table", "appendingtable", "appending-table", "forallentries", "for-all-entries", "assigning", "refinto", "referenceinto", "reference-into"],
       SORT_ITAB: ["itab"],
-      WRITE: ["output", "destination"]
+      WRITE: ["output", "destination"],
+      CONCATENATE: ["sources", "into", "separatedby", "separated-by", "linesof", "lines-of"]
     };
     const allowed = allowedByType[objectType];
     if (!Array.isArray(allowed) || !allowed.includes(entryName)) {
@@ -17971,11 +19463,11 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       return false;
     }
     const objectType = String(decl.objectType || "").toUpperCase();
-    if (objectType === "FORM_PARAM") {
+    if (objectType === "FORM_PARAM" || objectType === "METHOD_PARAM") {
       return true;
     }
     return objectType === "STRUCT_FIELD"
-      && String(decl.structObjectType || "").toUpperCase() === "FORM_PARAM"
+      && ["FORM_PARAM", "METHOD_PARAM"].includes(String(decl.structObjectType || "").toUpperCase())
       && String(decl.structName || "").trim() !== ""
       && String(decl.fieldPath || "").trim() !== "";
   }
@@ -17985,10 +19477,10 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       return "";
     }
     const objectType = String(decl.objectType || "").toUpperCase();
-    if (objectType === "FORM_PARAM") {
+    if (objectType === "FORM_PARAM" || objectType === "METHOD_PARAM") {
       return String(decl.name || "").trim().toUpperCase();
     }
-    if (objectType === "STRUCT_FIELD" && String(decl.structObjectType || "").toUpperCase() === "FORM_PARAM") {
+    if (objectType === "STRUCT_FIELD" && ["FORM_PARAM", "METHOD_PARAM"].includes(String(decl.structObjectType || "").toUpperCase())) {
       return String(decl.structName || "").trim().toUpperCase();
     }
     return "";
@@ -18249,7 +19741,9 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     "lines-of": ["source", "source-itab"],
     "source-itab": ["source"],
     "to-itab": ["to"],
-    "transporting-no-fields": [],
+    "transporting-no-fields": ["transportingNoFields", "transporting-no-fields"],
+    "binary-search": ["binarySearch", "binary-search"],
+    "from-index": ["from"],
     "when-others": ["branch"]
   };
 
@@ -18287,7 +19781,8 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     "MOVE-CORRESPONDING": "source",
     CLEAR: "target",
     METHOD: "name",
-    WRITE: "output"
+    WRITE: "output",
+    CONCATENATE: "sources"
   };
 
   function keywordPositionInRaw(keyword, raw) {
@@ -18856,6 +20351,127 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     return parts;
   }
 
+  function splitTemplateExpressionOperands(rawValue) {
+    const text = String(rawValue || "").trim();
+    if (!text) {
+      return [];
+    }
+
+    const operands = [];
+    let current = "";
+    let quote = "";
+    let roundDepth = 0;
+    let squareDepth = 0;
+    let curlyDepth = 0;
+
+    const pushCurrent = () => {
+      const part = current.trim();
+      if (part) {
+        operands.push(part);
+      }
+      current = "";
+    };
+
+    const isTopLevel = () => roundDepth === 0 && squareDepth === 0 && curlyDepth === 0;
+
+    for (let index = 0; index < text.length; index += 1) {
+      const ch = text[index];
+      const next = text[index + 1] || "";
+
+      if (quote) {
+        current += ch;
+        if ((quote === "'" || quote === "`") && ch === quote && next === quote) {
+          current += next;
+          index += 1;
+          continue;
+        }
+        if (quote === "|" && ch === "\\" && next) {
+          current += next;
+          index += 1;
+          continue;
+        }
+        if (ch === quote) {
+          quote = "";
+        }
+        continue;
+      }
+
+      if (ch === "'" || ch === "`" || ch === "|") {
+        quote = ch;
+        current += ch;
+        continue;
+      }
+      if (ch === "(") {
+        roundDepth += 1;
+        current += ch;
+        continue;
+      }
+      if (ch === ")") {
+        roundDepth = Math.max(0, roundDepth - 1);
+        current += ch;
+        continue;
+      }
+      if (ch === "[") {
+        squareDepth += 1;
+        current += ch;
+        continue;
+      }
+      if (ch === "]") {
+        squareDepth = Math.max(0, squareDepth - 1);
+        current += ch;
+        continue;
+      }
+      if (ch === "{") {
+        curlyDepth += 1;
+        current += ch;
+        continue;
+      }
+      if (ch === "}") {
+        curlyDepth = Math.max(0, curlyDepth - 1);
+        current += ch;
+        continue;
+      }
+
+      if (isTopLevel()) {
+        if (ch === "&" && next === "&") {
+          pushCurrent();
+          index += 1;
+          continue;
+        }
+        if (ch === "+" || ch === "*" || ch === "/") {
+          pushCurrent();
+          continue;
+        }
+        if (ch === "-") {
+          const hasTrailingSpace = current.length > 0 && /\s$/.test(current);
+          const trimmed = current.trim();
+          const nextIsIdent = /[A-Za-z_<@]/.test(next);
+          const endsWithIdent = /[A-Za-z0-9_>]$/.test(trimmed);
+          // Keep structure/component paths like ids_inner-item or <fs>-field together.
+          if (!hasTrailingSpace && endsWithIdent && nextIsIdent) {
+            current += ch;
+            continue;
+          }
+          const prev = trimmed.slice(-1);
+          const unaryContext = !trimmed
+            || /[+\-*/(&]$/.test(prev)
+            || /\b(?:AND|OR|EQ|NE|LT|LE|GT|GE)$/i.test(trimmed);
+          if (unaryContext) {
+            current += ch;
+            continue;
+          }
+          pushCurrent();
+          continue;
+        }
+      }
+
+      current += ch;
+    }
+
+    pushCurrent();
+    return operands.length ? operands : [text];
+  }
+
   function findTemplateTopLevelWord(rawValue, word, startIndex) {
     const text = String(rawValue || "");
     const upperWord = String(word || "").trim().toUpperCase();
@@ -18942,7 +20558,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
 
   function isTemplateSafeSimpleListItem(value) {
     const text = String(value || "").trim();
-    if (!text || /^(?:AS|CASE|CAST|DISTINCT|END|FIELDS|NO|SINGLE|THEN|WHEN)$/i.test(text)) {
+    if (!text || /^(?:AS|ASCENDING|CASE|CAST|DESCENDING|DISTINCT|END|FIELDS|NO|SINGLE|TEXT|THEN|WHEN)$/i.test(text)) {
       return false;
     }
     if (/^\(\s*[A-Za-z_][A-Za-z0-9_]*\s*\)$/.test(text)) {
@@ -18956,6 +20572,137 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     return items.length > 1 && items.every((item) => isTemplateSafeSimpleListItem(item)) ? items : null;
   }
 
+  function normalizeTemplateItabComponentToken(rawValue) {
+    let text = String(rawValue || "").trim().replace(/^@+/, "");
+    const parenMatch = text.match(/^\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)$/);
+    if (parenMatch && parenMatch[1]) {
+      text = parenMatch[1];
+    }
+    return text.trim();
+  }
+
+  function splitTemplateItabComponentList(rawValue) {
+    const items = splitTemplateTopLevelText(rawValue, "space");
+    const out = [];
+    for (const item of items) {
+      if (!isTemplateSafeSimpleListItem(item)) {
+        continue;
+      }
+      const token = normalizeTemplateItabComponentToken(item);
+      if (!token || /[-~>]/.test(token)) {
+        continue;
+      }
+      if (!/^(?:table_line|[A-Za-z_][A-Za-z0-9_]*)$/i.test(token)) {
+        continue;
+      }
+      out.push(token);
+    }
+    return out.length ? out : null;
+  }
+
+  function getTemplateStatementItabEntry(sourceObj) {
+    if (!sourceObj || typeof sourceObj !== "object") {
+      return null;
+    }
+    const objectType = String(sourceObj.objectType || "").trim().toUpperCase();
+    const valueEntries = flattenTemplateValueEntries(sourceObj);
+    const wantedNames = objectType === "MODIFY_ITAB"
+      ? ["itab", "itabOrDbtab"]
+      : objectType === "DELETE_ITAB"
+        ? ["target", "itab", "from"]
+        : ["itab"];
+    for (const wanted of wantedNames) {
+      const entry = valueEntries.find((item) => (
+        normalizeTemplatePairToken(item && item.name) === normalizeTemplatePairToken(wanted)
+        || normalizeTemplatePairToken(item && item.label) === normalizeTemplatePairToken(wanted)
+      ));
+      if (entry) {
+        return entry;
+      }
+    }
+    return null;
+  }
+
+  function getTemplateStatementItabName(sourceObj) {
+    const entry = getTemplateStatementItabEntry(sourceObj);
+    if (!entry) {
+      return "";
+    }
+    const raw = String(entry.value || entry.name || "").trim().replace(/^@+/, "").split(/\s+/)[0] || "";
+    if (/^<[^>]+>$/.test(raw) || /^[A-Za-z_][A-Za-z0-9_]*$/.test(raw)) {
+      return raw;
+    }
+    return "";
+  }
+
+  function getTemplateStatementItabScopeHint(sourceObj, ownerContext) {
+    const entry = getTemplateStatementItabEntry(sourceObj);
+    const fromItabDecl = String(entry && entry.decl && entry.decl.scopeLabel || "").trim();
+    if (fromItabDecl) {
+      return fromItabDecl;
+    }
+    const fromOwner = String(ownerContext && ownerContext.scopeLabel || "").trim();
+    if (fromOwner) {
+      return fromOwner;
+    }
+    const hints = ownerContext && ownerContext.scopeHints;
+    if (hints instanceof Set) {
+      for (const hint of hints.values()) {
+        const text = String(hint || "").trim();
+        if (text) {
+          return text;
+        }
+      }
+    } else if (Array.isArray(hints) && hints.length) {
+      const text = String(hints[0] || "").trim();
+      if (text) {
+        return text;
+      }
+    }
+    return "";
+  }
+
+  function lookupTemplateItabComponentDecl(itabName, componentToken, scopeHint) {
+    const structName = String(itabName || "").trim();
+    const fieldPath = normalizeTemplateItabComponentToken(componentToken);
+    if (!structName || !fieldPath) {
+      return null;
+    }
+    const fullRefUpper = `${structName}-${fieldPath}`.toUpperCase();
+    const wantedScope = String(scopeHint || "").trim().toUpperCase();
+    const decls = state.data && Array.isArray(state.data.decls) ? state.data.decls : [];
+
+    let best = null;
+    let bestScore = Number.NEGATIVE_INFINITY;
+    for (const decl of decls) {
+      if (!decl || typeof decl !== "object") {
+        continue;
+      }
+      if (String(decl.objectType || "").trim().toUpperCase() !== "STRUCT_FIELD") {
+        continue;
+      }
+      if (String(decl.name || "").trim().toUpperCase() !== fullRefUpper) {
+        continue;
+      }
+
+      const declScope = String(decl.scopeLabel || "").trim().toUpperCase();
+      let score = 0;
+      if (wantedScope && declScope === wantedScope) {
+        score += 1000;
+      } else if (wantedScope && declScope) {
+        score -= 100;
+      }
+      if (!decl.synthetic) {
+        score += 10;
+      }
+      if (score > bestScore) {
+        best = decl;
+        bestScore = score;
+      }
+    }
+    return best;
+  }
+
   function getTemplateSafeRawListRows(sourceObj, keywordLabel, valueEntry) {
     const objectType = String(sourceObj && sourceObj.objectType || "").trim().toUpperCase();
     if (objectType === "SELECT" && keywordLabel === "stmt") {
@@ -18967,10 +20714,13 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       return splitTemplateSafeSimpleList(fieldsRaw);
     }
     if (objectType === "SORT_ITAB" && keywordLabel === "by") {
-      return splitTemplateSafeSimpleList(valueEntry && valueEntry.value);
+      return splitTemplateItabComponentList(valueEntry && valueEntry.value);
     }
-    if (objectType === "MODIFY_ITAB" && keywordLabel === "transporting") {
-      return splitTemplateSafeSimpleList(valueEntry && valueEntry.value);
+    if (
+      (objectType === "MODIFY_ITAB" || objectType === "READ_TABLE")
+      && keywordLabel === "transporting"
+    ) {
+      return splitTemplateItabComponentList(valueEntry && valueEntry.value);
     }
     return null;
   }
@@ -18990,11 +20740,187 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     return false;
   }
 
+  function getTemplateAssignmentOperandRows(sourceObj, ownerContext, objectIndexOneBased) {
+    if (!sourceObj || typeof sourceObj !== "object") {
+      return null;
+    }
+    if (String(sourceObj.objectType || "").trim().toUpperCase() !== "ASSIGNMENT") {
+      return null;
+    }
+
+    const valueEntries = flattenTemplateValueEntries(sourceObj);
+    const findEntry = (name) => valueEntries.find((entry) => (
+      normalizeTemplatePairToken(entry && entry.name) === name
+      || normalizeTemplatePairToken(entry && entry.label) === name
+    )) || null;
+
+    const targetEntry = findEntry("target");
+    const exprEntry = findEntry("expr") || findEntry("source") || findEntry("value");
+    const rows = [];
+
+    if (targetEntry) {
+      const targetRow = buildTemplateSemanticValueRow(targetEntry, ownerContext);
+      rows.push(createTemplateExpandedRow(
+        targetRow.text,
+        targetRow.declCandidates,
+        targetRow.provenance,
+        "Đích"
+      ));
+    }
+
+    const exprRaw = String(exprEntry && exprEntry.value !== undefined && exprEntry.value !== null
+      ? exprEntry.value
+      : "").trim();
+    if (!exprRaw) {
+      return rows.length ? rows : null;
+    }
+
+    const operands = splitTemplateExpressionOperands(exprRaw);
+    const exprDeclName = String(
+      (exprEntry && exprEntry.declRef)
+      || (exprEntry && exprEntry.decl && exprEntry.decl.name)
+      || ""
+    ).trim().toUpperCase();
+
+    for (let index = 0; index < operands.length; index += 1) {
+      const part = String(operands[index] || "").trim();
+      if (!part) {
+        continue;
+      }
+
+      if (isTemplateLiteralOrWildcard(part) || /^[+-]?\d+(?:\.\d+)?$/i.test(part)) {
+        rows.push(createTemplateExpandedRow(part, [], {
+          status: "not_applicable",
+          reasonCode: "LITERAL_NO_DECL"
+        }, "Nguồn"));
+        continue;
+      }
+
+      const matchesWholeExpr = operands.length === 1
+        && part.toUpperCase() === exprRaw.toUpperCase();
+      const matchesBoundDecl = exprDeclName
+        && part.replace(/^@/, "").toUpperCase() === exprDeclName.replace(/^@/, "");
+
+      let partEntry;
+      if ((matchesWholeExpr || matchesBoundDecl) && exprEntry) {
+        partEntry = {
+          ...exprEntry,
+          value: part
+        };
+      } else {
+        partEntry = ensureTemplateCanonicalValueEntry(sourceObj, {
+          name: "expr",
+          label: "expr",
+          value: part,
+          userDesc: "",
+          codeDesc: "",
+          decl: null
+        }, objectIndexOneBased);
+      }
+
+      const valueRow = buildTemplateSemanticValueRow(partEntry, ownerContext);
+      rows.push(createTemplateExpandedRow(
+        valueRow.text || part,
+        valueRow.declCandidates,
+        valueRow.provenance,
+        "Nguồn"
+      ));
+    }
+
+    return rows.length ? rows : null;
+  }
+
+  function getTemplateConcatenateSourceRows(sourceObj, valueEntry, ownerContext, objectIndexOneBased) {
+    if (!sourceObj || typeof sourceObj !== "object") {
+      return null;
+    }
+    if (String(sourceObj.objectType || "").trim().toUpperCase() !== "CONCATENATE") {
+      return null;
+    }
+
+    const valueEntries = flattenTemplateValueEntries(sourceObj);
+    const sourcesEntry = valueEntry && normalizeTemplatePairToken(valueEntry.name || valueEntry.label) === "sources"
+      ? valueEntry
+      : (valueEntries.find((entry) => normalizeTemplatePairToken(entry && entry.name) === "sources"
+        || normalizeTemplatePairToken(entry && entry.label) === "sources") || null);
+    const raw = String(sourcesEntry && sourcesEntry.value !== undefined && sourcesEntry.value !== null
+      ? sourcesEntry.value
+      : "").trim();
+    if (!raw) {
+      return null;
+    }
+
+    const parts = splitTemplateSafeSimpleList(raw) || splitTemplateTopLevelText(raw, "space");
+    if (!Array.isArray(parts) || !parts.length) {
+      return null;
+    }
+
+    const boundName = String(
+      (sourcesEntry && sourcesEntry.declRef)
+      || (sourcesEntry && sourcesEntry.decl && sourcesEntry.decl.name)
+      || ""
+    ).trim().toUpperCase();
+
+    return parts.map((part) => {
+      const text = String(part || "").trim();
+      if (!text) {
+        return createTemplateExpandedRow("", [], {
+          status: "not_applicable",
+          reasonCode: "MISSING_PROVENANCE"
+        }, "CONCATENATE");
+      }
+      if (isTemplateLiteralOrWildcard(text) || /^[+-]?\d+(?:\.\d+)?$/i.test(text)) {
+        return createTemplateExpandedRow(text, [], {
+          status: "not_applicable",
+          reasonCode: "LITERAL_NO_DECL"
+        }, "CONCATENATE");
+      }
+
+      const matchesBound = boundName && text.replace(/^@/, "").toUpperCase() === boundName.replace(/^@/, "");
+      const matchesWhole = parts.length === 1 && text.toUpperCase() === raw.toUpperCase();
+      let partEntry;
+      if ((matchesBound || matchesWhole) && sourcesEntry) {
+        partEntry = { ...sourcesEntry, value: text };
+      } else {
+        partEntry = ensureTemplateCanonicalValueEntry(sourceObj, {
+          name: "sources",
+          label: "sources",
+          value: text,
+          userDesc: "",
+          codeDesc: "",
+          decl: null
+        }, objectIndexOneBased);
+      }
+      const valueRow = buildTemplateSemanticValueRow(partEntry, ownerContext);
+      return createTemplateExpandedRow(
+        valueRow.text || text,
+        valueRow.declCandidates,
+        valueRow.provenance,
+        "CONCATENATE"
+      );
+    });
+  }
+
   function getTemplateExpandedKeywordRows(sourceObj, keyword, valueEntry, ownerContext, objectIndexOneBased) {
     const keywordLabel = normalizeTemplatePairToken(keyword && keyword.label);
     const objectType = String(sourceObj && sourceObj.objectType || "").trim().toUpperCase();
     if (shouldSkipConditionKeywordInTemplateRows(objectType, keywordLabel)) {
       return [];
+    }
+    if (
+      objectType === "ASSIGNMENT"
+      && ["assign", "add-assign", "sub-assign", "mul-assign", "div-assign", "cast"].includes(keywordLabel)
+    ) {
+      const assignmentRows = getTemplateAssignmentOperandRows(sourceObj, ownerContext, objectIndexOneBased);
+      if (Array.isArray(assignmentRows) && assignmentRows.length) {
+        return assignmentRows;
+      }
+    }
+    if (objectType === "CONCATENATE" && (keywordLabel === "stmt" || keywordLabel === "sources")) {
+      const sourceRows = getTemplateConcatenateSourceRows(sourceObj, valueEntry, ownerContext, objectIndexOneBased);
+      if (Array.isArray(sourceRows) && sourceRows.length) {
+        return sourceRows;
+      }
     }
     const semanticRows = getTemplateSemanticSectionRows(sourceObj, keywordLabel, ownerContext, objectIndexOneBased);
     if (Array.isArray(semanticRows) && semanticRows.length) {
@@ -19005,12 +20931,37 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       return conditionRows;
     }
     const rawListRows = getTemplateSafeRawListRows(sourceObj, keywordLabel, valueEntry);
-    return Array.isArray(rawListRows) && rawListRows.length
-      ? rawListRows.map((text) => createTemplateExpandedRow(text, [], {
+    if (Array.isArray(rawListRows) && rawListRows.length) {
+      const objectType = String(sourceObj && sourceObj.objectType || "").trim().toUpperCase();
+      const itabName = (
+        objectType === "SORT_ITAB"
+        || objectType === "MODIFY_ITAB"
+        || objectType === "READ_TABLE"
+      )
+        ? getTemplateStatementItabName(sourceObj)
+        : "";
+      return rawListRows.map((text) => {
+        const scopeHint = getTemplateStatementItabScopeHint(sourceObj, ownerContext);
+        const componentDecl = itabName
+          ? lookupTemplateItabComponentDecl(itabName, text, scopeHint)
+          : null;
+        if (componentDecl) {
+          return createTemplateExpandedRow(
+            text,
+            collectTemplateTraceAwareDeclCandidates(componentDecl, ownerContext),
+            {
+              status: "editable",
+              reasonCode: ""
+            }
+          );
+        }
+        return createTemplateExpandedRow(text, [], {
           status: "not_applicable",
           reasonCode: "NON_DECL_SCHEMA_VALUE"
-        }))
-      : null;
+        });
+      });
+    }
+    return null;
   }
 
   function buildTemplateKeywordRows(sourceObj, ownerContext, objectIndexOneBased) {
@@ -21588,7 +23539,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
           sourcePath: String(cellMeta.sourcePath || token),
           declCandidates: modalDeclCandidates,
           onSaveDesc: ({ decl, decls, text: nextDesc, skipNormalize }) => {
-            if (typeof getDeclOverrideStorageKey !== "function" || typeof saveDescOverrides !== "function") {
+            if (typeof applyDeclDescriptionOverride !== "function") {
               return { ok: false, error: "Description override helpers are unavailable." };
             }
             const targetDecls = Array.isArray(decls) && decls.length
@@ -21598,8 +23549,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
               return { ok: false, error: "Decl target is unavailable." };
             }
             const raw = String(nextDesc === undefined || nextDesc === null ? "" : nextDesc);
-            const trimmed = raw.trim();
-            const stored = skipNormalize ? trimmed : stripDeclCategoryPrefix(trimmed);
+            const clear = !raw.trim();
             state.pendingTemplateViewportAnchor = captureTemplateViewportAnchor({
               templateIndex: absIndex,
               gridRow: Number(cellElement && cellElement.getAttribute("data-template-grid-row")),
@@ -21608,13 +23558,17 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
 
             let wroteAnyKey = false;
             for (const targetDecl of targetDecls) {
-              let lookupKeys = [];
-              let declKey = "";
               try {
-                lookupKeys = getDeclLookupKeysSafe(targetDecl);
-                declKey = lookupKeys.length
-                  ? lookupKeys[0]
-                  : getDeclOverrideStorageKey(targetDecl);
+                const applied = applyDeclDescriptionOverride({
+                  decl: targetDecl,
+                  text: raw,
+                  skipNormalize: Boolean(skipNormalize),
+                  clear
+                });
+                if (applied === false || (applied && applied.ok === false)) {
+                  continue;
+                }
+                wroteAnyKey = true;
               } catch (err) {
                 warnTemplateProvenanceOnce("decl-key", {
                   objectId: obj && obj.id,
@@ -21626,32 +23580,11 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
                 });
                 continue;
               }
-              if (!declKey) {
-                continue;
-              }
-              const deleteKeys = String(declKey).startsWith("PERFORM_CHAIN:")
-                ? [declKey]
-                : (lookupKeys.length ? lookupKeys : [declKey]);
-              for (const key of deleteKeys) {
-                delete state.descOverrides[key];
-                if (state.descOverridesLegacy && typeof state.descOverridesLegacy === "object") {
-                  delete state.descOverridesLegacy[key];
-                }
-              }
-              if (stored) {
-                state.descOverrides[declKey] = skipNormalize ? { text: stored, noNormalize: true } : stored;
-              }
-              wroteAnyKey = true;
             }
 
             if (!wroteAnyKey) {
               state.pendingTemplateViewportAnchor = null;
               return { ok: false, error: "Decl key is unavailable." };
-            }
-            const saved = saveDescOverrides();
-            if (saved === false) {
-              state.pendingTemplateViewportAnchor = null;
-              return { ok: false, error: "Failed to persist description override." };
             }
             if (typeof renderTemplatePreview === "function") {
               renderTemplatePreview();
@@ -23372,7 +25305,6 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       TEMPLATE_CONFIG_STORAGE_KEY_V1,
       SETTINGS_STORAGE_KEY_V1,
       DESC_STORAGE_KEY_V2,
-      DESC_STORAGE_KEY_LEGACY_V1,
       THEME_STORAGE_KEY_V1,
       LAYOUT_SPLIT_STORAGE_KEY_V1,
       TEMPLATE_GUI_FILTER_STORAGE_KEY_V1,
@@ -23405,7 +25337,6 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       templateConfig: cloneViewerConfigValue(state.templateConfig || getDefaultTemplateConfig()),
       settings: cloneViewerConfigValue(state.settings || loadSettings()),
       descOverrides: cloneViewerConfigValue(state.descOverrides || {}),
-      descOverridesLegacy: cloneViewerConfigValue(state.descOverridesLegacy || {}),
       theme: state.theme,
       layoutLeftPane: state.layoutLeftPane,
       hiddenObjectTypes: Array.from(state.templateGuiHiddenTypes.values()),
@@ -23432,7 +25363,6 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     state.templateConfig = cloneViewerConfigValue(snapshot.templateConfig);
     state.settings = cloneViewerConfigValue(snapshot.settings);
     state.descOverrides = cloneViewerConfigValue(snapshot.descOverrides);
-    state.descOverridesLegacy = cloneViewerConfigValue(snapshot.descOverridesLegacy);
     state.templateGuiHiddenTypes = new Set(snapshot.hiddenObjectTypes || []);
     applyTheme(snapshot.theme, { save: false });
     applyLayoutSplit(snapshot.layoutLeftPane, { save: false });
@@ -23453,7 +25383,6 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     }
     if (selectedKeys.has("descriptionOverrides")) {
       localStorage.setItem(DESC_STORAGE_KEY_V2, JSON.stringify(prepared.descriptionOverrides));
-      localStorage.removeItem(DESC_STORAGE_KEY_LEGACY_V1);
     }
     if (selectedKeys.has("appearance")) {
       localStorage.setItem(THEME_STORAGE_KEY_V1, prepared.appearance.theme);
@@ -23486,7 +25415,6 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     }
     if (selectedKeys.has("descriptionOverrides")) {
       state.descOverrides = cloneViewerConfigValue(prepared.descriptionOverrides);
-      state.descOverridesLegacy = {};
     }
     if (selectedKeys.has("appearance")) {
       applyTheme(prepared.appearance.theme, { save: false });
@@ -26015,11 +27943,11 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         return false;
       }
       const objectType = String(decl.objectType || "").toUpperCase();
-      if (objectType === "FORM_PARAM") {
+      if (objectType === "FORM_PARAM" || objectType === "METHOD_PARAM") {
         return true;
       }
       return objectType === "STRUCT_FIELD"
-        && String(decl.structObjectType || "").toUpperCase() === "FORM_PARAM"
+        && ["FORM_PARAM", "METHOD_PARAM"].includes(String(decl.structObjectType || "").toUpperCase())
         && String(decl.structName || "").trim() !== ""
         && String(decl.fieldPath || "").trim() !== "";
     };
@@ -26100,7 +28028,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         : (String(candidate && candidate.currentDesc ? candidate.currentDesc : "") || getAtomicEffectiveDescSafe(decl));
       const itemDisplay = stripStructPrefixForModalItemText(itemDisplayRaw, String(decl.structName || ""));
 
-      if (String(candidate && candidate.declKey || "").startsWith("PERFORM_CHAIN:")) {
+      if (/^(?:PERFORM|METHOD)_CHAIN:/.test(String(candidate && candidate.declKey || ""))) {
         return {
           mode: "single",
           text: itemDisplay,
@@ -26859,7 +28787,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
   const state = runtime.state;
   const els = runtime.els;
   const constants = runtime.constants || {};
-  const { DESC_STORAGE_KEY_V2, DESC_STORAGE_KEY_LEGACY_V1, SETTINGS_STORAGE_KEY_V1, TEMPLATE_CONFIG_STORAGE_KEY_V1, THEME_STORAGE_KEY_V1, LAYOUT_SPLIT_STORAGE_KEY_V1, LAYOUT_SPLIT_DEFAULT, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX, MOBILE_LAYOUT_QUERY, RENDER_TREE_OPTIONS, DECL_TYPE_OPTIONS, NAME_CODE_OPTIONS, DEFAULT_SETTINGS, TEMPLATE_DEFAULT_CONFIG_V1, SAMPLE_ABAP } = constants;
+  const { DESC_STORAGE_KEY_V2, SETTINGS_STORAGE_KEY_V1, TEMPLATE_CONFIG_STORAGE_KEY_V1, THEME_STORAGE_KEY_V1, LAYOUT_SPLIT_STORAGE_KEY_V1, LAYOUT_SPLIT_DEFAULT, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX, MOBILE_LAYOUT_QUERY, RENDER_TREE_OPTIONS, DECL_TYPE_OPTIONS, NAME_CODE_OPTIONS, DEFAULT_SETTINGS, TEMPLATE_DEFAULT_CONFIG_V1, SAMPLE_ABAP } = constants;
   const setError = runtime.requireServiceMethod("runtimeState", "setError");
   const normalizeSettings = runtime.requireServiceMethod("runtimeState", "normalizeSettings");
   const saveSettings = runtime.requireServiceMethod("runtimeState", "saveSettings");
@@ -27303,7 +29231,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
   const state = runtime.state;
   const els = runtime.els;
   const constants = runtime.constants || {};
-  const { DESC_STORAGE_KEY_V2, DESC_STORAGE_KEY_LEGACY_V1, SETTINGS_STORAGE_KEY_V1, TEMPLATE_CONFIG_STORAGE_KEY_V1, THEME_STORAGE_KEY_V1, LAYOUT_SPLIT_STORAGE_KEY_V1, LAYOUT_SPLIT_DEFAULT, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX, MOBILE_LAYOUT_QUERY, RENDER_TREE_OPTIONS, DECL_TYPE_OPTIONS, NAME_CODE_OPTIONS, DEFAULT_SETTINGS, TEMPLATE_DEFAULT_CONFIG_V1, SAMPLE_ABAP } = constants;
+  const { DESC_STORAGE_KEY_V2, SETTINGS_STORAGE_KEY_V1, TEMPLATE_CONFIG_STORAGE_KEY_V1, THEME_STORAGE_KEY_V1, LAYOUT_SPLIT_STORAGE_KEY_V1, LAYOUT_SPLIT_DEFAULT, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX, MOBILE_LAYOUT_QUERY, RENDER_TREE_OPTIONS, DECL_TYPE_OPTIONS, NAME_CODE_OPTIONS, DEFAULT_SETTINGS, TEMPLATE_DEFAULT_CONFIG_V1, SAMPLE_ABAP } = constants;
   const setError = runtime.requireServiceMethod("runtimeState", "setError");
   const setTemplatePreviewMessage = runtime.requireServiceMethod("runtimeState", "setTemplatePreviewMessage");
   const walkObjects = runtime.requireServiceMethod("output", "walkObjects");
@@ -27312,6 +29240,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
   const normalizeParsedJson = runtime.requireServiceMethod("output", "normalizeParsedJson");
   const rebuildInputGutter = runtime.requireServiceMethod("output", "rebuildInputGutter");
   const renderDeclDescPanelUi = runtime.requireServiceMethod("descriptions", "renderDeclDescPanelUi");
+  const rebuildTypeUsageIndex = runtime.requireServiceMethod("descriptions", "rebuildTypeUsageIndex");
   const rebuildConstantInitializerIndex = runtime.requireServiceMethod("descriptions", "rebuildConstantInitializerIndex");
   const buildPerformCallPathRegistry = runtime.requireServiceMethod("performSources", "buildPerformCallPathRegistry");
   const buildRenderableObjects = runtime.requireServiceMethod("performSources", "buildRenderableObjects");
@@ -27336,13 +29265,18 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
 
 
 
-  function makeDeclScopeNameKeyForSynthetic(scopeLabel, name) {
+  function makeDeclScopeNameKeyForSynthetic(scopeLabel, name, lexicalDecl) {
     const scope = normalizeDeclKeyTokenForSynthetic(scopeLabel);
     const declName = normalizeDeclKeyTokenForSynthetic(name);
     if (!scope || !declName) {
       return "";
     }
-    return `${scope}:${declName}`;
+    const declScopePath = normalizeDeclKeyTokenForSynthetic(lexicalDecl && lexicalDecl.declScopePath);
+    const visibleFromLine = Number(lexicalDecl && lexicalDecl.visibleFromLine);
+    const lexicalSuffix = declScopePath && Number.isFinite(visibleFromLine) && visibleFromLine > 0
+      ? `|LEX:${declScopePath}:${Math.floor(visibleFromLine)}`
+      : "";
+    return `${scope}:${declName}${lexicalSuffix}`;
   }
 
 
@@ -27353,7 +29287,9 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       return null;
     }
 
-    const match = text.match(/(^|[^A-Za-z0-9_<>])([A-Za-z_][A-Za-z0-9_]*-[A-Za-z_][A-Za-z0-9_]*(?:-[A-Za-z_][A-Za-z0-9_]*)*)/);
+    const match = text.match(
+      /(^|[^A-Za-z0-9_<>])((?:<[^>]+>|[A-Za-z_][A-Za-z0-9_]*)-[A-Za-z_][A-Za-z0-9_]*(?:-[A-Za-z_][A-Za-z0-9_]*)*)/
+    );
     if (!match || !match[2]) {
       return null;
     }
@@ -27371,12 +29307,272 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     }
 
     const structUpper = normalizeDeclKeyTokenForSynthetic(structName);
-    // Skip ABAP system fields (SY-*) and field symbols (<fs>-*) in this synthetic flow.
-    if (structUpper === "SY" || structName.startsWith("<")) {
+    // SY-* is runtime metadata, not a user-editable structure instance.
+    if (structUpper === "SY") {
       return null;
     }
 
     return { fullRef, structName, fieldPath, structUpper };
+  }
+
+  const ITAB_COMPONENT_LIST_NOISE = new Set([
+    "ASCENDING",
+    "DESCENDING",
+    "AS",
+    "TEXT",
+    "STABLE",
+    "USING",
+    "KEY"
+  ]);
+
+  function stripHostEscapePrefixForSynthetic(text) {
+    return String(text || "").trim().replace(/^@+/, "");
+  }
+
+  function normalizeBareItabComponentToken(rawValue) {
+    let text = stripHostEscapePrefixForSynthetic(rawValue);
+    if (!text) {
+      return "";
+    }
+    const parenMatch = text.match(/^\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)$/);
+    if (parenMatch && parenMatch[1]) {
+      text = parenMatch[1];
+    }
+    return text.trim();
+  }
+
+  function isBareItabComponentToken(rawValue) {
+    const text = normalizeBareItabComponentToken(rawValue);
+    if (!text) {
+      return false;
+    }
+    const upper = normalizeDeclKeyTokenForSynthetic(text);
+    if (ITAB_COMPONENT_LIST_NOISE.has(upper)) {
+      return false;
+    }
+    if (upper === "TABLE_LINE") {
+      return true;
+    }
+    if (/[-~>()]/.test(text) || /['"`]/.test(text)) {
+      return false;
+    }
+    return /^[A-Za-z_][A-Za-z0-9_]*$/.test(text);
+  }
+
+  function buildItabComponentCandidate(itabName, componentToken) {
+    const structName = stripHostEscapePrefixForSynthetic(itabName);
+    const fieldPath = normalizeBareItabComponentToken(componentToken);
+    if (!structName || !fieldPath || /[-~>]/.test(structName)) {
+      return null;
+    }
+    if (normalizeDeclKeyTokenForSynthetic(structName) === "SY") {
+      return null;
+    }
+    const fullRef = `${structName}-${fieldPath}`;
+    return {
+      fullRef,
+      structName,
+      fieldPath,
+      structUpper: normalizeDeclKeyTokenForSynthetic(structName)
+    };
+  }
+
+  function splitItabComponentList(rawValue) {
+    const text = String(rawValue || "").trim();
+    if (!text) {
+      return [];
+    }
+    const parts = text.split(/\s+/).map((part) => String(part || "").trim()).filter(Boolean);
+    const out = [];
+    for (const part of parts) {
+      if (!isBareItabComponentToken(part)) {
+        continue;
+      }
+      out.push(normalizeBareItabComponentToken(part));
+    }
+    return out;
+  }
+
+  function getFirstValueEntryFromObject(obj, names) {
+    if (!obj || typeof obj !== "object" || !obj.values || typeof obj.values !== "object") {
+      return null;
+    }
+    const wanted = Array.isArray(names) ? names : [names];
+    for (const name of wanted) {
+      const key = String(name || "").trim();
+      if (!key || !Object.prototype.hasOwnProperty.call(obj.values, key)) {
+        continue;
+      }
+      const entryOrList = obj.values[key];
+      if (Array.isArray(entryOrList)) {
+        return entryOrList[0] || null;
+      }
+      if (entryOrList && typeof entryOrList === "object") {
+        return entryOrList;
+      }
+    }
+    return null;
+  }
+
+  function getValueEntryRawText(entry) {
+    if (!entry || typeof entry !== "object") {
+      return "";
+    }
+    return String(entry.value || entry.name || entry.declRef || "").trim();
+  }
+
+  function getItabNameFromStatementObject(obj) {
+    if (!obj || typeof obj !== "object") {
+      return "";
+    }
+    const objectType = normalizeDeclKeyTokenForSynthetic(obj.objectType);
+    let entry = null;
+    if (objectType === "SORT_ITAB" || objectType === "READ_TABLE" || objectType === "LOOP_AT_ITAB") {
+      entry = getFirstValueEntryFromObject(obj, ["itab"]);
+    } else if (objectType === "MODIFY_ITAB") {
+      entry = getFirstValueEntryFromObject(obj, ["itab", "itabOrDbtab"]);
+    } else if (objectType === "DELETE_ITAB") {
+      entry = getFirstValueEntryFromObject(obj, ["target", "itab", "from"]);
+    }
+    if (!entry) {
+      return "";
+    }
+    const raw = getValueEntryRawText(entry);
+    const itabName = stripHostEscapePrefixForSynthetic(raw).split(/\s+/)[0] || "";
+    if (!itabName) {
+      return "";
+    }
+    if (/^<[^>]+>$/.test(itabName)) {
+      return itabName;
+    }
+    if (/[-~>]/.test(itabName)) {
+      return "";
+    }
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(itabName)) {
+      return "";
+    }
+    return itabName;
+  }
+
+  function ensureItabComponentStructFieldDecl(candidate, context, index, createdDecls) {
+    if (!candidate || !index) {
+      return null;
+    }
+    const baseDecl = pickStructBaseDeclForSynthetic(candidate, context, index);
+    if (!baseDecl) {
+      return null;
+    }
+
+    const scopeNameKey = makeDeclScopeNameKeyForSynthetic(baseDecl.scopeLabel, candidate.fullRef, baseDecl);
+    if (!scopeNameKey) {
+      return null;
+    }
+
+    let fieldDecl = index.byScopeName.get(scopeNameKey) || null;
+    if (!fieldDecl) {
+      fieldDecl = createSyntheticStructFieldDecl(baseDecl, candidate, context);
+      if (!fieldDecl) {
+        return null;
+      }
+      index.byScopeName.set(scopeNameKey, fieldDecl);
+
+      const nameUpper = normalizeDeclKeyTokenForSynthetic(fieldDecl.name);
+      if (nameUpper) {
+        if (!index.byNameUpper.has(nameUpper)) {
+          index.byNameUpper.set(nameUpper, []);
+        }
+        index.byNameUpper.get(nameUpper).push(fieldDecl);
+      }
+      if (Array.isArray(createdDecls) && fieldDecl.synthetic === true) {
+        createdDecls.push(fieldDecl);
+      }
+    }
+    return fieldDecl;
+  }
+
+  function bindItabComponentToEntry(entry, options, index, createdDecls) {
+    if (!entry || typeof entry !== "object" || !options || !index) {
+      return false;
+    }
+    const itabName = String(options.itabName || "").trim();
+    const targetProp = String(options.targetProp || "decl");
+    const sourceKeys = Array.isArray(options.sourceKeys) && options.sourceKeys.length
+      ? options.sourceKeys
+      : ["value", "name", "leftOperand", "leftOperandRef"];
+
+    let componentToken = "";
+    for (const key of sourceKeys) {
+      const raw = entry[key];
+      if (raw == null) {
+        continue;
+      }
+      if (isBareItabComponentToken(raw)) {
+        componentToken = normalizeBareItabComponentToken(raw);
+        break;
+      }
+    }
+    if (!itabName || !componentToken) {
+      return false;
+    }
+
+    const candidate = buildItabComponentCandidate(itabName, componentToken);
+    if (!candidate) {
+      return false;
+    }
+
+    const currentDecl = entry[targetProp];
+    const currentDeclType = String(currentDecl && currentDecl.objectType || "").trim().toUpperCase();
+    const currentName = String(currentDecl && currentDecl.name || "").trim();
+    if (
+      currentDeclType === "STRUCT_FIELD"
+      && normalizeDeclKeyTokenForSynthetic(currentName) === normalizeDeclKeyTokenForSynthetic(candidate.fullRef)
+    ) {
+      return false;
+    }
+
+    const forceReplace = options.forceReplace === true
+      || currentDeclType === "CONDITION_VALUE"
+      || !isDeclLikeRecordForSynthetic(currentDecl);
+    if (!forceReplace && isDeclLikeRecordForSynthetic(currentDecl)) {
+      // Keep resolved program decls (DATA/FORM_PARAM/STRUCT_FIELD/...).
+      // Only CONDITION_VALUE / missing decls are upgraded to itab-field above.
+      return false;
+    }
+
+    const fieldDecl = ensureItabComponentStructFieldDecl(candidate, options.context, index, createdDecls);
+    if (!fieldDecl) {
+      return false;
+    }
+
+    entry[targetProp] = fieldDecl;
+    if (targetProp === "decl" && !String(entry.declRef || "").trim()) {
+      entry.declRef = candidate.fullRef;
+    }
+    if (targetProp === "valueDecl" && !String(entry.valueRef || "").trim()) {
+      entry.valueRef = candidate.fullRef;
+    }
+    if (targetProp === "leftOperandDecl") {
+      entry.leftOperandRef = candidate.fullRef;
+    }
+    if (targetProp === "rightOperandDecl" && !String(entry.rightOperandRef || "").trim()) {
+      entry.rightOperandRef = candidate.fullRef;
+    }
+    return true;
+  }
+
+  function ensureItabComponentDeclsFromRawList(rawValue, itabName, context, index, createdDecls) {
+    const tokens = splitItabComponentList(rawValue);
+    let count = 0;
+    for (const token of tokens) {
+      const candidate = buildItabComponentCandidate(itabName, token);
+      if (!candidate) {
+        continue;
+      }
+      if (ensureItabComponentStructFieldDecl(candidate, context, index, createdDecls)) {
+        count += 1;
+      }
+    }
+    return count;
   }
 
 
@@ -27516,8 +29712,26 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     const preferredScopeSet = new Set(preferredScopes.map((value) => normalizeDeclKeyTokenForSynthetic(value)));
     const usageFile = context ? String(context.file || "").trim() : "";
     const usageLine = context ? (Number(context.lineStart) || 0) : 0;
+    const activeLexicalScopeIds = context && context.lexicalScopeIds instanceof Set
+      ? context.lexicalScopeIds
+      : new Set();
+    const activeLexicalScopePaths = context && context.lexicalScopePaths instanceof Set
+      ? context.lexicalScopePaths
+      : new Set();
 
     const scoreCandidate = (decl) => {
+      const declScopeId = Number(decl && decl.declScopeId);
+      if (Number.isFinite(declScopeId) && declScopeId > 0 && !activeLexicalScopeIds.has(declScopeId)) {
+        return Number.NEGATIVE_INFINITY;
+      }
+      const declScopePath = normalizeDeclKeyTokenForSynthetic(decl && decl.declScopePath);
+      if (declScopePath && declScopePath !== "GLOBAL" && !activeLexicalScopePaths.has(declScopePath)) {
+        return Number.NEGATIVE_INFINITY;
+      }
+      const visibleFromLine = Number(decl && decl.visibleFromLine);
+      if (Number.isFinite(visibleFromLine) && visibleFromLine > 0 && usageLine > 0 && visibleFromLine > usageLine) {
+        return Number.NEGATIVE_INFINITY;
+      }
       const declScope = normalizeDeclKeyTokenForSynthetic(decl.scopeLabel);
       const declFile = String(decl.file || "").trim();
       const declLine = Number(decl.lineStart || 0) || 0;
@@ -27554,6 +29768,34 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
 
 
 
+  function findCatalogStructFieldDecl(scopeLabel, fullRef, baseDecl) {
+    const scopeNameKey = makeDeclScopeNameKeyForSynthetic(scopeLabel, fullRef, baseDecl);
+    if (!scopeNameKey) {
+      return null;
+    }
+
+    const decls = state.data && Array.isArray(state.data.decls) ? state.data.decls : [];
+    let syntheticFallback = null;
+    for (const decl of decls) {
+      if (!decl || typeof decl !== "object") {
+        continue;
+      }
+      if (String(decl.objectType || "").trim().toUpperCase() !== "STRUCT_FIELD") {
+        continue;
+      }
+      if (makeDeclScopeNameKeyForSynthetic(decl.scopeLabel, decl.name, decl) !== scopeNameKey) {
+        continue;
+      }
+      if (!decl.synthetic) {
+        return decl;
+      }
+      if (!syntheticFallback) {
+        syntheticFallback = decl;
+      }
+    }
+    return syntheticFallback;
+  }
+
   function createSyntheticStructFieldDecl(baseDecl, candidate, context) {
     if (!isDeclLikeRecordForSynthetic(baseDecl) || !candidate) {
       return null;
@@ -27570,14 +29812,28 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       return null;
     }
 
+    const catalogDecl = findCatalogStructFieldDecl(scopeLabel, fullRef, baseDecl);
+    if (catalogDecl) {
+      // Reuse the catalog row as-is. Do not clone/append another decls entry.
+      return catalogDecl;
+    }
+
     const idScope = sanitizeDeclSyntheticIdToken(scopeLabel) || "NO_SCOPE";
     const idStruct = sanitizeDeclSyntheticIdToken(baseDecl.name || candidate.structName || "") || "STRUCT";
     const idField = sanitizeDeclSyntheticIdToken(fieldPath) || "FIELD";
+    const idLexicalScope = sanitizeDeclSyntheticIdToken(baseDecl.declScopePath || "");
+    const idVisibleLine = Number(baseDecl.visibleFromLine || 0) || 0;
+    const idLexical = idLexicalScope && idVisibleLine > 0 ? `:${idLexicalScope}:${idVisibleLine}` : "";
     const usageFile = context ? String(context.file || "").trim() : "";
     const usageLine = context ? (Number(context.lineStart) || 0) : 0;
+    const baseObjectType = String(baseDecl.objectType || "STRUCT");
+    const isInlineFieldSymbol = normalizeDeclKeyTokenForSynthetic(baseObjectType) === "INLINE"
+      && String(baseDecl.name || "").trim().startsWith("<");
+    const typeIdentity = String(baseDecl.typeIdentity || "").trim();
+    const typeComponentIdentity = typeIdentity ? `${typeIdentity}:${fieldPath.toUpperCase()}` : "";
 
     return {
-      id: `SYNTH:STRUCT_FIELD:${idScope}:${idStruct}:${idField}`,
+      id: `SYNTH:STRUCT_FIELD:${idScope}:${idStruct}:${idField}${idLexical}`,
       objectType: "STRUCT_FIELD",
       name: fullRef,
       file: String(usageFile || baseDecl.file || ""),
@@ -27588,17 +29844,86 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       scopeLabel,
       scopeType: String(baseDecl.scopeType || ""),
       scopeName: String(baseDecl.scopeName || ""),
+      declScopeId: baseDecl.declScopeId == null ? null : baseDecl.declScopeId,
+      declScopePath: String(baseDecl.declScopePath || ""),
+      visibleFromLine: Number(baseDecl.visibleFromLine || 0) || null,
       structId: baseDecl.id || null,
       structName: String(baseDecl.name || candidate.structName || ""),
-      structObjectType: String(baseDecl.objectType || "STRUCT"),
+      structObjectType: isInlineFieldSymbol ? "FIELD-SYMBOLS" : baseObjectType,
       structLineStart: Number(baseDecl.lineStart || 0) || null,
       structRaw: String(baseDecl.raw || ""),
       structComment: String(baseDecl.comment || ""),
       traceFile: usageFile || "",
       traceLineStart: usageLine || null,
       fieldPath,
+      typeIdentity,
+      typeName: String(baseDecl.typeName || ""),
+      typeComponentIdentity,
+      dynamic: Boolean(baseDecl.dynamic),
       synthetic: true
     };
+  }
+
+  function buildLexicalScopeContextByObject(roots) {
+    const index = new WeakMap();
+    const visit = (objects, activeScopeNodes) => {
+      for (const obj of Array.isArray(objects) ? objects : []) {
+        if (!obj || typeof obj !== "object") {
+          continue;
+        }
+        const scopeIds = new Set(activeScopeNodes.map((node) => node.id));
+        const scopePaths = new Set();
+        for (let indexValue = 0; indexValue < activeScopeNodes.length; indexValue += 1) {
+          scopePaths.add(activeScopeNodes
+            .slice(0, indexValue + 1)
+            .map((node) => `${node.objectType}:${node.id}`)
+            .join(">")
+            .toUpperCase());
+        }
+        index.set(obj, { scopeIds, scopePaths });
+        const children = Array.isArray(obj.children) ? obj.children : [];
+        if (!children.length) {
+          continue;
+        }
+        const objectId = Number(obj.id);
+        const nextScopeNodes = activeScopeNodes.slice();
+        if (Number.isFinite(objectId) && objectId > 0) {
+          nextScopeNodes.push({
+            id: objectId,
+            objectType: normalizeDeclKeyTokenForSynthetic(obj.objectType)
+          });
+        }
+        visit(children, nextScopeNodes);
+      }
+    };
+    visit(roots, []);
+    return index;
+  }
+
+  function attachTableLineTypeToInlineFieldSymbol(obj) {
+    const objectType = normalizeDeclKeyTokenForSynthetic(obj && obj.objectType);
+    if (!obj || !["READ_TABLE", "LOOP_AT_ITAB"].includes(objectType)) {
+      return;
+    }
+    const itabEntry = getFirstValueEntryFromObject(obj, ["itab"]);
+    const assigningEntry = getFirstValueEntryFromObject(obj, ["assigning"]);
+    const itabDecl = itabEntry && itabEntry.decl;
+    const inlineDecl = assigningEntry && assigningEntry.decl;
+    if (
+      !itabDecl
+      || !inlineDecl
+      || normalizeDeclKeyTokenForSynthetic(inlineDecl.objectType) !== "INLINE"
+      || !String(inlineDecl.name || "").trim().startsWith("<")
+    ) {
+      return;
+    }
+    const typeIdentity = String(itabDecl.typeIdentity || "").trim();
+    if (!typeIdentity) {
+      return;
+    }
+    inlineDecl.typeIdentity = typeIdentity;
+    inlineDecl.typeName = String(itabDecl.typeName || "");
+    inlineDecl.dynamic = Boolean(itabDecl.dynamic);
   }
 
 
@@ -27653,7 +29978,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         }
       }
 
-      const key = makeDeclScopeNameKeyForSynthetic(decl.scopeLabel, decl.name);
+      const key = makeDeclScopeNameKeyForSynthetic(decl.scopeLabel, decl.name, decl);
       if (key && !byScopeName.has(key)) {
         byScopeName.set(key, decl);
       }
@@ -27703,7 +30028,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       return false;
     }
 
-    const scopeNameKey = makeDeclScopeNameKeyForSynthetic(baseDecl.scopeLabel, candidate.fullRef);
+    const scopeNameKey = makeDeclScopeNameKeyForSynthetic(baseDecl.scopeLabel, candidate.fullRef, baseDecl);
     if (!scopeNameKey) {
       return false;
     }
@@ -27723,7 +30048,8 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         }
         index.byNameUpper.get(nameUpper).push(fieldDecl);
       }
-      if (Array.isArray(createdDecls)) {
+      // Catalog reuse returns an existing decls row (not synthetic). Only append new synthetics.
+      if (Array.isArray(createdDecls) && fieldDecl.synthetic === true) {
         createdDecls.push(fieldDecl);
       }
     }
@@ -27755,6 +30081,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
 
     const index = buildSyntheticDeclIndex(data);
     const createdDecls = [];
+    const lexicalScopeContextByObject = buildLexicalScopeContextByObject(data.objects);
 
     const processAssignSections = (container, sections, context) => {
       for (const sectionName of sections) {
@@ -27772,11 +30099,19 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       }
     };
 
-    const processConditionList = (conditions, context) => {
+    const processConditionList = (conditions, context, itabName) => {
       const list = Array.isArray(conditions) ? conditions : [];
       for (const clause of list) {
         if (!clause || typeof clause !== "object") {
           continue;
+        }
+        if (itabName) {
+          bindItabComponentToEntry(clause, {
+            itabName,
+            targetProp: "leftOperandDecl",
+            sourceKeys: ["leftOperandRef", "leftOperand"],
+            context
+          }, index, createdDecls);
         }
         ensureSyntheticStructFieldDeclForEntry(clause, {
           targetProp: "leftOperandDecl",
@@ -27797,12 +30132,19 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
           return;
         }
 
+        const lexicalScopeContext = lexicalScopeContextByObject.get(obj) || {
+          scopeIds: new Set(),
+          scopePaths: new Set()
+        };
         const context = {
           file: String(obj.file || ""),
           lineStart: Number(obj.lineStart || 0) || 0,
-          scopeHints: collectScopeHintsFromObjectForSynthetic(obj)
+          scopeHints: collectScopeHintsFromObjectForSynthetic(obj),
+          lexicalScopeIds: lexicalScopeContext.scopeIds,
+          lexicalScopePaths: lexicalScopeContext.scopePaths
         };
 
+        attachTableLineTypeToInlineFieldSymbol(obj);
         const values = obj.values && typeof obj.values === "object" ? obj.values : null;
         if (values) {
           for (const entryOrList of Object.values(values)) {
@@ -27820,6 +30162,26 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
           }
         }
 
+        const objectType = normalizeDeclKeyTokenForSynthetic(obj.objectType);
+        const itabName = getItabNameFromStatementObject(obj);
+
+        if (itabName && (objectType === "SORT_ITAB" || objectType === "MODIFY_ITAB" || objectType === "READ_TABLE")) {
+          const byEntry = objectType === "SORT_ITAB" ? getFirstValueEntryFromObject(obj, ["by"]) : null;
+          if (byEntry) {
+            ensureItabComponentDeclsFromRawList(getValueEntryRawText(byEntry), itabName, context, index, createdDecls);
+          }
+          const transportingEntry = getFirstValueEntryFromObject(obj, ["transporting"]);
+          if (transportingEntry) {
+            ensureItabComponentDeclsFromRawList(
+              getValueEntryRawText(transportingEntry),
+              itabName,
+              context,
+              index,
+              createdDecls
+            );
+          }
+        }
+
         const extras = obj.extras && typeof obj.extras === "object" ? obj.extras : null;
         if (!extras) {
           return;
@@ -27833,21 +30195,24 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         }
         if (extras.performCall) {
           processAssignSections(extras.performCall, ["using", "changing", "tables"], context);
-          processConditionList(extras.performCall.ifConditions, context);
+          processConditionList(extras.performCall.ifConditions, context, "");
         }
 
         if (extras.ifCondition) {
-          processConditionList(extras.ifCondition.conditions, context);
+          processConditionList(extras.ifCondition.conditions, context, "");
         }
 
         if (extras.select) {
-          processConditionList(extras.select.whereConditions, context);
-          processConditionList(extras.select.havingConditions, context);
+          processConditionList(extras.select.whereConditions, context, "");
+          processConditionList(extras.select.havingConditions, context, "");
         }
 
         for (const key of ["readTable", "loopAtItab", "modifyItab", "deleteItab"]) {
           if (extras[key]) {
-            processConditionList(extras[key].conditions, context);
+            const extrasItab = key === "readTable" || key === "loopAtItab" || key === "modifyItab" || key === "deleteItab"
+              ? itabName
+              : "";
+            processConditionList(extras[key].conditions, context, extrasItab);
           }
         }
       });
@@ -27869,6 +30234,9 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     state.data = null;
     state.renderObjects = [];
     state.performSourceRegistry = null;
+    if (typeof rebuildTypeUsageIndex === "function") {
+      rebuildTypeUsageIndex(null);
+    }
     state.templatePreviewCache = null;
     resetTemplateSelectionStateMain();
     state.selectedDeclKey = "";
@@ -27927,8 +30295,9 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       }
     }
 
-        augmentSyntheticStructFieldDecls(state.data);
-        rebuildConstantInitializerIndex(state.data);
+    augmentSyntheticStructFieldDecls(state.data);
+    rebuildTypeUsageIndex(state.data);
+    rebuildConstantInitializerIndex(state.data);
 
     resetTemplateSelectionStateMain();
     state.performSourceRegistry = buildPerformCallPathRegistry(state.data && state.data.objects);
@@ -27959,11 +30328,10 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
   const state = runtime.state;
   const els = runtime.els;
   const constants = runtime.constants || {};
-  const { DESC_STORAGE_KEY_V2, DESC_STORAGE_KEY_LEGACY_V1, SETTINGS_STORAGE_KEY_V1, TEMPLATE_CONFIG_STORAGE_KEY_V1, THEME_STORAGE_KEY_V1, LAYOUT_SPLIT_STORAGE_KEY_V1, LAYOUT_SPLIT_DEFAULT, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX, MOBILE_LAYOUT_QUERY, RENDER_TREE_OPTIONS, DECL_TYPE_OPTIONS, NAME_CODE_OPTIONS, DEFAULT_SETTINGS, TEMPLATE_DEFAULT_CONFIG_V1, SAMPLE_ABAP } = constants;
+  const { DESC_STORAGE_KEY_V2, SETTINGS_STORAGE_KEY_V1, TEMPLATE_CONFIG_STORAGE_KEY_V1, THEME_STORAGE_KEY_V1, LAYOUT_SPLIT_STORAGE_KEY_V1, LAYOUT_SPLIT_DEFAULT, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX, MOBILE_LAYOUT_QUERY, RENDER_TREE_OPTIONS, DECL_TYPE_OPTIONS, NAME_CODE_OPTIONS, DEFAULT_SETTINGS, TEMPLATE_DEFAULT_CONFIG_V1, SAMPLE_ABAP } = constants;
   const setError = runtime.requireServiceMethod("runtimeState", "setError");
   const renderBuildInfo = runtime.requireServiceMethod("runtimeState", "renderBuildInfo");
   const loadDescOverrides = runtime.requireServiceMethod("runtimeState", "loadDescOverrides");
-  const loadLegacyDescOverrides = runtime.requireServiceMethod("runtimeState", "loadLegacyDescOverrides");
   const loadSettings = runtime.requireServiceMethod("runtimeState", "loadSettings");
   const setTemplateConfigError = runtime.requireServiceMethod("runtimeState", "setTemplateConfigError");
   const getDefaultTemplateConfig = runtime.requireServiceMethod("runtimeState", "getDefaultTemplateConfig");
@@ -28113,7 +30481,6 @@ function start() {
   function init() {
     renderBuildInfo();
     state.descOverrides = loadDescOverrides();
-    state.descOverridesLegacy = loadLegacyDescOverrides();
     state.settings = loadSettings();
     state.templateConfig = loadTemplateConfig();
     if (!state.templateConfig || typeof state.templateConfig !== "object" || Array.isArray(state.templateConfig)) {
@@ -28267,8 +30634,6 @@ function start() {
         openJsonModal({
           storageKey: DESC_STORAGE_KEY_V2,
           overrides: state.descOverrides,
-          legacyStorageKey: DESC_STORAGE_KEY_LEGACY_V1,
-          legacyOverrides: state.descOverridesLegacy,
           registry: constants.VARIABLE_DESCRIPTIONS || {}
         });
       });

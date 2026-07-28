@@ -340,33 +340,12 @@
           "exceptions": [
             {
               "name": "OTHERS",
-              "originDecls": [],
               "value": "1"
             }
           ],
           "exporting": [
             {
               "name": "iv_a",
-              "originDecls": [
-                {
-                  "objectType": "DATA",
-                  "name": "lv_a",
-                  "file": "extras-dynamic-bindings.abap",
-                  "lineStart": 2,
-                  "raw": "DATA lv_a TYPE i VALUE 1.",
-                  "comment": "",
-                  "scopeLabel": "GLOBAL",
-                  "scopeType": "GLOBAL",
-                  "scopeName": "",
-                  "structName": "",
-                  "structObjectType": "",
-                  "structLineStart": 0,
-                  "fieldPath": "",
-                  "traceFile": "",
-                  "traceLineStart": 0,
-                  "synthetic": false
-                }
-              ],
               "value": "lv_a",
               "valueDecl": {
                 "objectType": "DATA",
@@ -390,26 +369,6 @@
             },
             {
               "name": "iv_b",
-              "originDecls": [
-                {
-                  "objectType": "DATA",
-                  "name": "lv_b",
-                  "file": "extras-dynamic-bindings.abap",
-                  "lineStart": 3,
-                  "raw": "DATA lv_b TYPE string VALUE 'X'.",
-                  "comment": "",
-                  "scopeLabel": "GLOBAL",
-                  "scopeType": "GLOBAL",
-                  "scopeName": "",
-                  "structName": "",
-                  "structObjectType": "",
-                  "structLineStart": 0,
-                  "fieldPath": "",
-                  "traceFile": "",
-                  "traceLineStart": 0,
-                  "synthetic": false
-                }
-              ],
               "value": "lv_b",
               "valueDecl": {
                 "objectType": "DATA",
@@ -435,26 +394,6 @@
           "importing": [
             {
               "name": "ev_c",
-              "originDecls": [
-                {
-                  "objectType": "DATA",
-                  "name": "lv_c",
-                  "file": "extras-dynamic-bindings.abap",
-                  "lineStart": 4,
-                  "raw": "DATA lv_c TYPE i VALUE 0.",
-                  "comment": "",
-                  "scopeLabel": "GLOBAL",
-                  "scopeType": "GLOBAL",
-                  "scopeName": "",
-                  "structName": "",
-                  "structObjectType": "",
-                  "structLineStart": 0,
-                  "fieldPath": "",
-                  "traceFile": "",
-                  "traceLineStart": 0,
-                  "synthetic": false
-                }
-              ],
               "value": "lv_c",
               "valueDecl": {
                 "objectType": "DATA",
@@ -481,26 +420,6 @@
           "tables": [
             {
               "name": "et_tab",
-              "originDecls": [
-                {
-                  "objectType": "DATA",
-                  "name": "lt_tab",
-                  "file": "extras-dynamic-bindings.abap",
-                  "lineStart": 5,
-                  "raw": "DATA lt_tab TYPE STANDARD TABLE OF string WITH EMPTY KEY.",
-                  "comment": "",
-                  "scopeLabel": "GLOBAL",
-                  "scopeType": "GLOBAL",
-                  "scopeName": "",
-                  "structName": "",
-                  "structObjectType": "",
-                  "structLineStart": 0,
-                  "fieldPath": "",
-                  "traceFile": "",
-                  "traceLineStart": 0,
-                  "synthetic": false
-                }
-              ],
               "value": "lt_tab",
               "valueDecl": {
                 "objectType": "DATA",

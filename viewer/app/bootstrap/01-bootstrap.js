@@ -7,11 +7,10 @@
   const state = runtime.state;
   const els = runtime.els;
   const constants = runtime.constants || {};
-  const { DESC_STORAGE_KEY_V2, DESC_STORAGE_KEY_LEGACY_V1, SETTINGS_STORAGE_KEY_V1, TEMPLATE_CONFIG_STORAGE_KEY_V1, THEME_STORAGE_KEY_V1, LAYOUT_SPLIT_STORAGE_KEY_V1, LAYOUT_SPLIT_DEFAULT, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX, MOBILE_LAYOUT_QUERY, RENDER_TREE_OPTIONS, DECL_TYPE_OPTIONS, NAME_CODE_OPTIONS, DEFAULT_SETTINGS, TEMPLATE_DEFAULT_CONFIG_V1, SAMPLE_ABAP } = constants;
+  const { DESC_STORAGE_KEY_V2, SETTINGS_STORAGE_KEY_V1, TEMPLATE_CONFIG_STORAGE_KEY_V1, THEME_STORAGE_KEY_V1, LAYOUT_SPLIT_STORAGE_KEY_V1, LAYOUT_SPLIT_DEFAULT, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX, MOBILE_LAYOUT_QUERY, RENDER_TREE_OPTIONS, DECL_TYPE_OPTIONS, NAME_CODE_OPTIONS, DEFAULT_SETTINGS, TEMPLATE_DEFAULT_CONFIG_V1, SAMPLE_ABAP } = constants;
   const setError = runtime.requireServiceMethod("runtimeState", "setError");
   const renderBuildInfo = runtime.requireServiceMethod("runtimeState", "renderBuildInfo");
   const loadDescOverrides = runtime.requireServiceMethod("runtimeState", "loadDescOverrides");
-  const loadLegacyDescOverrides = runtime.requireServiceMethod("runtimeState", "loadLegacyDescOverrides");
   const loadSettings = runtime.requireServiceMethod("runtimeState", "loadSettings");
   const setTemplateConfigError = runtime.requireServiceMethod("runtimeState", "setTemplateConfigError");
   const getDefaultTemplateConfig = runtime.requireServiceMethod("runtimeState", "getDefaultTemplateConfig");
@@ -161,7 +160,6 @@ function start() {
   function init() {
     renderBuildInfo();
     state.descOverrides = loadDescOverrides();
-    state.descOverridesLegacy = loadLegacyDescOverrides();
     state.settings = loadSettings();
     state.templateConfig = loadTemplateConfig();
     if (!state.templateConfig || typeof state.templateConfig !== "object" || Array.isArray(state.templateConfig)) {
@@ -315,8 +313,6 @@ function start() {
         openJsonModal({
           storageKey: DESC_STORAGE_KEY_V2,
           overrides: state.descOverrides,
-          legacyStorageKey: DESC_STORAGE_KEY_LEGACY_V1,
-          legacyOverrides: state.descOverridesLegacy,
           registry: constants.VARIABLE_DESCRIPTIONS || {}
         });
       });

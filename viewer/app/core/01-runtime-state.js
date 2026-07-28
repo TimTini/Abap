@@ -91,7 +91,7 @@ const els = {
     templateSelectionAnchorIndex: "",
     selectedDeclKey: "",
     descOverrides: {},
-    descOverridesLegacy: {},
+    typeUsageIndex: new Map(),
     constantInitializers: new Map(),
     activeEdit: null,
     inputLineOffsets: [],
@@ -132,7 +132,6 @@ const els = {
   };
 
   const DESC_STORAGE_KEY_V2 = "abap-parser-viewer.declDescOverrides.v2";
-  const DESC_STORAGE_KEY_LEGACY_V1 = "abap-parser-viewer.descOverrides.v1";
   const SETTINGS_STORAGE_KEY_V1 = "abap-parser-viewer.settings.v1";
   const TEMPLATE_CONFIG_STORAGE_KEY_V1 = "abap-parser-viewer.templateConfig.v1";
   const THEME_STORAGE_KEY_V1 = "abap-parser-viewer.theme.v1";
@@ -159,7 +158,8 @@ const els = {
     "CLASS-DATA",
     "FIELD-SYMBOLS",
     "FORM_PARAM",
-    "METHOD_PARAM"
+    "METHOD_PARAM",
+    "TYPE_COMPONENT"
   ];
 
   const NAME_CODE_OPTIONS = [
@@ -186,7 +186,8 @@ const els = {
       "CLASS-DATA",
       "FIELD-SYMBOLS",
       "FORM_PARAM",
-      "METHOD_PARAM"
+      "METHOD_PARAM",
+      "TYPE_COMPONENT"
     ],
     structDescTemplate: "{{struct}}-{{item}}",
     nameTemplatesByCode: {
@@ -2279,7 +2280,7 @@ const els = {
       DEFAULT: UNIFIED_KEYWORD_ROW_TEMPLATE_V1,
       APPEND: createKeywordDescriptionTemplate(),
       APPEND_LINES_OF: createAppendLinesOfTemplate(),
-      ASSIGNMENT: ASSIGNMENT_ROW_TEMPLATE_V1,
+      ASSIGNMENT: createKeywordDescriptionTemplate(),
       CALL_FUNCTION: createKeywordDescriptionTemplate(),
       CASE: createKeywordDescriptionTemplate(),
       CLEAR: createKeywordDescriptionTemplate(),
@@ -2488,15 +2489,12 @@ const els = {
     return loadStorageObject(DESC_STORAGE_KEY_V2);
   }
 
-  function loadLegacyDescOverrides() {
-    return loadStorageObject(DESC_STORAGE_KEY_LEGACY_V1);
-  }
-
   function saveDescOverrides() {
     try {
       localStorage.setItem(DESC_STORAGE_KEY_V2, JSON.stringify(state.descOverrides || {}));
+      return true;
     } catch {
-      // ignore
+      return false;
     }
   }
 
@@ -3122,7 +3120,6 @@ const els = {
   const runtimeConstants = {
     ...(runtime.constants || {}),
     DESC_STORAGE_KEY_V2,
-    DESC_STORAGE_KEY_LEGACY_V1,
     SETTINGS_STORAGE_KEY_V1,
     TEMPLATE_CONFIG_STORAGE_KEY_V1,
     THEME_STORAGE_KEY_V1,
@@ -3149,7 +3146,6 @@ const els = {
     getValueEntries,
     getFirstValueFromValues,
     loadDescOverrides,
-    loadLegacyDescOverrides,
     saveDescOverrides,
     normalizeSettings,
     loadSettings,

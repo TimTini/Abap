@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.07.26-r80">
-  <meta name="abap-viewer-updated-at" content="2026-07-26 22:32:05">
-  <meta name="abap-viewer-updated-note" content="Excel imports now preserve adjacent outlines encoded through shared cell edges.">
+  <meta name="abap-viewer-version" content="v2026.07.28-r86">
+  <meta name="abap-viewer-updated-at" content="2026-07-28 15:18:11">
+  <meta name="abap-viewer-updated-note" content="Scope-safe description edits; TYPE items fan out to typed DATA/FIELD-SYMBOL items and exact local call chains only.">
   <title>ABAP Parser Viewer</title>
     <link rel="stylesheet" href="./styles/viewer.css">
 </head>
@@ -13,22 +13,23 @@
   <div class="container">
     <header id="appHeader">
       <h1>ABAP Parser Viewer</h1>
-      <p>Paste ABAP code (or JSON output) and click Render.</p>
-      <p class="build-info" id="buildInfo">Updated: manual timestamp not set.</p>
+      <div class="header-actions">
+        <button type="button" id="parseBtn">Render</button>
+        <details class="controls-secondary-menu">
+          <summary>Config</summary>
+          <div class="controls-secondary-body">
+            <label class="toggle"><input type="checkbox" id="themeToggle" checked>dark</label>
+            <button type="button" id="descBtn" class="secondary">Data</button>
+            <button type="button" id="settingsBtn" class="secondary">Settings</button>
+          </div>
+        </details>
+      </div>
     </header>
-
-    <div class="controls" id="appControls">
-      <button type="button" id="parseBtn">Render</button>
-      <label class="toggle"><input type="checkbox" id="themeToggle" checked>dark</label>
-      <button type="button" id="descBtn" class="secondary">Data</button>
-      <button type="button" id="settingsBtn" class="secondary">Settings</button>
-      <span class="muted hint">Tip: use Template or Data to inspect parsed declarations and jump to source lines.</span>
-    </div>
 
     <div class="layout" id="mainLayout">
       <div class="panel">
         <div class="panel-heading-row">
-          <h2>Input (ABAP / JSON)</h2>
+          <h2>Input</h2>
           <div class="goto-line-controls">
             <label for="inputGotoLine">Goto line</label>
             <input type="number" id="inputGotoLine" min="1" step="1" placeholder="e.g. 120">
@@ -62,21 +63,28 @@
         </div>
         <div id="templatePreviewPanel">
           <div class="template-controls">
-            <span class="template-key-mode">
-              Template key mode
-              <span id="templateKeyMode" class="template-key-badge">AUTO: objectType -&gt; DEFAULT</span>
-            </span>
-            <label class="template-copy-mode">
-              <input type="checkbox" id="templateCopyTableOnly" checked>
-              Copy table only
-            </label>
-            <button type="button" id="templateCopySelectedBtn" class="secondary" disabled>Copy Selected (0)</button>
-            <button type="button" id="templateCopyAllBtn" class="secondary">Copy All</button>
-            <button type="button" id="templateResetBtn" class="secondary">Reset default</button>
-            <button type="button" id="templateExportBtn" class="secondary">Export config</button>
-            <button type="button" id="templateImportBtn" class="secondary">Import config</button>
-            <button type="button" id="templateApplyBtn" class="secondary">Template Form</button>
-            <button type="button" id="templateFilterModalBtn" class="secondary">Object Filter</button>
+            <div class="template-controls-primary">
+              <button type="button" id="templateCopySelectedBtn" class="secondary" disabled>Copy Selected (0)</button>
+              <button type="button" id="templateCopyAllBtn" class="secondary">Copy All</button>
+            </div>
+            <details class="template-controls-secondary-menu">
+              <summary>Template config</summary>
+              <div class="template-controls-secondary-body">
+                <span class="template-key-mode">
+                  Template key mode
+                  <span id="templateKeyMode" class="template-key-badge">AUTO: objectType -&gt; DEFAULT</span>
+                </span>
+                <label class="template-copy-mode">
+                  <input type="checkbox" id="templateCopyTableOnly" checked>
+                  Copy table only
+                </label>
+                <button type="button" id="templateResetBtn" class="secondary">Reset default</button>
+                <button type="button" id="templateExportBtn" class="secondary">Export config</button>
+                <button type="button" id="templateImportBtn" class="secondary">Import config</button>
+                <button type="button" id="templateApplyBtn" class="secondary">Template Form</button>
+                <button type="button" id="templateFilterModalBtn" class="secondary">Object Filter</button>
+              </div>
+            </details>
             <input type="file" id="templateImportInput" accept=".json,application/json,text/plain" hidden>
           </div>
           <div id="templateConfigError" class="template-error" role="alert" aria-live="polite"></div>

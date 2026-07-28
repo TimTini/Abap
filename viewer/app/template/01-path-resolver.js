@@ -7,7 +7,7 @@
   const state = runtime.state;
   const els = runtime.els;
   const constants = runtime.constants || {};
-  const { DESC_STORAGE_KEY_V2, DESC_STORAGE_KEY_LEGACY_V1, SETTINGS_STORAGE_KEY_V1, TEMPLATE_CONFIG_STORAGE_KEY_V1, THEME_STORAGE_KEY_V1, LAYOUT_SPLIT_STORAGE_KEY_V1, LAYOUT_SPLIT_DEFAULT, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX, MOBILE_LAYOUT_QUERY, RENDER_TREE_OPTIONS, DECL_TYPE_OPTIONS, NAME_CODE_OPTIONS, DEFAULT_SETTINGS, TEMPLATE_DEFAULT_CONFIG_V1, SAMPLE_ABAP } = constants;
+  const { DESC_STORAGE_KEY_V2, SETTINGS_STORAGE_KEY_V1, TEMPLATE_CONFIG_STORAGE_KEY_V1, THEME_STORAGE_KEY_V1, LAYOUT_SPLIT_STORAGE_KEY_V1, LAYOUT_SPLIT_DEFAULT, LAYOUT_SPLIT_MIN, LAYOUT_SPLIT_MAX, MOBILE_LAYOUT_QUERY, RENDER_TREE_OPTIONS, DECL_TYPE_OPTIONS, NAME_CODE_OPTIONS, DEFAULT_SETTINGS, TEMPLATE_DEFAULT_CONFIG_V1, SAMPLE_ABAP } = constants;
   const setError = runtime.requireServiceMethod("runtimeState", "setError");
   const getKeywordEntries = runtime.requireServiceMethod("runtimeState", "getKeywordEntries");
   const getValueEntries = runtime.requireServiceMethod("runtimeState", "getValueEntries");
@@ -52,6 +52,7 @@
   const getDeclOverrideLookupKeys = runtime.requireServiceMethod("descriptions", "getDeclOverrideLookupKeys");
   const cloneDeclWithPerformChainOverride = runtime.requireServiceMethod("descriptions", "cloneDeclWithPerformChainOverride");
   const getDeclOverrideStorageKey = runtime.requireServiceMethod("descriptions", "getDeclOverrideStorageKey");
+  const applyDeclDescriptionOverride = runtime.requireServiceMethod("descriptions", "applyDeclDescriptionOverride");
   const normalizeDescOverrideEntry = runtime.requireServiceMethod("descriptions", "normalizeDescOverrideEntry");
   const getDeclOverrideEntry = runtime.requireServiceMethod("descriptions", "getDeclOverrideEntry");
   const normalizeDeclDescText = runtime.requireServiceMethod("descriptions", "normalizeDeclDescText");
@@ -627,7 +628,8 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       READ_TABLE: ["itab", "into", "assigning", "refinto", "referenceinto", "reference-into", "index"],
       SELECT: ["into", "intotable", "into-table", "appendingtable", "appending-table", "forallentries", "for-all-entries", "assigning", "refinto", "referenceinto", "reference-into"],
       SORT_ITAB: ["itab"],
-      WRITE: ["output", "destination"]
+      WRITE: ["output", "destination"],
+      CONCATENATE: ["sources", "into", "separatedby", "separated-by", "linesof", "lines-of"]
     };
     const allowed = allowedByType[objectType];
     if (!Array.isArray(allowed) || !allowed.includes(entryName)) {
@@ -809,11 +811,11 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       return false;
     }
     const objectType = String(decl.objectType || "").toUpperCase();
-    if (objectType === "FORM_PARAM") {
+    if (objectType === "FORM_PARAM" || objectType === "METHOD_PARAM") {
       return true;
     }
     return objectType === "STRUCT_FIELD"
-      && String(decl.structObjectType || "").toUpperCase() === "FORM_PARAM"
+      && ["FORM_PARAM", "METHOD_PARAM"].includes(String(decl.structObjectType || "").toUpperCase())
       && String(decl.structName || "").trim() !== ""
       && String(decl.fieldPath || "").trim() !== "";
   }
@@ -823,10 +825,10 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       return "";
     }
     const objectType = String(decl.objectType || "").toUpperCase();
-    if (objectType === "FORM_PARAM") {
+    if (objectType === "FORM_PARAM" || objectType === "METHOD_PARAM") {
       return String(decl.name || "").trim().toUpperCase();
     }
-    if (objectType === "STRUCT_FIELD" && String(decl.structObjectType || "").toUpperCase() === "FORM_PARAM") {
+    if (objectType === "STRUCT_FIELD" && ["FORM_PARAM", "METHOD_PARAM"].includes(String(decl.structObjectType || "").toUpperCase())) {
       return String(decl.structName || "").trim().toUpperCase();
     }
     return "";
@@ -1087,7 +1089,9 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     "lines-of": ["source", "source-itab"],
     "source-itab": ["source"],
     "to-itab": ["to"],
-    "transporting-no-fields": [],
+    "transporting-no-fields": ["transportingNoFields", "transporting-no-fields"],
+    "binary-search": ["binarySearch", "binary-search"],
+    "from-index": ["from"],
     "when-others": ["branch"]
   };
 
@@ -1125,7 +1129,8 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     "MOVE-CORRESPONDING": "source",
     CLEAR: "target",
     METHOD: "name",
-    WRITE: "output"
+    WRITE: "output",
+    CONCATENATE: "sources"
   };
 
   function keywordPositionInRaw(keyword, raw) {
@@ -1694,6 +1699,127 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     return parts;
   }
 
+  function splitTemplateExpressionOperands(rawValue) {
+    const text = String(rawValue || "").trim();
+    if (!text) {
+      return [];
+    }
+
+    const operands = [];
+    let current = "";
+    let quote = "";
+    let roundDepth = 0;
+    let squareDepth = 0;
+    let curlyDepth = 0;
+
+    const pushCurrent = () => {
+      const part = current.trim();
+      if (part) {
+        operands.push(part);
+      }
+      current = "";
+    };
+
+    const isTopLevel = () => roundDepth === 0 && squareDepth === 0 && curlyDepth === 0;
+
+    for (let index = 0; index < text.length; index += 1) {
+      const ch = text[index];
+      const next = text[index + 1] || "";
+
+      if (quote) {
+        current += ch;
+        if ((quote === "'" || quote === "`") && ch === quote && next === quote) {
+          current += next;
+          index += 1;
+          continue;
+        }
+        if (quote === "|" && ch === "\\" && next) {
+          current += next;
+          index += 1;
+          continue;
+        }
+        if (ch === quote) {
+          quote = "";
+        }
+        continue;
+      }
+
+      if (ch === "'" || ch === "`" || ch === "|") {
+        quote = ch;
+        current += ch;
+        continue;
+      }
+      if (ch === "(") {
+        roundDepth += 1;
+        current += ch;
+        continue;
+      }
+      if (ch === ")") {
+        roundDepth = Math.max(0, roundDepth - 1);
+        current += ch;
+        continue;
+      }
+      if (ch === "[") {
+        squareDepth += 1;
+        current += ch;
+        continue;
+      }
+      if (ch === "]") {
+        squareDepth = Math.max(0, squareDepth - 1);
+        current += ch;
+        continue;
+      }
+      if (ch === "{") {
+        curlyDepth += 1;
+        current += ch;
+        continue;
+      }
+      if (ch === "}") {
+        curlyDepth = Math.max(0, curlyDepth - 1);
+        current += ch;
+        continue;
+      }
+
+      if (isTopLevel()) {
+        if (ch === "&" && next === "&") {
+          pushCurrent();
+          index += 1;
+          continue;
+        }
+        if (ch === "+" || ch === "*" || ch === "/") {
+          pushCurrent();
+          continue;
+        }
+        if (ch === "-") {
+          const hasTrailingSpace = current.length > 0 && /\s$/.test(current);
+          const trimmed = current.trim();
+          const nextIsIdent = /[A-Za-z_<@]/.test(next);
+          const endsWithIdent = /[A-Za-z0-9_>]$/.test(trimmed);
+          // Keep structure/component paths like ids_inner-item or <fs>-field together.
+          if (!hasTrailingSpace && endsWithIdent && nextIsIdent) {
+            current += ch;
+            continue;
+          }
+          const prev = trimmed.slice(-1);
+          const unaryContext = !trimmed
+            || /[+\-*/(&]$/.test(prev)
+            || /\b(?:AND|OR|EQ|NE|LT|LE|GT|GE)$/i.test(trimmed);
+          if (unaryContext) {
+            current += ch;
+            continue;
+          }
+          pushCurrent();
+          continue;
+        }
+      }
+
+      current += ch;
+    }
+
+    pushCurrent();
+    return operands.length ? operands : [text];
+  }
+
   function findTemplateTopLevelWord(rawValue, word, startIndex) {
     const text = String(rawValue || "");
     const upperWord = String(word || "").trim().toUpperCase();
@@ -1780,7 +1906,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
 
   function isTemplateSafeSimpleListItem(value) {
     const text = String(value || "").trim();
-    if (!text || /^(?:AS|CASE|CAST|DISTINCT|END|FIELDS|NO|SINGLE|THEN|WHEN)$/i.test(text)) {
+    if (!text || /^(?:AS|ASCENDING|CASE|CAST|DESCENDING|DISTINCT|END|FIELDS|NO|SINGLE|TEXT|THEN|WHEN)$/i.test(text)) {
       return false;
     }
     if (/^\(\s*[A-Za-z_][A-Za-z0-9_]*\s*\)$/.test(text)) {
@@ -1794,6 +1920,137 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     return items.length > 1 && items.every((item) => isTemplateSafeSimpleListItem(item)) ? items : null;
   }
 
+  function normalizeTemplateItabComponentToken(rawValue) {
+    let text = String(rawValue || "").trim().replace(/^@+/, "");
+    const parenMatch = text.match(/^\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)$/);
+    if (parenMatch && parenMatch[1]) {
+      text = parenMatch[1];
+    }
+    return text.trim();
+  }
+
+  function splitTemplateItabComponentList(rawValue) {
+    const items = splitTemplateTopLevelText(rawValue, "space");
+    const out = [];
+    for (const item of items) {
+      if (!isTemplateSafeSimpleListItem(item)) {
+        continue;
+      }
+      const token = normalizeTemplateItabComponentToken(item);
+      if (!token || /[-~>]/.test(token)) {
+        continue;
+      }
+      if (!/^(?:table_line|[A-Za-z_][A-Za-z0-9_]*)$/i.test(token)) {
+        continue;
+      }
+      out.push(token);
+    }
+    return out.length ? out : null;
+  }
+
+  function getTemplateStatementItabEntry(sourceObj) {
+    if (!sourceObj || typeof sourceObj !== "object") {
+      return null;
+    }
+    const objectType = String(sourceObj.objectType || "").trim().toUpperCase();
+    const valueEntries = flattenTemplateValueEntries(sourceObj);
+    const wantedNames = objectType === "MODIFY_ITAB"
+      ? ["itab", "itabOrDbtab"]
+      : objectType === "DELETE_ITAB"
+        ? ["target", "itab", "from"]
+        : ["itab"];
+    for (const wanted of wantedNames) {
+      const entry = valueEntries.find((item) => (
+        normalizeTemplatePairToken(item && item.name) === normalizeTemplatePairToken(wanted)
+        || normalizeTemplatePairToken(item && item.label) === normalizeTemplatePairToken(wanted)
+      ));
+      if (entry) {
+        return entry;
+      }
+    }
+    return null;
+  }
+
+  function getTemplateStatementItabName(sourceObj) {
+    const entry = getTemplateStatementItabEntry(sourceObj);
+    if (!entry) {
+      return "";
+    }
+    const raw = String(entry.value || entry.name || "").trim().replace(/^@+/, "").split(/\s+/)[0] || "";
+    if (/^<[^>]+>$/.test(raw) || /^[A-Za-z_][A-Za-z0-9_]*$/.test(raw)) {
+      return raw;
+    }
+    return "";
+  }
+
+  function getTemplateStatementItabScopeHint(sourceObj, ownerContext) {
+    const entry = getTemplateStatementItabEntry(sourceObj);
+    const fromItabDecl = String(entry && entry.decl && entry.decl.scopeLabel || "").trim();
+    if (fromItabDecl) {
+      return fromItabDecl;
+    }
+    const fromOwner = String(ownerContext && ownerContext.scopeLabel || "").trim();
+    if (fromOwner) {
+      return fromOwner;
+    }
+    const hints = ownerContext && ownerContext.scopeHints;
+    if (hints instanceof Set) {
+      for (const hint of hints.values()) {
+        const text = String(hint || "").trim();
+        if (text) {
+          return text;
+        }
+      }
+    } else if (Array.isArray(hints) && hints.length) {
+      const text = String(hints[0] || "").trim();
+      if (text) {
+        return text;
+      }
+    }
+    return "";
+  }
+
+  function lookupTemplateItabComponentDecl(itabName, componentToken, scopeHint) {
+    const structName = String(itabName || "").trim();
+    const fieldPath = normalizeTemplateItabComponentToken(componentToken);
+    if (!structName || !fieldPath) {
+      return null;
+    }
+    const fullRefUpper = `${structName}-${fieldPath}`.toUpperCase();
+    const wantedScope = String(scopeHint || "").trim().toUpperCase();
+    const decls = state.data && Array.isArray(state.data.decls) ? state.data.decls : [];
+
+    let best = null;
+    let bestScore = Number.NEGATIVE_INFINITY;
+    for (const decl of decls) {
+      if (!decl || typeof decl !== "object") {
+        continue;
+      }
+      if (String(decl.objectType || "").trim().toUpperCase() !== "STRUCT_FIELD") {
+        continue;
+      }
+      if (String(decl.name || "").trim().toUpperCase() !== fullRefUpper) {
+        continue;
+      }
+
+      const declScope = String(decl.scopeLabel || "").trim().toUpperCase();
+      let score = 0;
+      if (wantedScope && declScope === wantedScope) {
+        score += 1000;
+      } else if (wantedScope && declScope) {
+        score -= 100;
+      }
+      if (!decl.synthetic) {
+        score += 10;
+      }
+      if (score > bestScore) {
+        best = decl;
+        bestScore = score;
+      }
+    }
+    return best;
+  }
+
   function getTemplateSafeRawListRows(sourceObj, keywordLabel, valueEntry) {
     const objectType = String(sourceObj && sourceObj.objectType || "").trim().toUpperCase();
     if (objectType === "SELECT" && keywordLabel === "stmt") {
@@ -1805,10 +2062,13 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       return splitTemplateSafeSimpleList(fieldsRaw);
     }
     if (objectType === "SORT_ITAB" && keywordLabel === "by") {
-      return splitTemplateSafeSimpleList(valueEntry && valueEntry.value);
+      return splitTemplateItabComponentList(valueEntry && valueEntry.value);
     }
-    if (objectType === "MODIFY_ITAB" && keywordLabel === "transporting") {
-      return splitTemplateSafeSimpleList(valueEntry && valueEntry.value);
+    if (
+      (objectType === "MODIFY_ITAB" || objectType === "READ_TABLE")
+      && keywordLabel === "transporting"
+    ) {
+      return splitTemplateItabComponentList(valueEntry && valueEntry.value);
     }
     return null;
   }
@@ -1828,11 +2088,187 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     return false;
   }
 
+  function getTemplateAssignmentOperandRows(sourceObj, ownerContext, objectIndexOneBased) {
+    if (!sourceObj || typeof sourceObj !== "object") {
+      return null;
+    }
+    if (String(sourceObj.objectType || "").trim().toUpperCase() !== "ASSIGNMENT") {
+      return null;
+    }
+
+    const valueEntries = flattenTemplateValueEntries(sourceObj);
+    const findEntry = (name) => valueEntries.find((entry) => (
+      normalizeTemplatePairToken(entry && entry.name) === name
+      || normalizeTemplatePairToken(entry && entry.label) === name
+    )) || null;
+
+    const targetEntry = findEntry("target");
+    const exprEntry = findEntry("expr") || findEntry("source") || findEntry("value");
+    const rows = [];
+
+    if (targetEntry) {
+      const targetRow = buildTemplateSemanticValueRow(targetEntry, ownerContext);
+      rows.push(createTemplateExpandedRow(
+        targetRow.text,
+        targetRow.declCandidates,
+        targetRow.provenance,
+        "Đích"
+      ));
+    }
+
+    const exprRaw = String(exprEntry && exprEntry.value !== undefined && exprEntry.value !== null
+      ? exprEntry.value
+      : "").trim();
+    if (!exprRaw) {
+      return rows.length ? rows : null;
+    }
+
+    const operands = splitTemplateExpressionOperands(exprRaw);
+    const exprDeclName = String(
+      (exprEntry && exprEntry.declRef)
+      || (exprEntry && exprEntry.decl && exprEntry.decl.name)
+      || ""
+    ).trim().toUpperCase();
+
+    for (let index = 0; index < operands.length; index += 1) {
+      const part = String(operands[index] || "").trim();
+      if (!part) {
+        continue;
+      }
+
+      if (isTemplateLiteralOrWildcard(part) || /^[+-]?\d+(?:\.\d+)?$/i.test(part)) {
+        rows.push(createTemplateExpandedRow(part, [], {
+          status: "not_applicable",
+          reasonCode: "LITERAL_NO_DECL"
+        }, "Nguồn"));
+        continue;
+      }
+
+      const matchesWholeExpr = operands.length === 1
+        && part.toUpperCase() === exprRaw.toUpperCase();
+      const matchesBoundDecl = exprDeclName
+        && part.replace(/^@/, "").toUpperCase() === exprDeclName.replace(/^@/, "");
+
+      let partEntry;
+      if ((matchesWholeExpr || matchesBoundDecl) && exprEntry) {
+        partEntry = {
+          ...exprEntry,
+          value: part
+        };
+      } else {
+        partEntry = ensureTemplateCanonicalValueEntry(sourceObj, {
+          name: "expr",
+          label: "expr",
+          value: part,
+          userDesc: "",
+          codeDesc: "",
+          decl: null
+        }, objectIndexOneBased);
+      }
+
+      const valueRow = buildTemplateSemanticValueRow(partEntry, ownerContext);
+      rows.push(createTemplateExpandedRow(
+        valueRow.text || part,
+        valueRow.declCandidates,
+        valueRow.provenance,
+        "Nguồn"
+      ));
+    }
+
+    return rows.length ? rows : null;
+  }
+
+  function getTemplateConcatenateSourceRows(sourceObj, valueEntry, ownerContext, objectIndexOneBased) {
+    if (!sourceObj || typeof sourceObj !== "object") {
+      return null;
+    }
+    if (String(sourceObj.objectType || "").trim().toUpperCase() !== "CONCATENATE") {
+      return null;
+    }
+
+    const valueEntries = flattenTemplateValueEntries(sourceObj);
+    const sourcesEntry = valueEntry && normalizeTemplatePairToken(valueEntry.name || valueEntry.label) === "sources"
+      ? valueEntry
+      : (valueEntries.find((entry) => normalizeTemplatePairToken(entry && entry.name) === "sources"
+        || normalizeTemplatePairToken(entry && entry.label) === "sources") || null);
+    const raw = String(sourcesEntry && sourcesEntry.value !== undefined && sourcesEntry.value !== null
+      ? sourcesEntry.value
+      : "").trim();
+    if (!raw) {
+      return null;
+    }
+
+    const parts = splitTemplateSafeSimpleList(raw) || splitTemplateTopLevelText(raw, "space");
+    if (!Array.isArray(parts) || !parts.length) {
+      return null;
+    }
+
+    const boundName = String(
+      (sourcesEntry && sourcesEntry.declRef)
+      || (sourcesEntry && sourcesEntry.decl && sourcesEntry.decl.name)
+      || ""
+    ).trim().toUpperCase();
+
+    return parts.map((part) => {
+      const text = String(part || "").trim();
+      if (!text) {
+        return createTemplateExpandedRow("", [], {
+          status: "not_applicable",
+          reasonCode: "MISSING_PROVENANCE"
+        }, "CONCATENATE");
+      }
+      if (isTemplateLiteralOrWildcard(text) || /^[+-]?\d+(?:\.\d+)?$/i.test(text)) {
+        return createTemplateExpandedRow(text, [], {
+          status: "not_applicable",
+          reasonCode: "LITERAL_NO_DECL"
+        }, "CONCATENATE");
+      }
+
+      const matchesBound = boundName && text.replace(/^@/, "").toUpperCase() === boundName.replace(/^@/, "");
+      const matchesWhole = parts.length === 1 && text.toUpperCase() === raw.toUpperCase();
+      let partEntry;
+      if ((matchesBound || matchesWhole) && sourcesEntry) {
+        partEntry = { ...sourcesEntry, value: text };
+      } else {
+        partEntry = ensureTemplateCanonicalValueEntry(sourceObj, {
+          name: "sources",
+          label: "sources",
+          value: text,
+          userDesc: "",
+          codeDesc: "",
+          decl: null
+        }, objectIndexOneBased);
+      }
+      const valueRow = buildTemplateSemanticValueRow(partEntry, ownerContext);
+      return createTemplateExpandedRow(
+        valueRow.text || text,
+        valueRow.declCandidates,
+        valueRow.provenance,
+        "CONCATENATE"
+      );
+    });
+  }
+
   function getTemplateExpandedKeywordRows(sourceObj, keyword, valueEntry, ownerContext, objectIndexOneBased) {
     const keywordLabel = normalizeTemplatePairToken(keyword && keyword.label);
     const objectType = String(sourceObj && sourceObj.objectType || "").trim().toUpperCase();
     if (shouldSkipConditionKeywordInTemplateRows(objectType, keywordLabel)) {
       return [];
+    }
+    if (
+      objectType === "ASSIGNMENT"
+      && ["assign", "add-assign", "sub-assign", "mul-assign", "div-assign", "cast"].includes(keywordLabel)
+    ) {
+      const assignmentRows = getTemplateAssignmentOperandRows(sourceObj, ownerContext, objectIndexOneBased);
+      if (Array.isArray(assignmentRows) && assignmentRows.length) {
+        return assignmentRows;
+      }
+    }
+    if (objectType === "CONCATENATE" && (keywordLabel === "stmt" || keywordLabel === "sources")) {
+      const sourceRows = getTemplateConcatenateSourceRows(sourceObj, valueEntry, ownerContext, objectIndexOneBased);
+      if (Array.isArray(sourceRows) && sourceRows.length) {
+        return sourceRows;
+      }
     }
     const semanticRows = getTemplateSemanticSectionRows(sourceObj, keywordLabel, ownerContext, objectIndexOneBased);
     if (Array.isArray(semanticRows) && semanticRows.length) {
@@ -1843,12 +2279,37 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       return conditionRows;
     }
     const rawListRows = getTemplateSafeRawListRows(sourceObj, keywordLabel, valueEntry);
-    return Array.isArray(rawListRows) && rawListRows.length
-      ? rawListRows.map((text) => createTemplateExpandedRow(text, [], {
+    if (Array.isArray(rawListRows) && rawListRows.length) {
+      const objectType = String(sourceObj && sourceObj.objectType || "").trim().toUpperCase();
+      const itabName = (
+        objectType === "SORT_ITAB"
+        || objectType === "MODIFY_ITAB"
+        || objectType === "READ_TABLE"
+      )
+        ? getTemplateStatementItabName(sourceObj)
+        : "";
+      return rawListRows.map((text) => {
+        const scopeHint = getTemplateStatementItabScopeHint(sourceObj, ownerContext);
+        const componentDecl = itabName
+          ? lookupTemplateItabComponentDecl(itabName, text, scopeHint)
+          : null;
+        if (componentDecl) {
+          return createTemplateExpandedRow(
+            text,
+            collectTemplateTraceAwareDeclCandidates(componentDecl, ownerContext),
+            {
+              status: "editable",
+              reasonCode: ""
+            }
+          );
+        }
+        return createTemplateExpandedRow(text, [], {
           status: "not_applicable",
           reasonCode: "NON_DECL_SCHEMA_VALUE"
-        }))
-      : null;
+        });
+      });
+    }
+    return null;
   }
 
   function buildTemplateKeywordRows(sourceObj, ownerContext, objectIndexOneBased) {
@@ -4426,7 +4887,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
           sourcePath: String(cellMeta.sourcePath || token),
           declCandidates: modalDeclCandidates,
           onSaveDesc: ({ decl, decls, text: nextDesc, skipNormalize }) => {
-            if (typeof getDeclOverrideStorageKey !== "function" || typeof saveDescOverrides !== "function") {
+            if (typeof applyDeclDescriptionOverride !== "function") {
               return { ok: false, error: "Description override helpers are unavailable." };
             }
             const targetDecls = Array.isArray(decls) && decls.length
@@ -4436,8 +4897,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
               return { ok: false, error: "Decl target is unavailable." };
             }
             const raw = String(nextDesc === undefined || nextDesc === null ? "" : nextDesc);
-            const trimmed = raw.trim();
-            const stored = skipNormalize ? trimmed : stripDeclCategoryPrefix(trimmed);
+            const clear = !raw.trim();
             state.pendingTemplateViewportAnchor = captureTemplateViewportAnchor({
               templateIndex: absIndex,
               gridRow: Number(cellElement && cellElement.getAttribute("data-template-grid-row")),
@@ -4446,13 +4906,17 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
 
             let wroteAnyKey = false;
             for (const targetDecl of targetDecls) {
-              let lookupKeys = [];
-              let declKey = "";
               try {
-                lookupKeys = getDeclLookupKeysSafe(targetDecl);
-                declKey = lookupKeys.length
-                  ? lookupKeys[0]
-                  : getDeclOverrideStorageKey(targetDecl);
+                const applied = applyDeclDescriptionOverride({
+                  decl: targetDecl,
+                  text: raw,
+                  skipNormalize: Boolean(skipNormalize),
+                  clear
+                });
+                if (applied === false || (applied && applied.ok === false)) {
+                  continue;
+                }
+                wroteAnyKey = true;
               } catch (err) {
                 warnTemplateProvenanceOnce("decl-key", {
                   objectId: obj && obj.id,
@@ -4464,32 +4928,11 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
                 });
                 continue;
               }
-              if (!declKey) {
-                continue;
-              }
-              const deleteKeys = String(declKey).startsWith("PERFORM_CHAIN:")
-                ? [declKey]
-                : (lookupKeys.length ? lookupKeys : [declKey]);
-              for (const key of deleteKeys) {
-                delete state.descOverrides[key];
-                if (state.descOverridesLegacy && typeof state.descOverridesLegacy === "object") {
-                  delete state.descOverridesLegacy[key];
-                }
-              }
-              if (stored) {
-                state.descOverrides[declKey] = skipNormalize ? { text: stored, noNormalize: true } : stored;
-              }
-              wroteAnyKey = true;
             }
 
             if (!wroteAnyKey) {
               state.pendingTemplateViewportAnchor = null;
               return { ok: false, error: "Decl key is unavailable." };
-            }
-            const saved = saveDescOverrides();
-            if (saved === false) {
-              state.pendingTemplateViewportAnchor = null;
-              return { ok: false, error: "Failed to persist description override." };
             }
             if (typeof renderTemplatePreview === "function") {
               renderTemplatePreview();
@@ -6210,7 +6653,6 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       TEMPLATE_CONFIG_STORAGE_KEY_V1,
       SETTINGS_STORAGE_KEY_V1,
       DESC_STORAGE_KEY_V2,
-      DESC_STORAGE_KEY_LEGACY_V1,
       THEME_STORAGE_KEY_V1,
       LAYOUT_SPLIT_STORAGE_KEY_V1,
       TEMPLATE_GUI_FILTER_STORAGE_KEY_V1,
@@ -6243,7 +6685,6 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       templateConfig: cloneViewerConfigValue(state.templateConfig || getDefaultTemplateConfig()),
       settings: cloneViewerConfigValue(state.settings || loadSettings()),
       descOverrides: cloneViewerConfigValue(state.descOverrides || {}),
-      descOverridesLegacy: cloneViewerConfigValue(state.descOverridesLegacy || {}),
       theme: state.theme,
       layoutLeftPane: state.layoutLeftPane,
       hiddenObjectTypes: Array.from(state.templateGuiHiddenTypes.values()),
@@ -6270,7 +6711,6 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     state.templateConfig = cloneViewerConfigValue(snapshot.templateConfig);
     state.settings = cloneViewerConfigValue(snapshot.settings);
     state.descOverrides = cloneViewerConfigValue(snapshot.descOverrides);
-    state.descOverridesLegacy = cloneViewerConfigValue(snapshot.descOverridesLegacy);
     state.templateGuiHiddenTypes = new Set(snapshot.hiddenObjectTypes || []);
     applyTheme(snapshot.theme, { save: false });
     applyLayoutSplit(snapshot.layoutLeftPane, { save: false });
@@ -6291,7 +6731,6 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     }
     if (selectedKeys.has("descriptionOverrides")) {
       localStorage.setItem(DESC_STORAGE_KEY_V2, JSON.stringify(prepared.descriptionOverrides));
-      localStorage.removeItem(DESC_STORAGE_KEY_LEGACY_V1);
     }
     if (selectedKeys.has("appearance")) {
       localStorage.setItem(THEME_STORAGE_KEY_V1, prepared.appearance.theme);
@@ -6324,7 +6763,6 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     }
     if (selectedKeys.has("descriptionOverrides")) {
       state.descOverrides = cloneViewerConfigValue(prepared.descriptionOverrides);
-      state.descOverridesLegacy = {};
     }
     if (selectedKeys.has("appearance")) {
       applyTheme(prepared.appearance.theme, { save: false });
@@ -8853,11 +9291,11 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         return false;
       }
       const objectType = String(decl.objectType || "").toUpperCase();
-      if (objectType === "FORM_PARAM") {
+      if (objectType === "FORM_PARAM" || objectType === "METHOD_PARAM") {
         return true;
       }
       return objectType === "STRUCT_FIELD"
-        && String(decl.structObjectType || "").toUpperCase() === "FORM_PARAM"
+        && ["FORM_PARAM", "METHOD_PARAM"].includes(String(decl.structObjectType || "").toUpperCase())
         && String(decl.structName || "").trim() !== ""
         && String(decl.fieldPath || "").trim() !== "";
     };
@@ -8938,7 +9376,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         : (String(candidate && candidate.currentDesc ? candidate.currentDesc : "") || getAtomicEffectiveDescSafe(decl));
       const itemDisplay = stripStructPrefixForModalItemText(itemDisplayRaw, String(decl.structName || ""));
 
-      if (String(candidate && candidate.declKey || "").startsWith("PERFORM_CHAIN:")) {
+      if (/^(?:PERFORM|METHOD)_CHAIN:/.test(String(candidate && candidate.declKey || ""))) {
         return {
           mode: "single",
           text: itemDisplay,

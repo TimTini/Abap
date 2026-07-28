@@ -1,0 +1,1310 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Data Source Chain Map · CodeGraph-style</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page: #e8eef5;
+      --panel: #ffffff;
+      --panel-soft: #f4f7fb;
+      --ink: #162033;
+      --muted: #607087;
+      --line: #ccd6e3;
+      --accent: #1769aa;
+      --accent-dark: #0e4d80;
+      --active: #c45c16;
+      --active-soft: #fff1e4;
+      --dim: #9aa8bb;
+      --good: #1f7a45;
+      --shadow: 0 10px 28px rgba(28, 48, 78, 0.1);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--page);
+      color: var(--ink);
+      font-family: "Segoe UI", Arial, sans-serif;
+    }
+
+    button, input {
+      font: inherit;
+    }
+
+    button {
+      min-height: 34px;
+      padding: 6px 11px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--ink);
+      cursor: pointer;
+      font-weight: 650;
+    }
+
+    button:hover { border-color: var(--accent); color: var(--accent-dark); }
+
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    button.primary:hover {
+      background: var(--accent-dark);
+      color: #fff;
+    }
+
+    button.is-active {
+      border-color: var(--accent);
+      background: #e7f4ff;
+      color: var(--accent-dark);
+    }
+
+    button:focus-visible,
+    .code-token:focus-visible,
+    .map-node:focus-visible,
+    .node-row:focus-visible {
+      outline: 3px solid rgba(23, 105, 170, 0.25);
+      outline-offset: 2px;
+    }
+
+    .app {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .topbar {
+      flex: 0 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+
+    .topbar h1 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+    }
+
+    .topbar .sub {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .top-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .workspace {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) minmax(260px, 320px);
+      gap: 0;
+    }
+
+    @media (max-width: 1100px) {
+      .workspace {
+        grid-template-columns: 1fr;
+        grid-template-rows: 220px minmax(360px, 1fr) 280px;
+      }
+    }
+
+    .col {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+    }
+
+    .col:last-child {
+      border-right: 0;
+      border-left: 1px solid var(--line);
+    }
+
+    .col-head {
+      flex: 0 0 auto;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-soft);
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .col-body {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+    }
+
+    .search-box {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .search-box input {
+      width: 100%;
+      min-height: 36px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 0 12px 10px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .filter-row button {
+      min-height: 28px;
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+
+    .node-list {
+      list-style: none;
+      margin: 0;
+      padding: 6px;
+    }
+
+    .node-row {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 4px 8px;
+      text-align: left;
+      padding: 8px 10px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: transparent;
+      margin-bottom: 2px;
+    }
+
+    .node-row:hover {
+      background: var(--panel-soft);
+      border-color: var(--line);
+    }
+
+    .node-row.is-selected {
+      background: var(--active-soft);
+      border-color: var(--active);
+    }
+
+    .node-row .name {
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .node-row .kind {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .node-row .line {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      align-self: center;
+      font-size: 11px;
+      color: var(--dim);
+    }
+
+    .map-col .col-body {
+      overflow: hidden;
+      position: relative;
+      background:
+        linear-gradient(90deg, rgba(204, 214, 227, 0.28) 1px, transparent 1px) 0 0 / 32px 32px,
+        linear-gradient(rgba(204, 214, 227, 0.28) 1px, transparent 1px) 0 0 / 32px 32px,
+        #f7fafc;
+    }
+
+    .map-wrap {
+      position: absolute;
+      inset: 0;
+      touch-action: none;
+    }
+
+    .map-wrap.is-panning {
+      cursor: grabbing;
+    }
+
+    .map-toolbar {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 2;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .map-toolbar button {
+      min-height: 32px;
+      min-width: 32px;
+      padding: 4px 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .map-zoom-label {
+      min-width: 48px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 6px 8px;
+    }
+
+    .map-hint {
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      z-index: 2;
+      max-width: 70%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      pointer-events: none;
+    }
+
+    #mapSvg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: grab;
+    }
+
+    #mapSvg:active { cursor: grabbing; }
+
+    .map-edge {
+      fill: none;
+      stroke: #93a4b8;
+      stroke-width: 2.5;
+    }
+
+    .map-edge.is-chain {
+      stroke: var(--active);
+      stroke-width: 3.5;
+    }
+
+    .map-node rect {
+      fill: #fff;
+      stroke: #7f93ab;
+      stroke-width: 1.8;
+      rx: 10;
+      ry: 10;
+    }
+
+    .map-node text {
+      fill: var(--ink);
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 13px;
+      pointer-events: none;
+    }
+
+    .map-node .kind-label {
+      fill: var(--muted);
+      font-size: 11px;
+    }
+
+    .map-node { cursor: pointer; }
+
+    .map-node.is-active rect {
+      fill: var(--active-soft);
+      stroke: var(--active);
+      stroke-width: 3;
+    }
+
+    .map-node.is-chain rect {
+      fill: #e8f6ee;
+      stroke: #2f8f57;
+      stroke-width: 2.4;
+    }
+
+    .detail-body {
+      padding: 12px;
+      font-size: 13px;
+    }
+
+    .detail-title {
+      margin: 0 0 4px;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 16px;
+    }
+
+    .detail-meta {
+      color: var(--muted);
+      margin-bottom: 12px;
+      font-size: 12px;
+    }
+
+    .detail-section {
+      margin-top: 14px;
+    }
+
+    .detail-section h3 {
+      margin: 0 0 6px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+
+    .rel-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .rel-list li {
+      margin: 0 0 4px;
+    }
+
+    .rel-list button {
+      width: 100%;
+      text-align: left;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+      min-height: 30px;
+      padding: 5px 8px;
+    }
+
+    .chain-text {
+      font-family: "Cascadia Code", Consolas, monospace;
+      white-space: pre-wrap;
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      line-height: 1.45;
+    }
+
+    .usage-list {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .usage-list li { margin: 2px 0; }
+
+    .empty-hint {
+      color: var(--muted);
+      margin: 0;
+      line-height: 1.45;
+    }
+
+    .code-drawer {
+      flex: 0 0 auto;
+      border-top: 1px solid var(--line);
+      background: var(--panel);
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.2s ease;
+    }
+
+    .code-drawer.is-open {
+      max-height: 38vh;
+    }
+
+    .code-drawer-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-soft);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .code-scroll {
+      max-height: calc(38vh - 40px);
+      overflow: auto;
+      padding: 8px 12px;
+    }
+
+    .code-view {
+      margin: 0;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: pre;
+      tab-size: 2;
+    }
+
+    .code-line {
+      display: flex;
+      gap: 10px;
+      min-height: 1.5em;
+    }
+
+    .code-line.is-focus {
+      background: rgba(196, 92, 22, 0.1);
+    }
+
+    .line-no {
+      flex: 0 0 44px;
+      text-align: right;
+      color: var(--dim);
+      user-select: none;
+    }
+
+    .code-token {
+      display: inline;
+      padding: 0 2px;
+      border-radius: 3px;
+      border: 1px solid transparent;
+      background: rgba(23, 105, 170, 0.08);
+      color: var(--accent-dark);
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .code-token.is-active {
+      background: var(--active-soft);
+      border-color: var(--active);
+      color: #8a3a00;
+      font-weight: 700;
+    }
+
+    .code-token.is-chain {
+      background: #e8f6ee;
+      border-color: #7ab894;
+      color: #14633a;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div>
+        <h1>Data Source Chain Map</h1>
+        <p class="sub">UX kiểu CodeGraph: search → focus chain → callers/callees. Parser graph từ deep_form / SAMPLE_ABAP.</p>
+      </div>
+      <div class="top-actions">
+        <button type="button" id="btnShowCode">Hiện code</button>
+        <button type="button" id="btnClear">Clear</button>
+        <span class="meta" id="sourceRef"></span>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <section class="col" aria-label="Search symbols">
+        <div class="col-head">Search</div>
+        <div class="search-box">
+          <input id="searchInput" type="search" placeholder="Tìm biến, FORM_PARAM, literal…" aria-label="Search nodes">
+        </div>
+        <div class="filter-row">
+          <button type="button" class="is-active" data-kind-filter="ALL">All</button>
+          <button type="button" data-kind-filter="ROOT">ROOT</button>
+          <button type="button" data-kind-filter="FORM_PARAM">FORM</button>
+          <button type="button" data-kind-filter="LOCAL">LOCAL</button>
+          <button type="button" data-kind-filter="BOUND">Có edge</button>
+        </div>
+        <div class="col-body">
+          <ul class="node-list" id="nodeList"></ul>
+        </div>
+      </section>
+
+      <section class="col map-col" aria-label="Focus map">
+        <div class="col-head">Map · focus chain · scroll zoom · kéo thả</div>
+        <div class="col-body">
+          <div class="map-wrap" id="mapPanel">
+            <div class="map-toolbar" aria-label="Map zoom">
+              <button type="button" id="btnZoomOut" title="Zoom out">−</button>
+              <span class="map-zoom-label" id="mapZoomLabel">100%</span>
+              <button type="button" id="btnZoomIn" title="Zoom in">+</button>
+              <button type="button" id="btnFit" title="Fit selection">Fit</button>
+              <button type="button" id="btnZoomReset" title="Reset view">Reset</button>
+            </div>
+            <svg id="mapSvg" role="img" aria-label="Data source chain map"></svg>
+            <div class="map-hint" id="mapHint">Chọn symbol bên trái hoặc click node để xem chain.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="col" aria-label="Context detail">
+        <div class="col-head">Context</div>
+        <div class="col-body detail-body" id="detailPanel" aria-live="polite">
+          <p class="empty-hint">Chưa chọn. Search / list / map → hiện callers, callees, chain, usages.</p>
+        </div>
+      </section>
+    </div>
+
+    <section class="code-drawer" id="codeDrawer" aria-label="Program source">
+      <div class="code-drawer-head">
+        <span>Program · examples/deep_form_demo.abap</span>
+        <button type="button" id="btnHideCode">Ẩn</button>
+      </div>
+      <div class="code-scroll" id="codePanel"></div>
+    </section>
+  </div>
+
+  <script src="./data-source-chain-map.sample.js"></script>
+  <script src="./data-source-chain-map.fixture.js"></script>
+  <script>
+(function () {
+  "use strict";
+
+  const fixture = window.DataSourceChainMapFixture;
+  const sample = window.DataSourceChainMapSample;
+  if (!fixture || !Array.isArray(fixture.nodes) || !Array.isArray(fixture.edges)) {
+    document.body.innerHTML = "<p style='padding:24px'>Fixture missing. Load data-source-chain-map.fixture.js</p>";
+    return;
+  }
+  if (!sample || typeof sample.sourceText !== "string" || !sample.sourceText) {
+    document.body.innerHTML = "<p style='padding:24px'>Sample missing. Run: node scripts/sync-data-source-chain-map-sample.js</p>";
+    return;
+  }
+
+  const sourceText = sample.sourceText;
+  const sourceRef = sample.sourceRef || fixture.sourceRef || "examples/deep_form_demo.abap";
+
+  const nodeById = new Map(fixture.nodes.map((n) => [n.id, n]));
+  const childrenById = new Map();
+  const parentsById = new Map();
+  const boundNodeIds = new Set();
+
+  for (const edge of fixture.edges) {
+    if (!childrenById.has(edge.from)) childrenById.set(edge.from, []);
+    if (!parentsById.has(edge.to)) parentsById.set(edge.to, []);
+    childrenById.get(edge.from).push(edge.to);
+    parentsById.get(edge.to).push(edge.from);
+    boundNodeIds.add(edge.from);
+    boundNodeIds.add(edge.to);
+  }
+
+  const ZOOM_MIN = 0.2;
+  const ZOOM_MAX = 5;
+  let selectedId = null;
+  let kindFilter = "ALL";
+  let searchQuery = "";
+  let mapContent = { width: 900, height: 600 };
+  let mapView = { x: 0, y: 0, w: 900, h: 600 };
+  let mapPan = null;
+  let mapDidPan = false;
+  let lastLayout = null;
+  let codeOpen = false;
+
+  const codePanel = document.getElementById("codePanel");
+  const codeDrawer = document.getElementById("codeDrawer");
+  const mapPanel = document.getElementById("mapPanel");
+  const mapSvg = document.getElementById("mapSvg");
+  const mapZoomLabel = document.getElementById("mapZoomLabel");
+  const mapHint = document.getElementById("mapHint");
+  const detailPanel = document.getElementById("detailPanel");
+  const nodeList = document.getElementById("nodeList");
+  const searchInput = document.getElementById("searchInput");
+
+  document.getElementById("sourceRef").textContent =
+    sourceRef + " · " + fixture.nodes.length + " nodes / " + fixture.edges.length + " edges" +
+    (fixture.generatedBy ? " · parser" : "");
+
+  const nodesByName = new Map();
+  for (const n of fixture.nodes) {
+    if (!nodesByName.has(n.name)) nodesByName.set(n.name, []);
+    nodesByName.get(n.name).push(n);
+  }
+
+  const namePattern = fixture.nodes
+    .map((n) => n.name)
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length)
+    .map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|");
+  const tokenRegex = namePattern ? new RegExp("\\b(" + namePattern + ")\\b", "g") : /$^/;
+
+  function escapeHtml(text) {
+    return String(text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function collectAncestors(id) {
+    const out = new Set();
+    const stack = [id];
+    while (stack.length) {
+      const cur = stack.pop();
+      for (const p of parentsById.get(cur) || []) {
+        if (!out.has(p)) {
+          out.add(p);
+          stack.push(p);
+        }
+      }
+    }
+    return out;
+  }
+
+  function collectDescendants(id) {
+    const out = new Set();
+    const stack = [id];
+    while (stack.length) {
+      const cur = stack.pop();
+      for (const k of childrenById.get(cur) || []) {
+        if (!out.has(k)) {
+          out.add(k);
+          stack.push(k);
+        }
+      }
+    }
+    return out;
+  }
+
+  function chainSetFor(id) {
+    const set = new Set([id]);
+    for (const a of collectAncestors(id)) set.add(a);
+    for (const d of collectDescendants(id)) set.add(d);
+    return set;
+  }
+
+  function edgeOnChain(edge, chain) {
+    return chain.has(edge.from) && chain.has(edge.to);
+  }
+
+  function defaultVisibleIds() {
+    // CodeGraph-style: don't dump whole graph — prefer bound subgraph.
+    if (boundNodeIds.size > 0) return new Set(boundNodeIds);
+    return new Set(fixture.nodes.map((n) => n.id));
+  }
+
+  function visibleNodeIds() {
+    if (selectedId) return chainSetFor(selectedId);
+    return defaultVisibleIds();
+  }
+
+  function filteredNodes() {
+    const q = searchQuery.trim().toLowerCase();
+    return fixture.nodes.filter(function (n) {
+      if (kindFilter === "BOUND" && !boundNodeIds.has(n.id)) return false;
+      if (kindFilter !== "ALL" && kindFilter !== "BOUND" && n.kind !== kindFilter) return false;
+      if (!q) return true;
+      const hay = (n.name + " " + n.kind + " " + n.id).toLowerCase();
+      return hay.includes(q);
+    });
+  }
+
+  function renderNodeList() {
+    const nodes = filteredNodes().slice(0, 400);
+    nodeList.innerHTML = "";
+    if (!nodes.length) {
+      nodeList.innerHTML = '<li class="empty-hint" style="padding:10px">Không khớp filter/search.</li>';
+      return;
+    }
+    for (const node of nodes) {
+      const li = document.createElement("li");
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "node-row" + (node.id === selectedId ? " is-selected" : "");
+      btn.innerHTML =
+        '<span class="name">' + escapeHtml(node.name) + "</span>" +
+        '<span class="line">L' + node.declLine + "</span>" +
+        '<span class="kind">' + escapeHtml(node.kind) + (boundNodeIds.has(node.id) ? " · linked" : "") + "</span>";
+      btn.addEventListener("click", function () {
+        selectNode(node.id);
+      });
+      li.appendChild(btn);
+      nodeList.appendChild(li);
+    }
+  }
+
+  function pickNodeForToken(name, lineNo) {
+    const matches = nodesByName.get(name) || [];
+    if (!matches.length) return null;
+    if (matches.length === 1) return matches[0];
+    const onDeclLine = matches.find((n) => n.declLine === lineNo);
+    if (onDeclLine) return onDeclLine;
+    const withUsageOnLine = matches.find((n) =>
+      (n.usages || []).some((u) => u.line === lineNo)
+    );
+    if (withUsageOnLine) return withUsageOnLine;
+    return matches[0];
+  }
+
+  function tokenizeLine(line, lineNo) {
+    tokenRegex.lastIndex = 0;
+    let html = "";
+    let last = 0;
+    let match;
+    while ((match = tokenRegex.exec(line)) !== null) {
+      html += escapeHtml(line.slice(last, match.index));
+      const node = pickNodeForToken(match[1], lineNo);
+      if (node) {
+        html +=
+          '<button type="button" class="code-token" data-node-id="' +
+          escapeHtml(node.id) +
+          '">' +
+          escapeHtml(match[1]) +
+          "</button>";
+      } else {
+        html += escapeHtml(match[0]);
+      }
+      last = match.index + match[0].length;
+    }
+    html += escapeHtml(line.slice(last));
+    return html || "&nbsp;";
+  }
+
+  function renderCode() {
+    const lines = sourceText.replace(/\r\n?/g, "\n").split("\n");
+    const pre = document.createElement("pre");
+    pre.className = "code-view";
+    const parts = [];
+    for (let i = 0; i < lines.length; i += 1) {
+      const lineNo = i + 1;
+      parts.push(
+        '<div class="code-line" data-line="' + lineNo + '">' +
+          '<span class="line-no">' + lineNo + "</span>" +
+          '<span class="line-text">' + tokenizeLine(lines[i], lineNo) + "</span>" +
+        "</div>"
+      );
+    }
+    pre.innerHTML = parts.join("");
+    codePanel.innerHTML = "";
+    codePanel.appendChild(pre);
+    pre.addEventListener("click", function (ev) {
+      const token = ev.target.closest(".code-token");
+      if (!token) return;
+      selectNode(token.getAttribute("data-node-id"));
+    });
+  }
+
+  function scrollCodeToSelection() {
+    if (!selectedId || !codeOpen) return;
+    const node = nodeById.get(selectedId);
+    const focusLine = node && node.declLine ? node.declLine : null;
+    let target = null;
+    if (focusLine) {
+      target = codePanel.querySelector('.code-line[data-line="' + focusLine + '"]');
+    }
+    if (!target) {
+      target = codePanel.querySelector('.code-token[data-node-id="' + selectedId + '"]');
+    }
+    if (target && typeof target.scrollIntoView === "function") {
+      target.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+    codePanel.querySelectorAll(".code-line.is-focus").forEach(function (el) {
+      el.classList.remove("is-focus");
+    });
+    if (focusLine) {
+      const lineEl = codePanel.querySelector('.code-line[data-line="' + focusLine + '"]');
+      if (lineEl) lineEl.classList.add("is-focus");
+    }
+  }
+
+  function buildLayout(visibleIds) {
+    const nodes = fixture.nodes.filter((n) => visibleIds.has(n.id));
+    const depths = new Map();
+
+    function depthOf(id, visiting) {
+      if (depths.has(id)) return depths.get(id);
+      if (visiting.has(id)) return 0;
+      visiting.add(id);
+      const parents = (parentsById.get(id) || []).filter((p) => visibleIds.has(p));
+      let d = 0;
+      if (parents.length) {
+        d = 1 + Math.max.apply(null, parents.map((p) => depthOf(p, visiting)));
+      }
+      visiting.delete(id);
+      depths.set(id, d);
+      return d;
+    }
+
+    for (const n of nodes) depthOf(n.id, new Set());
+
+    const columns = new Map();
+    for (const n of nodes) {
+      const d = depths.get(n.id) || 0;
+      if (!columns.has(d)) columns.set(d, []);
+      columns.get(d).push(n);
+    }
+
+    const colKeys = Array.from(columns.keys()).sort((a, b) => a - b);
+    const positions = new Map();
+    const colWidth = 230;
+    const rowHeight = 78;
+    const padX = 48;
+    const padY = 48;
+    const nodeW = 168;
+    const nodeH = 50;
+    let maxY = 0;
+
+    for (const col of colKeys) {
+      const list = columns.get(col);
+      list.sort((a, b) => a.name.localeCompare(b.name));
+      list.forEach(function (node, index) {
+        const x = padX + col * colWidth;
+        const y = padY + index * rowHeight;
+        positions.set(node.id, { x: x, y: y, w: nodeW, h: nodeH });
+        maxY = Math.max(maxY, y + nodeH);
+      });
+    }
+
+    const width = Math.max(padX * 2 + Math.max(colKeys.length, 1) * colWidth, 640);
+    const height = Math.max(maxY + padY, 420);
+    return { positions: positions, width: width, height: height, nodeW: nodeW, nodeH: nodeH };
+  }
+
+  function getMapZoom() {
+    return mapContent.width / mapView.w;
+  }
+
+  function updateZoomLabel() {
+    mapZoomLabel.textContent = Math.round(getMapZoom() * 100) + "%";
+  }
+
+  function applyMapView() {
+    mapSvg.setAttribute(
+      "viewBox",
+      mapView.x + " " + mapView.y + " " + mapView.w + " " + mapView.h
+    );
+    updateZoomLabel();
+  }
+
+  function resetMapView(layout) {
+    mapContent = { width: layout.width, height: layout.height };
+    mapView = { x: 0, y: 0, w: layout.width, h: layout.height };
+    applyMapView();
+  }
+
+  function fitLayout(layout, ids) {
+    const idSet = ids || new Set(layout.positions.keys());
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let count = 0;
+    for (const id of idSet) {
+      const pos = layout.positions.get(id);
+      if (!pos) continue;
+      count += 1;
+      minX = Math.min(minX, pos.x);
+      minY = Math.min(minY, pos.y);
+      maxX = Math.max(maxX, pos.x + pos.w);
+      maxY = Math.max(maxY, pos.y + pos.h);
+    }
+    if (!count) {
+      resetMapView(layout);
+      return;
+    }
+    const pad = 56;
+    const w = Math.max(maxX - minX + pad * 2, 320);
+    const h = Math.max(maxY - minY + pad * 2, 240);
+    mapContent = { width: layout.width, height: layout.height };
+    mapView = {
+      x: minX - pad,
+      y: minY - pad,
+      w: w,
+      h: h
+    };
+    applyMapView();
+  }
+
+  function clientToSvgPoint(clientX, clientY) {
+    const rect = mapSvg.getBoundingClientRect();
+    if (!rect.width || !rect.height) {
+      return { x: mapView.x, y: mapView.y };
+    }
+    return {
+      x: mapView.x + ((clientX - rect.left) / rect.width) * mapView.w,
+      y: mapView.y + ((clientY - rect.top) / rect.height) * mapView.h
+    };
+  }
+
+  function zoomMapAt(factor, clientX, clientY) {
+    const nextZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, getMapZoom() * factor));
+    const applied = nextZoom / getMapZoom();
+    if (Math.abs(applied - 1) < 0.001) return;
+    const rect = mapSvg.getBoundingClientRect();
+    const anchor = clientToSvgPoint(
+      clientX != null ? clientX : rect.left + rect.width / 2,
+      clientY != null ? clientY : rect.top + rect.height / 2
+    );
+    mapView = {
+      x: anchor.x - (anchor.x - mapView.x) / applied,
+      y: anchor.y - (anchor.y - mapView.y) / applied,
+      w: mapView.w / applied,
+      h: mapView.h / applied
+    };
+    applyMapView();
+  }
+
+  function renderMap(opts) {
+    const options = opts || {};
+    const visibleIds = visibleNodeIds();
+    const layout = buildLayout(visibleIds);
+    lastLayout = layout;
+    mapContent = { width: layout.width, height: layout.height };
+    mapSvg.innerHTML = "";
+
+    const edgeLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    edgeLayer.setAttribute("class", "edges");
+    const nodeLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    nodeLayer.setAttribute("class", "nodes");
+    mapSvg.appendChild(edgeLayer);
+    mapSvg.appendChild(nodeLayer);
+
+    for (const edge of fixture.edges) {
+      if (!visibleIds.has(edge.from) || !visibleIds.has(edge.to)) continue;
+      const a = layout.positions.get(edge.from);
+      const b = layout.positions.get(edge.to);
+      if (!a || !b) continue;
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      const x1 = a.x + a.w;
+      const y1 = a.y + a.h / 2;
+      const x2 = b.x;
+      const y2 = b.y + b.h / 2;
+      const mx = (x1 + x2) / 2;
+      path.setAttribute("d", "M " + x1 + " " + y1 + " C " + mx + " " + y1 + ", " + mx + " " + y2 + ", " + x2 + " " + y2);
+      path.setAttribute("class", "map-edge");
+      path.setAttribute("data-from", edge.from);
+      path.setAttribute("data-to", edge.to);
+      edgeLayer.appendChild(path);
+    }
+
+    for (const node of fixture.nodes) {
+      if (!visibleIds.has(node.id)) continue;
+      const pos = layout.positions.get(node.id);
+      if (!pos) continue;
+      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      g.setAttribute("class", "map-node");
+      g.setAttribute("data-node-id", node.id);
+      g.setAttribute("tabindex", "0");
+      g.setAttribute("role", "button");
+      g.setAttribute("aria-label", node.name + " " + node.kind);
+
+      const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      rect.setAttribute("x", String(pos.x));
+      rect.setAttribute("y", String(pos.y));
+      rect.setAttribute("width", String(pos.w));
+      rect.setAttribute("height", String(pos.h));
+      g.appendChild(rect);
+
+      const nameText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      nameText.setAttribute("x", String(pos.x + 12));
+      nameText.setAttribute("y", String(pos.y + 22));
+      nameText.textContent = node.name.length > 18 ? node.name.slice(0, 16) + "…" : node.name;
+      g.appendChild(nameText);
+
+      const kindText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      kindText.setAttribute("class", "kind-label");
+      kindText.setAttribute("x", String(pos.x + 12));
+      kindText.setAttribute("y", String(pos.y + 40));
+      kindText.textContent = node.kind + " · L" + node.declLine;
+      g.appendChild(kindText);
+
+      g.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        if (mapDidPan) return;
+        selectNode(node.id);
+      });
+      g.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter" || ev.key === " ") {
+          ev.preventDefault();
+          selectNode(node.id);
+        }
+      });
+      nodeLayer.appendChild(g);
+    }
+
+    if (options.fitSelection && selectedId) {
+      fitLayout(layout, chainSetFor(selectedId));
+    } else if (options.resetView || options.fitAll) {
+      fitLayout(layout, visibleIds);
+    } else {
+      applyMapView();
+    }
+
+    mapHint.textContent = selectedId
+      ? "Focus: chain của " + (nodeById.get(selectedId).name || selectedId) + " · Fit / zoom / kéo thả"
+      : "Overview: " + visibleIds.size + " node có edge · chọn search/list để focus chain";
+  }
+
+  mapSvg.addEventListener("wheel", function (ev) {
+    ev.preventDefault();
+    zoomMapAt(ev.deltaY < 0 ? 1.12 : 1 / 1.12, ev.clientX, ev.clientY);
+  }, { passive: false });
+
+  mapSvg.addEventListener("pointerdown", function (ev) {
+    if (ev.button !== 0) return;
+    mapDidPan = false;
+    mapPan = {
+      pointerId: ev.pointerId,
+      startX: ev.clientX,
+      startY: ev.clientY,
+      originX: mapView.x,
+      originY: mapView.y
+    };
+    mapSvg.setPointerCapture(ev.pointerId);
+    mapPanel.classList.add("is-panning");
+  });
+
+  mapSvg.addEventListener("pointermove", function (ev) {
+    if (!mapPan || mapPan.pointerId !== ev.pointerId) return;
+    const rect = mapSvg.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const dx = ((ev.clientX - mapPan.startX) / rect.width) * mapView.w;
+    const dy = ((ev.clientY - mapPan.startY) / rect.height) * mapView.h;
+    if (Math.abs(ev.clientX - mapPan.startX) + Math.abs(ev.clientY - mapPan.startY) > 3) {
+      mapDidPan = true;
+    }
+    mapView.x = mapPan.originX - dx;
+    mapView.y = mapPan.originY - dy;
+    applyMapView();
+  });
+
+  function endMapPan(ev) {
+    if (!mapPan || mapPan.pointerId !== ev.pointerId) return;
+    mapPan = null;
+    mapPanel.classList.remove("is-panning");
+    try { mapSvg.releasePointerCapture(ev.pointerId); } catch (_err) { /* ignore */ }
+  }
+
+  mapSvg.addEventListener("pointerup", endMapPan);
+  mapSvg.addEventListener("pointercancel", endMapPan);
+  mapSvg.addEventListener("click", function () {
+    if (mapDidPan) {
+      mapDidPan = false;
+      return;
+    }
+    clearSelection();
+  });
+
+  document.getElementById("btnZoomIn").addEventListener("click", function () { zoomMapAt(1.2); });
+  document.getElementById("btnZoomOut").addEventListener("click", function () { zoomMapAt(1 / 1.2); });
+  document.getElementById("btnZoomReset").addEventListener("click", function () {
+    renderMap({ fitAll: true });
+    applyHighlight();
+  });
+  document.getElementById("btnFit").addEventListener("click", function () {
+    if (!lastLayout) return;
+    if (selectedId) fitLayout(lastLayout, chainSetFor(selectedId));
+    else fitLayout(lastLayout, visibleNodeIds());
+  });
+
+  function buildChainText(id) {
+    const descendants = Array.from(collectDescendants(id));
+    const ordered = [];
+    function walkUp(cur) {
+      const parents = parentsById.get(cur) || [];
+      if (!parents.length) {
+        ordered.push(cur);
+        return;
+      }
+      walkUp(parents[0]);
+      if (!ordered.includes(cur)) ordered.push(cur);
+    }
+    walkUp(id);
+    for (const d of descendants) {
+      if (!ordered.includes(d)) ordered.push(d);
+    }
+    return ordered.map(function (nid) {
+      const n = nodeById.get(nid);
+      return n ? n.name : nid;
+    }).join(" → ");
+  }
+
+  function relButton(id) {
+    const n = nodeById.get(id);
+    if (!n) return "";
+    return (
+      '<li><button type="button" data-jump-id="' + escapeHtml(id) + '">' +
+      escapeHtml(n.name) + " · " + escapeHtml(n.kind) + " · L" + n.declLine +
+      "</button></li>"
+    );
+  }
+
+  function renderDetail() {
+    if (!selectedId) {
+      detailPanel.innerHTML =
+        '<p class="empty-hint">Chưa chọn. Search / list / map → hiện callers, callees, chain, usages.</p>';
+      return;
+    }
+    const node = nodeById.get(selectedId);
+    if (!node) {
+      detailPanel.innerHTML = '<p class="empty-hint">Node không tìm thấy.</p>';
+      return;
+    }
+
+    const callers = parentsById.get(selectedId) || [];
+    const callees = childrenById.get(selectedId) || [];
+    const viaLines = [];
+    for (const edge of fixture.edges) {
+      if (edge.from !== selectedId && edge.to !== selectedId) continue;
+      for (const v of edge.via || []) {
+        viaLines.push(
+          "L" + v.performLine + " · " + (v.callType || "PERFORM") + " · " +
+          v.form + " · " + v.section
+        );
+      }
+    }
+    const usageHtml = (node.usages || []).map(function (u) {
+      return "<li>L" + u.line + " — " + escapeHtml(u.context) + "</li>";
+    }).join("");
+
+    detailPanel.innerHTML =
+      '<p class="detail-title">' + escapeHtml(node.name) + "</p>" +
+      '<p class="detail-meta">' + escapeHtml(node.kind) + " · decl L" + node.declLine +
+      (boundNodeIds.has(node.id) ? " · linked" : " · isolated") + "</p>" +
+      '<div class="detail-section"><h3>Chain</h3><div class="chain-text">' +
+      escapeHtml(buildChainText(selectedId)) + "</div></div>" +
+      '<div class="detail-section"><h3>Callers (cha)</h3>' +
+      (callers.length
+        ? '<ul class="rel-list">' + callers.map(relButton).join("") + "</ul>"
+        : '<p class="empty-hint">Không có</p>') +
+      "</div>" +
+      '<div class="detail-section"><h3>Callees (con)</h3>' +
+      (callees.length
+        ? '<ul class="rel-list">' + callees.map(relButton).join("") + "</ul>"
+        : '<p class="empty-hint">Không có</p>') +
+      "</div>" +
+      '<div class="detail-section"><h3>Binding via</h3>' +
+      (viaLines.length
+        ? '<div class="chain-text">' + escapeHtml(viaLines.join("\n")) + "</div>"
+        : '<p class="empty-hint">—</p>') +
+      "</div>" +
+      '<div class="detail-section"><h3>Usages</h3>' +
+      (usageHtml ? '<ul class="usage-list">' + usageHtml + "</ul>" : '<p class="empty-hint">—</p>') +
+      "</div>";
+
+    detailPanel.querySelectorAll("[data-jump-id]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        selectNode(btn.getAttribute("data-jump-id"));
+      });
+    });
+  }
+
+  function applyHighlight() {
+    const chain = selectedId ? chainSetFor(selectedId) : null;
+    const hasSelection = Boolean(chain);
+
+    document.querySelectorAll(".code-token").forEach(function (token) {
+      const id = token.getAttribute("data-node-id");
+      token.classList.toggle("is-active", id === selectedId);
+      token.classList.toggle("is-chain", hasSelection && id !== selectedId && chain.has(id));
+    });
+
+    document.querySelectorAll(".map-node").forEach(function (g) {
+      const id = g.getAttribute("data-node-id");
+      g.classList.toggle("is-active", id === selectedId);
+      g.classList.toggle("is-chain", hasSelection && id !== selectedId && chain.has(id));
+    });
+
+    document.querySelectorAll(".map-edge").forEach(function (path) {
+      const from = path.getAttribute("data-from");
+      const to = path.getAttribute("data-to");
+      const on = hasSelection && chain.has(from) && chain.has(to) &&
+        fixture.edges.some(function (e) {
+          return e.from === from && e.to === to && edgeOnChain(e, chain);
+        });
+      path.classList.toggle("is-chain", on);
+    });
+
+    renderNodeList();
+  }
+
+  function selectNode(id) {
+    if (!nodeById.has(id)) return;
+    selectedId = id;
+    renderMap({ fitSelection: true });
+    applyHighlight();
+    renderDetail();
+    scrollCodeToSelection();
+  }
+
+  function clearSelection() {
+    selectedId = null;
+    renderMap({ fitAll: true });
+    applyHighlight();
+    renderDetail();
+    codePanel.querySelectorAll(".code-line.is-focus").forEach(function (el) {
+      el.classList.remove("is-focus");
+    });
+  }
+
+  function setCodeOpen(open) {
+    codeOpen = open;
+    codeDrawer.classList.toggle("is-open", open);
+    document.getElementById("btnShowCode").textContent = open ? "Ẩn code" : "Hiện code";
+    if (open) scrollCodeToSelection();
+  }
+
+  searchInput.addEventListener("input", function () {
+    searchQuery = searchInput.value || "";
+    renderNodeList();
+  });
+
+  document.querySelectorAll("[data-kind-filter]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      kindFilter = btn.getAttribute("data-kind-filter") || "ALL";
+      document.querySelectorAll("[data-kind-filter]").forEach(function (b) {
+        b.classList.toggle("is-active", b === btn);
+      });
+      renderNodeList();
+    });
+  });
+
+  document.getElementById("btnClear").addEventListener("click", clearSelection);
+  document.getElementById("btnShowCode").addEventListener("click", function () {
+    setCodeOpen(!codeOpen);
+  });
+  document.getElementById("btnHideCode").addEventListener("click", function () {
+    setCodeOpen(false);
+  });
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "Escape") clearSelection();
+  });
+
+  renderCode();
+  renderNodeList();
+  renderMap({ fitAll: true });
+  applyHighlight();
+  renderDetail();
+
+  // Prefer a useful starting focus if gs_request exists.
+  const start = fixture.nodes.find((n) => n.name === "gs_request");
+  if (start) selectNode(start.id);
+})();
+  </script>
+</body>
+</html>
