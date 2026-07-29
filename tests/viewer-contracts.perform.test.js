@@ -1598,6 +1598,35 @@ assertViewerFixtureDirectoriesStayInSync();
 defineFocusedTest(test, "viewer perform source picker contracts", ["perform-source-picker"], async (t) => {
   assertViewerFixtureDirectoriesStayInSync();
 
+  await t.test("template block title actions CSS caps intrinsic width from long PERFORM summaries", () => {
+    const fs = require("fs");
+    const path = require("path");
+    const css = fs.readFileSync(
+      path.resolve(__dirname, "..", "viewer", "styles", "viewer.css"),
+      "utf8"
+    );
+    assert(
+      !/\.template-block-actions\s*\{/.test(css),
+      "Expected .template-block-actions to be removed from viewer.css"
+    );
+    const actionsRule = css.match(/\.template-block-title-actions\s*\{[^}]+\}/);
+    assert(actionsRule, "Expected .template-block-title-actions rule in viewer.css");
+    assert(
+      /max-width:\s*100%/.test(actionsRule[0]),
+      "Expected .template-block-title-actions { max-width: 100% } so icon actions stay in-pane."
+    );
+    assert(
+      /min-width:\s*0/.test(actionsRule[0]),
+      "Expected .template-block-title-actions { min-width: 0 } so flex min-content can shrink."
+    );
+    const pickerRule = css.match(/(?:^|\n)\s*\.perform-source-picker\s*\{[^}]+\}/);
+    assert(pickerRule, "Expected .perform-source-picker rule in viewer.css");
+    assert(
+      /min-width:\s*0/.test(pickerRule[0]),
+      "Expected .perform-source-picker { min-width: 0 }."
+    );
+  });
+
   await t.test("registry records stable source trees and ranks suggestions", async () => {
     await assertPerformSourcePickerRegistryTreeAndSuggestions();
   });

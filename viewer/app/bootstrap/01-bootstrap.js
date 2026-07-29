@@ -45,7 +45,6 @@
   const handleTemplateVirtualScroll = runtime.requireServiceMethod("template", "handleTemplateVirtualScroll");
   const handleTemplateVirtualUserIntent = runtime.requireServiceMethod("template", "handleTemplateVirtualUserIntent");
   const renderTemplatePreview = runtime.requireServiceMethod("template", "renderTemplatePreview");
-  const copyAllTemplateBlocks = runtime.requireServiceMethod("template", "copyAllTemplateBlocks");
   const isTemplateDynamicModalOpen = runtime.requireServiceMethod("template", "isTemplateDynamicModalOpen");
   const closeTemplateDynamicModal = runtime.requireServiceMethod("template", "closeTemplateDynamicModal");
   const initTemplateGuiFilterControls = runtime.requireServiceMethod("template", "initTemplateGuiFilterControls");
@@ -261,14 +260,6 @@ function start() {
           ev.stopPropagation();
         }
         copySelectedTemplateBlocks()
-          .then(() => setError(""))
-          .catch((err) => setError(`Copy failed: ${err && err.message ? err.message : err}`));
-      });
-    }
-
-    if (els.templateCopyAllBtn) {
-      els.templateCopyAllBtn.addEventListener("click", () => {
-        copyAllTemplateBlocks()
           .then(() => setError(""))
           .catch((err) => setError(`Copy failed: ${err && err.message ? err.message : err}`));
       });

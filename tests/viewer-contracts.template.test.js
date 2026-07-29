@@ -1774,12 +1774,6 @@ async function assertTemplateMultiSelectionAndClipboardSpacing() {
   allHost.innerHTML = allPayload.html;
   assert.strictEqual(allHost.querySelectorAll("tr[data-template-spacer]").length, virtual.items.length - 1, "Expected Copy All builder to use the same spacing rule.");
 
-  window.__clipboardWrites.length = 0;
-  els.templateCopyAllBtn.click();
-  await waitForViewerUi(window);
-  const allClipboard = window.__clipboardWrites[window.__clipboardWrites.length - 1];
-  assert(allClipboard && allClipboard.text.includes("Row 01") && allClipboard.text.includes("Row 45"), "Expected Copy All to use the shared collection builder.");
-
   els.parseBtn.click();
   await waitForViewerUi(window);
   assert.deepStrictEqual(selectedIndexes(), [], "Expected reparse to clear multi-selection.");

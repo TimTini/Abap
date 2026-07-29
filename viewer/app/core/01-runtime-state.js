@@ -26,7 +26,6 @@ const els = {
     templateKeyMode: document.getElementById("templateKeyMode"),
     templateCopyTableOnly: document.getElementById("templateCopyTableOnly"),
     templateCopySelectedBtn: document.getElementById("templateCopySelectedBtn"),
-    templateCopyAllBtn: document.getElementById("templateCopyAllBtn"),
     templateResetBtn: document.getElementById("templateResetBtn"),
     templateExportBtn: document.getElementById("templateExportBtn"),
     templateImportBtn: document.getElementById("templateImportBtn"),

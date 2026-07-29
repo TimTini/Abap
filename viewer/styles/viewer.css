@@ -747,12 +747,56 @@
       flex: 1 1 140px;
     }
 
+    .template-block-title-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      min-width: 0;
+    }
+
     .template-block-title {
       margin: 0;
+      flex: 1 1 auto;
+      min-width: 0;
       font-size: 14px;
       line-height: 1.3;
       overflow-wrap: anywhere;
       word-break: break-word;
+    }
+
+    .template-block-title-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      flex-shrink: 0;
+      max-width: 100%;
+      min-width: 0;
+    }
+
+    .template-block-icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      padding: 0;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .template-block-icon-btn:hover {
+      color: var(--text);
+      background: var(--hover);
+      border-color: var(--border);
+    }
+
+    .template-block-icon-btn:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
     }
 
     .template-block-meta {
@@ -762,13 +806,9 @@
       word-break: break-word;
     }
 
-    .template-block-actions {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-      flex-shrink: 0;
+    .template-block-header .perform-source-picker {
+      margin-top: 6px;
+      max-width: 100%;
     }
 
     .template-preview-table {
@@ -831,6 +871,7 @@
       align-items: center;
       gap: 6px;
       max-width: min(680px, 100%);
+      min-width: 0;
       color: var(--text);
     }
 
@@ -852,6 +893,7 @@
       font-size: 12px;
       line-height: 1.25;
       max-width: min(560px, 100%);
+      min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -872,6 +914,8 @@
     .data-perform-source-select {
       position: absolute !important;
       width: 1px !important;
+      max-width: 0 !important;
+      min-width: 0 !important;
       height: 1px !important;
       margin: -1px !important;
       padding: 0 !important;

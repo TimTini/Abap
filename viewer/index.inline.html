@@ -9,9 +9,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.07.28-r86">
-  <meta name="abap-viewer-updated-at" content="2026-07-28 15:18:11">
-  <meta name="abap-viewer-updated-note" content="Scope-safe description edits; TYPE items fan out to typed DATA/FIELD-SYMBOL items and exact local call chains only.">
+  <meta name="abap-viewer-version" content="v2026.07.29-r89">
+  <meta name="abap-viewer-updated-at" content="2026-07-29 08:38:34">
+  <meta name="abap-viewer-updated-note" content="Template Code/Paths/Copy as title-row icons; PERFORM picker under meta; remove template-block-actions.">
   <title>ABAP Parser Viewer</title>
     <style>
 /* inlined from: ./styles/viewer.css */
@@ -764,12 +764,56 @@
       flex: 1 1 140px;
     }
 
+    .template-block-title-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      min-width: 0;
+    }
+
     .template-block-title {
       margin: 0;
+      flex: 1 1 auto;
+      min-width: 0;
       font-size: 14px;
       line-height: 1.3;
       overflow-wrap: anywhere;
       word-break: break-word;
+    }
+
+    .template-block-title-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      flex-shrink: 0;
+      max-width: 100%;
+      min-width: 0;
+    }
+
+    .template-block-icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      padding: 0;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .template-block-icon-btn:hover {
+      color: var(--text);
+      background: var(--hover);
+      border-color: var(--border);
+    }
+
+    .template-block-icon-btn:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
     }
 
     .template-block-meta {
@@ -779,13 +823,9 @@
       word-break: break-word;
     }
 
-    .template-block-actions {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-      flex-shrink: 0;
+    .template-block-header .perform-source-picker {
+      margin-top: 6px;
+      max-width: 100%;
     }
 
     .template-preview-table {
@@ -848,6 +888,7 @@
       align-items: center;
       gap: 6px;
       max-width: min(680px, 100%);
+      min-width: 0;
       color: var(--text);
     }
 
@@ -869,6 +910,7 @@
       font-size: 12px;
       line-height: 1.25;
       max-width: min(560px, 100%);
+      min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -889,6 +931,8 @@
     .data-perform-source-select {
       position: absolute !important;
       width: 1px !important;
+      max-width: 0 !important;
+      min-width: 0 !important;
       height: 1px !important;
       margin: -1px !important;
       padding: 0 !important;
@@ -2050,7 +2094,6 @@
           <div class="template-controls">
             <div class="template-controls-primary">
               <button type="button" id="templateCopySelectedBtn" class="secondary" disabled>Copy Selected (0)</button>
-              <button type="button" id="templateCopyAllBtn" class="secondary">Copy All</button>
             </div>
             <details class="template-controls-secondary-menu">
               <summary>Template config</summary>
@@ -9413,7 +9456,6 @@ const els = {
     templateKeyMode: document.getElementById("templateKeyMode"),
     templateCopyTableOnly: document.getElementById("templateCopyTableOnly"),
     templateCopySelectedBtn: document.getElementById("templateCopySelectedBtn"),
-    templateCopyAllBtn: document.getElementById("templateCopyAllBtn"),
     templateResetBtn: document.getElementById("templateResetBtn"),
     templateExportBtn: document.getElementById("templateExportBtn"),
     templateImportBtn: document.getElementById("templateImportBtn"),
@@ -23209,6 +23251,31 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     return map;
   }
 
+  function createTemplateBlockIconButton(action, title, svgMarkup) {
+    const btn = el("button", {
+      className: "template-block-icon-btn",
+      attrs: {
+        type: "button",
+        title: String(title || ""),
+        "aria-label": String(title || ""),
+        "data-template-action": String(action || "")
+      }
+    });
+    btn.innerHTML = String(svgMarkup || "");
+    const svg = btn.querySelector("svg");
+    if (svg) {
+      svg.setAttribute("aria-hidden", "true");
+      svg.setAttribute("focusable", "false");
+    }
+    return btn;
+  }
+
+  const TEMPLATE_BLOCK_ICON_SVG = {
+    code: '<svg viewBox="0 0 16 16" width="14" height="14"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M5.5 3.5 2.5 8l3 4.5M10.5 3.5l3 4.5-3 4.5"/></svg>',
+    paths: '<svg viewBox="0 0 16 16" width="14" height="14"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M3 4.5h10M3 8h10M3 11.5h7"/></svg>',
+    copy: '<svg viewBox="0 0 16 16" width="14" height="14"><rect x="5.5" y="2.5" width="7.5" height="9.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M3.5 5.5v7.3c0 .7.5 1.2 1.2 1.2h6"/></svg>'
+  };
+
   function buildTemplateBlockElement(item, absIndex, config, interactive) {
     const row = item && typeof item === "object" ? item : null;
     const obj = row && row.obj ? row.obj : null;
@@ -23246,24 +23313,16 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     const left = el("div");
     const label = getObjectLabel(obj);
     const titleText = `${absIndex + 1}. ${String(obj.objectType || "OBJECT")}${label ? ` ${label}` : ""}`;
-    left.appendChild(el("h4", { className: "template-block-title", text: titleText }));
+    const titleRow = el("div", { className: "template-block-title-row" });
+    titleRow.appendChild(el("h4", { className: "template-block-title", text: titleText }));
+    left.appendChild(titleRow);
     const meta = renderMeta(obj);
     left.appendChild(el("div", { className: "template-block-meta", text: meta || "" }));
     header.appendChild(left);
 
     if (isInteractive) {
-      const actions = el("div", { className: "template-block-actions" });
-      const performSourceControl = typeof createPerformSourceControl === "function"
-        ? createPerformSourceControl(obj)
-        : null;
-      if (performSourceControl) {
-        actions.appendChild(performSourceControl);
-      }
-      const codeBtn = el("button", {
-        className: "secondary",
-        text: "Code",
-        attrs: { type: "button", "data-template-action": "code" }
-      });
+      const titleActions = el("div", { className: "template-block-title-actions" });
+      const codeBtn = createTemplateBlockIconButton("code", "Code", TEMPLATE_BLOCK_ICON_SVG.code);
       codeBtn.addEventListener("click", (ev) => {
         if (ev && typeof ev.stopPropagation === "function") {
           ev.stopPropagation();
@@ -23278,26 +23337,18 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
           selectCodeLines(lineStart, lineEnd);
         }
       });
-      actions.appendChild(codeBtn);
+      titleActions.appendChild(codeBtn);
 
-      const pathsBtn = el("button", {
-        className: "secondary",
-        text: "Paths",
-        attrs: { type: "button", "data-template-action": "paths" }
-      });
+      const pathsBtn = createTemplateBlockIconButton("paths", "Paths", TEMPLATE_BLOCK_ICON_SVG.paths);
       pathsBtn.addEventListener("click", (ev) => {
         if (ev && typeof ev.stopPropagation === "function") {
           ev.stopPropagation();
         }
         openTemplatePathDump(templateContextObj, absIndex, obj);
       });
-      actions.appendChild(pathsBtn);
+      titleActions.appendChild(pathsBtn);
 
-      const copyBtn = el("button", {
-        className: "secondary",
-        text: "Copy",
-        attrs: { type: "button", "data-template-action": "copy" }
-      });
+      const copyBtn = createTemplateBlockIconButton("copy", "Copy", TEMPLATE_BLOCK_ICON_SVG.copy);
       copyBtn.addEventListener("click", async (ev) => {
         if (ev && typeof ev.stopPropagation === "function") {
           ev.stopPropagation();
@@ -23314,8 +23365,15 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
           setError(`Copy failed: ${err && err.message ? err.message : err}`);
         }
       });
-      actions.appendChild(copyBtn);
-      header.appendChild(actions);
+      titleActions.appendChild(copyBtn);
+      titleRow.appendChild(titleActions);
+
+      const performSourceControl = typeof createPerformSourceControl === "function"
+        ? createPerformSourceControl(obj)
+        : null;
+      if (performSourceControl) {
+        left.appendChild(performSourceControl);
+      }
 
       block.addEventListener("click", (ev) => {
         if (typeof selectTemplateBlockFromInteraction === "function") {
@@ -24389,47 +24447,6 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       refreshInputGutterTargets();
     }
   }
-
-  async function copyAllTemplateBlocks() {
-    const virtual = getTemplateVirtualState();
-    const items = Array.isArray(virtual.items) && virtual.items.length
-      ? virtual.items
-      : getRenderableObjectListForTemplate();
-    if (!items.length) {
-      setError("Nothing to copy.");
-      return;
-    }
-
-    const config = virtual.config && typeof virtual.config === "object"
-      ? virtual.config
-      : (state.templateConfig && typeof state.templateConfig === "object"
-        ? state.templateConfig
-        : getDefaultTemplateConfig());
-
-    const wrapper = document.createElement("div");
-    const plainLines = [];
-    const tableOnly = isTemplateCopyTableOnlyEnabled();
-    for (let index = 0; index < items.length; index += 1) {
-      const payload = buildTemplateBlockCopyPayload(items[index], index, config, tableOnly);
-      if (!payload.node) {
-        continue;
-      }
-      wrapper.appendChild(payload.node);
-      if (tableOnly) {
-        wrapper.appendChild(document.createElement("br"));
-      }
-      plainLines.push(payload.text);
-    }
-
-    if (!wrapper.childNodes.length) {
-      setError("Nothing to copy.");
-      return;
-    }
-
-    await copyHtmlWithFallback(wrapper.innerHTML, plainLines.filter(Boolean).join("\n\n"));
-  }
-
-
 
   function isTemplateDynamicModalOpen() {
     return Boolean(activeTemplateDynamicModal && activeTemplateDynamicModal.root && activeTemplateDynamicModal.root.isConnected);
@@ -28756,7 +28773,6 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     resetTemplateVirtualState,
     captureTemplateViewportAnchor,
     renderTemplatePreview,
-    copyAllTemplateBlocks,
     isTemplateDynamicModalOpen,
     closeTemplateDynamicModal,
     refreshTemplateGuiFilterTypes,
@@ -30366,7 +30382,6 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
   const handleTemplateVirtualScroll = runtime.requireServiceMethod("template", "handleTemplateVirtualScroll");
   const handleTemplateVirtualUserIntent = runtime.requireServiceMethod("template", "handleTemplateVirtualUserIntent");
   const renderTemplatePreview = runtime.requireServiceMethod("template", "renderTemplatePreview");
-  const copyAllTemplateBlocks = runtime.requireServiceMethod("template", "copyAllTemplateBlocks");
   const isTemplateDynamicModalOpen = runtime.requireServiceMethod("template", "isTemplateDynamicModalOpen");
   const closeTemplateDynamicModal = runtime.requireServiceMethod("template", "closeTemplateDynamicModal");
   const initTemplateGuiFilterControls = runtime.requireServiceMethod("template", "initTemplateGuiFilterControls");
@@ -30582,14 +30597,6 @@ function start() {
           ev.stopPropagation();
         }
         copySelectedTemplateBlocks()
-          .then(() => setError(""))
-          .catch((err) => setError(`Copy failed: ${err && err.message ? err.message : err}`));
-      });
-    }
-
-    if (els.templateCopyAllBtn) {
-      els.templateCopyAllBtn.addEventListener("click", () => {
-        copyAllTemplateBlocks()
           .then(() => setError(""))
           .catch((err) => setError(`Copy failed: ${err && err.message ? err.message : err}`));
       });
