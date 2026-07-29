@@ -2114,6 +2114,12 @@ const els = {
     };
   }
 
+  function createConcatenateTemplate() {
+    const template = createKeywordDescriptionTemplate();
+    template._options.hideRowsWithoutValues = true;
+    return template;
+  }
+
   function createAppendLinesOfTemplate() {
     const template = {
       _options: {
@@ -2283,6 +2289,7 @@ const els = {
       CALL_FUNCTION: createKeywordDescriptionTemplate(),
       CASE: createKeywordDescriptionTemplate(),
       CLEAR: createKeywordDescriptionTemplate(),
+      CONCATENATE: createConcatenateTemplate(),
       CONSTANTS: createKeywordDescriptionTemplate(),
       DATA: createKeywordDescriptionTemplate(),
       DELETE_ITAB: createKeywordAndConditionTemplate([

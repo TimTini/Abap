@@ -305,6 +305,12 @@ async function assertConcatenateSourcesExpandToEditableRows() {
   };
 
   const multiTable = findTable(multi);
+  assert(multiTable, "Expected rendered CONCATENATE template table.");
+  assert.strictEqual(
+    multiTable.getAttribute("data-template-key"),
+    "CONCATENATE",
+    "Expected CONCATENATE to render with its dedicated config instead of DEFAULT."
+  );
   const multiRows = getTemplateTableRows(multiTable);
   assert(
     multiRows.some((row) => row[0] === "CONCATENATE" && row[1] === "lv_a"),

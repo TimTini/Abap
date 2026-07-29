@@ -452,6 +452,7 @@ async function assertStatementSpecificTwentyCellTemplates() {
     "FIELD-SYMBOLS <ls_any> TYPE any.",
     "lv_a = lv_b.",
     "CLEAR lv_a.",
+    "CONCATENATE lv_a lv_b INTO lv_a.",
     "APPEND ls_row TO lt_rows.",
     "READ TABLE lt_rows WITH KEY table_line = lv_a INTO ls_row.",
     "MODIFY lt_rows FROM ls_row WHERE table_line = lv_a.",
