@@ -719,13 +719,13 @@
       overflow: hidden;
     }
 
-    /* Keep selected template blocks visible beside scrollbars on narrow split panes. */
+    /* Selection chrome must stay layout-neutral: no outer outline/offset growth
+       (outer ring caused scroll/hit-target jump on the first click of a double-click edit). */
     .template-block.selected {
       border-color: var(--selected-focus-ring);
       background: linear-gradient(var(--selected-focus-fill), var(--selected-focus-fill)), var(--panel);
-      outline: 2px solid var(--selected-focus-ring);
-      outline-offset: 1px;
-      box-shadow: 0 0 0 1px color-mix(in srgb, var(--selected-focus-ring) 45%, transparent);
+      outline: none;
+      box-shadow: inset 0 0 0 2px var(--selected-focus-ring);
     }
 
     .template-block:last-child {

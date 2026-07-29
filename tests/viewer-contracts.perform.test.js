@@ -1625,6 +1625,16 @@ defineFocusedTest(test, "viewer perform source picker contracts", ["perform-sour
       /min-width:\s*0/.test(pickerRule[0]),
       "Expected .perform-source-picker { min-width: 0 }."
     );
+    const selectedRule = css.match(/\.template-block\.selected\s*\{[^}]+\}/);
+    assert(selectedRule, "Expected .template-block.selected rule in viewer.css");
+    assert(
+      /box-shadow:\s*inset/.test(selectedRule[0]),
+      "Expected selected template block to use inset ring (layout-neutral)."
+    );
+    assert(
+      !/outline-offset:\s*[1-9]/.test(selectedRule[0]),
+      "Selected template block must not grow outward via positive outline-offset."
+    );
   });
 
   await t.test("registry records stable source trees and ranks suggestions", async () => {

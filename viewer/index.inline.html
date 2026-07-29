@@ -9,9 +9,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.07.29-r89">
-  <meta name="abap-viewer-updated-at" content="2026-07-29 08:38:34">
-  <meta name="abap-viewer-updated-note" content="Template Code/Paths/Copy as title-row icons; PERFORM picker under meta; remove template-block-actions.">
+  <meta name="abap-viewer-version" content="v2026.07.29-r90">
+  <meta name="abap-viewer-updated-at" content="2026-07-29 09:15:48">
+  <meta name="abap-viewer-updated-note" content="Layout-neutral template selection ring (inset) so first-click select does not jump double-click edit targets.">
   <title>ABAP Parser Viewer</title>
     <style>
 /* inlined from: ./styles/viewer.css */
@@ -736,13 +736,13 @@
       overflow: hidden;
     }
 
-    /* Keep selected template blocks visible beside scrollbars on narrow split panes. */
+    /* Selection chrome must stay layout-neutral: no outer outline/offset growth
+       (outer ring caused scroll/hit-target jump on the first click of a double-click edit). */
     .template-block.selected {
       border-color: var(--selected-focus-ring);
       background: linear-gradient(var(--selected-focus-fill), var(--selected-focus-fill)), var(--panel);
-      outline: 2px solid var(--selected-focus-ring);
-      outline-offset: 1px;
-      box-shadow: 0 0 0 1px color-mix(in srgb, var(--selected-focus-ring) 45%, transparent);
+      outline: none;
+      box-shadow: inset 0 0 0 2px var(--selected-focus-ring);
     }
 
     .template-block:last-child {
