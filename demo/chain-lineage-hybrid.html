@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chain Lineage · Hybrid</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1220; --panel: #0f172a; --border: #22324a; --text: #e5e7eb;
+      --muted: #94a3b8; --accent: #60a5fa; --hover: #1e293b; --code-bg: #0b1526;
+      --edge: #4b6a8a; --cycle: #c47a2a; --pop: #111827;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { font-family: "Segoe UI", Tahoma, sans-serif; color: var(--text); background: var(--bg); overflow: hidden; }
+    .app { height: 100%; display: flex; flex-direction: column; min-height: 0; }
+    .topbar { flex: 0 0 auto; padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--panel); display: flex; justify-content: space-between; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+    .topbar h1 { margin: 0; font-size: 17px; }
+    .sub, .muted, .hint { color: var(--muted); font-size: 12px; margin: 0; }
+    .nav a { color: var(--accent); margin-left: 10px; font-size: 12px; }
+    .main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .badge-row { flex: 0 0 auto; padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; }
+    .badge { padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border); background: var(--hover); }
+    .badge.simple { border-color: #34d399; color: #34d399; }
+    .badge.complex { border-color: #f59e0b; color: #f59e0b; }
+    .code-scroll { flex: 1; min-height: 0; overflow: auto; background: var(--code-bg); position: relative; }
+    .code { margin: 0; padding: 12px; font-family: Consolas, monospace; font-size: 12.5px; line-height: 1.55; white-space: pre; }
+    .chain-token { border: 1px solid transparent; border-radius: 3px; padding: 0 1px; cursor: pointer; }
+    .chain-token:hover { border-color: rgba(96,165,250,.55); background: rgba(96,165,250,.08); }
+    .chain-token.is-active { border-color: #f59e0b; background: rgba(245,158,11,.28); }
+    .popover {
+      position: absolute; z-index: 20; display: none; min-width: 220px; max-width: 360px;
+      padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--pop);
+      box-shadow: 0 12px 28px rgba(0,0,0,.45);
+    }
+    .popover.is-open { display: block; }
+    .popover h3 { margin: 0 0 8px; font-size: 12px; color: var(--muted); }
+    .simple-path { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0; padding: 0; list-style: none; }
+    .simple-path li { font-size: 12px; padding: 4px 8px; border-radius: 8px; background: var(--hover); border: 1px solid var(--border); }
+    .simple-path .sep { border: 0; background: transparent; color: var(--muted); padding: 0; }
+    .mode-tag { font-size: 10px; color: var(--accent); margin-bottom: 6px; }
+    .sheet {
+      flex: 0 0 auto; height: 0; overflow: hidden; background: var(--panel);
+      border-top: 1px solid var(--border); transition: height 0.2s ease;
+      display: flex; flex-direction: column;
+    }
+    .sheet.is-open { height: min(42vh, 380px); }
+    .sheet-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+    .sheet-head h2 { margin: 0; font-size: 13px; }
+    .sheet-body { flex: 1; min-height: 0; overflow: auto; padding: 10px; display: grid; grid-template-columns: 1.3fr 0.7fr; gap: 10px; }
+    button { font: inherit; min-height: 30px; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--hover); color: var(--text); cursor: pointer; }
+    .dag-edge { fill: none; stroke: var(--edge); stroke-width: 1.6; }
+    .dag-edge.is-cycle { stroke: var(--cycle); stroke-dasharray: 5 4; }
+    .dag-node rect { fill: #152033; stroke: var(--border); stroke-width: 1.2; cursor: pointer; }
+    .dag-node.is-root rect { stroke: var(--accent); fill: #132a44; }
+    .dag-node text { fill: var(--text); font-size: 11px; pointer-events: none; }
+    .code-snip { margin: 8px 0 0; padding: 8px; background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; font-family: Consolas, monospace; font-size: 11.5px; white-space: pre-wrap; }
+    .pill { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 999px; background: var(--hover); color: var(--muted); }
+    @media (max-width: 800px) { .sheet-body { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div>
+        <h1>4 · Hybrid</h1>
+        <p class="sub">Chain thẳng ≤2 hop → popover. Nhánh ≥2 hoặc cycle → DAG sheet.</p>
+      </div>
+      <div class="nav">
+        <span class="hint" id="fxRef"></span>
+        <a href="./chain-lineage-index.html">Index</a>
+      </div>
+    </header>
+    <div class="badge-row">
+      <span class="badge simple">simple → popover</span>
+      <span class="badge complex">branch / cycle → sheet</span>
+      <span class="hint">Thử <code>gv_default_carrier_name</code> (simple) vs <code>gs_request</code> (complex)</span>
+    </div>
+    <div class="main">
+      <div class="code-scroll" id="codeScroll">
+        <pre class="code" id="codePanel"></pre>
+        <div class="popover" id="popover" role="dialog">
+          <div class="mode-tag">Mode: simple popover</div>
+          <h3 id="popTitle"></h3>
+          <ul class="simple-path" id="simplePath"></ul>
+          <div id="popDetail"></div>
+        </div>
+      </div>
+      <aside class="sheet" id="sheet">
+        <div class="sheet-head">
+          <h2 id="sheetTitle">Complex lineage</h2>
+          <button type="button" id="btnCloseSheet">Đóng</button>
+        </div>
+        <div class="sheet-body">
+          <div><svg id="dagSvg"></svg></div>
+          <div id="sheetDetail"><p class="muted">Chọn node.</p></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+  <script src="./chain-dot-popover.fixture.js"></script>
+  <script src="./chain-lineage-common.js"></script>
+  <script>
+    (function () {
+      var L = window.ChainLineage;
+      var fx = L.fixture();
+      if (!fx) { document.getElementById("codePanel").textContent = "Missing fixture"; return; }
+      document.getElementById("fxRef").textContent = fx.sourceRef || "";
+      var codePanel = document.getElementById("codePanel");
+      var codeScroll = document.getElementById("codeScroll");
+      var popover = document.getElementById("popover");
+      var simplePath = document.getElementById("simplePath");
+      var popDetail = document.getElementById("popDetail");
+      var popTitle = document.getElementById("popTitle");
+      var sheet = document.getElementById("sheet");
+      var dagSvg = document.getElementById("dagSvg");
+      var sheetDetail = document.getElementById("sheetDetail");
+      var sheetTitle = document.getElementById("sheetTitle");
+      var activeRoot = null;
+
+      codePanel.innerHTML = L.renderCodeHtml(fx);
+
+      function clearActive() {
+        codePanel.querySelectorAll(".chain-token.is-active").forEach(function (el) {
+          el.classList.remove("is-active");
+        });
+      }
+
+      function closeAll() {
+        activeRoot = null;
+        clearActive();
+        popover.classList.remove("is-open");
+        sheet.classList.remove("is-open");
+      }
+
+      function linearPath(chain) {
+        var nodes = chain.nodes || [];
+        var root = nodes.filter(function (n) { return n.role === "root"; })[0];
+        if (!root) return [];
+        var path = [root];
+        var cur = root;
+        var guard = 0;
+        while (guard < 20) {
+          guard += 1;
+          var kids = L.childrenOf(nodes, cur.id);
+          if (!kids.length) break;
+          path.push(kids[0]);
+          cur = kids[0];
+        }
+        return path;
+      }
+
+      function showSimple(chain, tokenEl) {
+        sheet.classList.remove("is-open");
+        popTitle.textContent = chain.rootId;
+        var path = linearPath(chain);
+        simplePath.innerHTML = path.map(function (n, i) {
+          return (i ? '<li class="sep">→</li>' : "")
+            + "<li>" + L.escapeHtml(n.label || n.id) + "</li>";
+        }).join("");
+        popDetail.innerHTML = L.nodeDetailHtml(path[path.length - 1] || path[0]);
+        popover.classList.add("is-open");
+        var scrollRect = codeScroll.getBoundingClientRect();
+        var r = tokenEl.getBoundingClientRect();
+        var left = r.left - scrollRect.left + codeScroll.scrollLeft;
+        var top = r.bottom - scrollRect.top + codeScroll.scrollTop + 6;
+        popover.style.left = Math.max(8, left) + "px";
+        popover.style.top = top + "px";
+      }
+
+      function showComplex(chain) {
+        popover.classList.remove("is-open");
+        sheet.classList.add("is-open");
+        sheetTitle.textContent = "Complex · " + chain.rootId
+          + (L.chainComplexity(chain).hasCycle ? " · cycle" : "")
+          + " · branches " + L.chainComplexity(chain).branchKids;
+        L.renderDagSvg(dagSvg, chain, {
+          onNodeClick: function (id, node) {
+            sheetDetail.innerHTML = L.nodeDetailHtml(node);
+          }
+        });
+        sheetDetail.innerHTML = L.nodeDetailHtml((chain.nodes || []).filter(function (n) { return n.role === "root"; })[0]);
+      }
+
+      function openRoot(rootId, tokenEl) {
+        var chain = L.findChain(rootId);
+        if (!chain) return;
+        if (activeRoot === rootId) {
+          closeAll();
+          return;
+        }
+        activeRoot = rootId;
+        clearActive();
+        if (tokenEl) tokenEl.classList.add("is-active");
+        var cx = L.chainComplexity(chain);
+        if (cx.isSimple) showSimple(chain, tokenEl);
+        else showComplex(chain);
+      }
+
+      codePanel.addEventListener("click", function (e) {
+        var t = e.target.closest(".chain-token");
+        if (!t) return;
+        e.stopPropagation();
+        openRoot(t.getAttribute("data-root-id"), t);
+      });
+      document.getElementById("btnCloseSheet").addEventListener("click", closeAll);
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") closeAll();
+      });
+      document.addEventListener("click", function (e) {
+        if (!popover.classList.contains("is-open")) return;
+        if (popover.contains(e.target)) return;
+        if (e.target.closest && e.target.closest(".chain-token")) return;
+        popover.classList.remove("is-open");
+      });
+    })();
+  </script>
+</body>
+</html>

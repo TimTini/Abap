@@ -1,0 +1,969 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chain Dot Popover Demo</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1220;
+      --panel: #0f172a;
+      --border: #22324a;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #60a5fa;
+      --hover: #1e293b;
+      --gutter-bg: #0b1526;
+      --code-bg: #0b1526;
+      --token-border: rgba(96, 165, 250, 0.55);
+      --token-active: rgba(245, 158, 11, 0.35);
+      --popover-bg: #111827;
+      --popover-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+      --dot: #60a5fa;
+      --dot-hover: #f59e0b;
+      --edge: #4b6a8a;
+      --edge-cycle: #c47a2a;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    .app {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      padding: 12px;
+      gap: 10px;
+    }
+
+    .topbar {
+      flex: 0 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+
+    .topbar h1 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+    }
+
+    .topbar .sub {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    /* Mimic #mainLayout > div.panel (Input) */
+    .panel {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .panel-heading-row {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-heading-row h2 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 650;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .input-editor {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 48px 1fr;
+      background: var(--code-bg);
+      position: relative;
+    }
+
+    .gutter {
+      background: var(--gutter-bg);
+      border-right: 1px solid var(--border);
+      color: var(--muted);
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+      line-height: 1.55;
+      padding: 10px 6px;
+      text-align: right;
+      user-select: none;
+      overflow: hidden;
+    }
+
+    .code-scroll {
+      overflow: auto;
+      padding: 10px 12px;
+      position: relative;
+    }
+
+    .code {
+      margin: 0;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12.5px;
+      line-height: 1.55;
+      white-space: pre;
+      color: var(--text);
+    }
+
+    .chain-token {
+      border: 1px solid transparent;
+      border-radius: 3px;
+      padding: 0 1px;
+      cursor: pointer;
+      transition: border-color 0.12s ease, background 0.12s ease;
+    }
+
+    .chain-token:hover {
+      border-color: var(--token-border);
+      background: rgba(96, 165, 250, 0.08);
+    }
+
+    .chain-token.is-active {
+      border-color: var(--dot-hover);
+      background: var(--token-active);
+    }
+
+    .chain-token:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+
+    .popover {
+      position: absolute;
+      z-index: 20;
+      min-width: 280px;
+      max-width: min(720px, calc(100% - 16px));
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--popover-bg);
+      box-shadow: var(--popover-shadow);
+      display: none;
+    }
+
+    .popover.is-open { display: block; }
+
+    .popover-title {
+      margin: 0 0 8px;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 650;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      margin: 0 0 8px;
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .legend span::before {
+      content: "";
+      display: inline-block;
+      width: 16px;
+      height: 0;
+      margin-right: 5px;
+      vertical-align: middle;
+      border-top: 2px solid var(--edge);
+    }
+
+    .legend .cycle::before {
+      border-top-style: dashed;
+      border-top-color: var(--edge-cycle);
+    }
+
+    .chain-graph {
+      position: relative;
+      min-height: 40px;
+      overflow: auto;
+      max-height: min(420px, 55vh);
+    }
+
+    .chain-edges {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      overflow: visible;
+    }
+
+    .chain-edges .edge {
+      fill: none;
+      stroke: var(--edge, #4b6a8a);
+      stroke-width: 1.5;
+    }
+
+    .chain-edges .edge.is-cycle {
+      stroke: var(--edge-cycle, #c47a2a);
+      stroke-dasharray: 4 3;
+    }
+
+    .chain-nodes {
+      position: relative;
+      z-index: 1;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      min-height: 48px;
+    }
+
+    .chain-node {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      width: 44px;
+      z-index: 1;
+    }
+
+    .chain-node.is-root {
+      width: min(260px, 70vw);
+      z-index: 2;
+    }
+
+    .chain-node.is-expanded-hop {
+      z-index: 6;
+      width: min(280px, 65vw);
+    }
+
+    .node-anchor {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex: 0 0 auto;
+    }
+
+    .node-root-body {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      align-items: flex-start;
+      max-width: 100%;
+    }
+
+    .node-root-code,
+    .node-hop-code {
+      margin: 0;
+      padding: 6px 8px;
+      border-radius: 6px;
+      background: var(--hover);
+      border: 1px solid var(--border);
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 11.5px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      color: var(--text);
+      max-width: 100%;
+    }
+
+    .node-root-label {
+      font-size: 11px;
+      color: var(--accent);
+      font-weight: 650;
+    }
+
+    .hop-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--dot);
+      border: 2px solid transparent;
+      cursor: default;
+      padding: 0;
+      display: inline-block;
+      vertical-align: middle;
+      flex: 0 0 auto;
+      transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+    }
+
+    .hop-dot:hover,
+    .hop-wrap.is-expanded .hop-dot {
+      background: var(--dot-hover);
+      border-color: rgba(245, 158, 11, 0.5);
+      transform: scale(1.15);
+    }
+
+    .hop-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      position: relative;
+    }
+
+    .hop-meta {
+      font-size: 11px;
+      color: var(--muted);
+      display: none;
+    }
+
+    .hop-wrap.is-expanded .hop-meta,
+    .hop-wrap.is-expanded .node-hop-code {
+      display: block;
+    }
+
+    .node-hop-code {
+      display: none;
+      width: 100%;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+    }
+
+    .cycle-badge {
+      display: none;
+      font-size: 10px;
+      color: var(--edge-cycle, #c47a2a);
+      font-weight: 650;
+    }
+
+    .hop-wrap.has-cycle .cycle-badge {
+      display: inline;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div>
+        <h1>Chain Dot Popover Demo</h1>
+        <p class="sub">Offline · Input panel shell · hardcoded chains</p>
+      </div>
+      <p class="hint">14 chains · Click token → graph · ● hover bung code · line = hop / dashed = cycle</p>
+    </div>
+
+    <section class="panel" id="inputPanel" aria-label="Input">
+      <div class="panel-heading-row">
+        <h2>Input</h2>
+        <span class="hint" id="fixtureRef"></span>
+      </div>
+      <div class="input-editor" id="inputEditor">
+        <div class="gutter" id="gutter" aria-hidden="true"></div>
+        <div class="code-scroll" id="codeScroll">
+          <pre class="code" id="codePanel"></pre>
+          <div class="popover" id="popover" role="dialog" aria-label="Source chain">
+            <p class="popover-title" id="popoverTitle"></p>
+            <div class="legend">
+              <span>branch / hop</span>
+              <span class="cycle">cycle / back-edge</span>
+            </div>
+            <div class="chain-graph" id="chainGraph">
+              <svg class="chain-edges" id="chainEdges" aria-hidden="true"></svg>
+              <ul class="chain-nodes" id="chainTree"></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="./chain-dot-popover.fixture.js"></script>
+  <script>
+    (function () {
+      "use strict";
+
+      var fixture = window.ChainDotPopoverFixture;
+      if (!fixture || !fixture.sourceText || !Array.isArray(fixture.chains)) {
+        document.getElementById("codePanel").textContent = "Missing ChainDotPopoverFixture.";
+        return;
+      }
+
+      var codePanel = document.getElementById("codePanel");
+      var codeScroll = document.getElementById("codeScroll");
+      var gutter = document.getElementById("gutter");
+      var popover = document.getElementById("popover");
+      var popoverTitle = document.getElementById("popoverTitle");
+      var chainGraph = document.getElementById("chainGraph");
+      var chainEdges = document.getElementById("chainEdges");
+      var chainTree = document.getElementById("chainTree");
+      var activeRootId = null;
+      var activeChain = null;
+      var edgeDrawTimer = null;
+
+      document.getElementById("fixtureRef").textContent = fixture.sourceRef || "";
+
+      function escapeHtml(text) {
+        return String(text)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function collectRanges() {
+        var byKey = Object.create(null);
+        fixture.chains.forEach(function (chain) {
+          (chain.tokenRanges || []).forEach(function (range) {
+            var key = range.start + ":" + range.end + ":" + chain.rootId;
+            byKey[key] = {
+              start: range.start,
+              end: range.end,
+              rootId: chain.rootId,
+              name: range.name || chain.rootId
+            };
+          });
+        });
+        return Object.keys(byKey).map(function (k) { return byKey[k]; })
+          .sort(function (a, b) { return a.start - b.start || b.end - a.end; });
+      }
+
+      function renderCode() {
+        var text = fixture.sourceText;
+        var ranges = collectRanges();
+        var html = "";
+        var cursor = 0;
+        var lineCount = text.split("\n").length;
+
+        ranges.forEach(function (range) {
+          if (range.start < cursor) {
+            return;
+          }
+          html += escapeHtml(text.slice(cursor, range.start));
+          html += '<span class="chain-token" tabindex="0" data-root-id="'
+            + escapeHtml(range.rootId)
+            + '" data-start="' + range.start + '">'
+            + escapeHtml(text.slice(range.start, range.end))
+            + "</span>";
+          cursor = range.end;
+        });
+        html += escapeHtml(text.slice(cursor));
+        codePanel.innerHTML = html;
+
+        var gutterLines = [];
+        for (var i = 1; i <= lineCount; i += 1) {
+          gutterLines.push(String(i));
+        }
+        gutter.textContent = gutterLines.join("\n");
+      }
+
+      function findChain(rootId) {
+        for (var i = 0; i < fixture.chains.length; i += 1) {
+          if (fixture.chains[i].rootId === rootId) {
+            return fixture.chains[i];
+          }
+        }
+        return null;
+      }
+
+      function childrenOf(nodes, parentId) {
+        return nodes.filter(function (n) { return n.parentId === parentId; });
+      }
+
+      function collectEdges(chain) {
+        var nodes = chain.nodes || [];
+        var edges = [];
+        var seen = Object.create(null);
+
+        function pushEdge(from, to, kind) {
+          if (!from || !to) {
+            return;
+          }
+          var key = from + "->" + to + ":" + (kind || "hop");
+          if (seen[key]) {
+            return;
+          }
+          seen[key] = true;
+          edges.push({ from: from, to: to, kind: kind || "hop" });
+        }
+
+        nodes.forEach(function (node) {
+          if (node.parentId) {
+            pushEdge(node.parentId, node.id, "hop");
+          }
+          (node.links || []).forEach(function (link) {
+            pushEdge(node.id, link.to, link.kind || "hop");
+          });
+        });
+
+        (chain.edges || []).forEach(function (edge) {
+          pushEdge(edge.from, edge.to, edge.kind || "hop");
+        });
+
+        return edges;
+      }
+
+      function hasCycleLink(node) {
+        return (node.links || []).some(function (link) {
+          return link.kind === "cycle";
+        });
+      }
+
+      var COL_GAP = 52;
+      var ROW_GAP = 40;
+      var ROOT_ROW_H = 78;
+      var PAD_X = 10;
+      var PAD_Y = 8;
+
+      function computeBranchLayout(chain) {
+        var nodes = chain.nodes || [];
+        var byId = Object.create(null);
+        nodes.forEach(function (n) { byId[n.id] = n; });
+
+        var roots = nodes.filter(function (n) { return n.role === "root"; });
+        if (!roots.length) {
+          roots = nodes.filter(function (n) { return !n.parentId; });
+        }
+
+        var positions = Object.create(null);
+        var visited = Object.create(null);
+        var nextLeafCol = 0;
+
+        function kidsOf(id) {
+          return childrenOf(nodes, id);
+        }
+
+        function place(node, depth) {
+          if (!node) {
+            return;
+          }
+          if (visited[node.id]) {
+            return;
+          }
+          visited[node.id] = true;
+          var kids = kidsOf(node.id);
+          if (!kids.length) {
+            positions[node.id] = { col: nextLeafCol, depth: depth };
+            nextLeafCol += 1;
+            return;
+          }
+          kids.forEach(function (kid) {
+            place(kid, depth + 1);
+          });
+          var first = positions[kids[0].id];
+          var last = positions[kids[kids.length - 1].id];
+          positions[node.id] = {
+            col: (first.col + last.col) / 2,
+            depth: depth
+          };
+        }
+
+        roots.forEach(function (root) {
+          place(root, 0);
+        });
+        nodes.forEach(function (n) {
+          if (!positions[n.id]) {
+            place(n, 0);
+          }
+        });
+
+        var maxCol = 0;
+        var maxDepth = 0;
+        Object.keys(positions).forEach(function (id) {
+          maxCol = Math.max(maxCol, positions[id].col);
+          maxDepth = Math.max(maxDepth, positions[id].depth);
+        });
+
+        return {
+          positions: positions,
+          colCount: Math.max(1, maxCol + 1),
+          maxDepth: maxDepth
+        };
+      }
+
+      function buildTreeHtml(chain) {
+        var nodes = chain.nodes || [];
+        var roots = nodes.filter(function (n) { return n.role === "root"; });
+        if (!roots.length) {
+          roots = nodes.filter(function (n) { return !n.parentId; });
+        }
+
+        var ordered = [];
+        var visited = Object.create(null);
+
+        function walk(node, depth) {
+          if (!node || visited[node.id]) {
+            return;
+          }
+          visited[node.id] = true;
+          ordered.push({ node: node, depth: depth });
+          childrenOf(nodes, node.id).forEach(function (kid) {
+            walk(kid, depth + 1);
+          });
+        }
+
+        roots.forEach(function (r) { walk(r, 0); });
+        nodes.forEach(function (n) {
+          if (!visited[n.id]) {
+            walk(n, 0);
+          }
+        });
+
+        return ordered.map(function (item) {
+          var node = item.node;
+          var depth = item.depth;
+          var isRoot = node.role === "root" || depth === 0;
+          var html = '<li class="chain-node' + (isRoot ? " is-root" : "")
+            + '" data-depth="' + depth
+            + '" data-node-id="' + escapeHtml(node.id) + '">';
+          if (isRoot) {
+            html += '<div class="node-root-body" data-anchor-id="' + escapeHtml(node.id) + '">';
+            html += '<span class="node-anchor hop-dot" style="background:var(--accent)" aria-hidden="true"></span>';
+            html += '<div class="node-root-label">' + escapeHtml(node.label || node.id) + "</div>";
+            html += '<pre class="node-root-code">' + escapeHtml(node.code || "") + "</pre>";
+            html += "</div>";
+          } else {
+            var cycleClass = hasCycleLink(node) ? " has-cycle" : "";
+            html += '<div class="hop-wrap' + cycleClass + '" data-node-id="'
+              + escapeHtml(node.id) + '" data-anchor-id="' + escapeHtml(node.id) + '">';
+            html += '<button type="button" class="hop-dot" aria-label="'
+              + escapeHtml(node.label || "hop") + '"></button>';
+            html += '<span class="hop-meta">' + escapeHtml(node.label || "") + "</span>";
+            if (hasCycleLink(node)) {
+              html += '<span class="cycle-badge">cycle link</span>';
+            }
+            html += '<pre class="node-hop-code">' + escapeHtml(node.code || "") + "</pre>";
+            html += "</div>";
+          }
+          html += "</li>";
+          return html;
+        }).join("");
+      }
+
+      function applyBranchLayout(chain) {
+        var layout = computeBranchLayout(chain);
+        var positions = layout.positions;
+        var rootTop = PAD_Y;
+
+        // Pass 1: place all nodes with provisional hop band.
+        var hopTop0 = rootTop + ROOT_ROW_H;
+        chainTree.querySelectorAll(".chain-node").forEach(function (el) {
+          var id = el.getAttribute("data-node-id");
+          var pos = positions[id];
+          if (!pos) {
+            return;
+          }
+          var left = PAD_X + pos.col * COL_GAP;
+          var top = pos.depth === 0
+            ? rootTop
+            : hopTop0 + (pos.depth - 1) * ROW_GAP;
+          el.style.left = left + "px";
+          el.style.top = top + "px";
+        });
+
+        // Pass 2: push hop rows below measured root height so root code never covers dots.
+        var rootEl = chainTree.querySelector(".chain-node.is-root");
+        if (rootEl) {
+          hopTop0 = rootEl.offsetTop + rootEl.offsetHeight + 18;
+          chainTree.querySelectorAll(".chain-node").forEach(function (el) {
+            var id = el.getAttribute("data-node-id");
+            var pos = positions[id];
+            if (!pos || pos.depth === 0) {
+              return;
+            }
+            el.style.top = (hopTop0 + (pos.depth - 1) * ROW_GAP) + "px";
+          });
+        }
+
+        var width = PAD_X * 2 + Math.max(layout.colCount * COL_GAP, 280) + 80;
+        var height = hopTop0 + Math.max(0, layout.maxDepth) * ROW_GAP + 48;
+        chainTree.style.width = width + "px";
+        chainTree.style.height = height + "px";
+        chainGraph.style.minWidth = Math.min(width, 680) + "px";
+        return layout;
+      }
+
+      function anchorPoint(el, graphRect) {
+        var rect = el.getBoundingClientRect();
+        var x = rect.left - graphRect.left + rect.width / 2;
+        var y = rect.top - graphRect.top + Math.min(8, rect.height / 2);
+        var dot = null;
+        if (el.classList.contains("hop-dot") || el.classList.contains("node-anchor")) {
+          dot = el;
+        } else {
+          dot = el.querySelector(".hop-dot, .node-anchor");
+        }
+        if (dot) {
+          var dr = dot.getBoundingClientRect();
+          x = dr.left - graphRect.left + dr.width / 2;
+          y = dr.top - graphRect.top + dr.height / 2;
+        }
+        return { x: x, y: y };
+      }
+
+      function findAnchorEl(nodeId) {
+        var nodes = chainGraph.querySelectorAll("[data-anchor-id]");
+        for (var i = 0; i < nodes.length; i += 1) {
+          if (nodes[i].getAttribute("data-anchor-id") === nodeId) {
+            return nodes[i];
+          }
+        }
+        return null;
+      }
+
+      function edgePath(from, to, kind, branchIndex) {
+        var dx = to.x - from.x;
+        var dy = to.y - from.y;
+        if (kind === "cycle") {
+          var side = (branchIndex % 2 === 0) ? 1 : -1;
+          var bulge = Math.max(36, Math.abs(dy) * 0.4 + 28) * side;
+          var cx1 = from.x + bulge;
+          var cy1 = from.y + dy * 0.2;
+          var cx2 = to.x + bulge;
+          var cy2 = to.y - dy * 0.2;
+          return "M " + from.x + " " + from.y
+            + " C " + cx1 + " " + cy1 + ", " + cx2 + " " + cy2 + ", " + to.x + " " + to.y;
+        }
+        if (Math.abs(dx) < 1.5) {
+          return "M " + from.x + " " + from.y + " L " + to.x + " " + to.y;
+        }
+        var midY = from.y + Math.max(12, dy * 0.45);
+        return "M " + from.x + " " + from.y
+          + " L " + from.x + " " + midY
+          + " L " + to.x + " " + midY
+          + " L " + to.x + " " + to.y;
+      }
+
+      function drawEdges() {
+        if (!activeChain || !popover.classList.contains("is-open")) {
+          chainEdges.innerHTML = "";
+          return;
+        }
+        var edges = collectEdges(activeChain);
+        var graphRect = chainGraph.getBoundingClientRect();
+        var width = Math.max(chainTree.offsetWidth, chainGraph.clientWidth, 1);
+        var height = Math.max(chainTree.offsetHeight, chainGraph.clientHeight, 1);
+        chainEdges.setAttribute("viewBox", "0 0 " + width + " " + height);
+        chainEdges.setAttribute("width", String(width));
+        chainEdges.setAttribute("height", String(height));
+
+        var parts = [];
+        edges.forEach(function (edge, index) {
+          var fromEl = findAnchorEl(edge.from);
+          var toEl = findAnchorEl(edge.to);
+          if (!fromEl || !toEl) {
+            return;
+          }
+          var from = anchorPoint(fromEl, graphRect);
+          var to = anchorPoint(toEl, graphRect);
+          // Compensate scroll inside chain-graph
+          from.x += chainGraph.scrollLeft;
+          from.y += chainGraph.scrollTop;
+          to.x += chainGraph.scrollLeft;
+          to.y += chainGraph.scrollTop;
+          var cls = "edge" + (edge.kind === "cycle" ? " is-cycle" : "");
+          parts.push(
+            '<path class="' + cls + '" d="'
+              + edgePath(from, to, edge.kind, index) + '" />'
+          );
+        });
+        chainEdges.innerHTML = parts.join("");
+      }
+
+      function scheduleDrawEdges() {
+        if (edgeDrawTimer) {
+          clearTimeout(edgeDrawTimer);
+        }
+        edgeDrawTimer = setTimeout(function () {
+          edgeDrawTimer = null;
+          drawEdges();
+        }, 16);
+      }
+
+      function positionPopover(anchorEl) {
+        var scrollRect = codeScroll.getBoundingClientRect();
+        var anchorRect = anchorEl.getBoundingClientRect();
+        popover.classList.add("is-open");
+        popover.style.visibility = "hidden";
+
+        var popW = popover.offsetWidth;
+        var popH = popover.offsetHeight;
+        var left = anchorRect.left - scrollRect.left + codeScroll.scrollLeft;
+        var top = anchorRect.bottom - scrollRect.top + codeScroll.scrollTop + 6;
+
+        var maxLeft = codeScroll.scrollLeft + codeScroll.clientWidth - popW - 8;
+        var maxTop = codeScroll.scrollTop + codeScroll.clientHeight - popH - 8;
+        left = Math.max(codeScroll.scrollLeft + 8, Math.min(left, maxLeft));
+        if (top > maxTop) {
+          top = anchorRect.top - scrollRect.top + codeScroll.scrollTop - popH - 6;
+        }
+        top = Math.max(codeScroll.scrollTop + 8, top);
+
+        popover.style.left = left + "px";
+        popover.style.top = top + "px";
+        popover.style.visibility = "visible";
+        scheduleDrawEdges();
+      }
+
+      function clearActiveTokens() {
+        codePanel.querySelectorAll(".chain-token.is-active").forEach(function (el) {
+          el.classList.remove("is-active");
+        });
+      }
+
+      function closePopover() {
+        activeRootId = null;
+        activeChain = null;
+        popover.classList.remove("is-open");
+        clearActiveTokens();
+        chainTree.innerHTML = "";
+        chainTree.style.width = "";
+        chainTree.style.height = "";
+        chainEdges.innerHTML = "";
+        popoverTitle.textContent = "";
+      }
+
+      function openChain(rootId, anchorEl) {
+        var chain = findChain(rootId);
+        if (!chain) {
+          return;
+        }
+        activeRootId = rootId;
+        activeChain = chain;
+        clearActiveTokens();
+        if (anchorEl) {
+          anchorEl.classList.add("is-active");
+        }
+        popoverTitle.textContent = "Chain · " + rootId;
+        chainTree.innerHTML = buildTreeHtml(chain);
+        applyBranchLayout(chain);
+        positionPopover(anchorEl || codePanel);
+        requestAnimationFrame(function () {
+          applyBranchLayout(chain);
+          drawEdges();
+        });
+      }
+
+      codePanel.addEventListener("click", function (event) {
+        var token = event.target.closest(".chain-token");
+        if (!token) {
+          return;
+        }
+        event.stopPropagation();
+        var rootId = token.getAttribute("data-root-id");
+        if (activeRootId === rootId && popover.classList.contains("is-open")) {
+          closePopover();
+          return;
+        }
+        openChain(rootId, token);
+      });
+
+      codePanel.addEventListener("keydown", function (event) {
+        if (event.key !== "Enter" && event.key !== " ") {
+          return;
+        }
+        var token = event.target.closest(".chain-token");
+        if (!token) {
+          return;
+        }
+        event.preventDefault();
+        openChain(token.getAttribute("data-root-id"), token);
+      });
+
+      chainTree.addEventListener("mouseover", function (event) {
+        var wrap = event.target.closest(".hop-wrap");
+        if (!wrap || !chainTree.contains(wrap)) {
+          return;
+        }
+        chainTree.querySelectorAll(".hop-wrap.is-expanded").forEach(function (el) {
+          if (el !== wrap) {
+            el.classList.remove("is-expanded");
+            var li = el.closest(".chain-node");
+            if (li) {
+              li.classList.remove("is-expanded-hop");
+            }
+          }
+        });
+        wrap.classList.add("is-expanded");
+        var nodeEl = wrap.closest(".chain-node");
+        if (nodeEl) {
+          nodeEl.classList.add("is-expanded-hop");
+        }
+        scheduleDrawEdges();
+      });
+
+      chainTree.addEventListener("mouseout", function (event) {
+        var wrap = event.target.closest(".hop-wrap");
+        if (!wrap || !chainTree.contains(wrap)) {
+          return;
+        }
+        var related = event.relatedTarget;
+        if (related && wrap.contains(related)) {
+          return;
+        }
+        wrap.classList.remove("is-expanded");
+        var nodeEl = wrap.closest(".chain-node");
+        if (nodeEl) {
+          nodeEl.classList.remove("is-expanded-hop");
+        }
+        scheduleDrawEdges();
+      });
+
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+          closePopover();
+        }
+      });
+
+      document.addEventListener("click", function (event) {
+        if (!popover.classList.contains("is-open")) {
+          return;
+        }
+        if (popover.contains(event.target)) {
+          return;
+        }
+        if (event.target.closest && event.target.closest(".chain-token")) {
+          return;
+        }
+        closePopover();
+      });
+
+      codeScroll.addEventListener("scroll", function () {
+        if (!popover.classList.contains("is-open") || !activeRootId) {
+          return;
+        }
+        var active = null;
+        codePanel.querySelectorAll(".chain-token.is-active").forEach(function (el) {
+          if (el.getAttribute("data-root-id") === activeRootId) {
+            active = el;
+          }
+        });
+        if (active) {
+          positionPopover(active);
+        }
+      });
+
+      chainGraph.addEventListener("scroll", scheduleDrawEdges);
+      window.addEventListener("resize", scheduleDrawEdges);
+
+      renderCode();
+    })();
+  </script>
+</body>
+</html>

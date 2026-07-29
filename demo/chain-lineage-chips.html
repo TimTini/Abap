@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chain Lineage · Chips</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1220; --panel: #0f172a; --border: #22324a; --text: #e5e7eb;
+      --muted: #94a3b8; --accent: #60a5fa; --hover: #1e293b; --code-bg: #0b1526;
+      --cycle: #c47a2a;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { font-family: "Segoe UI", Tahoma, sans-serif; color: var(--text); background: var(--bg); overflow: hidden; }
+    .app { height: 100%; display: flex; flex-direction: column; min-height: 0; }
+    .topbar { flex: 0 0 auto; padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--panel); display: flex; justify-content: space-between; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+    .topbar h1 { margin: 0; font-size: 17px; }
+    .sub, .muted, .hint { color: var(--muted); font-size: 12px; margin: 0; }
+    .nav a { color: var(--accent); margin-left: 10px; font-size: 12px; }
+    .layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 1.2fr 0.8fr; }
+    .pane { min-height: 0; display: flex; flex-direction: column; border-right: 1px solid var(--border); }
+    .pane:last-child { border-right: 0; }
+    .pane-head { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 650; }
+    .pane-body { flex: 1; min-height: 0; overflow: auto; background: var(--code-bg); }
+    .code-flow { padding: 12px; font-family: Consolas, monospace; font-size: 12.5px; line-height: 1.55; }
+    .code-line { white-space: pre; }
+    .chain-token { border: 1px solid transparent; border-radius: 3px; padding: 0 1px; cursor: pointer; }
+    .chain-token:hover { border-color: rgba(96,165,250,.55); background: rgba(96,165,250,.08); }
+    .chain-token.is-active { border-color: #f59e0b; background: rgba(245,158,11,.28); }
+    .inline-chain {
+      display: none;
+      margin: 4px 0 10px 16px;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      font-family: "Segoe UI", sans-serif;
+    }
+    .inline-chain.is-open { display: block; }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .chip-branch { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 4px 6px; border-radius: 8px; background: rgba(96,165,250,.06); border: 1px dashed var(--border); }
+    .chip {
+      border: 1px solid var(--border);
+      background: var(--hover);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 3px 9px;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .chip.is-root { border-color: var(--accent); color: var(--accent); }
+    .chip.is-cycle, .chip-sep.cycle { color: var(--cycle); border-color: var(--cycle); }
+    .chip.is-active { background: rgba(245,158,11,.25); border-color: #f59e0b; }
+    .chip-sep { color: var(--muted); font-size: 11px; }
+    .detail { padding: 12px; }
+    .code-snip { margin: 8px 0 0; padding: 8px; background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; font-family: Consolas, monospace; font-size: 11.5px; white-space: pre-wrap; }
+    .pill { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 999px; background: var(--hover); color: var(--muted); }
+    @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div>
+        <h1>3 · Inline path chips</h1>
+        <p class="sub">Click token → chip path ngay dưới dòng. Nhiều nhánh = nhiều hàng chip.</p>
+      </div>
+      <div class="nav">
+        <span class="hint" id="fxRef"></span>
+        <a href="./chain-lineage-index.html">Index</a>
+      </div>
+    </header>
+    <div class="layout">
+      <section class="pane">
+        <div class="pane-head">Code + inline chips</div>
+        <div class="pane-body"><div class="code-flow" id="codeFlow"></div></div>
+      </section>
+      <section class="pane">
+        <div class="pane-head">Hop detail</div>
+        <div class="pane-body detail" id="detailPanel"><p class="muted">Click chip để xem snippet code hop.</p></div>
+      </section>
+    </div>
+  </div>
+  <script src="./chain-dot-popover.fixture.js"></script>
+  <script src="./chain-lineage-common.js"></script>
+  <script>
+    (function () {
+      var L = window.ChainLineage;
+      var fx = L.fixture();
+      if (!fx) { document.getElementById("codeFlow").textContent = "Missing fixture"; return; }
+      document.getElementById("fxRef").textContent = fx.sourceRef || "";
+      var codeFlow = document.getElementById("codeFlow");
+      var detailPanel = document.getElementById("detailPanel");
+      var openRootId = null;
+
+      function buildFlow() {
+        var text = fx.sourceText || "";
+        var lines = text.split("\n");
+        var ranges = L.collectRanges(fx);
+        var html = "";
+        var offset = 0;
+        lines.forEach(function (line, lineIdx) {
+          var lineStart = offset;
+          var lineEnd = offset + line.length;
+          var lineRanges = ranges.filter(function (r) {
+            return r.start >= lineStart && r.end <= lineEnd;
+          });
+          html += '<div class="code-line" data-line="' + (lineIdx + 1) + '">';
+          if (!lineRanges.length) {
+            html += L.escapeHtml(line);
+          } else {
+            var cursor = lineStart;
+            lineRanges.forEach(function (range) {
+              html += L.escapeHtml(text.slice(cursor, range.start));
+              html += '<span class="chain-token" tabindex="0" data-root-id="'
+                + L.escapeHtml(range.rootId) + '">'
+                + L.escapeHtml(text.slice(range.start, range.end))
+                + "</span>";
+              cursor = range.end;
+            });
+            html += L.escapeHtml(text.slice(cursor, lineEnd));
+          }
+          html += "</div>";
+
+          // After first decl occurrence of each root on this line, reserve chip slot
+          var seen = Object.create(null);
+          lineRanges.forEach(function (range) {
+            if (seen[range.rootId]) return;
+            seen[range.rootId] = true;
+            // Only attach chip tray under DATA/FS declaration lines (heuristic: contains TYPE)
+            if (!/\bTYPE\b/i.test(line) && line.indexOf(range.rootId) !== line.indexOf(range.rootId)) {
+              // still allow
+            }
+            if (/\bTYPE\b/i.test(line) || line.trim().indexOf(range.rootId) === 0 || line.indexOf("<") >= 0) {
+              html += '<div class="inline-chain" data-chip-for="'
+                + L.escapeHtml(range.rootId) + '" hidden></div>';
+            }
+          });
+          offset = lineEnd + 1;
+        });
+        codeFlow.innerHTML = html;
+      }
+
+      function findNode(chain, nodeId) {
+        var nodes = chain.nodes || [];
+        for (var i = 0; i < nodes.length; i += 1) {
+          if (nodes[i].id === nodeId) return nodes[i];
+        }
+        return null;
+      }
+
+      function closeAllChips() {
+        codeFlow.querySelectorAll(".inline-chain").forEach(function (el) {
+          el.classList.remove("is-open");
+          el.hidden = true;
+          el.innerHTML = "";
+        });
+        codeFlow.querySelectorAll(".chain-token.is-active").forEach(function (el) {
+          el.classList.remove("is-active");
+        });
+        openRootId = null;
+      }
+
+      function openChips(rootId, tokenEl) {
+        var chain = L.findChain(rootId);
+        if (!chain) return;
+        closeAllChips();
+        openRootId = rootId;
+        if (tokenEl) tokenEl.classList.add("is-active");
+        codeFlow.querySelectorAll('.chain-token[data-root-id]').forEach(function (el) {
+          if (el.getAttribute("data-root-id") === rootId) el.classList.add("is-active");
+        });
+        var tray = codeFlow.querySelector('.inline-chain[data-chip-for="' + rootId.replace(/"/g, "") + '"]');
+        // attribute selector with <> needs query loop
+        if (!tray) {
+          codeFlow.querySelectorAll(".inline-chain").forEach(function (el) {
+            if (el.getAttribute("data-chip-for") === rootId) tray = el;
+          });
+        }
+        if (!tray) {
+          // fallback: create under token's line
+          var line = tokenEl && tokenEl.closest(".code-line");
+          if (line) {
+            tray = document.createElement("div");
+            tray.className = "inline-chain";
+            tray.setAttribute("data-chip-for", rootId);
+            line.insertAdjacentElement("afterend", tray);
+          }
+        }
+        if (!tray) return;
+        tray.hidden = false;
+        tray.classList.add("is-open");
+        tray.innerHTML = L.pathChipsHtml(chain);
+        var rootNode = (chain.nodes || []).filter(function (n) { return n.role === "root"; })[0];
+        detailPanel.innerHTML = L.nodeDetailHtml(rootNode);
+      }
+
+      buildFlow();
+
+      codeFlow.addEventListener("click", function (e) {
+        var chip = e.target.closest(".chip");
+        if (chip) {
+          var tray = chip.closest(".inline-chain");
+          var rootId = tray && tray.getAttribute("data-chip-for");
+          var chain = L.findChain(rootId);
+          if (!chain) return;
+          tray.querySelectorAll(".chip.is-active").forEach(function (el) { el.classList.remove("is-active"); });
+          chip.classList.add("is-active");
+          detailPanel.innerHTML = L.nodeDetailHtml(findNode(chain, chip.getAttribute("data-node-id")));
+          return;
+        }
+        var token = e.target.closest(".chain-token");
+        if (!token) return;
+        var id = token.getAttribute("data-root-id");
+        if (openRootId === id) {
+          closeAllChips();
+          detailPanel.innerHTML = '<p class="muted">Click token / chip.</p>';
+          return;
+        }
+        openChips(id, token);
+      });
+    })();
+  </script>
+</body>
+</html>

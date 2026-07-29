@@ -13,6 +13,7 @@ node_modules/
 # Local-only tools and machine configuration
 .codegraph/
 .cursor/
+.serena/
 *.local.*
 .env
 .env.*

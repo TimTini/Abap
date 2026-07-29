@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chain Lineage · Split</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1220; --panel: #0f172a; --border: #22324a; --text: #e5e7eb;
+      --muted: #94a3b8; --accent: #60a5fa; --hover: #1e293b; --code-bg: #0b1526;
+      --edge: #4b6a8a; --cycle: #c47a2a; --good: #34d399;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { font-family: "Segoe UI", Tahoma, sans-serif; color: var(--text); background: var(--bg); overflow: hidden; }
+    .app { height: 100%; display: flex; flex-direction: column; min-height: 0; }
+    .topbar { flex: 0 0 auto; padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--panel); display: flex; justify-content: space-between; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+    .topbar h1 { margin: 0; font-size: 17px; }
+    .sub, .muted, .hint { color: var(--muted); font-size: 12px; margin: 0; }
+    .nav a { color: var(--accent); margin-left: 10px; font-size: 12px; }
+    .workspace { flex: 1; min-height: 0; display: grid; grid-template-columns: 1.1fr 1fr; }
+    .pane { min-height: 0; display: flex; flex-direction: column; border-right: 1px solid var(--border); }
+    .pane:last-child { border-right: 0; }
+    .pane-head { flex: 0 0 auto; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 650; display: flex; justify-content: space-between; gap: 8px; }
+    .pane-body { flex: 1; min-height: 0; overflow: auto; background: var(--code-bg); }
+    .code { margin: 0; padding: 12px; font-family: Consolas, monospace; font-size: 12.5px; line-height: 1.55; white-space: pre; }
+    .chain-token { border: 1px solid transparent; border-radius: 3px; padding: 0 1px; cursor: pointer; }
+    .chain-token:hover { border-color: rgba(96,165,250,.55); background: rgba(96,165,250,.08); }
+    .chain-token.is-active { border-color: #f59e0b; background: rgba(245,158,11,.28); }
+    .canvas-wrap { padding: 10px; min-height: 100%; }
+    .empty { padding: 24px; color: var(--muted); font-size: 13px; }
+    .dag-edge { fill: none; stroke: var(--edge); stroke-width: 1.6; }
+    .dag-edge.is-cycle { stroke: var(--cycle); stroke-dasharray: 5 4; }
+    .dag-node rect { fill: #152033; stroke: var(--border); stroke-width: 1.2; cursor: pointer; }
+    .dag-node.is-root rect { stroke: var(--accent); fill: #132a44; }
+    .dag-node.is-selected rect { stroke: #f59e0b; fill: #3a2a12; }
+    .dag-node text { fill: var(--text); font-size: 11px; pointer-events: none; font-family: "Segoe UI", sans-serif; }
+    .detail { border-top: 1px solid var(--border); padding: 10px 12px; background: var(--panel); max-height: 35%; overflow: auto; }
+    .node-detail strong { display: inline-block; margin-right: 8px; }
+    .pill { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 999px; background: var(--hover); color: var(--muted); }
+    .code-snip { margin: 8px 0 0; padding: 8px; background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; font-family: Consolas, monospace; font-size: 11.5px; white-space: pre-wrap; }
+    @media (max-width: 900px) { .workspace { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div>
+        <h1>1 · Split lineage</h1>
+        <p class="sub">Code trái · DAG phải (luôn mở). Click token → focus chain.</p>
+      </div>
+      <div class="nav">
+        <span class="hint" id="fxRef"></span>
+        <a href="./chain-lineage-index.html">Index</a>
+      </div>
+    </header>
+    <div class="workspace">
+      <section class="pane" aria-label="Code">
+        <div class="pane-head"><span>Input / code</span><span class="hint">hover token · click</span></div>
+        <div class="pane-body"><pre class="code" id="codePanel"></pre></div>
+      </section>
+      <section class="pane" aria-label="Lineage">
+        <div class="pane-head"><span id="mapTitle">Lineage DAG</span><span class="hint">→ hop · ↺ cycle</span></div>
+        <div class="pane-body">
+          <div class="canvas-wrap" id="canvasWrap"><p class="empty" id="emptyHint">Chọn biến có chain bên trái.</p><svg id="dagSvg" hidden></svg></div>
+        </div>
+        <div class="detail" id="detailPanel"><p class="muted">Chọn node trên DAG để xem snippet.</p></div>
+      </section>
+    </div>
+  </div>
+  <script src="./chain-dot-popover.fixture.js"></script>
+  <script src="./chain-lineage-common.js"></script>
+  <script>
+    (function () {
+      var L = window.ChainLineage;
+      var fx = L.fixture();
+      if (!fx) { document.getElementById("codePanel").textContent = "Missing fixture"; return; }
+      document.getElementById("fxRef").textContent = fx.sourceRef || "";
+      var codePanel = document.getElementById("codePanel");
+      var dagSvg = document.getElementById("dagSvg");
+      var emptyHint = document.getElementById("emptyHint");
+      var detailPanel = document.getElementById("detailPanel");
+      var mapTitle = document.getElementById("mapTitle");
+      var active = null;
+      var activeChain = null;
+
+      codePanel.innerHTML = L.renderCodeHtml(fx);
+
+      function selectRoot(rootId, tokenEl) {
+        var chain = L.findChain(rootId);
+        if (!chain) return;
+        active = rootId;
+        activeChain = chain;
+        codePanel.querySelectorAll(".chain-token.is-active").forEach(function (el) { el.classList.remove("is-active"); });
+        if (tokenEl) tokenEl.classList.add("is-active");
+        else {
+          codePanel.querySelectorAll('.chain-token[data-root-id]').forEach(function (el) {
+            if (el.getAttribute("data-root-id") === rootId) el.classList.add("is-active");
+          });
+        }
+        emptyHint.hidden = true;
+        dagSvg.hidden = false;
+        mapTitle.textContent = "Lineage · " + rootId;
+        L.renderDagSvg(dagSvg, chain, {
+          onNodeClick: function (id, node) {
+            detailPanel.innerHTML = L.nodeDetailHtml(node);
+          }
+        });
+        var rootNode = (chain.nodes || []).filter(function (n) { return n.role === "root"; })[0];
+        detailPanel.innerHTML = L.nodeDetailHtml(rootNode);
+      }
+
+      codePanel.addEventListener("click", function (e) {
+        var t = e.target.closest(".chain-token");
+        if (!t) return;
+        selectRoot(t.getAttribute("data-root-id"), t);
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chain Lineage UX demos</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1220; --panel: #0f172a; --border: #22324a; --text: #e5e7eb;
+      --muted: #94a3b8; --accent: #60a5fa;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; padding: 28px 20px 40px;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      color: var(--text); background: var(--bg);
+    }
+    h1 { margin: 0 0 6px; font-size: 22px; }
+    .sub { color: var(--muted); margin: 0 0 22px; font-size: 13px; }
+    .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); max-width: 980px; }
+    a.card {
+      display: block; text-decoration: none; color: inherit;
+      padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px;
+      background: var(--panel);
+    }
+    a.card:hover { border-color: var(--accent); }
+    a.card h2 { margin: 0 0 6px; font-size: 15px; color: var(--accent); }
+    a.card p { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.45; }
+    .note { margin-top: 22px; font-size: 12px; color: var(--muted); max-width: 720px; }
+  </style>
+</head>
+<body>
+  <h1>Chain lineage UX demos</h1>
+  <p class="sub">Cùng fixture <code>chain-dot-popover.fixture.js</code>. Mỗi hướng 1 file — so sánh rồi chọn.</p>
+  <div class="grid">
+    <a class="card" href="./chain-lineage-split.html">
+      <h2>1 · Split</h2>
+      <p>Code trái · DAG lineage phải (luôn mở). Tốt cho nhánh / cycle.</p>
+    </a>
+    <a class="card" href="./chain-lineage-drawer.html">
+      <h2>2 · Bottom drawer</h2>
+      <p>Code full màn. Click token → sheet dưới với DAG + detail.</p>
+    </a>
+    <a class="card" href="./chain-lineage-chips.html">
+      <h2>3 · Inline chips</h2>
+      <p>Path chip ngay dưới dòng khai báo. Nhẹ, gần code.</p>
+    </a>
+    <a class="card" href="./chain-lineage-hybrid.html">
+      <h2>4 · Hybrid</h2>
+      <p>Chain thẳng → popover. Nhánh/cycle → DAG sheet.</p>
+    </a>
+    <a class="card" href="./chain-dot-popover.html">
+      <h2>0 · Dot popover (cũ)</h2>
+      <p>Prototype đầu: chấm + line trong popover. Giữ để đối chiếu.</p>
+    </a>
+    <a class="card" href="./data-source-chain-map.html">
+      <h2>Map SVG (khác)</h2>
+      <p>Demo CodeGraph-style cũ — graph parser full sample.</p>
+    </a>
+  </div>
+  <p class="note">Khuyến nghị thử nhanh: <strong>gs_request</strong> (nhiều nhánh + cycle) và <strong>gv_default_carrier_name</strong> (đường thẳng) trên Hybrid.</p>
+</body>
+</html>
