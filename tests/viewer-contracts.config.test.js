@@ -53,7 +53,7 @@ async function assertGroupedConfigExportIsDeterministic() {
     "Expected Viewer config export to expose deterministic filenames."
   );
 
-  state.templateConfig.templates.DEFAULT["Z98"] = { text: "EXPORT_TEMPLATE_MARKER" };
+  state.templateConfig.templates.DATA["Z98"] = { text: "EXPORT_TEMPLATE_MARKER" };
   state.settings = {
     normalizeDeclDesc: false,
     declFilterTypes: ["DATA", "TYPES"],
@@ -79,7 +79,7 @@ async function assertGroupedConfigExportIsDeterministic() {
   assert.strictEqual(selectedBundle.kind, "abap-viewer-config");
   assert.strictEqual(selectedBundle.version, 1);
   assert.strictEqual(selectedBundle.exportedAt, "2026-07-15T03:04:05.000Z");
-  assert.strictEqual(selectedBundle.sections.templates.templates.DEFAULT.Z98.text, "EXPORT_TEMPLATE_MARKER");
+  assert.strictEqual(selectedBundle.sections.templates.templates.DATA.Z98.text, "EXPORT_TEMPLATE_MARKER");
   assert.deepStrictEqual(Array.from(selectedBundle.sections.templateUi.hiddenObjectTypes), ["DATA", "IF"]);
   assert.strictEqual(selectedBundle.sections.templateUi.formEditorPct, 64);
   assert.strictEqual(
@@ -149,7 +149,7 @@ async function assertGroupedConfigRoundTripsStateStorageAndDom() {
   const runtime = window.AbapViewerRuntime;
   const { api, els, state } = runtime;
 
-  state.templateConfig.templates.DEFAULT["Z97"] = { text: "ROUNDTRIP_TEMPLATE" };
+  state.templateConfig.templates.DATA["Z97"] = { text: "ROUNDTRIP_TEMPLATE" };
   state.settings = {
     normalizeDeclDesc: false,
     declFilterTypes: ["DATA"],
@@ -166,7 +166,7 @@ async function assertGroupedConfigRoundTripsStateStorageAndDom() {
   const exported = api.buildViewerConfigBundle(VIEWER_CONFIG_SECTION_KEYS, "2026-07-15T04:05:06.000Z");
 
   state.templateConfig = cloneTestJson(state.templateConfig);
-  delete state.templateConfig.templates.DEFAULT.Z97;
+  delete state.templateConfig.templates.DATA.Z97;
   state.settings = {
     normalizeDeclDesc: true,
     declFilterTypes: ["TYPES"],
@@ -205,7 +205,7 @@ async function assertGroupedConfigRoundTripsStateStorageAndDom() {
     assert(confirmationText.includes(label), `Expected import confirmation to list ${label}.`);
   }
 
-  assert.strictEqual(state.templateConfig.templates.DEFAULT.Z97.text, "ROUNDTRIP_TEMPLATE");
+  assert.strictEqual(state.templateConfig.templates.DATA.Z97.text, "ROUNDTRIP_TEMPLATE");
   assert.strictEqual(state.settings.normalizeDeclDesc, false);
   assert.deepStrictEqual(Array.from(state.settings.declFilterTypes), ["DATA"]);
   assert.strictEqual(state.settings.nameTemplatesByCode.DS, "ROUNDTRIP[{{desc}}]");
@@ -301,7 +301,7 @@ async function assertGroupedConfigImportValidatesAndRollsBack() {
       descriptionSettings: { normalizeDeclDesc: "not-a-boolean" }
     }
   };
-  invalidBundle.sections.templates.templates.DEFAULT.Z96 = { text: "MUST_NOT_APPLY" };
+  invalidBundle.sections.templates.templates.DATA.Z96 = { text: "MUST_NOT_APPLY" };
   assert.strictEqual(api.importViewerConfigObject(invalidBundle), false);
   assert.strictEqual(confirmCalls, 0, "Expected validation to finish before confirmation or mutation.");
   assert.deepStrictEqual(cloneTestJson(state.templateConfig), originalTemplate);
@@ -345,7 +345,7 @@ async function assertGroupedConfigImportValidatesAndRollsBack() {
       descriptionSettings: cloneTestJson(originalSettings)
     }
   };
-  rollbackBundle.sections.templates.templates.DEFAULT.Z95 = { text: "ROLLBACK_MARKER" };
+  rollbackBundle.sections.templates.templates.DATA.Z95 = { text: "ROLLBACK_MARKER" };
   rollbackBundle.sections.descriptionSettings.structDescTemplate = "ROLLBACK_SETTINGS_MARKER";
 
   const storagePrototype = window.Storage.prototype;
@@ -421,7 +421,7 @@ async function assertTemplateResetCanBeCancelled() {
   const { els, state } = runtime;
   let confirmCalls = 0;
 
-  state.templateConfig.templates.DEFAULT["Z99"] = { text: "Keep my custom template" };
+  state.templateConfig.templates.DATA["Z99"] = { text: "Keep my custom template" };
   window.confirm = () => {
     confirmCalls += 1;
     return false;
@@ -432,7 +432,7 @@ async function assertTemplateResetCanBeCancelled() {
 
   assert.strictEqual(confirmCalls, 1, "Expected Reset default to ask for confirmation.");
   assert(
-    state.templateConfig.templates.DEFAULT["Z99"],
+    state.templateConfig.templates.DATA["Z99"],
     "Expected cancelling Reset default to preserve the current template config."
   );
 
@@ -453,13 +453,18 @@ async function assertStatementSpecificTwentyCellTemplates() {
     "lv_a = lv_b.",
     "CLEAR lv_a.",
     "CONCATENATE lv_a lv_b INTO lv_a.",
+    "MOVE lv_a TO lv_b.",
     "APPEND ls_row TO lt_rows.",
+    "INSERT ls_row INTO TABLE lt_rows INDEX 1.",
+    "INSERT LINES OF lt_rows INTO TABLE lt_rows.",
     "READ TABLE lt_rows WITH KEY table_line = lv_a INTO ls_row.",
     "MODIFY lt_rows FROM ls_row WHERE table_line = lv_a.",
     "DELETE lt_rows WHERE table_line = lv_a.",
     "SORT lt_rows BY table_line.",
     "MOVE-CORRESPONDING ls_row TO lv_b.",
     "CALL FUNCTION 'Z_DEMO' EXPORTING iv_user = p_user IMPORTING ev_text = lv_b.",
+    "CALL METHOD zcl_demo=>run EXPORTING iv_text = lv_a IMPORTING ev_text = lv_b.",
+    "CALL TRANSACTION 'SE38' USING lt_rows MODE 'N' UPDATE 'S' MESSAGES INTO lt_rows SKIP FIRST SCREEN AND RETURN.",
     "PERFORM missing_form USING lv_a.",
     "MESSAGE lv_a TYPE 'I'.",
     "WRITE lv_a.",
@@ -474,12 +479,36 @@ async function assertStatementSpecificTwentyCellTemplates() {
     "IF lv_a IS INITIAL.",
     "ELSEIF lv_b IS NOT INITIAL.",
     "ELSE.",
-    "ENDIF."
+    "ENDIF.",
+    "RANGES lr_text FOR lv_a.",
+    "STATICS lv_static TYPE string VALUE 'A'.",
+    "TRY.",
+    "CATCH cx_root INTO DATA(lx_error).",
+    "CLEANUP.",
+    "ENDTRY.",
+    "FORM local_form USING iv_text TYPE string CHANGING cv_text TYPE string.",
+    "ENDFORM.",
+    "CLASS lcl_demo DEFINITION.",
+    "PUBLIC SECTION.",
+    "CLASS-DATA gv_text TYPE string.",
+    "METHODS run IMPORTING iv_text TYPE string RETURNING VALUE(rv_text) TYPE string.",
+    "CLASS-METHODS create RETURNING VALUE(ro_instance) TYPE REF TO object.",
+    "ENDCLASS.",
+    "CLASS lcl_demo IMPLEMENTATION.",
+    "METHOD run.",
+    "ENDMETHOD.",
+    "ENDCLASS."
   ].join("\n");
   const dom = await renderFixture(source);
   const { window } = dom;
   const runtime = window.AbapViewerRuntime;
   const { els, state } = runtime;
+
+  assert.strictEqual(
+    Object.prototype.hasOwnProperty.call(state.templateConfig.templates, "DEFAULT"),
+    false,
+    "Expected default config to contain only dedicated parser object templates."
+  );
 
   for (const templateKey of STATEMENT_TEMPLATE_KEYS) {
     assert(
@@ -488,7 +517,9 @@ async function assertStatementSpecificTwentyCellTemplates() {
     );
   }
 
-  const genericKeys = STATEMENT_TEMPLATE_KEYS.filter((key) => !["IF", "ELSEIF"].includes(key));
+  const genericKeys = STATEMENT_TEMPLATE_KEYS.filter((key) => ![
+    "CALL_TRANSACTION", "IF", "ELSEIF", "TRY", "CLEANUP"
+  ].includes(key));
   for (const templateKey of genericKeys) {
     const template = state.templateConfig.templates[templateKey];
     assert(template["A1:T1"], `Expected ${templateKey} keyword frame to span A:T.`);
@@ -503,6 +534,17 @@ async function assertStatementSpecificTwentyCellTemplates() {
   assert.strictEqual(appendLinesOf.U1.text, "{extras.append.source.finalDesc}");
   assert.strictEqual(appendLinesOf.A6.text, "TO");
   assert.strictEqual(appendLinesOf.U6.text, "{extras.append.target.finalDesc}");
+
+  const insertLinesOf = state.templateConfig.templates.INSERT_LINES_OF;
+  assert(insertLinesOf, "Expected a dedicated INSERT_LINES_OF template config.");
+  assert.strictEqual(insertLinesOf.A1.text, "INSERT LINES OF");
+  assert.strictEqual(insertLinesOf.U1.text, "{values.source.finalDesc}");
+
+  for (const templateKey of ["TRY", "CLEANUP"]) {
+    const keywordOnly = state.templateConfig.templates[templateKey];
+    assert(keywordOnly["A1:AN1"], `Expected ${templateKey} keyword-only frame to span A:AN.`);
+    assert.strictEqual(keywordOnly.A1.text, "{rows.keyword}");
+  }
 
   const assignment = state.templateConfig.templates.ASSIGNMENT;
   assert.strictEqual(assignment.A1.text, "{rows.keyword}");
@@ -561,6 +603,21 @@ async function assertStatementSpecificTwentyCellTemplates() {
     }
   }
 
+  assert.strictEqual(
+    els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-template-key="DEFAULT"]').length,
+    0,
+    "Expected no parsed object to resolve through DEFAULT."
+  );
+
+  const insertLinesTable = Array.from(
+    els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="INSERT_ITAB"]')
+  ).find((table) => table.getAttribute("data-template-key") === "INSERT_LINES_OF");
+  assert(insertLinesTable, "Expected INSERT LINES OF to use its variant template.");
+  assert.deepStrictEqual(getTemplateTableRows(insertLinesTable), [
+    ["INSERT LINES OF", "lt_rows"],
+    ["INTO TABLE", "lt_rows"]
+  ]);
+
   const readTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="READ_TABLE"]');
   assert.deepStrictEqual(getTemplateTableRows(readTable), [
     ["READ TABLE", "lt_rows"],
@@ -587,6 +644,17 @@ async function assertStatementSpecificTwentyCellTemplates() {
     ["CALL FUNCTION", "'Z_DEMO'"],
     ["EXPORTING", "iv_user = p_user"],
     ["IMPORTING", "ev_text = lv_b"]
+  ]);
+
+  const callTransactionTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="CALL_TRANSACTION"]');
+  assert.deepStrictEqual(getTemplateTableRows(callTransactionTable), [
+    ["CALL TRANSACTION", "'SE38'"],
+    ["USING", "lt_rows"],
+    ["MODE", "'N'"],
+    ["UPDATE", "'S'"],
+    ["MESSAGES INTO", "lt_rows"],
+    ["SKIP FIRST SCREEN"],
+    ["AND RETURN"]
   ]);
 
   const loopTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="LOOP_AT_ITAB"]');
@@ -634,6 +702,11 @@ async function assertLegacyTemplateImportAddsMissingSpecificConfigs() {
         _options: { hideEmptyRows: true },
         "A1:T1": { text: "Custom append" },
         "U1:AN1": { text: "{rows.finalDesc}" }
+      },
+      INSERT_ITAB: {
+        _options: { hideEmptyRows: true },
+        "A1:T1": { text: "Custom insert" },
+        "U1:AN1": { text: "{rows.finalDesc}" }
       }
     }
   };
@@ -658,6 +731,11 @@ async function assertLegacyTemplateImportAddsMissingSpecificConfigs() {
     state.templateConfig.templates.APPEND_LINES_OF,
     state.templateConfig.templates.APPEND,
     "Expected a legacy custom APPEND template to clone into APPEND_LINES_OF."
+  );
+  assert.deepStrictEqual(
+    state.templateConfig.templates.INSERT_LINES_OF,
+    state.templateConfig.templates.INSERT_ITAB,
+    "Expected a legacy custom INSERT_ITAB template to clone into INSERT_LINES_OF."
   );
   for (const templateKey of STATEMENT_TEMPLATE_KEYS) {
     assert(

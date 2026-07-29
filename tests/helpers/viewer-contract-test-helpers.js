@@ -1,6 +1,7 @@
 "use strict";
 
 const assert = require("assert");
+const fs = require("fs");
 const path = require("path");
 const {
   assertJsonArtifactsMatchFixtures,
@@ -24,35 +25,13 @@ function assertViewerFixtureDirectoriesStayInSync() {
   return fixtureFiles;
 }
 
-const STATEMENT_TEMPLATE_KEYS = [
-  "APPEND",
-  "ASSIGNMENT",
-  "CALL_FUNCTION",
-  "CASE",
-  "CLEAR",
-  "CONCATENATE",
-  "CONSTANTS",
-  "DATA",
-  "DELETE_ITAB",
-  "DO",
-  "ELSE",
-  "ELSEIF",
-  "FIELD-SYMBOLS",
-  "IF",
-  "LOOP_AT_ITAB",
-  "MESSAGE",
-  "MODIFY_ITAB",
-  "MOVE-CORRESPONDING",
-  "PARAMETERS",
-  "PERFORM",
-  "READ_TABLE",
-  "SELECT",
-  "SELECT-OPTIONS",
-  "SORT_ITAB",
-  "TYPES",
-  "WHEN",
-  "WRITE"
-];
+const parserConfigDir = path.resolve(__dirname, "..", "..", "configs");
+const STATEMENT_TEMPLATE_KEYS = Array.from(new Set(
+  fs.readdirSync(parserConfigDir)
+    .filter((fileName) => fileName.endsWith(".json"))
+    .map((fileName) => JSON.parse(fs.readFileSync(path.join(parserConfigDir, fileName), "utf8")).object)
+    .filter(Boolean)
+)).sort();
 
 const VIEWER_CONFIG_SECTION_KEYS = [
   "templates",

@@ -9,9 +9,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.07.29-r92">
-  <meta name="abap-viewer-updated-at" content="2026-07-29 12:05:51">
-  <meta name="abap-viewer-updated-note" content="CONCATENATE now uses a dedicated template while preserving multi-source row expansion.">
+  <meta name="abap-viewer-version" content="v2026.07.29-r93">
+  <meta name="abap-viewer-updated-at" content="2026-07-29 13:18:51">
+  <meta name="abap-viewer-updated-note" content="Every parsed object now uses a dedicated template with no DEFAULT fallback.">
   <title>ABAP Parser Viewer</title>
     <style>
 /* inlined from: ./styles/viewer.css */
@@ -2100,7 +2100,7 @@
               <div class="template-controls-secondary-body">
                 <span class="template-key-mode">
                   Template key mode
-                  <span id="templateKeyMode" class="template-key-badge">AUTO: objectType -&gt; DEFAULT</span>
+                  <span id="templateKeyMode" class="template-key-badge">AUTO: objectType only</span>
                 </span>
                 <label class="template-copy-mode">
                   <input type="checkbox" id="templateCopyTableOnly" checked>
@@ -11550,6 +11550,73 @@ const els = {
     return template;
   }
 
+  function createKeywordOnlyTemplate() {
+    return {
+      _options: {
+        hideEmptyRows: true,
+        hideRowsWithoutValues: false,
+        expandMultilineRows: false
+      },
+      "A1:AN1": createTemplateBaseStyle("#dbeef4"),
+      A1: {
+        text: "{rows.keyword}"
+      }
+    };
+  }
+
+  function createInsertLinesOfTemplate() {
+    const template = {
+      _options: {
+        hideEmptyRows: true,
+        hideRowsWithoutValues: true,
+        expandMultilineRows: false
+      }
+    };
+    const rows = [
+      ["INSERT LINES OF", "{values.source.finalDesc}"],
+      ["INTO TABLE", "{values.intoTable.finalDesc}"],
+      ["INTO", "{values.into.finalDesc}"],
+      ["INDEX", "{values.index.finalDesc}"],
+      ["ASSIGNING", "{values.assigning.finalDesc}"],
+      ["REFERENCE INTO", "{values.refInto.finalDesc}"]
+    ];
+    rows.forEach(([label, token], index) => {
+      const row = index + 1;
+      template[`A${row}:T${row}`] = createTemplateBaseStyle("#dbeef4");
+      template[`A${row}`] = { text: label };
+      template[`U${row}:AN${row}`] = createTemplateBaseStyle("#ffffff");
+      template[`U${row}`] = { text: token };
+    });
+    return template;
+  }
+
+  function createCallTransactionTemplate() {
+    const template = {
+      _options: {
+        hideEmptyRows: true,
+        hideRowsWithoutValues: false,
+        expandMultilineRows: false
+      }
+    };
+    const rows = [
+      ["CALL TRANSACTION", "{values.tcode.finalDesc}"],
+      ["USING", "{values.using.finalDesc}"],
+      ["MODE", "{values.mode.finalDesc}"],
+      ["UPDATE", "{values.update.finalDesc}"],
+      ["MESSAGES INTO", "{values.messagesInto.finalDesc}"],
+      ["{keywords.skip-first-screen.text}", ""],
+      ["{keywords.and-return.text}", ""]
+    ];
+    rows.forEach(([label, token], index) => {
+      const row = index + 1;
+      template[`A${row}:T${row}`] = createTemplateBaseStyle("#dbeef4");
+      template[`A${row}`] = { text: label };
+      template[`U${row}:AN${row}`] = createTemplateBaseStyle("#ffffff");
+      template[`U${row}`] = { text: token };
+    });
+    return template;
+  }
+
   function createAppendLinesOfTemplate() {
     const template = {
       _options: {
@@ -11575,8 +11642,6 @@ const els = {
     });
     return template;
   }
-
-  const UNIFIED_KEYWORD_ROW_TEMPLATE_V1 = createKeywordDescriptionTemplate();
 
   const ASSIGNMENT_ROW_TEMPLATE_V1 = {
     _options: {
@@ -11712,12 +11777,18 @@ const els = {
   const TEMPLATE_DEFAULT_CONFIG_V1 = {
     version: 1,
     templates: {
-      DEFAULT: UNIFIED_KEYWORD_ROW_TEMPLATE_V1,
       APPEND: createKeywordDescriptionTemplate(),
       APPEND_LINES_OF: createAppendLinesOfTemplate(),
       ASSIGNMENT: createKeywordDescriptionTemplate(),
       CALL_FUNCTION: createKeywordDescriptionTemplate(),
+      CALL_METHOD: createKeywordDescriptionTemplate(),
+      CALL_TRANSACTION: createCallTransactionTemplate(),
       CASE: createKeywordDescriptionTemplate(),
+      CATCH: createKeywordDescriptionTemplate(),
+      CLASS: createKeywordDescriptionTemplate(),
+      "CLASS-DATA": createKeywordDescriptionTemplate(),
+      "CLASS-METHODS": createKeywordDescriptionTemplate(),
+      CLEANUP: createKeywordOnlyTemplate(),
       CLEAR: createKeywordDescriptionTemplate(),
       CONCATENATE: createConcatenateTemplate(),
       CONSTANTS: createKeywordDescriptionTemplate(),
@@ -11729,26 +11800,35 @@ const els = {
       ELSE: createKeywordDescriptionTemplate(),
       ELSEIF: createConditionRowTemplate(),
       "FIELD-SYMBOLS": createKeywordDescriptionTemplate(),
+      FORM: createKeywordDescriptionTemplate(),
       IF: createConditionRowTemplate(),
+      INSERT_ITAB: createKeywordDescriptionTemplate(),
+      INSERT_LINES_OF: createInsertLinesOfTemplate(),
       LOOP_AT_ITAB: createKeywordAndConditionTemplate([
         { pathPrefix: "extras.loopAtItab.conditions", sectionLabel: "WHERE" }
       ]),
       MESSAGE: createKeywordDescriptionTemplate(),
+      METHOD: createKeywordDescriptionTemplate(),
+      METHODS: createKeywordDescriptionTemplate(),
       MODIFY_ITAB: createKeywordAndConditionTemplate([
         { pathPrefix: "extras.modifyItab.conditions", sectionLabel: "WHERE" }
       ]),
+      MOVE: createKeywordDescriptionTemplate(),
       "MOVE-CORRESPONDING": createKeywordDescriptionTemplate(),
       PARAMETERS: createKeywordDescriptionTemplate(),
       PERFORM: createKeywordDescriptionTemplate(),
       READ_TABLE: createKeywordAndConditionTemplate([
         { pathPrefix: "extras.readTable.conditions", sectionLabel: "WITH KEY" }
       ]),
+      RANGES: createKeywordDescriptionTemplate(),
       SELECT: createKeywordAndConditionTemplate([
         { pathPrefix: "extras.select.whereConditions", sectionLabel: "WHERE" },
         { pathPrefix: "extras.select.havingConditions", sectionLabel: "HAVING" }
       ]),
       "SELECT-OPTIONS": createKeywordDescriptionTemplate(),
       SORT_ITAB: createKeywordDescriptionTemplate(),
+      STATICS: createKeywordDescriptionTemplate(),
+      TRY: createKeywordOnlyTemplate(),
       TYPES: createKeywordDescriptionTemplate(),
       WHEN: createKeywordDescriptionTemplate(),
       WRITE: createKeywordDescriptionTemplate()
@@ -12058,6 +12138,19 @@ const els = {
       const cloned = cloneJsonValue(sourceTemplate);
       if (cloned && typeof cloned === "object") {
         config.templates.APPEND_LINES_OF = cloned;
+        changed = true;
+      }
+    }
+    if (!Object.prototype.hasOwnProperty.call(config.templates, "INSERT_LINES_OF")) {
+      const legacyInsert = config.templates.INSERT_ITAB;
+      const defaultInsert = TEMPLATE_DEFAULT_CONFIG_V1.templates.INSERT_ITAB;
+      const dedicatedDefault = TEMPLATE_DEFAULT_CONFIG_V1.templates.INSERT_LINES_OF;
+      const sourceTemplate = legacyInsert && !templateDefinitionsEqual(legacyInsert, defaultInsert)
+        ? legacyInsert
+        : dedicatedDefault;
+      const cloned = cloneJsonValue(sourceTemplate);
+      if (cloned && typeof cloned === "object") {
+        config.templates.INSERT_LINES_OF = cloned;
         changed = true;
       }
     }
@@ -19883,8 +19976,8 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     SELECT: "fields",
     SORT_ITAB: "itab",
     WHEN: "branch",
-    CALL_METHOD: "name",
-    CALL_TRANSACTION: "name",
+    CALL_METHOD: "target",
+    CALL_TRANSACTION: "tcode",
     MESSAGE: "message",
     MOVE: "source",
     "MOVE-CORRESPONDING": "source",
@@ -23037,7 +23130,13 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       && obj.extras
       && obj.extras.append
       && String(obj.extras.append.variant || "") === "linesOf";
-    const preferredKeys = isAppendLinesOf ? ["APPEND_LINES_OF", "APPEND"] : [objectType];
+    const isInsertLinesOf = Boolean(objectType === "INSERT_ITAB"
+      && obj.values
+      && obj.values.source
+      && String(obj.values.source.value || "").trim());
+    const preferredKeys = isAppendLinesOf
+      ? ["APPEND_LINES_OF", "APPEND"]
+      : (isInsertLinesOf ? ["INSERT_LINES_OF", "INSERT_ITAB"] : [objectType]);
     for (const templateKey of preferredKeys) {
       if (templateKey && Object.prototype.hasOwnProperty.call(templates, templateKey)) {
         const resolved = resolveTemplateDefinitionForPreview(templates[templateKey]);
@@ -23053,10 +23152,6 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         const resolved = resolveTemplateDefinitionForPreview(defaultTemplates[templateKey]);
         return { key: templateKey, map: resolved.map, options: resolved.options };
       }
-    }
-    if (Object.prototype.hasOwnProperty.call(templates, "DEFAULT")) {
-      const resolved = resolveTemplateDefinitionForPreview(templates.DEFAULT);
-      return { key: "DEFAULT", map: resolved.map, options: resolved.options };
     }
     const resolved = resolveTemplateDefinitionForPreview(null);
     return { key: "", map: null, options: resolved.options };
@@ -26163,9 +26258,9 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       draft.templates = {};
     }
     if (!Object.keys(draft.templates).length) {
-      draft.templates.DEFAULT = {};
+      draft = getDefaultTemplateConfig();
     }
-    let selKey = Object.keys(draft.templates)[0] || "DEFAULT";
+    let selKey = Object.keys(draft.templates)[0] || "";
     let selRange = "";
     let pendingExcelImport = null;
     let excelPasteOpen = false;
@@ -27053,7 +27148,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       const root = document.createElement("div");
       root.className = "template-config-builder";
       const keys = Object.keys(draft.templates);
-      if (!keys.includes(selKey)) selKey = keys[0] || "DEFAULT";
+      if (!keys.includes(selKey)) selKey = keys[0] || "";
       if (!selRange) selRange = listRanges(selKey)[0]?.rangeKey || "A1";
       selRange = normalizeRangeKeyForBuilder(selRange);
 
@@ -27157,7 +27252,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         }
         if (!confirm(`Delete template key "${selKey}"?`)) return;
         delete draft.templates[selKey];
-        selKey = Object.keys(draft.templates)[0] || "DEFAULT";
+        selKey = Object.keys(draft.templates)[0] || "";
         selRange = listRanges(selKey)[0]?.rangeKey || "A1";
         showErr("");
         renderActive();
@@ -30586,7 +30681,7 @@ function start() {
     initLayoutSplitter();
 
     if (els.templateKeyMode) {
-      els.templateKeyMode.textContent = "AUTO: objectType -> DEFAULT";
+      els.templateKeyMode.textContent = "AUTO: objectType only";
     }
     syncTemplateEditorFromState();
     setTemplateConfigError("");

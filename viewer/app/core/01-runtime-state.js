@@ -2120,6 +2120,73 @@ const els = {
     return template;
   }
 
+  function createKeywordOnlyTemplate() {
+    return {
+      _options: {
+        hideEmptyRows: true,
+        hideRowsWithoutValues: false,
+        expandMultilineRows: false
+      },
+      "A1:AN1": createTemplateBaseStyle("#dbeef4"),
+      A1: {
+        text: "{rows.keyword}"
+      }
+    };
+  }
+
+  function createInsertLinesOfTemplate() {
+    const template = {
+      _options: {
+        hideEmptyRows: true,
+        hideRowsWithoutValues: true,
+        expandMultilineRows: false
+      }
+    };
+    const rows = [
+      ["INSERT LINES OF", "{values.source.finalDesc}"],
+      ["INTO TABLE", "{values.intoTable.finalDesc}"],
+      ["INTO", "{values.into.finalDesc}"],
+      ["INDEX", "{values.index.finalDesc}"],
+      ["ASSIGNING", "{values.assigning.finalDesc}"],
+      ["REFERENCE INTO", "{values.refInto.finalDesc}"]
+    ];
+    rows.forEach(([label, token], index) => {
+      const row = index + 1;
+      template[`A${row}:T${row}`] = createTemplateBaseStyle("#dbeef4");
+      template[`A${row}`] = { text: label };
+      template[`U${row}:AN${row}`] = createTemplateBaseStyle("#ffffff");
+      template[`U${row}`] = { text: token };
+    });
+    return template;
+  }
+
+  function createCallTransactionTemplate() {
+    const template = {
+      _options: {
+        hideEmptyRows: true,
+        hideRowsWithoutValues: false,
+        expandMultilineRows: false
+      }
+    };
+    const rows = [
+      ["CALL TRANSACTION", "{values.tcode.finalDesc}"],
+      ["USING", "{values.using.finalDesc}"],
+      ["MODE", "{values.mode.finalDesc}"],
+      ["UPDATE", "{values.update.finalDesc}"],
+      ["MESSAGES INTO", "{values.messagesInto.finalDesc}"],
+      ["{keywords.skip-first-screen.text}", ""],
+      ["{keywords.and-return.text}", ""]
+    ];
+    rows.forEach(([label, token], index) => {
+      const row = index + 1;
+      template[`A${row}:T${row}`] = createTemplateBaseStyle("#dbeef4");
+      template[`A${row}`] = { text: label };
+      template[`U${row}:AN${row}`] = createTemplateBaseStyle("#ffffff");
+      template[`U${row}`] = { text: token };
+    });
+    return template;
+  }
+
   function createAppendLinesOfTemplate() {
     const template = {
       _options: {
@@ -2145,8 +2212,6 @@ const els = {
     });
     return template;
   }
-
-  const UNIFIED_KEYWORD_ROW_TEMPLATE_V1 = createKeywordDescriptionTemplate();
 
   const ASSIGNMENT_ROW_TEMPLATE_V1 = {
     _options: {
@@ -2282,12 +2347,18 @@ const els = {
   const TEMPLATE_DEFAULT_CONFIG_V1 = {
     version: 1,
     templates: {
-      DEFAULT: UNIFIED_KEYWORD_ROW_TEMPLATE_V1,
       APPEND: createKeywordDescriptionTemplate(),
       APPEND_LINES_OF: createAppendLinesOfTemplate(),
       ASSIGNMENT: createKeywordDescriptionTemplate(),
       CALL_FUNCTION: createKeywordDescriptionTemplate(),
+      CALL_METHOD: createKeywordDescriptionTemplate(),
+      CALL_TRANSACTION: createCallTransactionTemplate(),
       CASE: createKeywordDescriptionTemplate(),
+      CATCH: createKeywordDescriptionTemplate(),
+      CLASS: createKeywordDescriptionTemplate(),
+      "CLASS-DATA": createKeywordDescriptionTemplate(),
+      "CLASS-METHODS": createKeywordDescriptionTemplate(),
+      CLEANUP: createKeywordOnlyTemplate(),
       CLEAR: createKeywordDescriptionTemplate(),
       CONCATENATE: createConcatenateTemplate(),
       CONSTANTS: createKeywordDescriptionTemplate(),
@@ -2299,26 +2370,35 @@ const els = {
       ELSE: createKeywordDescriptionTemplate(),
       ELSEIF: createConditionRowTemplate(),
       "FIELD-SYMBOLS": createKeywordDescriptionTemplate(),
+      FORM: createKeywordDescriptionTemplate(),
       IF: createConditionRowTemplate(),
+      INSERT_ITAB: createKeywordDescriptionTemplate(),
+      INSERT_LINES_OF: createInsertLinesOfTemplate(),
       LOOP_AT_ITAB: createKeywordAndConditionTemplate([
         { pathPrefix: "extras.loopAtItab.conditions", sectionLabel: "WHERE" }
       ]),
       MESSAGE: createKeywordDescriptionTemplate(),
+      METHOD: createKeywordDescriptionTemplate(),
+      METHODS: createKeywordDescriptionTemplate(),
       MODIFY_ITAB: createKeywordAndConditionTemplate([
         { pathPrefix: "extras.modifyItab.conditions", sectionLabel: "WHERE" }
       ]),
+      MOVE: createKeywordDescriptionTemplate(),
       "MOVE-CORRESPONDING": createKeywordDescriptionTemplate(),
       PARAMETERS: createKeywordDescriptionTemplate(),
       PERFORM: createKeywordDescriptionTemplate(),
       READ_TABLE: createKeywordAndConditionTemplate([
         { pathPrefix: "extras.readTable.conditions", sectionLabel: "WITH KEY" }
       ]),
+      RANGES: createKeywordDescriptionTemplate(),
       SELECT: createKeywordAndConditionTemplate([
         { pathPrefix: "extras.select.whereConditions", sectionLabel: "WHERE" },
         { pathPrefix: "extras.select.havingConditions", sectionLabel: "HAVING" }
       ]),
       "SELECT-OPTIONS": createKeywordDescriptionTemplate(),
       SORT_ITAB: createKeywordDescriptionTemplate(),
+      STATICS: createKeywordDescriptionTemplate(),
+      TRY: createKeywordOnlyTemplate(),
       TYPES: createKeywordDescriptionTemplate(),
       WHEN: createKeywordDescriptionTemplate(),
       WRITE: createKeywordDescriptionTemplate()
@@ -2628,6 +2708,19 @@ const els = {
       const cloned = cloneJsonValue(sourceTemplate);
       if (cloned && typeof cloned === "object") {
         config.templates.APPEND_LINES_OF = cloned;
+        changed = true;
+      }
+    }
+    if (!Object.prototype.hasOwnProperty.call(config.templates, "INSERT_LINES_OF")) {
+      const legacyInsert = config.templates.INSERT_ITAB;
+      const defaultInsert = TEMPLATE_DEFAULT_CONFIG_V1.templates.INSERT_ITAB;
+      const dedicatedDefault = TEMPLATE_DEFAULT_CONFIG_V1.templates.INSERT_LINES_OF;
+      const sourceTemplate = legacyInsert && !templateDefinitionsEqual(legacyInsert, defaultInsert)
+        ? legacyInsert
+        : dedicatedDefault;
+      const cloned = cloneJsonValue(sourceTemplate);
+      if (cloned && typeof cloned === "object") {
+        config.templates.INSERT_LINES_OF = cloned;
         changed = true;
       }
     }

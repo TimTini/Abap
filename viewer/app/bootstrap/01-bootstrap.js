@@ -182,7 +182,7 @@ function start() {
     initLayoutSplitter();
 
     if (els.templateKeyMode) {
-      els.templateKeyMode.textContent = "AUTO: objectType -> DEFAULT";
+      els.templateKeyMode.textContent = "AUTO: objectType only";
     }
     syncTemplateEditorFromState();
     setTemplateConfigError("");

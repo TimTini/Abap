@@ -1122,8 +1122,8 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     SELECT: "fields",
     SORT_ITAB: "itab",
     WHEN: "branch",
-    CALL_METHOD: "name",
-    CALL_TRANSACTION: "name",
+    CALL_METHOD: "target",
+    CALL_TRANSACTION: "tcode",
     MESSAGE: "message",
     MOVE: "source",
     "MOVE-CORRESPONDING": "source",
@@ -4276,7 +4276,13 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       && obj.extras
       && obj.extras.append
       && String(obj.extras.append.variant || "") === "linesOf";
-    const preferredKeys = isAppendLinesOf ? ["APPEND_LINES_OF", "APPEND"] : [objectType];
+    const isInsertLinesOf = Boolean(objectType === "INSERT_ITAB"
+      && obj.values
+      && obj.values.source
+      && String(obj.values.source.value || "").trim());
+    const preferredKeys = isAppendLinesOf
+      ? ["APPEND_LINES_OF", "APPEND"]
+      : (isInsertLinesOf ? ["INSERT_LINES_OF", "INSERT_ITAB"] : [objectType]);
     for (const templateKey of preferredKeys) {
       if (templateKey && Object.prototype.hasOwnProperty.call(templates, templateKey)) {
         const resolved = resolveTemplateDefinitionForPreview(templates[templateKey]);
@@ -4292,10 +4298,6 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         const resolved = resolveTemplateDefinitionForPreview(defaultTemplates[templateKey]);
         return { key: templateKey, map: resolved.map, options: resolved.options };
       }
-    }
-    if (Object.prototype.hasOwnProperty.call(templates, "DEFAULT")) {
-      const resolved = resolveTemplateDefinitionForPreview(templates.DEFAULT);
-      return { key: "DEFAULT", map: resolved.map, options: resolved.options };
     }
     const resolved = resolveTemplateDefinitionForPreview(null);
     return { key: "", map: null, options: resolved.options };
@@ -7402,9 +7404,9 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       draft.templates = {};
     }
     if (!Object.keys(draft.templates).length) {
-      draft.templates.DEFAULT = {};
+      draft = getDefaultTemplateConfig();
     }
-    let selKey = Object.keys(draft.templates)[0] || "DEFAULT";
+    let selKey = Object.keys(draft.templates)[0] || "";
     let selRange = "";
     let pendingExcelImport = null;
     let excelPasteOpen = false;
@@ -8292,7 +8294,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       const root = document.createElement("div");
       root.className = "template-config-builder";
       const keys = Object.keys(draft.templates);
-      if (!keys.includes(selKey)) selKey = keys[0] || "DEFAULT";
+      if (!keys.includes(selKey)) selKey = keys[0] || "";
       if (!selRange) selRange = listRanges(selKey)[0]?.rangeKey || "A1";
       selRange = normalizeRangeKeyForBuilder(selRange);
 
@@ -8396,7 +8398,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         }
         if (!confirm(`Delete template key "${selKey}"?`)) return;
         delete draft.templates[selKey];
-        selKey = Object.keys(draft.templates)[0] || "DEFAULT";
+        selKey = Object.keys(draft.templates)[0] || "";
         selRange = listRanges(selKey)[0]?.rangeKey || "A1";
         showErr("");
         renderActive();

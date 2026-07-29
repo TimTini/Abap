@@ -174,6 +174,10 @@ async function assertViewerFixture(fileName) {
     assert(configPage, "Expected Template Form page to open.");
     const activeConfigPage = configPage;
     assert(activeConfigPage.querySelector(".template-config-builder"), "Expected Template Form page to expose the drag-drop builder.");
+    const editedTemplateKey = String(
+      activeConfigPage.querySelector("select.template-config-select")?.value || ""
+    );
+    assert(editedTemplateKey, "Expected Template Form to select a dedicated template key.");
     assert.strictEqual(
       Boolean(activeConfigPage.querySelector(".template-config-ranges-table")),
       false,
@@ -284,11 +288,12 @@ async function assertViewerFixture(fileName) {
     applyButton.click();
     await new Promise((resolve) => window.setTimeout(resolve, 0));
     assert.strictEqual(Boolean(findVisibleTemplateConfigPage(window)), false, "Expected Template Form modal to close after valid builder apply.");
-    assert(state.templateConfig.templates.DEFAULT["A1:C2"], "Expected builder to save selected A1:C2 range.");
-    assert.strictEqual(state.templateConfig.templates.DEFAULT["A1:C2"].background, "#123abc");
-    assert.strictEqual(state.templateConfig.templates.DEFAULT["A1:C2"].border, "outside-thin");
-    assert.strictEqual(state.templateConfig.templates.DEFAULT["A1:C2"]["font color"], "#111111");
-    assert.strictEqual(state.templateConfig.templates.DEFAULT["A1:C2"].merge, true);
+    const editedTemplate = state.templateConfig.templates[editedTemplateKey];
+    assert(editedTemplate["A1:C2"], "Expected builder to save selected A1:C2 range.");
+    assert.strictEqual(editedTemplate["A1:C2"].background, "#123abc");
+    assert.strictEqual(editedTemplate["A1:C2"].border, "outside-thin");
+    assert.strictEqual(editedTemplate["A1:C2"]["font color"], "#111111");
+    assert.strictEqual(editedTemplate["A1:C2"].merge, true);
 
   }
 
