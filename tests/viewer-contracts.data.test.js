@@ -732,6 +732,162 @@ async function assertInlineFieldSymbolScopeAndTypeFanout() {
   dom.window.close();
 }
 
+async function assertExternalInstanceItemEditsFanOutAcrossFormChains() {
+  const source = [
+    "DATA a TYPE ztype.",
+    "DATA b TYPE ztype.",
+    "DATA c TYPE zother.",
+    "TYPES: BEGIN OF ty_local,",
+    "         createdate TYPE d,",
+    "       END OF ty_local.",
+    "DATA x TYPE ty_local.",
+    "DATA y TYPE ty_local.",
+    "a-createdate = sy-datum.",
+    "b-createdate = sy-datum.",
+    "c-createdate = sy-datum.",
+    "x-createdate = sy-datum.",
+    "y-createdate = sy-datum.",
+    "PERFORM frm_a USING a.",
+    "PERFORM frm_b USING b.",
+    "FORM frm_a USING p_a TYPE ztype.",
+    "  WRITE p_a-createdate.",
+    "ENDFORM.",
+    "FORM frm_b USING p_b TYPE ztype.",
+    "  WRITE p_b-createdate.",
+    "ENDFORM."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state, services } = window.AbapViewerRuntime;
+  const descriptions = services.descriptions;
+  state.settings = { ...state.settings, normalizeDeclDesc: false };
+
+  els.rightTabDescBtn.click();
+  await waitForViewerUi(window);
+
+  const findDecl = (name, objectType) => (state.data.decls || []).find((decl) => (
+    String(decl.name || "").toUpperCase() === String(name || "").toUpperCase()
+    && String(decl.objectType || "").toUpperCase() === String(objectType || "").toUpperCase()
+  ));
+  const getOverrideText = (decl) => descriptions.getDeclOverrideEntry(decl).text;
+
+  const rootA = findDecl("a", "DATA");
+  const rootB = findDecl("b", "DATA");
+  const itemA = findDecl("a-createdate", "STRUCT_FIELD");
+  const itemB = findDecl("b-createdate", "STRUCT_FIELD");
+  const otherTypeItem = findDecl("c-createdate", "STRUCT_FIELD");
+  const localItemX = findDecl("x-createdate", "STRUCT_FIELD");
+  const localItemY = findDecl("y-createdate", "STRUCT_FIELD");
+  assert(
+    rootA && rootB && itemA && itemB && otherTypeItem && localItemX && localItemY,
+    "external and local roots and observed items must be catalogued"
+  );
+
+  let globalGroup = findDataDeclGroup(els, "GLOBAL");
+  findDataDeclRow(globalGroup, "a")
+    .querySelector('button[data-action="edit-description"]')
+    .click();
+  await waitForViewerUi(window);
+  els.editDesc.value = "Root A only";
+  els.editSaveBtn.click();
+  await waitForViewerUi(window);
+  assert.strictEqual(getOverrideText(rootA), "Root A only");
+  assert.strictEqual(getOverrideText(rootB), "", "root descriptions stay isolated");
+
+  globalGroup = findDataDeclGroup(els, "GLOBAL");
+  findDataDeclRow(globalGroup, "a-createdate")
+    .querySelector('button[data-action="edit-description"]')
+    .click();
+  await waitForViewerUi(window);
+  els.editStructDesc.value = "Root A only";
+  els.editItemDesc.value = "Shared create date";
+  els.editSaveBtn.click();
+  await waitForViewerUi(window);
+
+  assert.strictEqual(getOverrideText(rootA), "Root A only");
+  assert.strictEqual(getOverrideText(rootB), "", "editing an item must not fan out its root description");
+  assert.strictEqual(getOverrideText(itemA), "Shared create date");
+  assert.strictEqual(getOverrideText(itemB), "Shared create date", "same external type item follows the edit");
+  assert.strictEqual(getOverrideText(otherTypeItem), "", "same-named items from another external type stay isolated");
+
+  globalGroup = findDataDeclGroup(els, "GLOBAL");
+  findDataDeclRow(globalGroup, "x-createdate")
+    .querySelector('button[data-action="edit-description"]')
+    .click();
+  await waitForViewerUi(window);
+  els.editStructDesc.value = "";
+  els.editItemDesc.value = "Local X only";
+  els.editSaveBtn.click();
+  await waitForViewerUi(window);
+  assert.strictEqual(getOverrideText(localItemX), "Local X only");
+  assert.strictEqual(getOverrideText(localItemY), "", "declared local type instances keep their existing isolated item edits");
+
+  let formAGroup = findDataDeclGroup(els, "FORM:FRM_A");
+  let formBGroup = findDataDeclGroup(els, "FORM:FRM_B");
+  let formAItemRow = findDataDeclRow(formAGroup, "p_a-createdate");
+  let formBItemRow = findDataDeclRow(formBGroup, "p_b-createdate");
+  const formAChainKey = String(formAItemRow.getAttribute("data-decl-key") || "");
+  const formBChainKey = String(formBItemRow.getAttribute("data-decl-key") || "");
+  assert.match(formAChainKey, /^PERFORM_CHAIN:/);
+  assert.match(formBChainKey, /^PERFORM_CHAIN:/);
+  assert.strictEqual(descriptions.normalizeDescOverrideEntry(state.descOverrides[formAChainKey]).text, "Shared create date");
+  assert.strictEqual(descriptions.normalizeDescOverrideEntry(state.descOverrides[formBChainKey]).text, "Shared create date");
+
+  formBItemRow.querySelector('button[data-action="edit-description"]').click();
+  await waitForViewerUi(window);
+  els.editDesc.value = "Updated from FORM B";
+  els.editSaveBtn.click();
+  await waitForViewerUi(window);
+
+  assert.strictEqual(getOverrideText(itemA), "Updated from FORM B");
+  assert.strictEqual(getOverrideText(itemB), "Updated from FORM B");
+  assert.strictEqual(descriptions.normalizeDescOverrideEntry(state.descOverrides[formAChainKey]).text, "Updated from FORM B");
+  assert.strictEqual(descriptions.normalizeDescOverrideEntry(state.descOverrides[formBChainKey]).text, "Updated from FORM B");
+  assert.strictEqual(getOverrideText(rootA), "Root A only");
+  assert.strictEqual(getOverrideText(rootB), "");
+
+  globalGroup = findDataDeclGroup(els, "GLOBAL");
+  findDataDeclRow(globalGroup, "b-createdate")
+    .querySelector('button[data-action="edit-description"]')
+    .click();
+  await waitForViewerUi(window);
+  els.editStructDesc.value = "";
+  els.editItemDesc.value = "";
+  els.editSaveBtn.click();
+  await waitForViewerUi(window);
+
+  assert.strictEqual(getOverrideText(itemA), "");
+  assert.strictEqual(getOverrideText(itemB), "");
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(state.descOverrides, formAChainKey), false);
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(state.descOverrides, formBChainKey), false);
+  assert.strictEqual(getOverrideText(rootA), "Root A only");
+  assert.strictEqual(getOverrideText(rootB), "");
+
+  const snapshot = JSON.parse(JSON.stringify(state.descOverrides));
+  globalGroup = findDataDeclGroup(els, "GLOBAL");
+  findDataDeclRow(globalGroup, "a-createdate")
+    .querySelector('button[data-action="edit-description"]')
+    .click();
+  await waitForViewerUi(window);
+  els.editStructDesc.value = "Must roll back root";
+  els.editItemDesc.value = "Must roll back item";
+  const originalSetItem = window.localStorage.setItem;
+  window.localStorage.setItem = () => {
+    throw new Error("simulated storage failure");
+  };
+  const failed = descriptions.applyEditModal("save");
+  window.localStorage.setItem = originalSetItem;
+  descriptions.closeEditModal();
+  assert.strictEqual(failed, false);
+  assert.deepStrictEqual(
+    JSON.parse(JSON.stringify(state.descOverrides)),
+    snapshot,
+    "external root and item writes roll back atomically"
+  );
+
+  dom.window.close();
+}
+
 async function assertLoopInlineFieldSymbolTypeFanout() {
   const source = [
     "TYPES: BEGIN OF ty_row,",
@@ -793,6 +949,10 @@ defineFocusedTest(test, "viewer scoped descriptions and type fan-out contract", 
 
   await t.test("TYPE save and clear include unselected local PERFORM candidates", async () => {
     await assertUnselectedPerformCandidateTypeFanout();
+  });
+
+  await t.test("external instance item edits fan out across FORM chains without sharing roots", async () => {
+    await assertExternalInstanceItemEditsFanOutAcrossFormChains();
   });
 
   await t.test("inline FIELD-SYMBOL stays lexical and its item follows inferred TYPE", async () => {

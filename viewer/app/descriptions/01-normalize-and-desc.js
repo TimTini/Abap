@@ -182,6 +182,33 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     const index = state.typeUsageIndex instanceof Map ? state.typeUsageIndex : null;
     return identity && index ? index.get(identity) || null : null;
   }
+  function getSharedExternalTypeComponentDecl(decl, formalDecl) {
+    const attachedDecl = decl && decl.__abapSharedExternalTypeComponentDecl;
+    if (attachedDecl) {
+      return attachedDecl;
+    }
+
+    let typeUsage = getTypeUsageEntry(decl);
+    if (!typeUsage && formalDecl) {
+      const typeIdentity = normalizeKeyToken(decl && decl.typeIdentity);
+      const fieldPath = normalizeKeyToken(formalDecl.fieldPath);
+      const index = state.typeUsageIndex instanceof Map ? state.typeUsageIndex : null;
+      if (typeIdentity.startsWith("EXTERNAL:") && fieldPath && index) {
+        typeUsage = index.get(`${typeIdentity}:${fieldPath}`) || null;
+      }
+    }
+
+    const typeComponentDecl = typeUsage && typeUsage.typeComponentDecl;
+    if (
+      !typeComponentDecl
+      || normalizeKeyToken(typeComponentDecl.objectType) !== "TYPE_COMPONENT"
+      || !typeComponentDecl.dynamic
+      || !normalizeKeyToken(typeComponentDecl.typeIdentity).startsWith("EXTERNAL:")
+    ) {
+      return null;
+    }
+    return typeComponentDecl;
+  }
 
   function getDataCatalogPerformParamUpper(decl) {
     if (!decl || typeof decl !== "object") {
@@ -929,6 +956,7 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       return decl;
     }
     registerTypeUsageChainKey(decl, chainKey);
+    const sharedExternalTypeComponentDecl = getSharedExternalTypeComponentDecl(decl, formalDecl);
     const clone = { ...decl };
     try {
       Object.defineProperty(clone, "__abapPerformChainOverrideKey", {
@@ -941,6 +969,13 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
         enumerable: false,
         configurable: true
       });
+      if (sharedExternalTypeComponentDecl) {
+        Object.defineProperty(clone, "__abapSharedExternalTypeComponentDecl", {
+          value: sharedExternalTypeComponentDecl,
+          enumerable: false,
+          configurable: true
+        });
+      }
     } catch {
       return decl;
     }
@@ -1764,7 +1799,7 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     return { ok: true, affectedKeys };
   }
 
-  function openEditModal({ mode, key, decl, structKey, itemKey, label, hint, initialValue, structValue, itemValue, skipNormalize }) {
+  function openEditModal({ mode, key, decl, structKey, itemKey, itemDecl, label, hint, initialValue, structValue, itemValue, skipNormalize }) {
     const editMode = mode === "structField" ? "structField" : "single";
 
     if (editMode === "single" && !key) {
@@ -1780,7 +1815,7 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     }
 
     state.activeEdit = editMode === "structField"
-      ? { mode: "structField", structKey, itemKey }
+      ? { mode: "structField", structKey, itemKey, itemDecl: itemDecl || null }
       : { mode: "single", key, decl: decl || null };
     els.editLabel.textContent = label ? String(label) : "";
 
@@ -1883,11 +1918,30 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       const itemTrimmed = itemValue.trim();
       const structStored = stripDeclCategoryPrefix(structTrimmed);
       const itemStored = skipNormalize ? itemTrimmed : stripDeclCategoryPrefix(itemTrimmed);
+      const hadStructOverride = Object.prototype.hasOwnProperty.call(state.descOverrides, structKey);
+      const previousStructOverride = state.descOverrides[structKey];
 
       if (!structStored) {
         delete state.descOverrides[structKey];
       } else {
         state.descOverrides[structKey] = structStored;
+      }
+
+      if (state.activeEdit.itemDecl) {
+        const result = applyDeclDescriptionOverride({
+          decl: state.activeEdit.itemDecl,
+          text: itemValue,
+          skipNormalize,
+          clear: action === "clear"
+        });
+        if (!result) {
+          if (hadStructOverride) {
+            state.descOverrides[structKey] = previousStructOverride;
+          } else {
+            delete state.descOverrides[structKey];
+          }
+        }
+        return result;
       }
 
       if (!itemStored) {
@@ -1913,6 +1967,7 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     }
     const isScopedPerformChain = /^(?:PERFORM|METHOD)_CHAIN:/.test(String(key));
     const isStructField = isStructFieldDecl(decl) && !isScopedPerformChain;
+    const sharedExternalTypeComponentDecl = getSharedExternalTypeComponentDecl(decl);
 
     const settings = state.settings || DEFAULT_SETTINGS;
     const normalizeEnabled = Boolean(settings.normalizeDeclDesc);
@@ -1947,10 +2002,12 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     }
 
     if (!isStructField) {
+      const editDecl = sharedExternalTypeComponentDecl || decl;
+      const editKey = getDeclOverrideStorageKey(editDecl);
       openEditModal({
         mode: "single",
-        key,
-        decl,
+        key: editKey,
+        decl: editDecl,
         label: `${decl.objectType || "DECL"} ${getDeclTechName(decl)}`,
         hint: hintParts.join(" • "),
         initialValue: currentDisplay || effective,
@@ -1961,7 +2018,9 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
 
     const structDecl = buildStructDeclFromFieldDecl(decl);
     const structKey = structDecl ? getDeclOverrideStorageKey(structDecl) : "";
-    if (!structKey) {
+    const itemDecl = sharedExternalTypeComponentDecl || null;
+    const itemKey = getDeclOverrideStorageKey(itemDecl || decl);
+    if (!structKey || !itemKey) {
       return;
     }
 
@@ -1973,16 +2032,17 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       : structCurrent;
 
     hintParts.push(`StructKey: ${structKey}`);
-    hintParts.push(`ItemKey: ${key}`);
+    hintParts.push(`ItemKey: ${itemKey}`);
 
     openEditModal({
       mode: "structField",
       structKey,
-      itemKey: key,
+      itemKey,
+      itemDecl,
       label: `${decl.objectType || "DECL"} ${getDeclTechName(decl)}`,
       hint: hintParts.join(" • "),
       structValue: structCurrentDisplay || structEffective,
-      itemValue: stripStructNamePrefixFromItemText(currentDisplay || getEffectiveDeclAtomicDescNormalized(decl), String(decl.structName || '').trim()),
+      itemValue: stripStructNamePrefixFromItemText(currentDisplay || getEffectiveDeclAtomicDescNormalized(decl), String(decl.structName || "").trim()),
       skipNormalize: Boolean(currentEntry.noNormalize)
     });
   }
