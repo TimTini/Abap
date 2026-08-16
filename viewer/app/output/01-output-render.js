@@ -26,6 +26,8 @@
   const attachTemplateSyntheticDeclAliases = runtime.requireServiceMethod("template", "attachTemplateSyntheticDeclAliases");
   const ensureTemplateWindowContainsIndex = runtime.requireServiceMethod("template", "ensureTemplateWindowContainsIndex");
   const scheduleTemplateVirtualScroll = runtime.requireServiceMethod("template", "scheduleTemplateVirtualScroll");
+  const captureTemplateViewportAnchor = runtime.requireServiceMethod("template", "captureTemplateViewportAnchor");
+  const restoreTemplateViewportAnchor = runtime.requireServiceMethod("template", "restoreTemplateViewportAnchor");
   const navigateInputRange = runtime.requireServiceMethod("uiNavigation", "navigateInputRange");
   const start = runtime.requireServiceMethod("bootstrap", "start");
 function isValueLikeEntryObject(value) {
@@ -414,7 +416,16 @@ function isValueLikeEntryObject(value) {
         `.template-block[data-template-index="${escapeSelectorValue(normalized)}"]`
       );
     }
+    const lockViewport = opts.scroll === false
+      && typeof captureTemplateViewportAnchor === "function"
+      && typeof restoreTemplateViewportAnchor === "function";
+    const viewportAnchor = lockViewport
+      ? captureTemplateViewportAnchor({ templateIndex: targetIndex })
+      : null;
     syncRenderedTemplateSelection();
+    if (lockViewport && viewportAnchor) {
+      restoreTemplateViewportAnchor(viewportAnchor);
+    }
 
     if (next && opts.scroll !== false) {
       const scrollMode = String(opts.scrollMode || "start").toLowerCase();

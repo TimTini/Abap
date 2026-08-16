@@ -5,7 +5,13 @@
       "block": null,
       "children": [],
       "comment": "",
-      "extras": null,
+      "extras": {
+        "declaration": {
+          "defaultRaw": "",
+          "typeRaw": "rfcdest",
+          "valueRaw": "'NONE'"
+        }
+      },
       "file": "extras-dynamic-bindings.abap",
       "keywords": {
         "stmt": {
@@ -72,7 +78,13 @@
       "block": null,
       "children": [],
       "comment": "",
-      "extras": null,
+      "extras": {
+        "declaration": {
+          "defaultRaw": "",
+          "typeRaw": "i",
+          "valueRaw": "1"
+        }
+      },
       "file": "extras-dynamic-bindings.abap",
       "keywords": {
         "stmt": {
@@ -139,7 +151,13 @@
       "block": null,
       "children": [],
       "comment": "",
-      "extras": null,
+      "extras": {
+        "declaration": {
+          "defaultRaw": "",
+          "typeRaw": "string",
+          "valueRaw": "'X'"
+        }
+      },
       "file": "extras-dynamic-bindings.abap",
       "keywords": {
         "stmt": {
@@ -206,7 +224,13 @@
       "block": null,
       "children": [],
       "comment": "",
-      "extras": null,
+      "extras": {
+        "declaration": {
+          "defaultRaw": "",
+          "typeRaw": "i",
+          "valueRaw": "0"
+        }
+      },
       "file": "extras-dynamic-bindings.abap",
       "keywords": {
         "stmt": {
@@ -273,7 +297,13 @@
       "block": null,
       "children": [],
       "comment": "",
-      "extras": null,
+      "extras": {
+        "declaration": {
+          "defaultRaw": "",
+          "typeRaw": "STANDARD TABLE OF string WITH EMPTY KEY",
+          "valueRaw": ""
+        }
+      },
       "file": "extras-dynamic-bindings.abap",
       "keywords": {
         "of": {

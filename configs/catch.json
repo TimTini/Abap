@@ -1,6 +1,7 @@
 {
   "object": "CATCH",
   "match": { "startKeyword": "CATCH" },
+  "extras": { "type": "catch" },
   "keywordLabels": {
     "CATCH": "stmt",
     "INTO": "into"
@@ -11,4 +12,3 @@
     { "after": "INTO", "name": "into", "label": "into" }
   ]
 }
-

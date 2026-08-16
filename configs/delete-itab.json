@@ -19,6 +19,7 @@
     { "after": "DELETE", "name": "target", "label": "target" },
     { "after": "FROM", "name": "from", "label": "from" },
     { "after": "INDEX", "name": "index", "label": "index" },
-    { "after": "WHERE", "name": "where", "label": "where", "capture": "rest" }
+    { "after": "WHERE", "name": "where", "label": "where", "capture": "rest", "stopTokens": ["COMPARING"] },
+    { "after": "COMPARING", "name": "comparing", "label": "comparing", "capture": "rest" }
   ]
 }

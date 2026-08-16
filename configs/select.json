@@ -31,7 +31,7 @@
     "UP TO": "up-to"
   },
   "captureRules": [
-    { "after": "SELECT", "name": "fields", "label": "fields", "capture": "rest", "stopTokens": ["FROM", "SINGLE", "DISTINCT"] },
+    { "after": "SELECT", "name": "fields", "label": "fields", "capture": "rest", "stopTokens": ["FROM", "INTO", "APPENDING", "SINGLE", "DISTINCT"] },
     { "after": "SINGLE", "name": "fields", "label": "fields", "capture": "rest", "stopTokens": ["FROM"] },
     { "after": "DISTINCT", "name": "fields", "label": "fields", "capture": "rest", "stopTokens": ["FROM"] },
     { "after": "FROM", "name": "from", "label": "from" },
@@ -43,6 +43,8 @@
     { "after": "INTO", "name": "into", "label": "into" },
     { "after": "FOR ALL ENTRIES IN", "name": "forAllEntries", "label": "for-all-entries", "descKey": "forAllEntries" },
     { "after": "WHERE", "name": "where", "label": "where", "capture": "rest", "stopTokens": ["ORDER", "GROUP", "HAVING", "UP", "INTO", "APPENDING", "UNION"] },
-    { "after": "HAVING", "name": "having", "label": "having", "capture": "rest", "stopTokens": ["ORDER", "UP", "INTO", "APPENDING"] }
+    { "after": "GROUP BY", "name": "groupBy", "label": "group-by", "capture": "rest", "stopTokens": ["HAVING", "ORDER", "UP", "INTO", "APPENDING", "UNION"] },
+    { "after": "ORDER BY", "name": "orderBy", "label": "order-by", "capture": "rest", "stopTokens": ["UP", "INTO", "APPENDING", "UNION"] },
+    { "after": "HAVING", "name": "having", "label": "having", "capture": "rest", "stopTokens": ["ORDER", "UP", "INTO", "APPENDING", "UNION"] }
   ]
 }

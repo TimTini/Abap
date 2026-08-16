@@ -839,7 +839,246 @@
       return buildWriteExtras(context);
     }
 
+    if (extrasConfig.type === "assignment") {
+      return buildAssignmentExtras(context);
+    }
+
+    if (extrasConfig.type === "sortItab") {
+      return buildSortItabExtras(context);
+    }
+
+    if (extrasConfig.type === "concatenate") {
+      return buildConcatenateExtras(context);
+    }
+
+    if (extrasConfig.type === "when") {
+      return buildWhenExtras(context);
+    }
+
+    if (extrasConfig.type === "catch") {
+      return buildCatchExtras(context);
+    }
+
+    if (extrasConfig.type === "declaration") {
+      return buildDeclarationExtras(context);
+    }
+
     return null;
+  }
+
+  function buildSortItabExtras({ raw, values }) {
+    const map = valuesToFirstValueMap(values);
+    const byRaw = String(map.by || "").trim();
+    const globalModifiers = parseSortGlobalModifiers(raw, map.itab || "");
+
+    return {
+      sortItab: {
+        byRaw,
+        keys: parseStaticSortKeys(byRaw),
+        direction: globalModifiers.direction,
+        asText: globalModifiers.asText
+      }
+    };
+  }
+
+  function parseSortGlobalModifiers(raw, itabValue) {
+    const source = stripStatementTerminator(raw);
+    const sortIndex = findTopLevelPhrase(source, "SORT");
+    if (sortIndex < 0) {
+      return { direction: "", asText: false };
+    }
+    const byIndex = findTopLevelPhrase(source, "BY", sortIndex + "SORT".length);
+    const prefix = source.slice(sortIndex + "SORT".length, byIndex >= 0 ? byIndex : source.length).trim();
+    const itab = String(itabValue || "").trim();
+    const modifierRaw = itab && prefix.toUpperCase().startsWith(itab.toUpperCase())
+      ? prefix.slice(itab.length).trim()
+      : prefix.replace(/^(?:<[^>]+>|[A-Za-z_][A-Za-z0-9_]*)\b/, "").trim();
+    const directionMatch = /\b(ASCENDING|DESCENDING)\b/i.exec(modifierRaw);
+    return {
+      direction: directionMatch ? String(directionMatch[1]).toUpperCase() : "",
+      asText: /\bAS\s+TEXT\b/i.test(modifierRaw)
+    };
+  }
+
+  function parseStaticSortKeys(byRaw) {
+    const parts = String(byRaw || "").trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) {
+      return [];
+    }
+
+    const componentPattern = /^(?:table_line|<[^>]+>|[A-Za-z_][A-Za-z0-9_]*)(?:(?:->|-)[A-Za-z_][A-Za-z0-9_]*|\+[A-Za-z0-9_]+\([A-Za-z0-9_]+\))*$/i;
+    const keys = [];
+    let index = 0;
+
+    while (index < parts.length) {
+      const component = parts[index];
+      if (!componentPattern.test(component)) {
+        return [];
+      }
+      index += 1;
+
+      let direction = "";
+      let asText = false;
+      if (index < parts.length && /^(?:ASCENDING|DESCENDING)$/i.test(parts[index])) {
+        direction = parts[index].toUpperCase();
+        index += 1;
+      }
+      if (
+        index + 1 < parts.length
+        && /^AS$/i.test(parts[index])
+        && /^TEXT$/i.test(parts[index + 1])
+      ) {
+        asText = true;
+        index += 2;
+      }
+
+      keys.push({
+        name: "by",
+        value: component,
+        direction,
+        asText
+      });
+    }
+
+    return keys;
+  }
+
+  function buildAssignmentExtras({ values }) {
+    const map = valuesToFirstValueMap(values);
+    const exprRaw = String(map.expr || "").trim();
+
+    return {
+      assignment: {
+        expression: {
+          raw: exprRaw,
+          tokens: splitAbapExpressionTokens(exprRaw)
+        }
+      }
+    };
+  }
+
+  function isAbapExpressionLiteralToken(part) {
+    const text = String(part || "").trim();
+    if (!text) {
+      return false;
+    }
+    if (text.startsWith("'") || text.startsWith("`") || text.startsWith("|")) {
+      return true;
+    }
+    return /^[+-]?\d+(?:\.\d+)?$/i.test(text);
+  }
+
+  function classifyAbapExpressionOperandToken(part) {
+    const value = String(part || "").trim();
+    if (!value) {
+      return null;
+    }
+    if (isAbapExpressionLiteralToken(value)) {
+      return { kind: "literal", value };
+    }
+    return { kind: "operand", value };
+  }
+
+  function splitAbapExpressionTokens(rawValue) {
+    const text = String(rawValue || "").trim();
+    if (!text) {
+      return [];
+    }
+
+    const tokens = [];
+    let current = "";
+    let quote = "";
+
+    const flushOperand = () => {
+      const token = classifyAbapExpressionOperandToken(current);
+      if (token) {
+        tokens.push(token);
+      }
+      current = "";
+    };
+
+    const pushOperator = (value) => {
+      flushOperand();
+      tokens.push({ kind: "operator", value: String(value || "") });
+    };
+
+    const pushParen = (value) => {
+      flushOperand();
+      tokens.push({ kind: "paren", value: String(value || "") });
+    };
+
+    for (let index = 0; index < text.length; index += 1) {
+      const ch = text[index];
+      const next = text[index + 1] || "";
+
+      if (quote) {
+        current += ch;
+        if ((quote === "'" || quote === "`") && ch === quote && next === quote) {
+          current += next;
+          index += 1;
+          continue;
+        }
+        if (quote === "|" && ch === "\\" && next) {
+          current += next;
+          index += 1;
+          continue;
+        }
+        if (ch === quote) {
+          quote = "";
+        }
+        continue;
+      }
+
+      if (ch === "'" || ch === "`" || ch === "|") {
+        quote = ch;
+        current += ch;
+        continue;
+      }
+
+      if (ch === "(") {
+        pushParen("(");
+        continue;
+      }
+      if (ch === ")") {
+        pushParen(")");
+        continue;
+      }
+
+      if (ch === "&" && next === "&") {
+        flushOperand();
+        index += 1;
+        continue;
+      }
+      if (ch === "+" || ch === "*" || ch === "/") {
+        pushOperator(ch);
+        continue;
+      }
+      if (ch === "-") {
+        const hasTrailingSpace = current.length > 0 && /\s$/.test(current);
+        const trimmed = current.trim();
+        const nextIsIdent = /[A-Za-z_<@]/.test(next);
+        const endsWithIdent = /[A-Za-z0-9_>]$/.test(trimmed);
+        if (!hasTrailingSpace && endsWithIdent && nextIsIdent) {
+          current += ch;
+          continue;
+        }
+        const prev = trimmed.slice(-1);
+        const unaryContext = !trimmed
+          || /[+\-*/(&]$/.test(prev)
+          || /\b(?:AND|OR|EQ|NE|LT|LE|GT|GE)$/i.test(trimmed);
+        if (unaryContext) {
+          current += ch;
+          continue;
+        }
+        pushOperator("-");
+        continue;
+      }
+
+      current += ch;
+    }
+
+    flushOperand();
+    return tokens;
   }
 
   function buildFormExtras({ raw, values, commentLines }) {
@@ -1034,17 +1273,26 @@
     };
   }
 
-  function buildSelectExtras({ values }) {
+  function buildSelectExtras({ raw, values }) {
     const map = valuesToFirstValueMap(values);
     const whereRaw = map.where || "";
     const havingRaw = map.having || "";
+    const fieldsRaw = extractSelectFieldsRaw(raw, map.fields || "");
+    const groupByRaw = extractRawClause(raw, "GROUP BY", ["HAVING", "ORDER BY", "UP TO", "INTO", "APPENDING", "UNION"], map.groupBy || "");
+    const orderByRaw = extractRawClause(raw, "ORDER BY", ["HAVING", "UP TO", "INTO", "APPENDING", "UNION"], map.orderBy || "");
 
     return {
       select: {
+        fieldsRaw,
+        fields: parseStaticValueList(fieldsRaw),
         whereRaw,
         whereConditions: parseConditionClauses(whereRaw, { allowImplicitAnd: false }),
+        groupByRaw,
+        groupBy: parseStaticValueList(groupByRaw),
         havingRaw,
-        havingConditions: parseConditionClauses(havingRaw, { allowImplicitAnd: false })
+        havingConditions: parseConditionClauses(havingRaw, { allowImplicitAnd: false }),
+        orderByRaw,
+        orderBy: parseStaticOrderByList(orderByRaw)
       }
     };
   }
@@ -1058,6 +1306,10 @@
     const conditionSource = withTableKeyRaw ? normalizedWithTableKey : withKeyRaw;
     const binarySearch = Boolean(String(map.binarySearch || "").trim());
     const transportingNoFields = Boolean(String(map.transportingNoFields || "").trim());
+    const comparingRaw = map.comparingNoFields
+      ? "NO FIELDS"
+      : (map.comparingAllFields ? "ALL FIELDS" : (map.comparing || ""));
+    const transportingRaw = map.transportingAllFields ? "ALL FIELDS" : (map.transporting || "");
 
     return {
       readTable: {
@@ -1066,7 +1318,10 @@
         into: map.into || "",
         assigning: map.assigning || "",
         refInto: map.refInto || "",
-        transporting: map.transporting || "",
+        transporting: parseStaticValueList(transportingRaw),
+        transportingRaw,
+        comparingRaw,
+        comparing: parseStaticValueList(comparingRaw),
         binarySearch,
         transportingNoFields,
         withKeyRaw,
@@ -1097,32 +1352,474 @@
   function buildModifyItabExtras({ values }) {
     const map = valuesToFirstValueMap(values);
     const whereRaw = map.where || "";
+    const transportingRaw = map.transporting || "";
 
     return {
       modifyItab: {
         itab: map.itab || map.itabOrDbtab || "",
         from: map.from || "",
         index: map.index || "",
-        transporting: map.transporting || "",
+        transportingRaw,
+        transporting: parseStaticValueList(transportingRaw),
         whereRaw,
         conditions: parseConditionClauses(whereRaw, { allowImplicitAnd: false })
       }
     };
   }
 
-  function buildDeleteItabExtras({ values }) {
+  function buildDeleteItabExtras({ raw, values }) {
     const map = valuesToFirstValueMap(values);
     const whereRaw = map.where || "";
+    const comparingRaw = map.comparing || "";
+    const adjacentDuplicates = /^DELETE\s+ADJACENT\s+DUPLICATES\b/i.test(String(raw || ""));
 
     return {
       deleteItab: {
-        target: map.target || "",
-        from: map.from || "",
+        variant: adjacentDuplicates ? "adjacentDuplicates" : "delete",
+        target: adjacentDuplicates ? (map.from || "") : (map.target || ""),
+        from: adjacentDuplicates ? "" : (map.from || ""),
         index: map.index || "",
         whereRaw,
-        conditions: parseConditionClauses(whereRaw, { allowImplicitAnd: false })
+        conditions: parseConditionClauses(whereRaw, { allowImplicitAnd: false }),
+        comparingRaw,
+        comparing: parseStaticValueList(comparingRaw)
       }
     };
+  }
+
+  function buildConcatenateExtras({ values }) {
+    const map = valuesToFirstValueMap(values);
+    const sourcesRaw = map.sources || "";
+    return {
+      concatenate: {
+        sourcesRaw,
+        sources: parseStaticValueList(sourcesRaw)
+      }
+    };
+  }
+
+  function buildWhenExtras({ values }) {
+    const map = valuesToFirstValueMap(values);
+    const branchesRaw = map.branch || "";
+    return {
+      when: {
+        branchesRaw,
+        branches: parseWhenBranches(branchesRaw)
+      }
+    };
+  }
+
+  function buildCatchExtras({ values }) {
+    const map = valuesToFirstValueMap(values);
+    const exceptionsRaw = map.exception || "";
+    const modifierMatch = /^\s*(BEFORE\s+UNWIND)\b\s*/i.exec(exceptionsRaw);
+    const modifier = modifierMatch ? String(modifierMatch[1] || "").toUpperCase() : "";
+    const exceptionClassesRaw = modifierMatch
+      ? exceptionsRaw.slice(modifierMatch[0].length).trim()
+      : exceptionsRaw;
+    return {
+      catch: {
+        exceptionsRaw,
+        modifier,
+        exceptions: parseStaticValueList(exceptionClassesRaw)
+      }
+    };
+  }
+
+  function buildDeclarationExtras({ raw, values }) {
+    const map = valuesToFirstValueMap(values);
+    const typeValue = extractDeclarationTypeRaw(raw, map);
+    return {
+      declaration: {
+        typeRaw: typeValue,
+        valueRaw: extractRawClause(raw, "VALUE", ["LENGTH", "DECIMALS", "READ-ONLY"], map.value || ""),
+        defaultRaw: extractRawClause(raw, "DEFAULT", ["OBLIGATORY", "NO-EXTENSION", "NO INTERVALS", "NO-DISPLAY", "LOWER CASE", "MEMORY ID", "MODIF ID", "VISIBLE LENGTH", "LENGTH"], map.default || "")
+      }
+    };
+  }
+
+  function extractDeclarationTypeRaw(raw, map) {
+    const source = stripStatementTerminator(raw);
+    const declarationStops = ["VALUE", "DEFAULT", "LOW", "HIGH", "NO-DISPLAY", "NO-EXTENSION", "NO INTERVALS", "LOWER CASE", "MEMORY ID", "MODIF ID", "VISIBLE LENGTH", "LENGTH", "DECIMALS", "READ-ONLY"];
+    const typeRaw = extractRawClause(source, "TYPE REF TO", declarationStops, "");
+    if (typeRaw) {
+      return `REF TO ${typeRaw}`;
+    }
+    for (const phrase of ["TYPE", "LIKE", "FOR", "STRUCTURE"]) {
+      const extracted = extractRawClause(source, phrase, declarationStops, "");
+      if (extracted) {
+        return extracted;
+      }
+    }
+    return map.refTo ? `REF TO ${map.refTo}` : (map.type || map.like || map.for || map.structure || "");
+  }
+
+  function parseStaticValueList(rawValue) {
+    const raw = String(rawValue || "").trim();
+    if (!raw) {
+      return [];
+    }
+    if (/^(?:NO|ALL)\s+FIELDS$/i.test(raw)) {
+      return [{ value: raw }];
+    }
+
+    const split = splitTopLevelCommaList(raw);
+    if (split.hasComma) {
+      return split.items.map((value) => ({ value }));
+    }
+
+    const parts = splitTopLevelWhitespaceList(raw);
+    if (parts.length > 1 && parts.every(isSimpleStaticValue)) {
+      return parts.map((value) => ({ value }));
+    }
+    return [{ value: raw }];
+  }
+
+  function extractSelectFieldsRaw(raw, fallback) {
+    const source = stripStatementTerminator(raw);
+    const fromIndex = findTopLevelPhrase(source, "FROM");
+    const fieldsIndex = findTopLevelPhrase(source, "FIELDS");
+    const fieldsBelongToCorrespondingTarget = fromIndex >= 0
+      && fieldsIndex > fromIndex
+      && /\b(?:INTO|APPENDING)\s+CORRESPONDING\s*$/i.test(source.slice(fromIndex, fieldsIndex));
+    if (fieldsIndex >= 0 && (fromIndex < 0 || (fieldsIndex > fromIndex && !fieldsBelongToCorrespondingTarget))) {
+      return extractRawClause(source, "FIELDS", ["WHERE", "INTO", "APPENDING", "ORDER BY", "GROUP BY", "HAVING", "UP TO", "FOR ALL ENTRIES", "UNION"], fallback)
+        .replace(/^\s*DISTINCT\b\s*/i, "")
+        .trim();
+    }
+    if (fromIndex < 0) {
+      return String(fallback || "").trim();
+    }
+    const selectIndex = findTopLevelPhrase(source, "SELECT");
+    const selectEnd = selectIndex >= 0 ? selectIndex + "SELECT".length : 0;
+    const classicFieldsEnd = findFirstTopLevelPhrase(source, ["INTO", "APPENDING"], selectEnd);
+    const endIndex = classicFieldsEnd >= 0 && classicFieldsEnd < fromIndex ? classicFieldsEnd : fromIndex;
+    return source
+      .slice(selectEnd, endIndex)
+      .replace(/^\s*(?:SINGLE|DISTINCT)\b\s*/i, "")
+      .trim();
+  }
+
+  function extractRawClause(raw, phrase, stopPhrases, fallback) {
+    const source = stripStatementTerminator(raw);
+    const phraseIndex = findTopLevelPhrase(source, phrase);
+    if (phraseIndex < 0) {
+      return String(fallback || "").trim();
+    }
+    const startIndex = phraseIndex + String(phrase || "").length;
+    const stopIndex = findFirstTopLevelPhrase(source, stopPhrases, startIndex);
+    return source.slice(startIndex, stopIndex >= 0 ? stopIndex : source.length).trim();
+  }
+
+  function findFirstTopLevelPhrase(source, phrases, startIndex) {
+    let earliest = -1;
+    for (const phrase of phrases || []) {
+      const index = findTopLevelPhrase(source, phrase, startIndex);
+      if (index >= 0 && (earliest < 0 || index < earliest)) {
+        earliest = index;
+      }
+    }
+    return earliest;
+  }
+
+  function findTopLevelPhrase(sourceValue, phraseValue, fromIndex) {
+    const source = String(sourceValue || "");
+    const phrase = String(phraseValue || "").trim();
+    if (!phrase) {
+      return -1;
+    }
+    const phrasePattern = phrase.replace(/\s+/g, "\\s+");
+    const matcher = new RegExp(`^${phrasePattern}(?=\\s|$)`, "i");
+    let quote = "";
+    let depth = 0;
+    const start = Math.max(0, Number(fromIndex || 0));
+
+    for (let index = 0; index < source.length; index += 1) {
+      const ch = source[index];
+      const next = source[index + 1] || "";
+      if (quote) {
+        if ((quote === "'" || quote === "`") && ch === quote && next === quote) {
+          index += 1;
+        } else if (quote === "|" && ch === "\\" && next) {
+          index += 1;
+        } else if (ch === quote) {
+          quote = "";
+        }
+        continue;
+      }
+      if (ch === "'" || ch === "`" || ch === "|") {
+        quote = ch;
+        continue;
+      }
+      if (ch === "(" || ch === "[") {
+        depth += 1;
+        continue;
+      }
+      if ((ch === ")" || ch === "]") && depth > 0) {
+        depth -= 1;
+        continue;
+      }
+      if (index < start || depth > 0 || (index > 0 && /[A-Za-z0-9_-]/.test(source[index - 1]))) {
+        continue;
+      }
+      if (matcher.test(source.slice(index))) {
+        return index;
+      }
+    }
+    return -1;
+  }
+
+  function stripStatementTerminator(raw) {
+    return String(raw || "").trim().replace(/\.\s*$/, "").trim();
+  }
+
+  function parseStaticOrderByList(rawValue) {
+    const raw = String(rawValue || "").trim();
+    if (/^PRIMARY\s+KEY$/i.test(raw)) {
+      return [{ value: raw }];
+    }
+    const split = splitTopLevelCommaList(raw);
+    const items = split.hasComma ? split.items : splitStaticOrderByWhitespaceList(raw);
+    return items.filter(Boolean).map((rawItem) => {
+      const match = rawItem.match(/^(.*?)(?:\s+(ASCENDING|DESCENDING))?$/i);
+      const value = String(match && match[1] || rawItem).trim();
+      const direction = String(match && match[2] || "").toUpperCase();
+      if (isSimpleStaticValue(value)) {
+        return { value, direction };
+      }
+      return { value: rawItem };
+    });
+  }
+
+  function splitStaticOrderByWhitespaceList(rawValue) {
+    const raw = String(rawValue || "").trim();
+    const parts = raw.split(/\s+/).filter(Boolean);
+    if (!parts.length || !parts.every((part) => isSimpleStaticValue(part) || /^(?:ASCENDING|DESCENDING)$/i.test(part))) {
+      return raw ? [raw] : [];
+    }
+
+    const items = [];
+    for (let index = 0; index < parts.length; index += 1) {
+      const value = parts[index];
+      if (!isSimpleStaticValue(value)) {
+        return [raw];
+      }
+      const direction = /^(?:ASCENDING|DESCENDING)$/i.test(parts[index + 1] || "")
+        ? ` ${parts[index + 1].toUpperCase()}`
+        : "";
+      if (direction) {
+        index += 1;
+      }
+      items.push(`${value}${direction}`);
+    }
+    return items;
+  }
+
+  function splitTopLevelCommaList(rawValue) {
+    const raw = String(rawValue || "").trim();
+    if (!raw) {
+      return { hasComma: false, items: [] };
+    }
+
+    const items = [];
+    let current = "";
+    let quote = "";
+    let depth = 0;
+    let hasComma = false;
+    for (let index = 0; index < raw.length; index += 1) {
+      const ch = raw[index];
+      const next = raw[index + 1] || "";
+      current += ch;
+
+      if (quote) {
+        if ((quote === "'" || quote === "`") && ch === quote && next === quote) {
+          current += next;
+          index += 1;
+        } else if (quote === "|" && ch === "\\" && next) {
+          current += next;
+          index += 1;
+        } else if (ch === quote) {
+          quote = "";
+        }
+        continue;
+      }
+
+      if (ch === "'" || ch === "`" || ch === "|") {
+        quote = ch;
+      } else if (ch === "(" || ch === "[") {
+        depth += 1;
+      } else if ((ch === ")" || ch === "]") && depth > 0) {
+        depth -= 1;
+      } else if (ch === "," && depth === 0) {
+        hasComma = true;
+        current = current.slice(0, -1);
+        const item = current.trim();
+        if (item) {
+          items.push(item);
+        }
+        current = "";
+      }
+    }
+    const last = current.trim();
+    if (last) {
+      items.push(last);
+    }
+    return { hasComma, items };
+  }
+
+  function splitTopLevelWhitespaceList(rawValue) {
+    const raw = String(rawValue || "").trim();
+    if (!raw) {
+      return [];
+    }
+
+    const items = [];
+    let current = "";
+    let quote = "";
+    let depth = 0;
+    for (let index = 0; index < raw.length; index += 1) {
+      const ch = raw[index];
+      const next = raw[index + 1] || "";
+
+      if (quote) {
+        current += ch;
+        if ((quote === "'" || quote === "`") && ch === quote && next === quote) {
+          current += next;
+          index += 1;
+        } else if (quote === "|" && ch === "\\" && next) {
+          current += next;
+          index += 1;
+        } else if (ch === quote) {
+          quote = "";
+        }
+        continue;
+      }
+
+      if (ch === "'" || ch === "`" || ch === "|") {
+        quote = ch;
+        current += ch;
+        continue;
+      }
+      if (ch === "(" || ch === "[") {
+        depth += 1;
+        current += ch;
+        continue;
+      }
+      if ((ch === ")" || ch === "]") && depth > 0) {
+        depth -= 1;
+        current += ch;
+        continue;
+      }
+      if (/\s/.test(ch) && depth === 0) {
+        const item = current.trim();
+        if (item) {
+          items.push(item);
+        }
+        current = "";
+        continue;
+      }
+      current += ch;
+    }
+    const last = current.trim();
+    if (last) {
+      items.push(last);
+    }
+    return items;
+  }
+
+  function isSimpleStaticValue(value) {
+    const text = String(value || "").trim();
+    return /^(?:@?(?:<[^>]+>|[A-Za-z_][A-Za-z0-9_]*)(?:(?:->|=>|~|-)[A-Za-z_][A-Za-z0-9_]*)*|[+-]?\d+(?:\.\d+)?|'(?:''|[^'])*'|`(?:``|[^`])*`|\|(?:\\.|[^|])*\|)$/i.test(text);
+  }
+
+  function parseWhenBranches(rawValue) {
+    const raw = String(rawValue || "").trim();
+    if (!raw) {
+      return [];
+    }
+    if (/^OTHERS$/i.test(raw)) {
+      return [{ value: "OTHERS", kind: "others" }];
+    }
+
+    const branches = [];
+    const segments = splitTopLevelWhenOrSegments(raw);
+    for (let index = 0; index < segments.length; index += 1) {
+      const segment = segments[index];
+      if (segment) {
+        const thruIndex = findTopLevelPhrase(segment, "THRU");
+        if (thruIndex >= 0) {
+          const branch = {
+            value: segment.slice(0, thruIndex).trim(),
+            rangeEnd: segment.slice(thruIndex + "THRU".length).trim(),
+            operator: "THRU"
+          };
+          if (index < segments.length - 1) {
+            branch.connector = "OR";
+          }
+          branches.push(branch);
+        } else {
+          const branch = { value: segment };
+          if (index < segments.length - 1) {
+            branch.connector = "OR";
+          }
+          branches.push(branch);
+        }
+      }
+    }
+    return branches;
+  }
+
+  function splitTopLevelWhenOrSegments(rawValue) {
+    const raw = String(rawValue || "").trim();
+    if (!raw) {
+      return [];
+    }
+
+    const segments = [];
+    let startIndex = 0;
+    let quote = "";
+    let depth = 0;
+    for (let index = 0; index < raw.length; index += 1) {
+      const ch = raw[index];
+      const next = raw[index + 1] || "";
+      if (quote) {
+        if ((quote === "'" || quote === "`") && ch === quote && next === quote) {
+          index += 1;
+        } else if (quote === "|" && ch === "\\" && next) {
+          index += 1;
+        } else if (ch === quote) {
+          quote = "";
+        }
+        continue;
+      }
+      if (ch === "'" || ch === "`" || ch === "|") {
+        quote = ch;
+        continue;
+      }
+      if (ch === "(" || ch === "[") {
+        depth += 1;
+        continue;
+      }
+      if ((ch === ")" || ch === "]") && depth > 0) {
+        depth -= 1;
+        continue;
+      }
+      const isOr = /^OR(?=\s|$)/i.test(raw.slice(index));
+      const hasWordStart = index === 0 || !/[A-Za-z0-9_-]/.test(raw[index - 1]);
+      if (depth === 0 && hasWordStart && isOr) {
+        const segment = raw.slice(startIndex, index).trim();
+        if (segment) {
+          segments.push(segment);
+        }
+        startIndex = index + 2;
+        index += 1;
+      }
+    }
+    const last = raw.slice(startIndex).trim();
+    if (last) {
+      segments.push(last);
+    }
+    return segments;
   }
 
   function getCustomValueCodeDesc(values) {
@@ -3047,6 +3744,10 @@
         }
       }
       if (objectType === "WRITE" && ["position", "formatraw"].includes(entryName)) {
+        return;
+      }
+      if (objectType === "CATCH" && entryName === "exception") {
+        // Exception classes are schema identifiers, not data operands.
         return;
       }
       const ref = extractFirstIdentifierFromExpression(entry.value);

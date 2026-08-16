@@ -1,5 +1,6 @@
 {
   "object": "CLASS-DATA",
+  "extras": { "type": "declaration" },
   "match": { "startKeyword": "CLASS-DATA" },
   "keywordLabels": {
     "CLASS-DATA": "stmt",

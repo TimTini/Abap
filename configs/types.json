@@ -1,5 +1,6 @@
 {
   "object": "TYPES",
+  "extras": { "type": "declaration" },
   "match": { "startKeyword": "TYPES" },
   "keywordLabels": {
     "TYPES": "stmt",

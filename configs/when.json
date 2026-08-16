@@ -1,6 +1,7 @@
 {
   "object": "WHEN",
   "match": { "startKeyword": "WHEN" },
+  "extras": { "type": "when" },
   "keywordLabels": {
     "WHEN": "stmt",
     "OTHERS": "others"
@@ -12,4 +13,3 @@
     { "after": "WHEN", "name": "branch", "label": "branch", "capture": "rest" }
   ]
 }
-

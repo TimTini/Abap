@@ -1,5 +1,6 @@
 {
   "object": "SELECT-OPTIONS",
+  "extras": { "type": "declaration" },
   "match": { "startKeyword": "SELECT-OPTIONS" },
   "keywordLabels": {
     "SELECT-OPTIONS": "stmt",
@@ -33,4 +34,3 @@
     { "after": "MODIF ID", "name": "modifId", "label": "modif-id" }
   ]
 }
-

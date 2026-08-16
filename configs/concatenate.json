@@ -1,6 +1,7 @@
 {
   "object": "CONCATENATE",
   "match": { "startKeyword": "CONCATENATE" },
+  "extras": { "type": "concatenate" },
   "keywordLabels": {
     "CONCATENATE": "stmt",
     "LINES": "lines",

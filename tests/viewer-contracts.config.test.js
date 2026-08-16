@@ -1,5 +1,7 @@
 "use strict";
 
+const fs = require("fs");
+const path = require("path");
 const { test } = require("node:test");
 const { defineFocusedTest } = require("./helpers/test-focus");
 const {
@@ -14,6 +16,44 @@ const {
   VIEWER_CONFIG_STORAGE_KEYS,
   waitForViewerUi
 } = require("./helpers/viewer-contract-test-helpers");
+
+function assertEveryStatementConfigHasCompleteSemanticLabels() {
+  const configsDir = path.resolve(__dirname, "..", "configs");
+  const configFiles = fs.readdirSync(configsDir)
+    .filter((fileName) => fileName.toLowerCase().endsWith(".json"))
+    .sort();
+  const objectTypes = new Set();
+  let keywordCount = 0;
+  let phraseCount = 0;
+  let captureRuleCount = 0;
+
+  assert.strictEqual(configFiles.length, 43, "Expected the complete statement config inventory.");
+  for (const fileName of configFiles) {
+    const config = JSON.parse(fs.readFileSync(path.join(configsDir, fileName), "utf8"));
+    assert(String(config.object || "").trim(), `${fileName}: expected object type.`);
+    objectTypes.add(String(config.object));
+
+    for (const [keyword, label] of Object.entries(config.keywordLabels || {})) {
+      keywordCount += 1;
+      assert(String(keyword || "").trim(), `${fileName}: keyword token must not be empty.`);
+      assert(String(label || "").trim(), `${fileName}: ${keyword} semantic label must not be empty.`);
+    }
+    for (const [phrase, label] of Object.entries(config.keywordPhrases || {})) {
+      phraseCount += 1;
+      assert(String(phrase || "").trim(), `${fileName}: keyword phrase must not be empty.`);
+      assert(String(label || "").trim(), `${fileName}: ${phrase} phrase label must not be empty.`);
+    }
+    for (const [index, rule] of (Array.isArray(config.captureRules) ? config.captureRules : []).entries()) {
+      captureRuleCount += 1;
+      assert(String(rule && rule.label || "").trim(), `${fileName}: captureRules[${index}].label must not be empty.`);
+    }
+  }
+
+  assert.strictEqual(objectTypes.size, 42);
+  assert.strictEqual(keywordCount, 317);
+  assert.strictEqual(phraseCount, 77);
+  assert.strictEqual(captureRuleCount, 196);
+}
 
 async function assertGroupedConfigExportIsDeterministic() {
   const dom = await renderFixture("DATA lv_export TYPE string.\nlv_export = 'A'.");
@@ -773,6 +813,10 @@ assertViewerFixtureDirectoriesStayInSync();
 
 defineFocusedTest(test, "viewer template config contracts", ["template-configs"], async (t) => {
 assertViewerFixtureDirectoriesStayInSync();
+
+  await t.test("every statement config has complete semantic labels", () => {
+    assertEveryStatementConfigHasCompleteSemanticLabels();
+  });
 
   await t.test("statement specific twenty cell templates", async () => {
     await assertStatementSpecificTwentyCellTemplates();

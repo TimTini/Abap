@@ -2093,7 +2093,8 @@ const els = {
     hideRowsWithoutValues: true,
     expandMultilineRows: true,
     squareCells: true,
-    squareCellSize: 18
+    squareCellSize: 18,
+    objectLabel: ""
   };
 
   function createKeywordDescriptionTemplate() {
@@ -2813,6 +2814,64 @@ const els = {
     );
   }
 
+  function parseTemplateLabelDirectives(rawText) {
+    const originalText = String(rawText === undefined || rawText === null ? "" : rawText);
+    const lines = originalText.replace(/\r\n?/g, "\n").split("\n");
+    const directives = [];
+    const errors = [];
+    let lineIndex = 0;
+
+    while (lineIndex < lines.length && String(lines[lineIndex] || "").startsWith("@label")) {
+      const lineNumber = lineIndex + 1;
+      const line = String(lines[lineIndex] || "").trim();
+      const match = line.match(/^@label\s+([^=]+)=(.*)$/);
+      if (!match) {
+        errors.push(`@label line ${lineNumber} must use "@label path=Display text".`);
+        lineIndex += 1;
+        continue;
+      }
+      const path = String(match[1] || "").trim();
+      const displayText = String(match[2] || "").trim();
+      if (!path) {
+        errors.push(`@label line ${lineNumber} requires a path.`);
+      } else if (!/^[A-Za-z_$][A-Za-z0-9_$-]*(?:\[\d+\])?(?:\.[A-Za-z_$][A-Za-z0-9_$-]*(?:\[\d+\])?)*$/.test(path)) {
+        errors.push(`@label line ${lineNumber} path must use canonical dot notation.`);
+      }
+      if (!displayText) {
+        errors.push(`@label line ${lineNumber} requires display text.`);
+      }
+      if (path && displayText) {
+        directives.push({ path, displayText });
+      }
+      lineIndex += 1;
+    }
+
+    if (!directives.length && !errors.length) {
+      const misplacedLineIndex = lines.findIndex((line) => String(line || "").trimStart().startsWith("@label"));
+      if (misplacedLineIndex >= 0) {
+        return {
+          directives: [],
+          body: originalText,
+          errors: [`@label line ${misplacedLineIndex + 1} must be at the start of the cell text.`]
+        };
+      }
+      return { directives: [], body: originalText, errors: [] };
+    }
+
+    if (lineIndex < lines.length && !String(lines[lineIndex] || "").trim()) {
+      errors.push("@label body must immediately follow the directive lines without a blank separator.");
+    }
+    const body = lines.slice(lineIndex).join("\n").trim();
+    if (body !== "{rows.keyword}") {
+      errors.push('@label directives require the remaining cell text to be exactly "{rows.keyword}".');
+    }
+    if (lines.slice(lineIndex).some((line) => String(line || "").trimStart().startsWith("@label"))) {
+      errors.push("@label directives must be contiguous at the start of the cell text.");
+    }
+
+    return { directives, body, errors };
+  }
+
   function validateTemplateConfig(config) {
     const errors = [];
     if (!config || typeof config !== "object" || Array.isArray(config)) {
@@ -2858,6 +2917,13 @@ const els = {
         const optValue = templateDef[optKey];
         if (!optValue || typeof optValue !== "object" || Array.isArray(optValue)) {
           errors.push(`templates.${templateKey}.${optKey} must be an object.`);
+          continue;
+        }
+        if (
+          Object.prototype.hasOwnProperty.call(optValue, "objectLabel")
+          && typeof optValue.objectLabel !== "string"
+        ) {
+          errors.push(`templates.${templateKey}.${optKey}.objectLabel must be a string.`);
         }
       }
 
@@ -2874,6 +2940,13 @@ const els = {
         const cellConfig = ranges[rangeKey];
         if (!cellConfig || typeof cellConfig !== "object" || Array.isArray(cellConfig)) {
           errors.push(`templates.${templateKey}.${rangeKey} must be an object.`);
+          continue;
+        }
+        if (Object.prototype.hasOwnProperty.call(cellConfig, "text")) {
+          const directiveCheck = parseTemplateLabelDirectives(cellConfig.text);
+          for (const message of directiveCheck.errors) {
+            errors.push(`templates.${templateKey}.${rangeKey}: ${message}`);
+          }
         }
       }
     }
@@ -3257,6 +3330,7 @@ const els = {
     normalizeTemplateAliasToken,
     parseRangeKey,
     isTemplateOptionConfigKey,
+    parseTemplateLabelDirectives,
     validateTemplateConfig,
     loadTemplateConfig,
     saveTemplateConfig,

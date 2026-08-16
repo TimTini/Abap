@@ -1,6 +1,7 @@
 {
   "object": "ASSIGNMENT",
   "match": { "type": "assignment" },
+  "extras": { "type": "assignment" },
   "keywordLabels": {
     "=": "assign",
     "+=": "add-assign",

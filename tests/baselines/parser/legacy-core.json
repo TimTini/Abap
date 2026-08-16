@@ -118,6 +118,11 @@
       "children": [],
       "comment": "",
       "extras": {
+        "declaration": {
+          "defaultRaw": "",
+          "typeRaw": "",
+          "valueRaw": ""
+        },
         "structDef": {
           "depth": 1,
           "isDecl": true,
@@ -174,6 +179,11 @@
       "children": [],
       "comment": "",
       "extras": {
+        "declaration": {
+          "defaultRaw": "",
+          "typeRaw": "xubname",
+          "valueRaw": ""
+        },
         "structDef": {
           "depth": 1,
           "isDecl": false,
@@ -218,6 +228,11 @@
       "children": [],
       "comment": "",
       "extras": {
+        "declaration": {
+          "defaultRaw": "",
+          "typeRaw": "abap_bool",
+          "valueRaw": ""
+        },
         "structDef": {
           "depth": 1,
           "isDecl": false,
@@ -262,6 +277,11 @@
       "children": [],
       "comment": "",
       "extras": {
+        "declaration": {
+          "defaultRaw": "",
+          "typeRaw": "string",
+          "valueRaw": ""
+        },
         "structDef": {
           "depth": 1,
           "isDecl": false,
@@ -306,6 +326,11 @@
       "children": [],
       "comment": "",
       "extras": {
+        "declaration": {
+          "defaultRaw": "",
+          "typeRaw": "",
+          "valueRaw": ""
+        },
         "structDef": {
           "depth": 1,
           "isDecl": false,
@@ -361,7 +386,13 @@
       "block": null,
       "children": [],
       "comment": "",
-      "extras": null,
+      "extras": {
+        "declaration": {
+          "defaultRaw": "",
+          "typeRaw": "STANDARD TABLE OF ty_user",
+          "valueRaw": ""
+        }
+      },
       "file": "legacy-core.abap",
       "keywords": {
         "of": {
@@ -421,7 +452,13 @@
       "block": null,
       "children": [],
       "comment": "",
-      "extras": null,
+      "extras": {
+        "declaration": {
+          "defaultRaw": "",
+          "typeRaw": "ty_user",
+          "valueRaw": ""
+        }
+      },
       "file": "legacy-core.abap",
       "keywords": {
         "stmt": {
@@ -496,7 +533,13 @@
       "block": null,
       "children": [],
       "comment": "",
-      "extras": null,
+      "extras": {
+        "declaration": {
+          "defaultRaw": "",
+          "typeRaw": "string",
+          "valueRaw": ""
+        }
+      },
       "file": "legacy-core.abap",
       "keywords": {
         "stmt": {
@@ -552,7 +595,13 @@
       "block": null,
       "children": [],
       "comment": "",
-      "extras": null,
+      "extras": {
+        "declaration": {
+          "defaultRaw": "",
+          "typeRaw": "i",
+          "valueRaw": ""
+        }
+      },
       "file": "legacy-core.abap",
       "keywords": {
         "stmt": {
@@ -608,7 +657,13 @@
       "block": null,
       "children": [],
       "comment": "",
-      "extras": null,
+      "extras": {
+        "declaration": {
+          "defaultRaw": "",
+          "typeRaw": "i",
+          "valueRaw": ""
+        }
+      },
       "file": "legacy-core.abap",
       "keywords": {
         "stmt": {
@@ -664,7 +719,19 @@
       "block": null,
       "children": [],
       "comment": "",
-      "extras": null,
+      "extras": {
+        "assignment": {
+          "expression": {
+            "raw": "1",
+            "tokens": [
+              {
+                "kind": "literal",
+                "value": "1"
+              }
+            ]
+          }
+        }
+      },
       "file": "legacy-core.abap",
       "keywords": {
         "assign": {
@@ -723,7 +790,19 @@
       "block": null,
       "children": [],
       "comment": "",
-      "extras": null,
+      "extras": {
+        "assignment": {
+          "expression": {
+            "raw": "2",
+            "tokens": [
+              {
+                "kind": "literal",
+                "value": "2"
+              }
+            ]
+          }
+        }
+      },
       "file": "legacy-core.abap",
       "keywords": {
         "assign": {
@@ -782,7 +861,13 @@
       "block": null,
       "children": [],
       "comment": "",
-      "extras": null,
+      "extras": {
+        "declaration": {
+          "defaultRaw": "",
+          "typeRaw": "string",
+          "valueRaw": "|A, B|"
+        }
+      },
       "file": "legacy-core.abap",
       "keywords": {
         "stmt": {
@@ -849,7 +934,13 @@
       "block": null,
       "children": [],
       "comment": "",
-      "extras": null,
+      "extras": {
+        "declaration": {
+          "defaultRaw": "",
+          "typeRaw": "string",
+          "valueRaw": "|C|"
+        }
+      },
       "file": "legacy-core.abap",
       "keywords": {
         "stmt": {
@@ -916,7 +1007,19 @@
       "block": null,
       "children": [],
       "comment": "",
-      "extras": null,
+      "extras": {
+        "assignment": {
+          "expression": {
+            "raw": "1.5",
+            "tokens": [
+              {
+                "kind": "literal",
+                "value": "1.5"
+              }
+            ]
+          }
+        }
+      },
       "file": "legacy-core.abap",
       "keywords": {
         "assign": {
@@ -1084,6 +1187,8 @@
         "readTable": {
           "assigning": "",
           "binarySearch": false,
+          "comparing": [],
+          "comparingRaw": "",
           "conditions": [
             {
               "comparisonOperator": "=",
@@ -1178,8 +1283,9 @@
           "into": "gs_ctx",
           "itab": "gt_users",
           "refInto": "",
-          "transporting": "",
+          "transporting": [],
           "transportingNoFields": false,
+          "transportingRaw": "",
           "withKeyRaw": "uname = p_user active = p_flag",
           "withTableKeyRaw": ""
         }
@@ -1540,7 +1646,19 @@
               "block": null,
               "children": [],
               "comment": "",
-              "extras": null,
+              "extras": {
+                "assignment": {
+                  "expression": {
+                    "raw": "|City: { is_ctx-uname }|",
+                    "tokens": [
+                      {
+                        "kind": "literal",
+                        "value": "|City: { is_ctx-uname }|"
+                      }
+                    ]
+                  }
+                }
+              },
               "file": "legacy-core.abap",
               "keywords": {
                 "assign": {

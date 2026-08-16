@@ -1,5 +1,6 @@
 {
   "object": "FIELD-SYMBOLS",
+  "extras": { "type": "declaration" },
   "match": { "startKeyword": "FIELD-SYMBOLS" },
   "keywordLabels": {
     "FIELD-SYMBOLS": "stmt",

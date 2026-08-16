@@ -366,7 +366,8 @@ async function assertAssignmentRhsOperandsExpandToEditableRows() {
     "DATA d TYPE i.",
     "DATA e TYPE i.",
     "a = b + c + d + e.",
-    "a = b + 1."
+    "a = b + 1.",
+    "a = ( b + c ) * d."
   ].join("\n");
 
   const dom = await renderFixture(source);
@@ -385,7 +386,8 @@ async function assertAssignmentRhsOperandsExpandToEditableRows() {
   const objects = Array.isArray(state.renderObjects) ? state.renderObjects : [];
   const multi = objects.find((obj) => String(obj && obj.raw || "").trim() === "a = b + c + d + e.");
   const withLiteral = objects.find((obj) => String(obj && obj.raw || "").trim() === "a = b + 1.");
-  assert(multi && withLiteral, "Expected both ASSIGNMENT objects.");
+  const grouped = objects.find((obj) => String(obj && obj.raw || "").trim() === "a = ( b + c ) * d.");
+  assert(multi && withLiteral && grouped, "Expected all ASSIGNMENT objects.");
 
   const findTable = (obj) => {
     const idText = `#${String(obj && obj.id || "")}`;
@@ -399,10 +401,13 @@ async function assertAssignmentRhsOperandsExpandToEditableRows() {
   assert.deepStrictEqual(multiRows, [
     ["Đích", "a"],
     ["Nguồn", "b"],
+    ["Toán tử", "+"],
     ["Nguồn", "c"],
+    ["Toán tử", "+"],
     ["Nguồn", "d"],
+    ["Toán tử", "+"],
     ["Nguồn", "e"]
-  ], `Expected one row per RHS operand. Got: ${JSON.stringify(multiRows)}`);
+  ], `Expected one row per RHS token. Got: ${JSON.stringify(multiRows)}`);
 
   for (const name of ["a", "b", "c", "d", "e"]) {
     const cell = findTemplateCellByText(multiTable, name);
@@ -419,6 +424,7 @@ async function assertAssignmentRhsOperandsExpandToEditableRows() {
   assert.deepStrictEqual(literalRows, [
     ["Đích", "a"],
     ["Nguồn", "b"],
+    ["Toán tử", "+"],
     ["Nguồn", "1"]
   ], `Expected literal to stay as its own display row. Got: ${JSON.stringify(literalRows)}`);
 
@@ -437,6 +443,25 @@ async function assertAssignmentRhsOperandsExpandToEditableRows() {
     Array.isArray(literalBCell && literalBCell.__templateCellMeta && literalBCell.__templateCellMeta.declCandidates)
     && literalBCell.__templateCellMeta.declCandidates.length > 0,
     "Expected b to remain editable beside literal 1."
+  );
+
+  const groupedTable = findTable(grouped);
+  const groupedRows = getTemplateTableRows(groupedTable);
+  assert.deepStrictEqual(groupedRows, [
+    ["Đích", "a"],
+    ["Toán tử", "("],
+    ["Nguồn", "b"],
+    ["Toán tử", "+"],
+    ["Nguồn", "c"],
+    ["Toán tử", ")"],
+    ["Toán tử", "*"],
+    ["Nguồn", "d"]
+  ], `Expected grouped expression tokens one per row. Got: ${JSON.stringify(groupedRows)}`);
+
+  const plusCell = findTemplateCellByText(groupedTable, "+");
+  assert.strictEqual(
+    plusCell && plusCell.__templateCellMeta && plusCell.__templateCellMeta.reasonCode,
+    "OPERATOR_TOKEN"
   );
 
   const joined = multiRows.map((row) => row.join(" ")).join(" | ");
@@ -703,6 +728,243 @@ async function assertSafeRawListsExpandWithoutSplittingExpressions() {
       : String(state.descOverrides[sortKey] || ""),
     "Sort key 1"
   );
+
+  dom.window.close();
+}
+
+async function assertSemanticMultiValueRowsPreferExtras() {
+  const source = [
+    "DATA lt_rows TYPE TABLE OF string.",
+    "DATA ls_row TYPE string.",
+    "DATA lv_a TYPE string.",
+    "DATA lv_b TYPE string.",
+    "DATA lv_out TYPE string.",
+    "DATA lx_error TYPE REF TO cx_root.",
+    "CONCATENATE lv_a lv_b INTO lv_out.",
+    "CONCATENATE to_upper( lv_a ) lv_b INTO lv_out.",
+    "READ TABLE lt_rows WITH KEY table_line = lv_a COMPARING table_line TRANSPORTING table_line.",
+    "MODIFY lt_rows FROM ls_row TRANSPORTING table_line.",
+    "DELETE ADJACENT DUPLICATES FROM lt_rows COMPARING table_line.",
+    "SORT lt_rows BY table_line DESCENDING AS TEXT.",
+    "TRY.",
+    "CATCH cx_one cx_two INTO lx_error.",
+    "ENDTRY.",
+    "CASE lv_a.",
+    "WHEN 1 OR 2 THRU 4.",
+    "WHEN OTHERS.",
+    "ENDCASE.",
+    "SELECT FROM dbtab FIELDS col1, col2 INTO TABLE @lt_rows.",
+    "SELECT col1, col2 FROM dbtab INTO TABLE @lt_rows GROUP BY col1 col2 ORDER BY col1 DESCENDING col2 ASCENDING."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const objects = [];
+  const collectObjects = (list) => {
+    for (const obj of Array.isArray(list) ? list : []) {
+      if (!obj || typeof obj !== "object") {
+        continue;
+      }
+      objects.push(obj);
+      collectObjects(obj.children);
+    }
+  };
+  collectObjects(state.renderObjects);
+  const findObject = (raw) => objects.find((obj) => String(obj && obj.raw || "").trim() === raw);
+  const findTable = (obj) => {
+    const idText = `#${String(obj && obj.id || "")}`;
+    const block = Array.from(els.templatePreviewOutput.querySelectorAll(".template-block"))
+      .find((candidate) => String(candidate.querySelector(".template-block-meta")?.textContent || "").includes(idText));
+    return block ? block.querySelector("table.template-preview-table") : null;
+  };
+  const tableText = (obj) => getTemplateTableRows(findTable(obj)).map((row) => row.join(" ")).join(" | ");
+
+  const modernSelect = findObject("SELECT FROM dbtab FIELDS col1, col2 INTO TABLE @lt_rows.");
+  const classicSelect = findObject("SELECT col1, col2 FROM dbtab INTO TABLE @lt_rows GROUP BY col1 col2 ORDER BY col1 DESCENDING col2 ASCENDING.");
+  const readTable = findObject("READ TABLE lt_rows WITH KEY table_line = lv_a COMPARING table_line TRANSPORTING table_line.");
+  const modifyItab = findObject("MODIFY lt_rows FROM ls_row TRANSPORTING table_line.");
+  const deleteItab = findObject("DELETE ADJACENT DUPLICATES FROM lt_rows COMPARING table_line.");
+  const sortItab = findObject("SORT lt_rows BY table_line DESCENDING AS TEXT.");
+  const concatenate = findObject("CONCATENATE lv_a lv_b INTO lv_out.");
+  const dynamicConcatenate = findObject("CONCATENATE to_upper( lv_a ) lv_b INTO lv_out.");
+  const whenBranch = findObject("WHEN 1 OR 2 THRU 4.");
+  const whenOthers = findObject("WHEN OTHERS.");
+  const catchStatement = findObject("CATCH cx_one cx_two INTO lx_error.");
+  assert(
+    modernSelect && classicSelect && readTable && modifyItab && deleteItab && sortItab
+      && concatenate && dynamicConcatenate && whenBranch && whenOthers && catchStatement,
+    "Expected all multi-value fixture statements."
+  );
+
+  assert.deepStrictEqual(Array.from(modernSelect.extras.select.fields, (item) => item.value), ["col1", "col2"]);
+  assert.deepStrictEqual(Array.from(classicSelect.extras.select.fields, (item) => item.value), ["col1", "col2"]);
+  assert.deepStrictEqual(Array.from(classicSelect.extras.select.groupBy, (item) => item.value), ["col1", "col2"]);
+  assert.deepStrictEqual(Array.from(classicSelect.extras.select.orderBy, (item) => item.value), ["col1", "col2"]);
+  assert.deepStrictEqual(Array.from(readTable.extras.readTable.comparing, (item) => item.value), ["table_line"]);
+  assert.deepStrictEqual(Array.from(readTable.extras.readTable.transporting, (item) => item.value), ["table_line"]);
+  assert.deepStrictEqual(Array.from(modifyItab.extras.modifyItab.transporting, (item) => item.value), ["table_line"]);
+  assert(/adjacent/i.test(String(deleteItab.extras.deleteItab.variant || "")));
+  assert.deepStrictEqual(Array.from(deleteItab.extras.deleteItab.comparing, (item) => item.value), ["table_line"]);
+  assert.deepStrictEqual(Array.from(sortItab.extras.sortItab.keys, (item) => item.value), ["table_line"]);
+  assert.strictEqual(sortItab.extras.sortItab.keys[0].direction, "DESCENDING");
+  assert.strictEqual(sortItab.extras.sortItab.keys[0].asText, true);
+  assert.deepStrictEqual(Array.from(concatenate.extras.concatenate.sources, (item) => item.value), ["lv_a", "lv_b"]);
+  assert.deepStrictEqual(Array.from(whenBranch.extras.when.branches, (item) => item.value), ["1", "2"]);
+  assert.strictEqual(whenBranch.extras.when.branches[1].operator, "THRU");
+  assert.strictEqual(whenBranch.extras.when.branches[1].rangeEnd, "4");
+  assert.strictEqual(String(whenOthers.extras.when.branches[0].kind || "").toUpperCase(), "OTHERS");
+  assert.deepStrictEqual(Array.from(catchStatement.extras.catch.exceptions, (item) => item.value), ["cx_one", "cx_two"]);
+
+  const getSingleSelectTableText = async (selectSource) => {
+    const selectDom = await renderFixture(selectSource);
+    const selectWindow = selectDom.window;
+    selectWindow.AbapViewerRuntime.els.rightTabTemplateBtn.click();
+    await waitForViewerUi(selectWindow);
+    const table = selectWindow.AbapViewerRuntime.els.templatePreviewOutput
+      .querySelector('.template-preview-table[data-object-type="SELECT"]');
+    assert(table, "Expected a SELECT template table.");
+    const text = getTemplateTableRows(table).map((row) => row.join(" ")).join(" | ");
+    selectDom.window.close();
+    return text;
+  };
+  const modernSelectText = await getSingleSelectTableText("DATA lt_rows TYPE TABLE OF string.\nSELECT FROM dbtab FIELDS col1, col2 INTO TABLE @lt_rows.");
+  const classicSelectText = await getSingleSelectTableText("DATA lt_rows TYPE TABLE OF string.\nSELECT col1, col2 FROM dbtab INTO TABLE @lt_rows GROUP BY col1 col2 ORDER BY col1 DESCENDING col2 ASCENDING.");
+  assert.strictEqual((modernSelectText.match(/\bcol1\b/g) || []).length, 1, `Expected one modern SELECT col1 row. Got: ${modernSelectText}`);
+  assert.strictEqual((modernSelectText.match(/\bcol2\b/g) || []).length, 1, `Expected one modern SELECT col2 row. Got: ${modernSelectText}`);
+  assert(classicSelectText.includes("GROUP BY col1") && classicSelectText.includes("GROUP BY col2"));
+  assert(classicSelectText.includes("ORDER BY col1 DESCENDING") && classicSelectText.includes("ORDER BY col2 ASCENDING"));
+  assert(tableText(readTable).includes("COMPARING table_line") && tableText(readTable).includes("TRANSPORTING table_line"));
+  assert(tableText(modifyItab).includes("TRANSPORTING table_line"));
+  assert(tableText(deleteItab).includes("COMPARING table_line"));
+  assert(tableText(sortItab).includes("BY table_line DESCENDING AS TEXT"));
+  assert(tableText(concatenate).includes("CONCATENATE lv_a") && tableText(concatenate).includes("CONCATENATE lv_b"));
+
+  const dynamicRows = getTemplateTableRows(findTable(dynamicConcatenate));
+  assert.deepStrictEqual(
+    dynamicRows.filter((row) => row[0] === "CONCATENATE"),
+    [["CONCATENATE", "to_upper( lv_a ) lv_b"]],
+    `Expected dynamic CONCATENATE source to remain a single fallback row. Got: ${JSON.stringify(dynamicRows)}`
+  );
+
+  const canonicalDom = await renderFixture("DATA lv_a TYPE string. \"Canonical source\nDATA lv_out TYPE string.\nCONCATENATE lv_a INTO lv_out.");
+  const canonicalWindow = canonicalDom.window;
+  canonicalWindow.AbapViewerRuntime.els.rightTabTemplateBtn.click();
+  await waitForViewerUi(canonicalWindow);
+  const canonicalTable = canonicalWindow.AbapViewerRuntime.els.templatePreviewOutput
+    .querySelector('.template-preview-table[data-object-type="CONCATENATE"]');
+  const canonicalCell = findTemplateCellByText(canonicalTable, "Canonical source");
+  assert(canonicalCell, "Expected semantic CONCATENATE source to use its declaration finalDesc.");
+  assert.strictEqual(
+    getDeclOverrideStorageKeyFromRuntime(canonicalWindow, canonicalCell.__templateCellMeta.declCandidates[0]),
+    "GLOBAL:LV_A",
+    "Expected semantic source to retain its canonical declaration storage key."
+  );
+  canonicalDom.window.close();
+
+  const dynamicSortDom = await renderFixture("DATA lt_rows TYPE TABLE OF string.\nDATA lv_key TYPE string.\nSORT lt_rows BY (lv_key) DESCENDING AS TEXT.");
+  const dynamicSortWindow = dynamicSortDom.window;
+  dynamicSortWindow.AbapViewerRuntime.els.rightTabTemplateBtn.click();
+  await waitForViewerUi(dynamicSortWindow);
+  const dynamicSortTable = dynamicSortWindow.AbapViewerRuntime.els.templatePreviewOutput
+    .querySelector('.template-preview-table[data-object-type="SORT_ITAB"]');
+  assert.deepStrictEqual(getTemplateTableRows(dynamicSortTable), [
+    ["SORT", "lt_rows"],
+    ["BY", "(lv_key) DESCENDING AS TEXT"]
+  ]);
+  dynamicSortDom.window.close();
+
+  const catchDom = await renderFixture("DATA lx TYPE REF TO cx_root.\nCATCH BEFORE UNWIND cx_one cx_two INTO lx.");
+  const catchWindow = catchDom.window;
+  catchWindow.AbapViewerRuntime.els.rightTabTemplateBtn.click();
+  await waitForViewerUi(catchWindow);
+  const catchTable = catchWindow.AbapViewerRuntime.els.templatePreviewOutput
+    .querySelector('.template-preview-table[data-object-type="CATCH"]');
+  assert(getTemplateTableRows(catchTable).some((row) => row.join(" ") === "CATCH BEFORE UNWIND cx_one"));
+  catchDom.window.close();
+
+  const whenDom = await renderFixture("DATA lv_low TYPE string. \"Low desc\nDATA lv_high TYPE string. \"High desc\nWHEN lv_low THRU lv_high.");
+  const whenWindow = whenDom.window;
+  whenWindow.AbapViewerRuntime.els.rightTabTemplateBtn.click();
+  await waitForViewerUi(whenWindow);
+  const whenTable = whenWindow.AbapViewerRuntime.els.templatePreviewOutput
+    .querySelector('.template-preview-table[data-object-type="WHEN"]');
+  const whenCell = findTemplateCellByText(whenTable, "Low desc THRU High desc");
+  assert(whenCell, "Expected WHEN THRU row to retain both operand descriptions.");
+  assert.deepStrictEqual(
+    Array.from(whenCell.__templateCellMeta.declCandidates, (decl) => getDeclOverrideStorageKeyFromRuntime(whenWindow, decl)),
+    ["GLOBAL:LV_LOW", "GLOBAL:LV_HIGH"]
+  );
+  whenDom.window.close();
+
+  const lexicalDom = await renderFixture([
+    "FORM first.", "  DATA lv_a TYPE string. \"First", "  DATA lv_out TYPE string.", "  CONCATENATE lv_a INTO lv_out.", "ENDFORM.",
+    "FORM second.", "  DATA lv_a TYPE string. \"Second", "  DATA lv_out TYPE string.", "  CONCATENATE lv_a INTO lv_out.", "ENDFORM."
+  ].join("\n"));
+  const lexicalWindow = lexicalDom.window;
+  lexicalWindow.AbapViewerRuntime.els.rightTabTemplateBtn.click();
+  await waitForViewerUi(lexicalWindow);
+  const lexicalCells = ["First", "Second"].map((text) => findTemplateCellByText(lexicalWindow.AbapViewerRuntime.els.templatePreviewOutput, text));
+  assert(lexicalCells.every(Boolean), "Expected each FORM to retain its own lv_a finalDesc.");
+  const lexicalKeys = lexicalCells.map((cell) => getDeclOverrideStorageKeyFromRuntime(lexicalWindow, cell.__templateCellMeta.declCandidates[0]));
+  assert.notStrictEqual(lexicalKeys[0], lexicalKeys[1], "Sibling FORM lv_a values must not share storage keys.");
+  lexicalDom.window.close();
+
+  const collisionDom = await renderFixture("DATA col1 TYPE string. \"Local collision\nDATA lt_rows TYPE TABLE OF string.\nSELECT FROM dbtab FIELDS col1, col2 INTO TABLE @lt_rows.");
+  const collisionWindow = collisionDom.window;
+  const collisionSelect = collisionWindow.AbapViewerRuntime.state.renderObjects.find((obj) => obj.objectType === "SELECT");
+  collisionSelect.extras.select.fields = [];
+  collisionWindow.AbapViewerRuntime.services.template.renderTemplatePreview();
+  collisionWindow.AbapViewerRuntime.els.rightTabTemplateBtn.click();
+  await waitForViewerUi(collisionWindow);
+  const collisionTable = collisionWindow.AbapViewerRuntime.els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="SELECT"]');
+  assert.deepStrictEqual(getTemplateTableRows(collisionTable), [["FROM", "dbtab"], ["FIELDS", "col1"], ["FIELDS", "col2"], ["INTO TABLE", "@lt_rows"]]);
+  assert(!findTemplateCellByText(collisionTable, "Local collision"));
+  collisionDom.window.close();
+
+  const structuredCollisionDom = await renderFixture("DATA col1 TYPE string. \"Wrong local\nDATA lt_rows TYPE TABLE OF string.\nSELECT col1, col2 FROM dbtab INTO TABLE @lt_rows GROUP BY col1 ORDER BY col1 DESCENDING.");
+  const structuredCollisionWindow = structuredCollisionDom.window;
+  structuredCollisionWindow.AbapViewerRuntime.els.rightTabTemplateBtn.click();
+  await waitForViewerUi(structuredCollisionWindow);
+  const structuredCollisionTable = structuredCollisionWindow.AbapViewerRuntime.els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="SELECT"]');
+  assert(!findTemplateCellByText(structuredCollisionTable, "Wrong local"));
+  assert.strictEqual(findTemplateCellByText(structuredCollisionTable, "col1").__templateCellMeta.declCandidates.length, 0);
+  structuredCollisionDom.window.close();
+
+  const concatTwoDom = await renderFixture("DATA lv_a TYPE string. \"Alpha\nDATA lv_b TYPE string. \"Beta\nDATA lv_out TYPE string.\nCONCATENATE lv_a lv_b INTO lv_out.");
+  const concatTwoWindow = concatTwoDom.window;
+  concatTwoWindow.AbapViewerRuntime.els.rightTabTemplateBtn.click();
+  await waitForViewerUi(concatTwoWindow);
+  const concatTwoTable = concatTwoWindow.AbapViewerRuntime.els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="CONCATENATE"]');
+  for (const [text, key] of [["Alpha", "GLOBAL:LV_A"], ["Beta", "GLOBAL:LV_B"]]) {
+    const cell = findTemplateCellByText(concatTwoTable, text);
+    assert(cell, `Expected CONCATENATE source ${text}.`);
+    assert.strictEqual(getDeclOverrideStorageKeyFromRuntime(concatTwoWindow, cell.__templateCellMeta.declCandidates[0]), key);
+  }
+  concatTwoDom.window.close();
+
+  const literalWhenDom = await renderFixture("DATA lv_high TYPE string. \"High endpoint\nWHEN 1 THRU lv_high.");
+  const literalWhenWindow = literalWhenDom.window;
+  literalWhenWindow.AbapViewerRuntime.els.rightTabTemplateBtn.click();
+  await waitForViewerUi(literalWhenWindow);
+  const literalWhenTable = literalWhenWindow.AbapViewerRuntime.els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="WHEN"]');
+  const literalWhenCell = findTemplateCellByText(literalWhenTable, "1 THRU High endpoint");
+  assert(literalWhenCell);
+  assert.deepStrictEqual(Array.from(literalWhenCell.__templateCellMeta.declCandidates, (decl) => getDeclOverrideStorageKeyFromRuntime(literalWhenWindow, decl)), ["GLOBAL:LV_HIGH"]);
+  literalWhenDom.window.close();
+
+  const absentSelectDom = await renderFixture("DATA lt_rows TYPE TABLE OF string.\nSELECT FROM dbtab FIELDS col1, col2 INTO TABLE @lt_rows.");
+  const absentSelectWindow = absentSelectDom.window;
+  const absentSelect = absentSelectWindow.AbapViewerRuntime.state.renderObjects.find((obj) => obj.objectType === "SELECT");
+  absentSelect.extras = null;
+  absentSelectWindow.AbapViewerRuntime.services.template.renderTemplatePreview();
+  absentSelectWindow.AbapViewerRuntime.els.rightTabTemplateBtn.click();
+  await waitForViewerUi(absentSelectWindow);
+  assert.deepStrictEqual(getTemplateTableRows(absentSelectWindow.AbapViewerRuntime.els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="SELECT"]')), [["FROM", "dbtab"], ["FIELDS", "col1"], ["FIELDS", "col2"], ["INTO TABLE", "@lt_rows"]]);
+  absentSelectDom.window.close();
 
   dom.window.close();
 }
@@ -1950,6 +2212,419 @@ assertViewerFixtureDirectoriesStayInSync();
 
   await t.test("safe raw lists expand without splitting expressions", async () => {
     await assertSafeRawListsExpandWithoutSplittingExpressions();
+  });
+});
+
+
+async function assertFinalMultiValueViewerIntegrationFindings() {
+  const source = [
+    "TYPES: BEGIN OF ty_row,",
+    "         col1 TYPE string,",
+    "         col2 TYPE string,",
+    "       END OF ty_row.",
+    "DATA lt_rows TYPE TABLE OF ty_row.",
+    "DATA ls_row TYPE ty_row.",
+    "DATA cx_one TYPE string. \"Wrong data collision",
+    "SELECT carrid carrname INTO TABLE lt_rows FROM scarr.",
+    "SELECT FROM scarr FIELDS DISTINCT carrid, carrname INTO TABLE @lt_rows.",
+    "SORT lt_rows DESCENDING AS TEXT BY col1 ASCENDING col2 DESCENDING.",
+    "READ TABLE lt_rows COMPARING NO FIELDS TRANSPORTING ALL FIELDS.",
+    "READ TABLE lt_rows COMPARING ALL FIELDS.",
+    "MODIFY lt_rows FROM ls_row TRANSPORTING col2.",
+    "DELETE ADJACENT DUPLICATES FROM lt_rows COMPARING col2.",
+    "WHEN a THRU b OR c.",
+    "CATCH cx_one INTO DATA(lx_error)."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els } = window.AbapViewerRuntime;
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const selectTables = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="SELECT"]'));
+  assert.deepStrictEqual(getTemplateTableRows(selectTables[0]).filter((row) => row[0] === "SELECT"), [["SELECT", "carrid"], ["SELECT", "carrname"]]);
+  assert.deepStrictEqual(getTemplateTableRows(selectTables[1]).filter((row) => row[0] === "FIELDS"), [["FIELDS", "carrid"], ["FIELDS", "carrname"]]);
+
+  let sortTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="SORT_ITAB"]');
+  assert(getTemplateTableRows(sortTable).some((row) => row.join(" ") === "DESCENDING"));
+  assert(getTemplateTableRows(sortTable).some((row) => row.join(" ") === "AS TEXT"));
+  const sortCol2 = findTemplateCellByText(sortTable, "col2 DESCENDING");
+  assert(sortCol2, "Expected SORT component to render its structured component declaration.");
+  const sortKey = getDeclOverrideStorageKeyFromRuntime(window, sortCol2.__templateCellMeta.declCandidates[0]);
+  const editModal = await openTemplateCellDescriptionTab(window, sortCol2);
+  await saveTemplateCellDescription(window, editModal, "Sorted column two");
+  sortTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="SORT_ITAB"]');
+  assert(findTemplateCellByText(sortTable, "lt_rows-Sorted column two DESCENDING"));
+  const clearModal = await openTemplateCellDescriptionTab(window, findTemplateCellByText(sortTable, "lt_rows-Sorted column two DESCENDING"));
+  await saveTemplateCellDescription(window, clearModal, "");
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(window.AbapViewerRuntime.state.descOverrides, sortKey), false);
+  sortTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="SORT_ITAB"]');
+  assert(findTemplateCellByText(sortTable, "col2 DESCENDING"));
+
+  const readTables = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="READ_TABLE"]'));
+  assert.deepStrictEqual(getTemplateTableRows(readTables[0]).filter((row) => /COMPARING|TRANSPORTING/.test(row[0])), [["COMPARING NO FIELDS"], ["TRANSPORTING ALL FIELDS"]]);
+  assert.deepStrictEqual(getTemplateTableRows(readTables[1]).filter((row) => /COMPARING/.test(row[0])), [["COMPARING ALL FIELDS"]]);
+  const modifyDom = await renderFixture([
+    "TYPES: BEGIN OF ty_row,", "col2 TYPE string,", "END OF ty_row.",
+    "DATA lt_rows TYPE TABLE OF ty_row.", "DATA ls_row TYPE ty_row.",
+    "MODIFY lt_rows FROM ls_row TRANSPORTING col2."
+  ].join("\n"));
+  modifyDom.window.AbapViewerRuntime.els.rightTabTemplateBtn.click();
+  await settleViewerUi(modifyDom.window);
+  assert(findTemplateCellByText(modifyDom.window.AbapViewerRuntime.els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="MODIFY_ITAB"]'), "col2"));
+  modifyDom.window.close();
+
+
+  const whenDom = await renderFixture("WHEN a THRU b OR c.");
+  whenDom.window.AbapViewerRuntime.els.rightTabTemplateBtn.click();
+  await settleViewerUi(whenDom.window);
+  const whenTable = whenDom.window.AbapViewerRuntime.els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="WHEN"]');
+  assert(findTemplateCellByText(whenTable, "a THRU b OR"));
+  whenDom.window.close();
+
+  const catchDom = await renderFixture("DATA cx_one TYPE string. \"Wrong data collision\nCATCH cx_one INTO DATA(lx_error).");
+  catchDom.window.AbapViewerRuntime.els.rightTabTemplateBtn.click();
+  await settleViewerUi(catchDom.window);
+  const catchTable = catchDom.window.AbapViewerRuntime.els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="CATCH"]');
+  const catchCell = findTemplateCellByText(catchTable, "cx_one");
+  assert(catchCell && catchCell.__templateCellMeta.declCandidates.length === 0);
+  assert(!String(catchCell.textContent || "").includes("Wrong data collision"));
+  catchDom.window.close();
+  dom.window.close();
+}
+
+
+async function assertNoByGlobalSortModifiersRenderOnce() {
+  const dom = await renderFixture([
+    "DATA lt_rows TYPE TABLE OF string.",
+    "SORT lt_rows DESCENDING.",
+    "SORT lt_rows AS TEXT.",
+    "SORT lt_rows DESCENDING AS TEXT."
+  ].join("\n"));
+  const { window } = dom;
+  window.AbapViewerRuntime.els.rightTabTemplateBtn.click();
+  await settleViewerUi(window);
+  const tables = Array.from(window.AbapViewerRuntime.els.templatePreviewOutput
+    .querySelectorAll('.template-preview-table[data-object-type="SORT_ITAB"]'));
+  assert.deepStrictEqual(getTemplateTableRows(tables[0]), [["SORT", "lt_rows"], ["DESCENDING"]]);
+  assert.deepStrictEqual(getTemplateTableRows(tables[1]), [["SORT", "lt_rows"], ["AS TEXT"]]);
+  assert.deepStrictEqual(getTemplateTableRows(tables[2]), [["SORT", "lt_rows"], ["DESCENDING"], ["AS TEXT"]]);
+  dom.window.close();
+}
+
+async function assertPerformTraceRemapsItabComponentRows() {
+  const source = [
+    "TYPES: BEGIN OF ty_row,", "col2 TYPE string,", "END OF ty_row.",
+    "DATA gt_first TYPE TABLE OF ty_row.",
+    "DATA gt_second TYPE TABLE OF ty_row.",
+    "PERFORM frm_apply TABLES gt_first.",
+    "PERFORM frm_apply TABLES gt_second.",
+    "FORM frm_apply TABLES ct_rows STRUCTURE ty_row.",
+    "  DATA cs_row TYPE ty_row.",
+    "  SORT ct_rows BY col2.",
+    "  MODIFY ct_rows FROM cs_row TRANSPORTING col2.",
+    "ENDFORM."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+  els.rightTabTemplateBtn.click();
+  await settleViewerUi(window);
+
+  let sortTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="SORT_ITAB"]');
+  let modifyTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="MODIFY_ITAB"]');
+  let sortCell = findTemplateCellByText(sortTable, "col2");
+  assert(sortCell, "Expected selected FORM source to remap SORT component to first caller table.");
+  assert(findTemplateCellByText(modifyTable, "col2"));
+  const firstKey = getDeclOverrideStorageKeyFromRuntime(window, sortCell.__templateCellMeta.declCandidates[0]);
+  const editModal = await openTemplateCellDescriptionTab(window, sortCell);
+  await saveTemplateCellDescription(window, editModal, "First component");
+  sortTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="SORT_ITAB"]');
+  assert(findTemplateCellByText(sortTable, "gt_first-First component"));
+  const clearModal = await openTemplateCellDescriptionTab(window, findTemplateCellByText(sortTable, "gt_first-First component"));
+  await saveTemplateCellDescription(window, clearModal, "");
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(state.descOverrides, firstKey), false);
+
+  const candidates = state.performSourceRegistry.candidatesByFormUpper.get("FRM_APPLY") || [];
+  assert.strictEqual(candidates.length, 2);
+  assert(window.AbapViewerRuntime.services.performSources.selectPerformSourceCandidate("FRM_APPLY", candidates[1].key));
+  await settleViewerUi(window);
+  sortTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="SORT_ITAB"]');
+  modifyTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="MODIFY_ITAB"]');
+  sortCell = findTemplateCellByText(sortTable, "col2");
+  assert(sortCell, "Expected second source to keep the component editable.");
+  const secondModal = await openTemplateCellDescriptionTab(window, sortCell);
+  await saveTemplateCellDescription(window, secondModal, "Second component");
+  sortTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="SORT_ITAB"]');
+  modifyTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="MODIFY_ITAB"]');
+  assert(findTemplateCellByText(sortTable, "gt_second-Second component"));
+  assert(findTemplateCellByText(modifyTable, "gt_second-Second component"));
+  dom.window.close();
+}
+
+async function assertTemplateKeywordRowsExposeSemanticLabels() {
+  const dom = await renderFixture([
+    "DATA lv_in TYPE string.",
+    "DATA lv_out TYPE string.",
+    "CALL FUNCTION 'Z_LABEL_TEST' EXPORTING iv_first = lv_in iv_second = lv_in IMPORTING ev_result = lv_out."
+  ].join("\n"));
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
+
+  state.templateConfig.templates.CALL_FUNCTION.A1.text = "{rows.label}";
+  runtime.services.template.renderTemplatePreview();
+  els.rightTabTemplateBtn.click();
+  await settleViewerUi(window);
+
+  const table = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="CALL_FUNCTION"]');
+  const rows = getTemplateTableRows(table);
+  assert(rows.some((row) => row[0] === "exporting"), "Expected EXPORTING rows to expose rows.label=exporting.");
+  assert(rows.some((row) => row[0] === "importing"), "Expected IMPORTING rows to expose rows.label=importing.");
+  dom.window.close();
+}
+
+async function assertTemplateRowLabelDirectivesTranslateMatchedKeywords() {
+  const dom = await renderFixture([
+    "DATA lv_in TYPE string.",
+    "DATA lv_out TYPE string.",
+    "CALL FUNCTION 'Z_LABEL_TEST' EXPORTING iv_first = lv_in iv_second = lv_in IMPORTING ev_result = lv_out EXCEPTIONS OTHERS = 1."
+  ].join("\n"));
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
+
+  state.templateConfig.templates.CALL_FUNCTION.A1.text = [
+    "@label keywords.exporting.label=Xuất",
+    "@label keywords.exporting.label=Không dùng",
+    "@label keywords.importing.label=Nhập",
+    "@label keywords.missing.label=Không tồn tại",
+    "{rows.keyword}"
+  ].join("\n");
+  runtime.services.template.renderTemplatePreview();
+  els.rightTabTemplateBtn.click();
+  await settleViewerUi(window);
+
+  const table = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="CALL_FUNCTION"]');
+  const rows = getTemplateTableRows(table);
+  assert.deepStrictEqual(
+    rows.filter((row) => ["Xuất", "Nhập", "EXCEPTIONS"].includes(row[0])),
+    [
+      ["Xuất", "iv_first = lv_in"],
+      ["Xuất", "iv_second = lv_in"],
+      ["Nhập", "ev_result = lv_out"],
+      ["EXCEPTIONS", "OTHERS = 1"]
+    ],
+    "Expected first matching @label directive to translate only its semantic rows and preserve fallback keywords."
+  );
+  assert.strictEqual(
+    String(table.textContent || "").includes("@label"),
+    false,
+    "Expected @label directives to stay out of rendered cells."
+  );
+  const exportingCell = findTemplateCellByText(table, "Xuất");
+  const importingCell = findTemplateCellByText(table, "Nhập");
+  assert(
+    exportingCell && exportingCell.__templateCellMeta.declCandidates.some((decl) => String(decl && decl.name || "") === "lv_in"),
+    "Expected translated EXPORTING rows to keep the exact editable declaration provenance."
+  );
+  assert(
+    importingCell && importingCell.__templateCellMeta.declCandidates.some((decl) => String(decl && decl.name || "") === "lv_out"),
+    "Expected translated IMPORTING rows to keep the exact editable declaration provenance."
+  );
+  assert.match(String(exportingCell.__templateCellMeta.sourcePath || ""), /^rows\[\d+\]\.keyword$/);
+  assert.match(String(importingCell.__templateCellMeta.sourcePath || ""), /^rows\[\d+\]\.keyword$/);
+  dom.window.close();
+}
+
+async function assertTemplateRowLabelDirectiveValidationRejectsMalformedPrefixes() {
+  const dom = await renderFixture("CALL FUNCTION 'Z_LABEL_TEST'.");
+  const runtimeState = dom.window.AbapViewerRuntime.services.runtimeState;
+  const config = dom.window.AbapViewerRuntime.state.templateConfig;
+  config.templates.CALL_FUNCTION.A1.text = "@label keywords.exporting.label\n{rows.keyword}";
+
+  const validation = runtimeState.validateTemplateConfig(config);
+  assert.strictEqual(validation.valid, false, "Expected malformed @label directives to block Template Form Apply.");
+  assert(
+    validation.errors.some((message) => String(message).includes("@label")),
+    "Expected validation to identify the malformed @label directive."
+  );
+
+  config.templates.CALL_FUNCTION.A1.text = "{rows.keyword}\n@label keywords.exporting.label=Xuất";
+  const misplacedValidation = runtimeState.validateTemplateConfig(config);
+  assert.strictEqual(misplacedValidation.valid, false, "Expected misplaced @label directives to block Apply.");
+  assert(
+    misplacedValidation.errors.some((message) => String(message).includes("start")),
+    "Expected validation to require @label directives at the start of cell text."
+  );
+
+  const invalidDirectiveTexts = [
+    "@label keywords..exporting.label=Xuất\n{rows.keyword}",
+    "@label .keywords.exporting.label=Xuất\n{rows.keyword}",
+    "@label keywords. exporting.label=Xuất\n{rows.keyword}",
+    "@label keywords.exporting.label.=Xuất\n{rows.keyword}",
+    " @label keywords.exporting.label=Xuất\n{rows.keyword}",
+    "@label keywords.exporting.label=Xuất\n\n{rows.keyword}"
+  ];
+  for (const invalidText of invalidDirectiveTexts) {
+    config.templates.CALL_FUNCTION.A1.text = invalidText;
+    const invalidValidation = runtimeState.validateTemplateConfig(config);
+    assert.strictEqual(invalidValidation.valid, false, `Expected invalid directive to fail: ${invalidText}`);
+  }
+  dom.window.close();
+}
+
+async function assertTemplateRowLabelsWorkAcrossStatementTypesAndPhrases() {
+  const dom = await renderFixture([
+    "DATA lv_in TYPE string.",
+    "DATA lv_out TYPE string.",
+    "DATA lt_rows TYPE TABLE OF string.",
+    "CALL METHOD zcl_demo=>run EXPORTING iv_input = lv_in RECEIVING result = lv_out.",
+    "SELECT col FROM dbtab INTO TABLE lt_rows.",
+    "READ TABLE lt_rows INTO lv_out INDEX 1."
+  ].join("\n"));
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
+
+  state.templateConfig.templates.CALL_METHOD.A1.text = [
+    "@label keywords.exporting.label=Xuất method",
+    "{rows.keyword}"
+  ].join("\n");
+  state.templateConfig.templates.SELECT.A1.text = [
+    "@label keywords.from.label=Nguồn dữ liệu",
+    "{rows.keyword}"
+  ].join("\n");
+  state.templateConfig.templates.READ_TABLE.A1.text = [
+    "@label keywords.read-table.label=Đọc bảng",
+    "{rows.keyword}"
+  ].join("\n");
+  runtime.services.template.renderTemplatePreview();
+  els.rightTabTemplateBtn.click();
+  await settleViewerUi(window);
+
+  const methodTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="CALL_METHOD"]');
+  const selectTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="SELECT"]');
+  const readTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="READ_TABLE"]');
+  assert(findTemplateCellByText(methodTable, "Xuất method"), "Expected CALL_METHOD keyword label override.");
+  assert(findTemplateCellByText(selectTable, "Nguồn dữ liệu"), "Expected SELECT keyword label override.");
+  assert(findTemplateCellByText(readTable, "Đọc bảng"), "Expected a hyphenated phrase-label path override.");
+  dom.window.close();
+}
+
+async function assertTemplateObjectLabelChangesHeaderAndRoundTripsThroughForm() {
+  const dom = await renderFixture("CALL FUNCTION 'Z_LABEL_TEST'.");
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
+  const defaultTemplates = runtime.constants.TEMPLATE_DEFAULT_CONFIG_V1.templates;
+
+  assert.strictEqual(Object.keys(defaultTemplates).length, 44, "Expected all dedicated template keys.");
+  for (const [templateKey, definition] of Object.entries(defaultTemplates)) {
+    assert(
+      definition && definition._options && Object.prototype.hasOwnProperty.call(definition._options, "objectLabel"),
+      `Expected ${templateKey} to expose _options.objectLabel.`
+    );
+  }
+
+  runtime.services.template.openTemplateConfigModal();
+  await waitForViewerUi(window);
+  const page = Array.from(window.document.querySelectorAll(".template-dynamic-page"))
+    .find((node) => String(node.textContent || "").includes("Template Form"));
+  assert(page, "Expected Template Form page.");
+  const keySelect = page.querySelector(".template-builder-key-field select");
+  keySelect.value = "CALL_FUNCTION";
+  keySelect.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await waitForViewerUi(window);
+
+  const objectLabelInput = page.querySelector(".template-builder-object-label");
+  assert(objectLabelInput, "Expected Object Label input for every selected template key.");
+  objectLabelInput.value = "Gọi Function";
+  objectLabelInput.dispatchEvent(new window.Event("input", { bubbles: true }));
+  const applyButton = Array.from(page.querySelectorAll("button"))
+    .find((button) => String(button.textContent || "").trim() === "Apply");
+  applyButton.click();
+  await settleViewerUi(window);
+
+  assert.strictEqual(state.templateConfig.templates.CALL_FUNCTION._options.objectLabel, "Gọi Function");
+  const storedTemplateConfig = JSON.parse(
+    window.localStorage.getItem(runtime.constants.TEMPLATE_CONFIG_STORAGE_KEY_V1)
+  );
+  assert.strictEqual(
+    storedTemplateConfig.templates.CALL_FUNCTION._options.objectLabel,
+    "Gọi Function",
+    "Expected Template Form Apply to persist Object Label in the existing template storage key."
+  );
+  const title = els.templatePreviewOutput.querySelector('.template-block .template-block-title');
+  assert(title, "Expected rendered Template block title.");
+  assert.strictEqual(String(title.textContent || "").trim(), "1. Gọi Function 'Z_LABEL_TEST'");
+  assert.strictEqual(title.getAttribute("title"), "CALL_FUNCTION", "Expected technical objectType in title tooltip.");
+
+  const bundle = runtime.api.buildViewerConfigBundle(["templates"], "2026-08-01T00:00:00.000Z");
+  assert.strictEqual(
+    bundle.sections.templates.templates.CALL_FUNCTION._options.objectLabel,
+    "Gọi Function",
+    "Expected Object Label in exported config."
+  );
+
+  state.templateConfig.templates.CALL_FUNCTION._options.objectLabel = "";
+  assert.strictEqual(runtime.api.importViewerConfigObject(bundle), true, "Expected exported Object Label config to import.");
+  await settleViewerUi(window);
+  assert.strictEqual(
+    state.templateConfig.templates.CALL_FUNCTION._options.objectLabel,
+    "Gọi Function",
+    "Expected imported config to restore Object Label."
+  );
+
+  state.templateConfig.templates.CALL_FUNCTION._options.objectLabel = "";
+  runtime.services.template.renderTemplatePreview();
+  await settleViewerUi(window);
+  const fallbackTitle = els.templatePreviewOutput.querySelector('.template-block .template-block-title');
+  assert.strictEqual(String(fallbackTitle.textContent || "").trim(), "1. CALL_FUNCTION 'Z_LABEL_TEST'");
+  dom.window.close();
+}
+
+defineFocusedTest(test, "viewer custom template labels contract", ["template-custom-labels"], async (t) => {
+  assertViewerFixtureDirectoriesStayInSync();
+
+  await t.test("keyword rows expose semantic labels", async () => {
+    await assertTemplateKeywordRowsExposeSemanticLabels();
+  });
+
+  await t.test("row label directives translate matched keywords", async () => {
+    await assertTemplateRowLabelDirectivesTranslateMatchedKeywords();
+  });
+
+  await t.test("row label directive validation rejects malformed prefixes", async () => {
+    await assertTemplateRowLabelDirectiveValidationRejectsMalformedPrefixes();
+  });
+
+  await t.test("row labels work across statement types and phrase paths", async () => {
+    await assertTemplateRowLabelsWorkAcrossStatementTypesAndPhrases();
+  });
+
+  await t.test("object label changes header and round trips through Template Form", async () => {
+    await assertTemplateObjectLabelChangesHeaderAndRoundTripsThroughForm();
+  });
+});
+
+defineFocusedTest(test, "viewer semantic multi-value contract", ["template-multi-value-semantic"], async (t) => {
+  assertViewerFixtureDirectoriesStayInSync();
+
+  await t.test("semantic extras expand rows and preserve modifiers", async () => {
+    await assertSemanticMultiValueRowsPreferExtras();
+  });
+
+  await t.test("final multi-value integration findings", async () => {
+    await assertFinalMultiValueViewerIntegrationFindings();
+  });
+
+  await t.test("no-BY global SORT modifiers render once", async () => {
+    await assertNoByGlobalSortModifiersRenderOnce();
+  });
+
+  await t.test("PERFORM trace remaps itab component rows", async () => {
+    await assertPerformTraceRemapsItabComponentRows();
   });
 });
 

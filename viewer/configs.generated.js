@@ -97,6 +97,9 @@
       "match": {
         "type": "assignment"
       },
+      "extras": {
+        "type": "assignment"
+      },
       "keywordLabels": {
         "=": "assign",
         "+=": "add-assign",
@@ -395,6 +398,9 @@
       "match": {
         "startKeyword": "CATCH"
       },
+      "extras": {
+        "type": "catch"
+      },
       "keywordLabels": {
         "CATCH": "stmt",
         "INTO": "into"
@@ -420,6 +426,9 @@
     {
       "_sourceFile": "class-data.json",
       "object": "CLASS-DATA",
+      "extras": {
+        "type": "declaration"
+      },
       "match": {
         "startKeyword": "CLASS-DATA"
       },
@@ -637,6 +646,9 @@
       "match": {
         "startKeyword": "CONCATENATE"
       },
+      "extras": {
+        "type": "concatenate"
+      },
       "keywordLabels": {
         "CONCATENATE": "stmt",
         "LINES": "lines",
@@ -764,6 +776,9 @@
     {
       "_sourceFile": "data.json",
       "object": "DATA",
+      "extras": {
+        "type": "declaration"
+      },
       "match": {
         "startKeyword": "DATA"
       },
@@ -883,6 +898,15 @@
           "after": "WHERE",
           "name": "where",
           "label": "where",
+          "capture": "rest",
+          "stopTokens": [
+            "COMPARING"
+          ]
+        },
+        {
+          "after": "COMPARING",
+          "name": "comparing",
+          "label": "comparing",
           "capture": "rest"
         }
       ]
@@ -951,6 +975,9 @@
     {
       "_sourceFile": "field-symbols.json",
       "object": "FIELD-SYMBOLS",
+      "extras": {
+        "type": "declaration"
+      },
       "match": {
         "startKeyword": "FIELD-SYMBOLS"
       },
@@ -1683,6 +1710,9 @@
     {
       "_sourceFile": "ranges.json",
       "object": "RANGES",
+      "extras": {
+        "type": "declaration"
+      },
       "match": {
         "startKeyword": "RANGES"
       },
@@ -1749,6 +1779,7 @@
         "ASSIGNING": "assigning",
         "REFERENCE": "reference",
         "TRANSPORTING": "transporting",
+        "COMPARING": "comparing",
         "NO": "no",
         "FIELDS": "fields",
         "BINARY": "binary",
@@ -1759,6 +1790,9 @@
         "WITH TABLE KEY": "with-table-key",
         "WITH KEY": "with-key",
         "TRANSPORTING NO FIELDS": "transporting-no-fields",
+        "TRANSPORTING ALL FIELDS": "transporting-all-fields",
+        "COMPARING NO FIELDS": "comparing-no-fields",
+        "COMPARING ALL FIELDS": "comparing-all-fields",
         "BINARY SEARCH": "binary-search",
         "REFERENCE INTO": "reference-into"
       },
@@ -1823,6 +1857,24 @@
           "capture": "flag"
         },
         {
+          "after": "TRANSPORTING ALL FIELDS",
+          "name": "transportingAllFields",
+          "label": "transporting-all-fields",
+          "capture": "flag"
+        },
+        {
+          "after": "COMPARING NO FIELDS",
+          "name": "comparingNoFields",
+          "label": "comparing-no-fields",
+          "capture": "flag"
+        },
+        {
+          "after": "COMPARING ALL FIELDS",
+          "name": "comparingAllFields",
+          "label": "comparing-all-fields",
+          "capture": "flag"
+        },
+        {
           "after": "TRANSPORTING",
           "name": "transporting",
           "label": "transporting",
@@ -1830,7 +1882,24 @@
           "stopTokens": [
             "BINARY",
             "COMPARING",
-            "WITH"
+            "WITH",
+            "INTO",
+            "ASSIGNING",
+            "REFERENCE"
+          ]
+        },
+        {
+          "after": "COMPARING",
+          "name": "comparing",
+          "label": "comparing",
+          "capture": "rest",
+          "stopTokens": [
+            "BINARY",
+            "TRANSPORTING",
+            "WITH",
+            "INTO",
+            "ASSIGNING",
+            "REFERENCE"
           ]
         },
         {
@@ -1844,6 +1913,9 @@
     {
       "_sourceFile": "select-options.json",
       "object": "SELECT-OPTIONS",
+      "extras": {
+        "type": "declaration"
+      },
       "match": {
         "startKeyword": "SELECT-OPTIONS"
       },
@@ -1949,6 +2021,8 @@
           "capture": "rest",
           "stopTokens": [
             "FROM",
+            "INTO",
+            "APPENDING",
             "SINGLE",
             "DISTINCT"
           ]
@@ -2041,6 +2115,32 @@
           ]
         },
         {
+          "after": "GROUP BY",
+          "name": "groupBy",
+          "label": "group-by",
+          "capture": "rest",
+          "stopTokens": [
+            "HAVING",
+            "ORDER",
+            "UP",
+            "INTO",
+            "APPENDING",
+            "UNION"
+          ]
+        },
+        {
+          "after": "ORDER BY",
+          "name": "orderBy",
+          "label": "order-by",
+          "capture": "rest",
+          "stopTokens": [
+            "UP",
+            "INTO",
+            "APPENDING",
+            "UNION"
+          ]
+        },
+        {
           "after": "HAVING",
           "name": "having",
           "label": "having",
@@ -2049,7 +2149,8 @@
             "ORDER",
             "UP",
             "INTO",
-            "APPENDING"
+            "APPENDING",
+            "UNION"
           ]
         }
       ]
@@ -2094,11 +2195,17 @@
           "name": "usingKey",
           "label": "using-key"
         }
-      ]
+      ],
+      "extras": {
+        "type": "sortItab"
+      }
     },
     {
       "_sourceFile": "statics.json",
       "object": "STATICS",
+      "extras": {
+        "type": "declaration"
+      },
       "match": {
         "startKeyword": "STATICS"
       },
@@ -2176,6 +2283,9 @@
     {
       "_sourceFile": "types.json",
       "object": "TYPES",
+      "extras": {
+        "type": "declaration"
+      },
       "match": {
         "startKeyword": "TYPES"
       },
@@ -2224,6 +2334,9 @@
       "object": "WHEN",
       "match": {
         "startKeyword": "WHEN"
+      },
+      "extras": {
+        "type": "when"
       },
       "keywordLabels": {
         "WHEN": "stmt",

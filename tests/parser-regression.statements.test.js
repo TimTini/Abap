@@ -54,6 +54,41 @@ function testDecimalLiteralDoesNotSplitStatement() {
   assert.strictEqual(getValue(assignmentObjects[0].values, "expr"), "1.5");
 }
 
+function testAssignmentExpressionTokensIncludeOperatorsAndParens() {
+  const result = parse([
+    "DATA a TYPE i.",
+    "DATA b TYPE i.",
+    "DATA c TYPE i.",
+    "DATA d TYPE i.",
+    "a = b + c.",
+    "a = ( b + c ) * d."
+  ].join("\n"));
+  const objects = flattenObjects(result.objects);
+  const simple = objects.find((obj) => obj && obj.raw === "a = b + c.");
+  const grouped = objects.find((obj) => obj && obj.raw === "a = ( b + c ) * d.");
+
+  assert(simple && grouped, "Expected both assignment objects.");
+  assert(simple.extras && simple.extras.assignment && simple.extras.assignment.expression);
+  assert(grouped.extras && grouped.extras.assignment && grouped.extras.assignment.expression);
+
+  assert.deepStrictEqual(
+    simple.extras.assignment.expression.tokens.map((token) => token.value),
+    ["b", "+", "c"]
+  );
+  assert.deepStrictEqual(
+    simple.extras.assignment.expression.tokens.map((token) => token.kind),
+    ["operand", "operator", "operand"]
+  );
+  assert.deepStrictEqual(
+    grouped.extras.assignment.expression.tokens.map((token) => token.value),
+    ["(", "b", "+", "c", ")", "*", "d"]
+  );
+  assert.deepStrictEqual(
+    grouped.extras.assignment.expression.tokens.map((token) => token.kind),
+    ["paren", "operand", "operator", "operand", "paren", "operator", "operand"]
+  );
+}
+
 function testChainedDataStatementSingleLine() {
   const result = parse("DATA: lv_a TYPE i, lv_b TYPE i.\n");
   const objects = flattenObjects(result.objects);
@@ -1134,6 +1169,130 @@ function testLoopAtFromIndexCapturesIndexValue() {
   assert.strictEqual(getValue(plainFrom.values, "to"), "lv_to");
 }
 
+function testMultiValueExtrasRemainAdditive() {
+  const code = [
+    "DATA lv_value TYPE string VALUE |ready|.",
+    "DATA ls_config TYPE ty_config VALUE #( field = 'A' ).",
+    "DATA ls_length_config TYPE ty_config VALUE #( length = 1 ).",
+    "STATICS gv_count TYPE i VALUE 1.",
+    "TYPES ty_code TYPE c LENGTH 4.",
+    "CLASS-DATA gv_class TYPE string VALUE 'class'.",
+    "FIELD-SYMBOLS <lv_field> TYPE string.",
+    "RANGES r_code FOR lv_value.",
+    "SELECT-OPTIONS s_code FOR lv_value DEFAULT 'A'.",
+    "SELECT-OPTIONS s_status FOR lv_status DEFAULT 'A' NO-DISPLAY MODIF ID 'S'.",
+    "SELECT carrid, connid, SUM( seatsmax ) AS capacity FROM spfli GROUP BY carrid, connid ORDER BY carrid ASCENDING, connid DESCENDING HAVING SUM( seatsmax ) > 0.",
+    "SELECT FROM scarr FIELDS CASE WHEN carrid = @lv_carrid THEN 'match' ELSE 'other' END AS status INTO @DATA(ls_status).",
+    "SELECT carrid FROM scarr ORDER BY carrid connid DESCENDING.",
+    "SELECT concat( ' FROM ', carrid ) AS label FROM scarr.",
+    "SELECT carrid, count( CASE WHEN marker = ' ORDER BY ' THEN 1 ELSE 0 END ) AS count FROM scarr GROUP BY carrid, CASE WHEN marker = ' ORDER BY ' THEN 1 ELSE 0 END ORDER BY PRIMARY KEY.",
+    "SELECT carrid FROM scarr INTO CORRESPONDING FIELDS OF TABLE lt_rows.",
+    "READ TABLE lt_rows WITH KEY carrid = lv_carrid COMPARING carrid connid TRANSPORTING planetype seatsmax BINARY SEARCH.",
+    "READ TABLE lt_rows INTO ls_row COMPARING table_line TRANSPORTING table_line.",
+    "READ TABLE lt_rows INTO ls_row COMPARING ALL FIELDS TRANSPORTING ALL FIELDS.",
+    "MODIFY lt_rows FROM ls_row TRANSPORTING carrid connid.",
+    "DELETE ADJACENT DUPLICATES FROM lt_rows COMPARING carrid connid.",
+    "DELETE ADJACENT DUPLICATES FROM lt_rows COMPARING table_line.",
+    "DELETE ADJACENT DUPLICATES FROM lt_rows COMPARING ALL FIELDS.",
+    "CONCATENATE lv_prefix lv_value |!| INTO lv_text.",
+    "CONCATENATE |hello world| lv_value INTO lv_text.",
+    "WHEN 'A' OR 'B' THRU 'D'.",
+    "WHEN OTHERS.",
+    "WHEN xsdbool( a = 1 OR b = 2 ) OR abap_true.",
+    "CATCH cx_one cx_two INTO DATA(lx_error).",
+    "CATCH BEFORE UNWIND cx_one cx_two INTO DATA(lx_unwind)."
+  ].join("\n");
+  const objects = flattenObjects(parse(code).objects);
+
+  const selects = findObjects(objects, "SELECT");
+  const select = selects[0];
+  assert.deepStrictEqual(select.extras.select.fields.map((item) => item.value), ["carrid", "connid", "SUM( seatsmax ) AS capacity"]);
+  assert.deepStrictEqual(select.extras.select.groupBy.map((item) => item.value), ["carrid", "connid"]);
+  assert.deepStrictEqual(select.extras.select.orderBy, [
+    { value: "carrid", direction: "ASCENDING" },
+    { value: "connid", direction: "DESCENDING" }
+  ]);
+  assert.strictEqual(selects[1].extras.select.fieldsRaw, "CASE WHEN carrid = @lv_carrid THEN 'match' ELSE 'other' END AS status");
+  assert.deepStrictEqual(selects[1].extras.select.fields, [
+    { value: "CASE WHEN carrid = @lv_carrid THEN 'match' ELSE 'other' END AS status" }
+  ]);
+  assert.deepStrictEqual(selects[2].extras.select.orderBy, [
+    { value: "carrid", direction: "" },
+    { value: "connid", direction: "DESCENDING" }
+  ]);
+  assert.deepStrictEqual(selects[3].extras.select.fields, [{ value: "concat( ' FROM ', carrid ) AS label" }]);
+  assert.deepStrictEqual(selects[4].extras.select.groupBy, [
+    { value: "carrid" },
+    { value: "CASE WHEN marker = ' ORDER BY ' THEN 1 ELSE 0 END" }
+  ]);
+  assert.deepStrictEqual(selects[4].extras.select.orderBy, [{ value: "PRIMARY KEY" }]);
+  assert.deepStrictEqual(selects[5].extras.select.fields, [{ value: "carrid" }]);
+
+  const reads = findObjects(objects, "READ_TABLE");
+  const read = reads[0];
+  assert.deepStrictEqual(read.extras.readTable.comparing.map((item) => item.value), ["carrid", "connid"]);
+  assert.deepStrictEqual(read.extras.readTable.transporting.map((item) => item.value), ["planetype", "seatsmax"]);
+  assert.strictEqual(reads[1].extras.readTable.comparingRaw, "table_line");
+  assert.deepStrictEqual(reads[1].extras.readTable.comparing, [{ value: "table_line" }]);
+  assert.strictEqual(reads[1].extras.readTable.transportingRaw, "table_line");
+  assert.deepStrictEqual(reads[1].extras.readTable.transporting, [{ value: "table_line" }]);
+  assert.deepStrictEqual(reads[2].extras.readTable.comparing, [{ value: "ALL FIELDS" }]);
+  assert.deepStrictEqual(reads[2].extras.readTable.transporting, [{ value: "ALL FIELDS" }]);
+
+  const modify = findObject(objects, "MODIFY_ITAB");
+  assert.deepStrictEqual(modify.extras.modifyItab.transporting.map((item) => item.value), ["carrid", "connid"]);
+
+  const deletes = findObjects(objects, "DELETE_ITAB");
+  const deleted = deletes[0];
+  assert.strictEqual(deleted.extras.deleteItab.variant, "adjacentDuplicates");
+  assert.strictEqual(deleted.extras.deleteItab.target, "lt_rows");
+  assert.strictEqual(deleted.extras.deleteItab.from, "");
+  assert.strictEqual(getValue(deleted.values, "target"), "ADJACENT");
+  assert.strictEqual(getValue(deleted.values, "from"), "lt_rows");
+  assert.deepStrictEqual(deleted.extras.deleteItab.comparing.map((item) => item.value), ["carrid", "connid"]);
+  assert.strictEqual(deletes[1].extras.deleteItab.comparingRaw, "table_line");
+  assert.deepStrictEqual(deletes[1].extras.deleteItab.comparing, [{ value: "table_line" }]);
+  assert.deepStrictEqual(deletes[2].extras.deleteItab.comparing, [{ value: "ALL FIELDS" }]);
+
+  const concatenate = findObject(objects, "CONCATENATE");
+  assert.deepStrictEqual(concatenate.extras.concatenate.sources.map((item) => item.value), ["lv_prefix", "lv_value", "|!|"]);
+  const concatenates = findObjects(objects, "CONCATENATE");
+  assert.deepStrictEqual(concatenates[1].extras.concatenate.sources, [{ value: "|hello world|" }, { value: "lv_value" }]);
+
+  const whens = findObjects(objects, "WHEN");
+  assert.deepStrictEqual(whens[0].extras.when.branches, [
+    { value: "'A'", connector: "OR" },
+    { value: "'B'", rangeEnd: "'D'", operator: "THRU" }
+  ]);
+  assert.deepStrictEqual(whens[1].extras.when.branches, [{ value: "OTHERS", kind: "others" }]);
+  assert.deepStrictEqual(whens[2].extras.when.branches, [
+    { value: "xsdbool( a = 1 OR b = 2 )", connector: "OR" },
+    { value: "abap_true" }
+  ]);
+
+  const caught = findObject(objects, "CATCH");
+  assert.deepStrictEqual(caught.extras.catch.exceptions.map((item) => item.value), ["cx_one", "cx_two"]);
+  const catches = findObjects(objects, "CATCH");
+  assert.strictEqual(catches[1].extras.catch.modifier, "BEFORE UNWIND");
+  assert.strictEqual(getValue(catches[1].values, "exception"), "BEFORE UNWIND cx_one cx_two");
+  assert.deepStrictEqual(catches[1].extras.catch.exceptions, [{ value: "cx_one" }, { value: "cx_two" }]);
+
+  for (const objectType of ["DATA", "STATICS", "TYPES", "CLASS-DATA", "FIELD-SYMBOLS", "RANGES", "SELECT-OPTIONS"]) {
+    const declaration = findObject(objects, objectType);
+    assert(declaration.extras && declaration.extras.declaration, `Expected declaration extras for ${objectType}.`);
+  }
+  assert.strictEqual(findObject(objects, "DATA").extras.declaration.typeRaw, "string");
+  assert.strictEqual(findObject(objects, "DATA").extras.declaration.valueRaw, "|ready|");
+  const structuredData = objects.find((object) => object.objectType === "DATA" && getValue(object.values, "name") === "ls_config");
+  assert.strictEqual(structuredData.extras.declaration.valueRaw, "#( field = 'A' )");
+  const lengthStructuredData = objects.find((object) => object.objectType === "DATA" && getValue(object.values, "name") === "ls_length_config");
+  assert.strictEqual(lengthStructuredData.extras.declaration.valueRaw, "#( length = 1 )");
+  assert.strictEqual(findObject(objects, "SELECT-OPTIONS").extras.declaration.defaultRaw, "'A'");
+  const selectOptionStatus = objects.find((object) => object.objectType === "SELECT-OPTIONS" && getValue(object.values, "name") === "s_status");
+  assert.strictEqual(selectOptionStatus.extras.declaration.typeRaw, "lv_status");
+  assert.strictEqual(selectOptionStatus.extras.declaration.defaultRaw, "'A'");
+}
+
 function testConcatenateStatement() {
   const basic = findObject(flattenObjects(parse(
     "CONCATENATE lv_a lv_b INTO lv_c."
@@ -1158,6 +1317,59 @@ function testConcatenateStatement() {
   assert.strictEqual(getValue(linesOf.values, "into"), "lv_text");
 }
 
+function testSortItabParsesEveryStaticSortKey() {
+  const result = parse([
+    "DATA lt_rows TYPE TABLE OF string.",
+    "SORT lt_rows BY col1 ASCENDING AS TEXT col2 DESCENDING col3."
+  ].join("\n"));
+  const sort = findObject(flattenObjects(result.objects), "SORT_ITAB");
+
+  assert(sort, "Expected SORT_ITAB object.");
+  assert.strictEqual(getValue(sort.values, "by"), "col1 ASCENDING AS TEXT col2 DESCENDING col3");
+  assert(sort.extras && sort.extras.sortItab, "Expected structured SORT extras.");
+  assert.deepStrictEqual(sort.extras.sortItab.keys, [
+    { name: "by", value: "col1", direction: "ASCENDING", asText: true },
+    { name: "by", value: "col2", direction: "DESCENDING", asText: false },
+    { name: "by", value: "col3", direction: "", asText: false }
+  ]);
+}
+
+
+function testFinalMultiValueParserIntegrationFindings() {
+  const result = parse([
+    "DATA lt_names TYPE TABLE OF string.",
+    "DATA lt_rows TYPE TABLE OF ty_row.",
+    "DATA cx_one TYPE string.",
+    "SELECT carrid carrname INTO TABLE lt_names FROM scarr.",
+    "SELECT FROM scarr FIELDS DISTINCT carrid, carrname INTO TABLE @lt_names.",
+    "SORT lt_rows DESCENDING AS TEXT BY col1 ASCENDING col2 DESCENDING.",
+    "READ TABLE lt_rows COMPARING NO FIELDS TRANSPORTING ALL FIELDS.",
+    "READ TABLE lt_rows COMPARING ALL FIELDS.",
+    "WHEN a THRU b OR c.",
+    "CATCH cx_one INTO DATA(lx_error)."
+  ].join("\n"));
+  const objects = flattenObjects(result.objects);
+  const selects = findObjects(objects, "SELECT");
+  const sort = findObject(objects, "SORT_ITAB");
+  const reads = findObjects(objects, "READ_TABLE");
+  const when = findObject(objects, "WHEN");
+  const caught = findObject(objects, "CATCH");
+
+  assert.deepStrictEqual(selects[0].extras.select.fields.map((entry) => entry.value), ["carrid", "carrname"]);
+  assert.deepStrictEqual(selects[1].extras.select.fields.map((entry) => entry.value), ["carrid", "carrname"]);
+  assert.deepStrictEqual(sort.extras.sortItab.keys, [
+    { name: "by", value: "col1", direction: "ASCENDING", asText: false },
+    { name: "by", value: "col2", direction: "DESCENDING", asText: false }
+  ]);
+  assert.strictEqual(sort.extras.sortItab.direction, "DESCENDING");
+  assert.strictEqual(sort.extras.sortItab.asText, true);
+  assert.deepStrictEqual(reads[0].extras.readTable.comparing.map((entry) => entry.value), ["NO FIELDS"]);
+  assert.deepStrictEqual(reads[0].extras.readTable.transporting.map((entry) => entry.value), ["ALL FIELDS"]);
+  assert.deepStrictEqual(reads[1].extras.readTable.comparing.map((entry) => entry.value), ["ALL FIELDS"]);
+  assert.strictEqual(when.extras.when.branches[0].connector, "OR");
+  assert.strictEqual(caught.values.exception.decl, undefined);
+}
+
 defineFocusedTest(test, "parser statements regression", ["statements"], async (t) => {
   await t.test("multiple statements on single line", () => {
     testMultipleStatementsOnSingleLine();
@@ -1169,6 +1381,10 @@ defineFocusedTest(test, "parser statements regression", ["statements"], async (t
 
   await t.test("decimal literal does not split statement", () => {
     testDecimalLiteralDoesNotSplitStatement();
+  });
+
+  await t.test("assignment expression tokens include operators and parens", () => {
+    testAssignmentExpressionTokensIncludeOperatorsAndParens();
   });
 
   await t.test("chained data statement single line", () => {
@@ -1305,6 +1521,18 @@ defineFocusedTest(test, "parser statements regression", ["statements"], async (t
 
   await t.test("concatenate statement", () => {
     testConcatenateStatement();
+  });
+
+  await t.test("multi-value extras remain additive", () => {
+    testMultiValueExtrasRemainAdditive();
+  });
+
+  await t.test("sort itab parses every static sort key", () => {
+    testSortItabParsesEveryStaticSortKey();
+  });
+
+  await t.test("final multi-value parser integration findings", () => {
+    testFinalMultiValueParserIntegrationFindings();
   });
 
   await t.test("supported statement smoke matrix", () => {

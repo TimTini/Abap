@@ -6,6 +6,7 @@ const {
   assert,
   assertViewerFixtureDirectoriesStayInSync,
   findTemplateCellByText,
+  findVisibleTemplateEditModal,
   installVirtualLayoutMock,
   openTemplateCellDescriptionTab,
   renderFixture,
@@ -391,6 +392,94 @@ async function assertBlankViewportFallbackUsesLogicalAnchor() {
   dom.window.close();
 }
 
+async function assertTemplateBlockSelectionPreservesViewportForDoubleClick() {
+  const itemCount = 700;
+  const targetLine = 600;
+  const source = [
+    'DATA gv_edit TYPE string. "Editable',
+    ...Array.from({ length: itemCount }, () => "CLEAR gv_edit.")
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els } = window.AbapViewerRuntime;
+
+  els.rightTabTemplateBtn.click();
+  await settleViewerUi(window);
+  const restoreLayout = installVirtualLayoutMock(
+    window,
+    els.templatePreviewOutput,
+    "template",
+    itemCount + 1,
+    (index) => 80 + ((index % 4) * 20),
+    { scrollEventViaRaf: true, visualScale: 1.25 }
+  );
+
+  try {
+    els.inputText.scrollTop = (targetLine - 1) * 18;
+    els.inputText.dispatchEvent(new window.Event("scroll"));
+    await settleViewerUi(window);
+    const gutterButton = els.inputGutterContent.querySelector(`button[data-line="${targetLine}"]`);
+    assert(gutterButton && !gutterButton.hidden, "Expected a deep Template gutter target for selection stability.");
+
+    gutterButton.click();
+    await settleViewerUi(window, 10);
+
+    const container = els.templatePreviewOutput;
+    const containerRect = container.getBoundingClientRect();
+    const isVisible = (node) => {
+      const rect = node.getBoundingClientRect();
+      return rect.bottom > containerRect.top && rect.top < containerRect.bottom;
+    };
+    const targetBlock = Array.from(container.querySelectorAll(".template-block[data-template-index]"))
+      .find((candidate) => isVisible(candidate) && !candidate.classList.contains("selected"));
+    assert(targetBlock, "Expected a visible unselected Template block to click.");
+
+    const cell = findTemplateCellByText(targetBlock, "Editable")
+      || targetBlock.querySelector("td.template-preview-editable");
+    assert(cell, "Expected an editable Template cell for double-click targeting.");
+
+    const containerTop = containerRect.top;
+    const beforeScrollTop = Number(container.scrollTop) || 0;
+    const beforeBlockTop = targetBlock.getBoundingClientRect().top - containerTop;
+    const beforeBlockHeight = targetBlock.getBoundingClientRect().height;
+    const beforeCellTop = cell.getBoundingClientRect().top - containerTop;
+
+    targetBlock.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+    await settleViewerUi(window, 6);
+
+    assert(targetBlock.classList.contains("selected"), "Expected first click to select the Template block.");
+    assert.strictEqual(
+      Math.abs((Number(container.scrollTop) || 0) - beforeScrollTop),
+      0,
+      `Expected Template block selection not to change scrollTop (before=${beforeScrollTop}, after=${container.scrollTop}).`
+    );
+    assert(
+      Math.abs(targetBlock.getBoundingClientRect().top - containerTop - beforeBlockTop) <= 0.5,
+      "Expected Template block selection not to shift block top."
+    );
+    assert(
+      Math.abs(targetBlock.getBoundingClientRect().height - beforeBlockHeight) <= 0.5,
+      "Expected Template block selection not to change block height."
+    );
+    assert(
+      Math.abs(cell.getBoundingClientRect().top - containerTop - beforeCellTop) <= 0.5,
+      "Expected Template block selection not to shift editable cell top."
+    );
+
+    cell.dispatchEvent(new window.MouseEvent("dblclick", { bubbles: true }));
+    await settleViewerUi(window, 6);
+    assert.strictEqual(
+      Boolean(findVisibleTemplateEditModal(window)),
+      true,
+      "Expected double-click on the same cell coordinates to open the Template editor."
+    );
+  } finally {
+    restoreLayout();
+  }
+
+  dom.window.close();
+}
+
 async function assertDescriptionSaveAndClearPreserveTemplateCellAnchor() {
   const clearCount = 700;
   const targetLine = 600;
@@ -509,6 +598,10 @@ assertViewerFixtureDirectoriesStayInSync();
 
   await t.test("description save and clear preserve template cell anchor", async () => {
     await assertDescriptionSaveAndClearPreserveTemplateCellAnchor();
+  });
+
+  await t.test("template block selection preserves viewport for double click", async () => {
+    await assertTemplateBlockSelectionPreservesViewportForDoubleClick();
   });
 });
 

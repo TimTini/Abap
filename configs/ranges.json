@@ -1,5 +1,6 @@
 {
   "object": "RANGES",
+  "extras": { "type": "declaration" },
   "match": { "startKeyword": "RANGES" },
   "keywordLabels": {
     "RANGES": "stmt",

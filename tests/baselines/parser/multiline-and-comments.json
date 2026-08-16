@@ -41,7 +41,13 @@
       "block": null,
       "children": [],
       "comment": "",
-      "extras": null,
+      "extras": {
+        "declaration": {
+          "defaultRaw": "",
+          "typeRaw": "string",
+          "valueRaw": "|A, B|"
+        }
+      },
       "file": "multiline-and-comments.abap",
       "keywords": {
         "stmt": {
@@ -108,7 +114,13 @@
       "block": null,
       "children": [],
       "comment": "",
-      "extras": null,
+      "extras": {
+        "declaration": {
+          "defaultRaw": "",
+          "typeRaw": "string",
+          "valueRaw": "|C|"
+        }
+      },
       "file": "multiline-and-comments.abap",
       "keywords": {
         "stmt": {
@@ -175,7 +187,19 @@
       "block": null,
       "children": [],
       "comment": "",
-      "extras": null,
+      "extras": {
+        "assignment": {
+          "expression": {
+            "raw": "'A\"B'",
+            "tokens": [
+              {
+                "kind": "literal",
+                "value": "'A\"B'"
+              }
+            ]
+          }
+        }
+      },
       "file": "multiline-and-comments.abap",
       "keywords": {
         "assign": {
@@ -215,7 +239,19 @@
       "block": null,
       "children": [],
       "comment": "",
-      "extras": null,
+      "extras": {
+        "assignment": {
+          "expression": {
+            "raw": "|A \" B|",
+            "tokens": [
+              {
+                "kind": "literal",
+                "value": "|A \" B|"
+              }
+            ]
+          }
+        }
+      },
       "file": "multiline-and-comments.abap",
       "keywords": {
         "assign": {
@@ -269,7 +305,19 @@
               "block": null,
               "children": [],
               "comment": "",
-              "extras": null,
+              "extras": {
+                "assignment": {
+                  "expression": {
+                    "raw": "|done|",
+                    "tokens": [
+                      {
+                        "kind": "literal",
+                        "value": "|done|"
+                      }
+                    ]
+                  }
+                }
+              },
               "file": "multiline-and-comments.abap",
               "keywords": {
                 "assign": {

@@ -12,6 +12,7 @@
     "ASSIGNING": "assigning",
     "REFERENCE": "reference",
     "TRANSPORTING": "transporting",
+    "COMPARING": "comparing",
     "NO": "no",
     "FIELDS": "fields",
     "BINARY": "binary",
@@ -22,6 +23,9 @@
     "WITH TABLE KEY": "with-table-key",
     "WITH KEY": "with-key",
     "TRANSPORTING NO FIELDS": "transporting-no-fields",
+    "TRANSPORTING ALL FIELDS": "transporting-all-fields",
+    "COMPARING NO FIELDS": "comparing-no-fields",
+    "COMPARING ALL FIELDS": "comparing-all-fields",
     "BINARY SEARCH": "binary-search",
     "REFERENCE INTO": "reference-into"
   },
@@ -34,7 +38,11 @@
     { "after": "ASSIGNING", "name": "assigning", "label": "assigning" },
     { "after": "REFERENCE INTO", "name": "refInto", "label": "reference-into" },
     { "after": "TRANSPORTING NO FIELDS", "name": "transportingNoFields", "label": "transporting-no-fields", "capture": "flag" },
-    { "after": "TRANSPORTING", "name": "transporting", "label": "transporting", "capture": "rest", "stopTokens": ["BINARY", "COMPARING", "WITH"] },
+    { "after": "TRANSPORTING ALL FIELDS", "name": "transportingAllFields", "label": "transporting-all-fields", "capture": "flag" },
+    { "after": "COMPARING NO FIELDS", "name": "comparingNoFields", "label": "comparing-no-fields", "capture": "flag" },
+    { "after": "COMPARING ALL FIELDS", "name": "comparingAllFields", "label": "comparing-all-fields", "capture": "flag" },
+    { "after": "TRANSPORTING", "name": "transporting", "label": "transporting", "capture": "rest", "stopTokens": ["BINARY", "COMPARING", "WITH", "INTO", "ASSIGNING", "REFERENCE"] },
+    { "after": "COMPARING", "name": "comparing", "label": "comparing", "capture": "rest", "stopTokens": ["BINARY", "TRANSPORTING", "WITH", "INTO", "ASSIGNING", "REFERENCE"] },
     { "after": "BINARY SEARCH", "name": "binarySearch", "label": "binary-search", "capture": "flag" }
   ]
 }
