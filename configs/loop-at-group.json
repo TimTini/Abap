@@ -1,40 +1,28 @@
 {
   "object": "LOOP_AT_ITAB",
-  "match": { "startPhrase": "LOOP AT" },
+  "match": { "startPhrase": "LOOP AT GROUP" },
   "extras": { "type": "loopAtItab" },
   "block": { "endKeyword": "ENDLOOP" },
   "keywordLabels": {
     "LOOP": "stmt",
     "AT": "at",
+    "GROUP": "group",
     "INTO": "into",
     "ASSIGNING": "assigning",
     "REFERENCE": "reference",
-    "USING": "using",
-    "KEY": "key",
     "WHERE": "where",
-    "FROM": "from",
-    "TO": "to",
-    "GROUP": "group",
-    "BY": "by",
-    "ASCENDING": "ascending",
-    "DESCENDING": "descending",
-    "WITHOUT": "without",
-    "MEMBERS": "members"
+    "GROUP BY": "group-by"
   },
   "keywordPhrases": {
-    "LOOP AT": "loop-at",
+    "LOOP AT GROUP": "loop-at-group",
     "REFERENCE INTO": "reference-into",
-    "USING KEY": "using-key",
     "GROUP BY": "group-by"
   },
   "captureRules": [
-    { "after": "LOOP AT", "name": "itab", "label": "itab", "descKey": "itab" },
+    { "after": "LOOP AT GROUP", "name": "group", "label": "group" },
     { "after": "INTO", "name": "into", "label": "into" },
     { "after": "ASSIGNING", "name": "assigning", "label": "assigning" },
     { "after": "REFERENCE INTO", "name": "refInto", "label": "reference-into" },
-    { "after": "USING KEY", "name": "usingKey", "label": "using-key" },
-    { "after": "FROM", "name": "from", "label": "from" },
-    { "after": "TO", "name": "to", "label": "to" },
     { "after": "WHERE", "name": "where", "label": "where", "capture": "rest", "stopTokens": ["GROUP"] },
     { "after": "GROUP BY", "name": "groupBy", "label": "group-by", "capture": "rest", "stopTokens": ["INTO", "ASSIGNING", "REFERENCE"] }
   ]

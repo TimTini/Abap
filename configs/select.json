@@ -18,7 +18,10 @@
     "HAVING": "having",
     "UP": "up",
     "TO": "to",
-    "ROWS": "rows"
+    "ROWS": "rows",
+    "OFFSET": "offset",
+    "PACKAGE": "package",
+    "SIZE": "size"
   },
   "keywordPhrases": {
     "INTO CORRESPONDING FIELDS OF TABLE": "into-corresponding-fields-of-table",
@@ -28,12 +31,13 @@
     "FOR ALL ENTRIES IN": "for-all-entries-in",
     "ORDER BY": "order-by",
     "GROUP BY": "group-by",
-    "UP TO": "up-to"
+    "UP TO": "up-to",
+    "PACKAGE SIZE": "package-size"
   },
   "captureRules": [
-    { "after": "SELECT", "name": "fields", "label": "fields", "capture": "rest", "stopTokens": ["FROM", "SINGLE", "DISTINCT"] },
-    { "after": "SINGLE", "name": "fields", "label": "fields", "capture": "rest", "stopTokens": ["FROM"] },
-    { "after": "DISTINCT", "name": "fields", "label": "fields", "capture": "rest", "stopTokens": ["FROM"] },
+    { "after": "SELECT", "name": "fields", "label": "fields", "capture": "rest", "stopTokens": ["FROM", "SINGLE", "DISTINCT", "INTO", "APPENDING", "PACKAGE"] },
+    { "after": "SINGLE", "name": "fields", "label": "fields", "capture": "rest", "stopTokens": ["FROM", "INTO", "APPENDING", "PACKAGE"] },
+    { "after": "DISTINCT", "name": "fields", "label": "fields", "capture": "rest", "stopTokens": ["FROM", "INTO", "APPENDING", "PACKAGE"] },
     { "after": "FROM", "name": "from", "label": "from" },
     { "after": "FIELDS", "name": "fields", "label": "fields", "capture": "rest", "stopTokens": ["WHERE", "INTO", "APPENDING", "ORDER", "GROUP", "HAVING", "UP", "FOR", "UNION", "OF"] },
     { "after": "INTO CORRESPONDING FIELDS OF TABLE", "name": "intoTable", "label": "into-corresponding-table" },
@@ -43,6 +47,9 @@
     { "after": "INTO", "name": "into", "label": "into" },
     { "after": "FOR ALL ENTRIES IN", "name": "forAllEntries", "label": "for-all-entries", "descKey": "forAllEntries" },
     { "after": "WHERE", "name": "where", "label": "where", "capture": "rest", "stopTokens": ["ORDER", "GROUP", "HAVING", "UP", "INTO", "APPENDING", "UNION"] },
-    { "after": "HAVING", "name": "having", "label": "having", "capture": "rest", "stopTokens": ["ORDER", "UP", "INTO", "APPENDING"] }
+    { "after": "HAVING", "name": "having", "label": "having", "capture": "rest", "stopTokens": ["ORDER", "UP", "INTO", "APPENDING"] },
+    { "after": "UP TO", "name": "upTo", "label": "up-to", "capture": "rest", "stopTokens": ["ROWS"] },
+    { "after": "OFFSET", "name": "offset", "label": "offset", "capture": "rest" },
+    { "after": "PACKAGE SIZE", "name": "packageSize", "label": "package-size" }
   ]
 }

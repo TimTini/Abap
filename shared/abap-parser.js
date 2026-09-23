@@ -1693,7 +1693,9 @@
         importing: parseAssignments(map.importingRaw || ""),
         changing: parseAssignments(map.changingRaw || ""),
         receiving: parseAssignments(map.receivingRaw || ""),
-        exceptions: parseAssignments(map.exceptionsRaw || "")
+        exceptions: parseAssignments(map.exceptionsRaw || ""),
+        parameterTable: map.parameterTable || "",
+        exceptionTable: map.exceptionTable || ""
       }
     };
   }
@@ -1834,7 +1836,10 @@
         whereRaw,
         whereConditions: parseConditionClauses(whereRaw, { allowImplicitAnd: false }),
         havingRaw,
-        havingConditions: parseConditionClauses(havingRaw, { allowImplicitAnd: false })
+        havingConditions: parseConditionClauses(havingRaw, { allowImplicitAnd: false }),
+        upTo: map.upTo || "",
+        offset: map.offset || "",
+        packageSize: map.packageSize || ""
       }
     };
   }
@@ -1854,6 +1859,9 @@
         into: map.into || "",
         assigning: map.assigning || "",
         refInto: map.refInto || "",
+        usingKey: map.usingKey || "",
+        whereRaw: map.where || "",
+        whereConditions: parseConditionClauses(map.where || "", { allowImplicitAnd: false }),
         withKeyRaw,
         withTableKeyRaw,
         conditions: parseConditionClauses(conditionSource, { allowImplicitAnd: true })
@@ -1873,6 +1881,10 @@
         refInto: map.refInto || "",
         from: map.from || "",
         to: map.to || "",
+        usingKey: map.usingKey || "",
+        group: map.group || "",
+        isGroupLoop: Boolean(map.group),
+        groupByRaw: map.groupBy || "",
         whereRaw,
         conditions: parseConditionClauses(whereRaw, { allowImplicitAnd: false })
       }
@@ -3709,6 +3721,7 @@
       return;
     }
     annotateConditionClausesWithDecls(readTable.conditions, context);
+    annotateConditionClausesWithDecls(readTable.whereConditions, context);
   }
 
   function annotateLoopAtItabExtras(loopAtItab, context) {

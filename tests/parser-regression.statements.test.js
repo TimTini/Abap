@@ -801,6 +801,12 @@ function testSupportedStatementSmokeMatrix() {
       code: "LOOP AT lt_rows INTO ls_row. ENDLOOP.\n"
     },
     {
+      name: "loop-at-group",
+      covers: ["loop-at-group.json"],
+      expectedTypes: ["LOOP_AT_ITAB"],
+      code: "LOOP AT GROUP lo_group INTO ls_member. ENDLOOP.\n"
+    },
+    {
       name: "method",
       covers: ["method.json"],
       expectedTypes: ["METHOD"],

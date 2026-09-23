@@ -19,6 +19,7 @@ const entries = [
   { file: "tests/viewer-contracts.perform.test.js", suites: ["viewer", "contracts", "fast", "full"], labels: ["if-template", "perform-root-trace", "perform-source-selection", "perform-source-picker", "template-multi-value-perform-call", "template-multi-value-perform-root", "data-perform-trace"] },
   { file: "tests/viewer-contracts.template.test.js", suites: ["viewer", "contracts", "fast", "full"], labels: ["struct-field-finaldesc", "constant-finaldesc", "template-multi-value-conditions", "template-multi-value-safe-lists", "template-row-description-loop", "template-row-description-perform", "template-row-description-condition", "template-provenance", "append-variants", "template-multi-select", "message-write", "template-excel-roundtrip"] },
   { file: "tests/viewer-contracts.data.test.js", suites: ["viewer", "contracts", "fast", "full"], labels: ["data-catalog", "output-removal"] },
+  { file: "tests/viewer-contracts.sap-coverage.test.js", suites: ["viewer", "contracts", "fast", "full"], labels: ["sap-viewer-coverage"] },
   { file: "tests/viewer-contracts.navigation.test.js", suites: ["viewer", "contracts", "full"], labels: ["scroll-navigation", "scroll-manual-takeover", "scroll-range-coverage", "scroll-geometry"] },
   { file: "tests/run.contracts.test.js", suites: ["contracts", "fast", "full"], labels: ["runner"] }
 ];

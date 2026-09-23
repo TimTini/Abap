@@ -238,7 +238,9 @@
         "IMPORTING": "importing",
         "CHANGING": "changing",
         "RECEIVING": "receiving",
-        "EXCEPTIONS": "exceptions"
+        "EXCEPTIONS": "exceptions",
+        "PARAMETER-TABLE": "parameter-table",
+        "EXCEPTION-TABLE": "exception-table"
       },
       "keywordPhrases": {
         "CALL METHOD": "call-method"
@@ -254,7 +256,9 @@
             "IMPORTING",
             "CHANGING",
             "RECEIVING",
-            "EXCEPTIONS"
+            "EXCEPTIONS",
+            "PARAMETER-TABLE",
+            "EXCEPTION-TABLE"
           ]
         },
         {
@@ -266,7 +270,9 @@
             "IMPORTING",
             "CHANGING",
             "RECEIVING",
-            "EXCEPTIONS"
+            "EXCEPTIONS",
+            "PARAMETER-TABLE",
+            "EXCEPTION-TABLE"
           ]
         },
         {
@@ -278,7 +284,9 @@
             "EXPORTING",
             "CHANGING",
             "RECEIVING",
-            "EXCEPTIONS"
+            "EXCEPTIONS",
+            "PARAMETER-TABLE",
+            "EXCEPTION-TABLE"
           ]
         },
         {
@@ -290,7 +298,9 @@
             "EXPORTING",
             "IMPORTING",
             "RECEIVING",
-            "EXCEPTIONS"
+            "EXCEPTIONS",
+            "PARAMETER-TABLE",
+            "EXCEPTION-TABLE"
           ]
         },
         {
@@ -302,14 +312,30 @@
             "EXPORTING",
             "IMPORTING",
             "CHANGING",
-            "EXCEPTIONS"
+            "EXCEPTIONS",
+            "PARAMETER-TABLE",
+            "EXCEPTION-TABLE"
           ]
         },
         {
           "after": "EXCEPTIONS",
           "name": "exceptionsRaw",
           "label": "exceptions",
-          "capture": "rest"
+          "capture": "rest",
+          "stopTokens": [
+            "PARAMETER-TABLE",
+            "EXCEPTION-TABLE"
+          ]
+        },
+        {
+          "after": "PARAMETER-TABLE",
+          "name": "parameterTable",
+          "label": "parameter-table"
+        },
+        {
+          "after": "EXCEPTION-TABLE",
+          "name": "exceptionTable",
+          "label": "exception-table"
         }
       ]
     },
@@ -1388,6 +1414,76 @@
       ]
     },
     {
+      "_sourceFile": "loop-at-group.json",
+      "object": "LOOP_AT_ITAB",
+      "match": {
+        "startPhrase": "LOOP AT GROUP"
+      },
+      "extras": {
+        "type": "loopAtItab"
+      },
+      "block": {
+        "endKeyword": "ENDLOOP"
+      },
+      "keywordLabels": {
+        "LOOP": "stmt",
+        "AT": "at",
+        "GROUP": "group",
+        "INTO": "into",
+        "ASSIGNING": "assigning",
+        "REFERENCE": "reference",
+        "WHERE": "where",
+        "GROUP BY": "group-by"
+      },
+      "keywordPhrases": {
+        "LOOP AT GROUP": "loop-at-group",
+        "REFERENCE INTO": "reference-into",
+        "GROUP BY": "group-by"
+      },
+      "captureRules": [
+        {
+          "after": "LOOP AT GROUP",
+          "name": "group",
+          "label": "group"
+        },
+        {
+          "after": "INTO",
+          "name": "into",
+          "label": "into"
+        },
+        {
+          "after": "ASSIGNING",
+          "name": "assigning",
+          "label": "assigning"
+        },
+        {
+          "after": "REFERENCE INTO",
+          "name": "refInto",
+          "label": "reference-into"
+        },
+        {
+          "after": "WHERE",
+          "name": "where",
+          "label": "where",
+          "capture": "rest",
+          "stopTokens": [
+            "GROUP"
+          ]
+        },
+        {
+          "after": "GROUP BY",
+          "name": "groupBy",
+          "label": "group-by",
+          "capture": "rest",
+          "stopTokens": [
+            "INTO",
+            "ASSIGNING",
+            "REFERENCE"
+          ]
+        }
+      ]
+    },
+    {
       "_sourceFile": "loop-at-itab.json",
       "object": "LOOP_AT_ITAB",
       "match": {
@@ -1405,13 +1501,23 @@
         "INTO": "into",
         "ASSIGNING": "assigning",
         "REFERENCE": "reference",
+        "USING": "using",
+        "KEY": "key",
         "WHERE": "where",
         "FROM": "from",
-        "TO": "to"
+        "TO": "to",
+        "GROUP": "group",
+        "BY": "by",
+        "ASCENDING": "ascending",
+        "DESCENDING": "descending",
+        "WITHOUT": "without",
+        "MEMBERS": "members"
       },
       "keywordPhrases": {
         "LOOP AT": "loop-at",
-        "REFERENCE INTO": "reference-into"
+        "REFERENCE INTO": "reference-into",
+        "USING KEY": "using-key",
+        "GROUP BY": "group-by"
       },
       "captureRules": [
         {
@@ -1436,6 +1542,11 @@
           "label": "reference-into"
         },
         {
+          "after": "USING KEY",
+          "name": "usingKey",
+          "label": "using-key"
+        },
+        {
           "after": "FROM",
           "name": "from",
           "label": "from"
@@ -1449,7 +1560,21 @@
           "after": "WHERE",
           "name": "where",
           "label": "where",
-          "capture": "rest"
+          "capture": "rest",
+          "stopTokens": [
+            "GROUP"
+          ]
+        },
+        {
+          "after": "GROUP BY",
+          "name": "groupBy",
+          "label": "group-by",
+          "capture": "rest",
+          "stopTokens": [
+            "INTO",
+            "ASSIGNING",
+            "REFERENCE"
+          ]
         }
       ]
     },
@@ -2093,6 +2218,8 @@
         "INTO": "into",
         "ASSIGNING": "assigning",
         "REFERENCE": "reference",
+        "WHERE": "where",
+        "USING": "using",
         "TRANSPORTING": "transporting",
         "NO": "no",
         "FIELDS": "fields",
@@ -2103,6 +2230,7 @@
         "READ TABLE": "read-table",
         "WITH TABLE KEY": "with-table-key",
         "WITH KEY": "with-key",
+        "USING KEY": "using-key",
         "TRANSPORTING NO FIELDS": "transporting-no-fields",
         "BINARY SEARCH": "binary-search",
         "REFERENCE INTO": "reference-into"
@@ -2145,6 +2273,11 @@
           ]
         },
         {
+          "after": "USING KEY",
+          "name": "usingKey",
+          "label": "using-key"
+        },
+        {
           "after": "INTO",
           "name": "into",
           "label": "into"
@@ -2158,6 +2291,12 @@
           "after": "REFERENCE INTO",
           "name": "refInto",
           "label": "reference-into"
+        },
+        {
+          "after": "WHERE",
+          "name": "where",
+          "label": "where",
+          "capture": "rest"
         }
       ]
     },
@@ -2276,7 +2415,10 @@
         "HAVING": "having",
         "UP": "up",
         "TO": "to",
-        "ROWS": "rows"
+        "ROWS": "rows",
+        "OFFSET": "offset",
+        "PACKAGE": "package",
+        "SIZE": "size"
       },
       "keywordPhrases": {
         "INTO CORRESPONDING FIELDS OF TABLE": "into-corresponding-fields-of-table",
@@ -2286,7 +2428,8 @@
         "FOR ALL ENTRIES IN": "for-all-entries-in",
         "ORDER BY": "order-by",
         "GROUP BY": "group-by",
-        "UP TO": "up-to"
+        "UP TO": "up-to",
+        "PACKAGE SIZE": "package-size"
       },
       "captureRules": [
         {
@@ -2297,7 +2440,10 @@
           "stopTokens": [
             "FROM",
             "SINGLE",
-            "DISTINCT"
+            "DISTINCT",
+            "INTO",
+            "APPENDING",
+            "PACKAGE"
           ]
         },
         {
@@ -2306,7 +2452,10 @@
           "label": "fields",
           "capture": "rest",
           "stopTokens": [
-            "FROM"
+            "FROM",
+            "INTO",
+            "APPENDING",
+            "PACKAGE"
           ]
         },
         {
@@ -2315,7 +2464,10 @@
           "label": "fields",
           "capture": "rest",
           "stopTokens": [
-            "FROM"
+            "FROM",
+            "INTO",
+            "APPENDING",
+            "PACKAGE"
           ]
         },
         {
@@ -2398,6 +2550,26 @@
             "INTO",
             "APPENDING"
           ]
+        },
+        {
+          "after": "UP TO",
+          "name": "upTo",
+          "label": "up-to",
+          "capture": "rest",
+          "stopTokens": [
+            "ROWS"
+          ]
+        },
+        {
+          "after": "OFFSET",
+          "name": "offset",
+          "label": "offset",
+          "capture": "rest"
+        },
+        {
+          "after": "PACKAGE SIZE",
+          "name": "packageSize",
+          "label": "package-size"
         }
       ]
     },

@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { test } = require("node:test");
-const { parseAbapText } = require("../shared/abap-parser");
+const { lexAbapSource, parseAbapText } = require("../shared/abap-parser");
 const { loadConfigs } = require("./helpers/config-loader");
 const { defineFocusedTest } = require("./helpers/test-focus");
 
@@ -15,6 +15,15 @@ const sapBase = "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US
 
 function flatten(objects) {
   return objects.flatMap((object) => [object, ...flatten(object.children || [])]);
+}
+
+function sourceHasMatcherTokens(source, phrase) {
+  const expected = String(phrase || "").trim().toUpperCase().split(/\s+/).filter(Boolean);
+  if (!expected.length) return false;
+  const actual = lexAbapSource(source).tokens
+    .filter((token) => token.kind !== "comment" && token.kind !== "literal")
+    .map((token) => token.upper);
+  return actual.some((_, index) => expected.every((token, offset) => actual[index + offset] === token));
 }
 
 defineFocusedTest(test, "SAP syntax inventory covers each configured parser matcher", ["sap-coverage"], () => {
@@ -29,7 +38,7 @@ defineFocusedTest(test, "SAP syntax inventory covers each configured parser matc
   assert.equal(new Set(configs.map((config) => config.object)).size, 45);
 
   for (const form of inventory.forms) {
-    assert.match(form.sapUrl, /^https:\/\/help\.sap\.com\/doc\/abapdocu_latest_index_htm\/latest\/en-US\/[^\s]+\.html$/);
+    assert.match(form.sapUrl, /^https:\/\/help\.sap\.com\/(?:doc\/abapdocu_latest_index_htm\/latest\/en-US\/[^\s]+\.html?|docs\/abap-cloud\/abap-keyword\/[a-z0-9-]+(?:\?[^\s]+)?)$/i);
     assert.ok(form.source && form.source.trim(), `${form.id}: missing source`);
     assert.ok(form.expectedType, `${form.id}: missing expected type`);
     assert.ok(form.assertions && Object.keys(form.assertions).length, `${form.id}: missing field assertions`);
@@ -43,10 +52,8 @@ defineFocusedTest(test, "SAP syntax inventory covers each configured parser matc
       const matcher = config.match || {};
       const startPhrase = matcher.startPhrase || matcher.startKeyword || (matcher.startTokens || []).join(" ");
       if (startPhrase) {
-        const normalizedSource = form.source.trim().toUpperCase().replace(/\s+/g, " ");
-        const normalizedMatcher = String(startPhrase).toUpperCase().replace(/\s+/g, " ");
         assert.ok(
-          normalizedSource.includes(normalizedMatcher),
+          sourceHasMatcherTokens(form.source, startPhrase),
           `${form.id}: source does not contain ${file} matcher ${startPhrase}`
         );
       } else {

@@ -262,6 +262,120 @@ test("SAP latest internal-table additions retain their operands", () => {
   }
 });
 
+test("SAP latest READ TABLE WHERE and secondary-index variants retain operands", () => {
+  const source = [
+    "DATA lt_rows TYPE STANDARD TABLE OF string WITH EMPTY KEY.",
+    "DATA lv_skip TYPE string.",
+    "READ TABLE lt_rows ASSIGNING FIELD-SYMBOL(<line>) WHERE table_line IS NOT INITIAL AND table_line <> lv_skip."
+  ].join("\n");
+  const result = parseAbapTextDetailed(source, configs, "read-table-where-key.abap");
+  const read = result.objects.find((object) => object.objectType === "READ_TABLE");
+
+  assert(read);
+  assert.deepEqual(result.diagnostics, []);
+  assert.equal(read.values.where && read.values.where.value, "table_line IS NOT INITIAL AND table_line <> lv_skip");
+  assert.equal(read.extras.readTable.whereRaw, "table_line IS NOT INITIAL AND table_line <> lv_skip");
+  assert.deepEqual(read.extras.readTable.whereConditions.map((condition) => condition.leftOperand), ["table_line", "table_line"]);
+  assert.equal(read.extras.readTable.whereConditions[0].rightOperand, "INITIAL");
+  assert.equal(read.extras.readTable.whereConditions[1].rightOperandDecl.name, "lv_skip");
+});
+
+test("SAP latest grouped LOOP and member LOOP retain clauses and nesting", () => {
+  const source = [
+    "DATA lt_rows TYPE STANDARD TABLE OF string WITH EMPTY KEY.",
+    "LOOP AT lt_rows ASSIGNING FIELD-SYMBOL(<keyed>) USING KEY sec_key WHERE table_line <> `skip`.",
+    "ENDLOOP.",
+    "LOOP AT lt_rows INTO DATA(row) GROUP BY ( key = row+0(1) size = GROUP SIZE index = GROUP INDEX ) ASCENDING INTO DATA(group).",
+    "  LOOP AT GROUP group INTO DATA(member) WHERE table_line <> `skip`.",
+    "    WRITE member.",
+    "  ENDLOOP.",
+    "ENDLOOP.",
+    "WRITE `after-group`."
+  ].join("\n");
+  const result = parseAbapTextDetailed(source, configs, "loop-group-by.abap");
+  const loops = flatten(result.objects).filter((object) => object.objectType === "LOOP_AT_ITAB");
+  const keyedLoop = loops.find((object) => /USING KEY sec_key/i.test(object.raw));
+  const groupedLoop = loops.find((object) => /GROUP BY/i.test(object.raw));
+  const memberLoop = loops.find((object) => /LOOP AT GROUP/i.test(object.raw));
+
+  assert.equal(loops.length, 3);
+  assert.deepEqual(result.diagnostics, []);
+  assert.equal(keyedLoop.extras.loopAtItab.usingKey, "sec_key");
+  assert.equal(keyedLoop.extras.loopAtItab.conditions[0].rightOperand, "`skip`");
+  assert.equal(groupedLoop.extras.loopAtItab.groupByRaw, "( key = row+0(1) size = GROUP SIZE index = GROUP INDEX ) ASCENDING");
+  assert.equal(groupedLoop.values.into[1].value, "DATA(group)");
+  assert.equal(memberLoop.values.group && memberLoop.values.group.value, "group");
+  assert.equal(memberLoop.extras.loopAtItab.group, "group");
+  assert.strictEqual(groupedLoop.children[0], memberLoop);
+  assert.deepEqual(memberLoop.children.map((child) => child.objectType), ["WRITE"]);
+  assert.equal(result.objects.at(-1).objectType, "WRITE");
+  assert.equal(result.objects.at(-1).raw, "WRITE `after-group`.");
+});
+
+test("repository ABAP examples retain READ TABLE and SELECT result additions", () => {
+  const source = fs.readFileSync(path.resolve(__dirname, "../examples/deep_form_demo.abap"), "utf8");
+  const result = parseAbapTextDetailed(source, configs, "examples/deep_form_demo.abap");
+  const objects = flatten(result.objects);
+  const priorityRead = objects.find((object) => object.objectType === "READ_TABLE" && /USING KEY priority_key/i.test(object.raw));
+  const offsetSelect = objects.find((object) => object.objectType === "SELECT" && /OFFSET 0/i.test(object.raw));
+  const packageSelect = objects.find((object) => object.objectType === "SELECT" && /PACKAGE SIZE 5/i.test(object.raw));
+
+  assert(priorityRead, "Expected the repository's secondary-key READ TABLE example.");
+  assert.equal(priorityRead.values.index && priorityRead.values.index.value, "1");
+  assert.equal(priorityRead.values.usingKey && priorityRead.values.usingKey.value, "priority_key");
+  assert.equal(priorityRead.extras.readTable.usingKey, "priority_key");
+  assert(offsetSelect, "Expected the repository's SELECT ... OFFSET example.");
+  assert.equal(offsetSelect.values.upTo && offsetSelect.values.upTo.value, "10");
+  assert.equal(offsetSelect.values.offset && offsetSelect.values.offset.value, "0");
+  assert.equal(offsetSelect.extras.select.offset, "0");
+  assert(packageSelect, "Expected the repository's SELECT ... PACKAGE SIZE example.");
+  assert.equal(packageSelect.values.packageSize && packageSelect.values.packageSize.value, "5");
+  assert.equal(packageSelect.extras.select.packageSize, "5");
+  assert.equal(packageSelect.values.fields && packageSelect.values.fields.value, "*");
+});
+
+test("classic SELECT field lists stop before INTO and PACKAGE SIZE additions", () => {
+  const source = [
+    "DATA lt_rows TYPE STANDARD TABLE OF string.",
+    "DATA lt_carriers TYPE STANDARD TABLE OF string.",
+    "DATA lv_carrier TYPE string.",
+    "DATA lv_package TYPE i.",
+    "SELECT * INTO TABLE lt_rows PACKAGE SIZE lv_package FROM sflight.",
+    "ENDSELECT.",
+    "SELECT SINGLE carrid INTO lv_carrier FROM scarr.",
+    "SELECT DISTINCT carrid INTO TABLE lt_carriers FROM scarr."
+  ].join("\n");
+  const result = parseAbapTextDetailed(source, configs, "select-classic-result-additions.abap");
+  const selects = result.objects.filter((object) => object.objectType === "SELECT");
+
+  assert.deepEqual(result.diagnostics, []);
+  assert.equal(selects.length, 3);
+  assert.equal(selects[0].values.fields.value, "*");
+  assert.equal(selects[0].values.packageSize.value, "lv_package");
+  assert.equal(selects[1].values.fields.value, "carrid");
+  assert.equal(selects[1].values.into.value, "lv_carrier");
+  assert.equal(selects[2].values.fields.value, "carrid");
+  assert.equal(selects[2].values.intoTable.value, "lt_carriers");
+});
+
+test("SAP latest dynamic CALL METHOD parameter tables retain both table operands", () => {
+  const result = parseAbapTextDetailed(
+    "CALL METHOD lo_handler->(lv_method) PARAMETER-TABLE lt_parameters EXCEPTION-TABLE lt_exceptions.",
+    configs,
+    "call-method-tables.abap"
+  );
+  const call = result.objects[0];
+
+  assert.equal(call && call.objectType, "CALL_METHOD");
+  assert.deepEqual(result.diagnostics, []);
+  assert.equal(call.values.target.value, "lo_handler->(lv_method)");
+  assert.equal(call.values.parameterTable.value, "lt_parameters");
+  assert.equal(call.values.exceptionTable.value, "lt_exceptions");
+  assert.equal(call.extras.callMethod.target, "lo_handler->(lv_method)");
+  assert.equal(call.extras.callMethod.parameterTable, "lt_parameters");
+  assert.equal(call.extras.callMethod.exceptionTable, "lt_exceptions");
+});
+
 test("SAP latest call and assignment variants retain statement families", () => {
   const cases = [
     ["CALL_FUNCTION", "CALL FUNCTION 'Z_DEMO' IN UPDATE TASK EXPORTING iv_mode = lv_mode."],

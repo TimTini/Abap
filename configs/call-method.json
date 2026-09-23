@@ -9,17 +9,21 @@
     "IMPORTING": "importing",
     "CHANGING": "changing",
     "RECEIVING": "receiving",
-    "EXCEPTIONS": "exceptions"
+    "EXCEPTIONS": "exceptions",
+    "PARAMETER-TABLE": "parameter-table",
+    "EXCEPTION-TABLE": "exception-table"
   },
   "keywordPhrases": {
     "CALL METHOD": "call-method"
   },
   "captureRules": [
-    { "after": "CALL METHOD", "name": "target", "label": "target", "capture": "rest", "stopTokens": ["EXPORTING", "IMPORTING", "CHANGING", "RECEIVING", "EXCEPTIONS"] },
-    { "after": "EXPORTING", "name": "exportingRaw", "label": "exporting", "capture": "rest", "stopTokens": ["IMPORTING", "CHANGING", "RECEIVING", "EXCEPTIONS"] },
-    { "after": "IMPORTING", "name": "importingRaw", "label": "importing", "capture": "rest", "stopTokens": ["EXPORTING", "CHANGING", "RECEIVING", "EXCEPTIONS"] },
-    { "after": "CHANGING", "name": "changingRaw", "label": "changing", "capture": "rest", "stopTokens": ["EXPORTING", "IMPORTING", "RECEIVING", "EXCEPTIONS"] },
-    { "after": "RECEIVING", "name": "receivingRaw", "label": "receiving", "capture": "rest", "stopTokens": ["EXPORTING", "IMPORTING", "CHANGING", "EXCEPTIONS"] },
-    { "after": "EXCEPTIONS", "name": "exceptionsRaw", "label": "exceptions", "capture": "rest" }
+    { "after": "CALL METHOD", "name": "target", "label": "target", "capture": "rest", "stopTokens": ["EXPORTING", "IMPORTING", "CHANGING", "RECEIVING", "EXCEPTIONS", "PARAMETER-TABLE", "EXCEPTION-TABLE"] },
+    { "after": "EXPORTING", "name": "exportingRaw", "label": "exporting", "capture": "rest", "stopTokens": ["IMPORTING", "CHANGING", "RECEIVING", "EXCEPTIONS", "PARAMETER-TABLE", "EXCEPTION-TABLE"] },
+    { "after": "IMPORTING", "name": "importingRaw", "label": "importing", "capture": "rest", "stopTokens": ["EXPORTING", "CHANGING", "RECEIVING", "EXCEPTIONS", "PARAMETER-TABLE", "EXCEPTION-TABLE"] },
+    { "after": "CHANGING", "name": "changingRaw", "label": "changing", "capture": "rest", "stopTokens": ["EXPORTING", "IMPORTING", "RECEIVING", "EXCEPTIONS", "PARAMETER-TABLE", "EXCEPTION-TABLE"] },
+    { "after": "RECEIVING", "name": "receivingRaw", "label": "receiving", "capture": "rest", "stopTokens": ["EXPORTING", "IMPORTING", "CHANGING", "EXCEPTIONS", "PARAMETER-TABLE", "EXCEPTION-TABLE"] },
+    { "after": "EXCEPTIONS", "name": "exceptionsRaw", "label": "exceptions", "capture": "rest", "stopTokens": ["PARAMETER-TABLE", "EXCEPTION-TABLE"] },
+    { "after": "PARAMETER-TABLE", "name": "parameterTable", "label": "parameter-table" },
+    { "after": "EXCEPTION-TABLE", "name": "exceptionTable", "label": "exception-table" }
   ]
 }

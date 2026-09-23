@@ -9,9 +9,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.09.23-r82">
-  <meta name="abap-viewer-updated-at" content="2026-09-23 13:04:01">
-  <meta name="abap-viewer-updated-note" content="Recognize project ABAP grammar families and report source-aware syntax diagnostics.">
+  <meta name="abap-viewer-version" content="v2026.09.23-r83">
+  <meta name="abap-viewer-updated-at" content="2026-09-23 18:44:55">
+  <meta name="abap-viewer-updated-note" content="Cover classic SELECT results and READ/grouped LOOP in Parser and Viewer.">
   <title>ABAP Parser Viewer</title>
     <style>
 /* inlined from: ./styles/viewer.css */
@@ -3711,7 +3711,9 @@
         importing: parseAssignments(map.importingRaw || ""),
         changing: parseAssignments(map.changingRaw || ""),
         receiving: parseAssignments(map.receivingRaw || ""),
-        exceptions: parseAssignments(map.exceptionsRaw || "")
+        exceptions: parseAssignments(map.exceptionsRaw || ""),
+        parameterTable: map.parameterTable || "",
+        exceptionTable: map.exceptionTable || ""
       }
     };
   }
@@ -3852,7 +3854,10 @@
         whereRaw,
         whereConditions: parseConditionClauses(whereRaw, { allowImplicitAnd: false }),
         havingRaw,
-        havingConditions: parseConditionClauses(havingRaw, { allowImplicitAnd: false })
+        havingConditions: parseConditionClauses(havingRaw, { allowImplicitAnd: false }),
+        upTo: map.upTo || "",
+        offset: map.offset || "",
+        packageSize: map.packageSize || ""
       }
     };
   }
@@ -3872,6 +3877,9 @@
         into: map.into || "",
         assigning: map.assigning || "",
         refInto: map.refInto || "",
+        usingKey: map.usingKey || "",
+        whereRaw: map.where || "",
+        whereConditions: parseConditionClauses(map.where || "", { allowImplicitAnd: false }),
         withKeyRaw,
         withTableKeyRaw,
         conditions: parseConditionClauses(conditionSource, { allowImplicitAnd: true })
@@ -3891,6 +3899,10 @@
         refInto: map.refInto || "",
         from: map.from || "",
         to: map.to || "",
+        usingKey: map.usingKey || "",
+        group: map.group || "",
+        isGroupLoop: Boolean(map.group),
+        groupByRaw: map.groupBy || "",
         whereRaw,
         conditions: parseConditionClauses(whereRaw, { allowImplicitAnd: false })
       }
@@ -5727,6 +5739,7 @@
       return;
     }
     annotateConditionClausesWithDecls(readTable.conditions, context);
+    annotateConditionClausesWithDecls(readTable.whereConditions, context);
   }
 
   function annotateLoopAtItabExtras(loopAtItab, context) {
@@ -7352,7 +7365,9 @@
         "IMPORTING": "importing",
         "CHANGING": "changing",
         "RECEIVING": "receiving",
-        "EXCEPTIONS": "exceptions"
+        "EXCEPTIONS": "exceptions",
+        "PARAMETER-TABLE": "parameter-table",
+        "EXCEPTION-TABLE": "exception-table"
       },
       "keywordPhrases": {
         "CALL METHOD": "call-method"
@@ -7368,7 +7383,9 @@
             "IMPORTING",
             "CHANGING",
             "RECEIVING",
-            "EXCEPTIONS"
+            "EXCEPTIONS",
+            "PARAMETER-TABLE",
+            "EXCEPTION-TABLE"
           ]
         },
         {
@@ -7380,7 +7397,9 @@
             "IMPORTING",
             "CHANGING",
             "RECEIVING",
-            "EXCEPTIONS"
+            "EXCEPTIONS",
+            "PARAMETER-TABLE",
+            "EXCEPTION-TABLE"
           ]
         },
         {
@@ -7392,7 +7411,9 @@
             "EXPORTING",
             "CHANGING",
             "RECEIVING",
-            "EXCEPTIONS"
+            "EXCEPTIONS",
+            "PARAMETER-TABLE",
+            "EXCEPTION-TABLE"
           ]
         },
         {
@@ -7404,7 +7425,9 @@
             "EXPORTING",
             "IMPORTING",
             "RECEIVING",
-            "EXCEPTIONS"
+            "EXCEPTIONS",
+            "PARAMETER-TABLE",
+            "EXCEPTION-TABLE"
           ]
         },
         {
@@ -7416,14 +7439,30 @@
             "EXPORTING",
             "IMPORTING",
             "CHANGING",
-            "EXCEPTIONS"
+            "EXCEPTIONS",
+            "PARAMETER-TABLE",
+            "EXCEPTION-TABLE"
           ]
         },
         {
           "after": "EXCEPTIONS",
           "name": "exceptionsRaw",
           "label": "exceptions",
-          "capture": "rest"
+          "capture": "rest",
+          "stopTokens": [
+            "PARAMETER-TABLE",
+            "EXCEPTION-TABLE"
+          ]
+        },
+        {
+          "after": "PARAMETER-TABLE",
+          "name": "parameterTable",
+          "label": "parameter-table"
+        },
+        {
+          "after": "EXCEPTION-TABLE",
+          "name": "exceptionTable",
+          "label": "exception-table"
         }
       ]
     },
@@ -8502,6 +8541,76 @@
       ]
     },
     {
+      "_sourceFile": "loop-at-group.json",
+      "object": "LOOP_AT_ITAB",
+      "match": {
+        "startPhrase": "LOOP AT GROUP"
+      },
+      "extras": {
+        "type": "loopAtItab"
+      },
+      "block": {
+        "endKeyword": "ENDLOOP"
+      },
+      "keywordLabels": {
+        "LOOP": "stmt",
+        "AT": "at",
+        "GROUP": "group",
+        "INTO": "into",
+        "ASSIGNING": "assigning",
+        "REFERENCE": "reference",
+        "WHERE": "where",
+        "GROUP BY": "group-by"
+      },
+      "keywordPhrases": {
+        "LOOP AT GROUP": "loop-at-group",
+        "REFERENCE INTO": "reference-into",
+        "GROUP BY": "group-by"
+      },
+      "captureRules": [
+        {
+          "after": "LOOP AT GROUP",
+          "name": "group",
+          "label": "group"
+        },
+        {
+          "after": "INTO",
+          "name": "into",
+          "label": "into"
+        },
+        {
+          "after": "ASSIGNING",
+          "name": "assigning",
+          "label": "assigning"
+        },
+        {
+          "after": "REFERENCE INTO",
+          "name": "refInto",
+          "label": "reference-into"
+        },
+        {
+          "after": "WHERE",
+          "name": "where",
+          "label": "where",
+          "capture": "rest",
+          "stopTokens": [
+            "GROUP"
+          ]
+        },
+        {
+          "after": "GROUP BY",
+          "name": "groupBy",
+          "label": "group-by",
+          "capture": "rest",
+          "stopTokens": [
+            "INTO",
+            "ASSIGNING",
+            "REFERENCE"
+          ]
+        }
+      ]
+    },
+    {
       "_sourceFile": "loop-at-itab.json",
       "object": "LOOP_AT_ITAB",
       "match": {
@@ -8519,13 +8628,23 @@
         "INTO": "into",
         "ASSIGNING": "assigning",
         "REFERENCE": "reference",
+        "USING": "using",
+        "KEY": "key",
         "WHERE": "where",
         "FROM": "from",
-        "TO": "to"
+        "TO": "to",
+        "GROUP": "group",
+        "BY": "by",
+        "ASCENDING": "ascending",
+        "DESCENDING": "descending",
+        "WITHOUT": "without",
+        "MEMBERS": "members"
       },
       "keywordPhrases": {
         "LOOP AT": "loop-at",
-        "REFERENCE INTO": "reference-into"
+        "REFERENCE INTO": "reference-into",
+        "USING KEY": "using-key",
+        "GROUP BY": "group-by"
       },
       "captureRules": [
         {
@@ -8550,6 +8669,11 @@
           "label": "reference-into"
         },
         {
+          "after": "USING KEY",
+          "name": "usingKey",
+          "label": "using-key"
+        },
+        {
           "after": "FROM",
           "name": "from",
           "label": "from"
@@ -8563,7 +8687,21 @@
           "after": "WHERE",
           "name": "where",
           "label": "where",
-          "capture": "rest"
+          "capture": "rest",
+          "stopTokens": [
+            "GROUP"
+          ]
+        },
+        {
+          "after": "GROUP BY",
+          "name": "groupBy",
+          "label": "group-by",
+          "capture": "rest",
+          "stopTokens": [
+            "INTO",
+            "ASSIGNING",
+            "REFERENCE"
+          ]
         }
       ]
     },
@@ -9207,6 +9345,8 @@
         "INTO": "into",
         "ASSIGNING": "assigning",
         "REFERENCE": "reference",
+        "WHERE": "where",
+        "USING": "using",
         "TRANSPORTING": "transporting",
         "NO": "no",
         "FIELDS": "fields",
@@ -9217,6 +9357,7 @@
         "READ TABLE": "read-table",
         "WITH TABLE KEY": "with-table-key",
         "WITH KEY": "with-key",
+        "USING KEY": "using-key",
         "TRANSPORTING NO FIELDS": "transporting-no-fields",
         "BINARY SEARCH": "binary-search",
         "REFERENCE INTO": "reference-into"
@@ -9259,6 +9400,11 @@
           ]
         },
         {
+          "after": "USING KEY",
+          "name": "usingKey",
+          "label": "using-key"
+        },
+        {
           "after": "INTO",
           "name": "into",
           "label": "into"
@@ -9272,6 +9418,12 @@
           "after": "REFERENCE INTO",
           "name": "refInto",
           "label": "reference-into"
+        },
+        {
+          "after": "WHERE",
+          "name": "where",
+          "label": "where",
+          "capture": "rest"
         }
       ]
     },
@@ -9390,7 +9542,10 @@
         "HAVING": "having",
         "UP": "up",
         "TO": "to",
-        "ROWS": "rows"
+        "ROWS": "rows",
+        "OFFSET": "offset",
+        "PACKAGE": "package",
+        "SIZE": "size"
       },
       "keywordPhrases": {
         "INTO CORRESPONDING FIELDS OF TABLE": "into-corresponding-fields-of-table",
@@ -9400,7 +9555,8 @@
         "FOR ALL ENTRIES IN": "for-all-entries-in",
         "ORDER BY": "order-by",
         "GROUP BY": "group-by",
-        "UP TO": "up-to"
+        "UP TO": "up-to",
+        "PACKAGE SIZE": "package-size"
       },
       "captureRules": [
         {
@@ -9411,7 +9567,10 @@
           "stopTokens": [
             "FROM",
             "SINGLE",
-            "DISTINCT"
+            "DISTINCT",
+            "INTO",
+            "APPENDING",
+            "PACKAGE"
           ]
         },
         {
@@ -9420,7 +9579,10 @@
           "label": "fields",
           "capture": "rest",
           "stopTokens": [
-            "FROM"
+            "FROM",
+            "INTO",
+            "APPENDING",
+            "PACKAGE"
           ]
         },
         {
@@ -9429,7 +9591,10 @@
           "label": "fields",
           "capture": "rest",
           "stopTokens": [
-            "FROM"
+            "FROM",
+            "INTO",
+            "APPENDING",
+            "PACKAGE"
           ]
         },
         {
@@ -9512,6 +9677,26 @@
             "INTO",
             "APPENDING"
           ]
+        },
+        {
+          "after": "UP TO",
+          "name": "upTo",
+          "label": "up-to",
+          "capture": "rest",
+          "stopTokens": [
+            "ROWS"
+          ]
+        },
+        {
+          "after": "OFFSET",
+          "name": "offset",
+          "label": "offset",
+          "capture": "rest"
+        },
+        {
+          "after": "PACKAGE SIZE",
+          "name": "packageSize",
+          "label": "package-size"
         }
       ]
     },
@@ -12271,7 +12456,8 @@ const els = {
       PARAMETERS: createKeywordDescriptionTemplate(),
       PERFORM: createKeywordDescriptionTemplate(),
       READ_TABLE: createKeywordAndConditionTemplate([
-        { pathPrefix: "extras.readTable.conditions", sectionLabel: "WITH KEY" }
+        { pathPrefix: "extras.readTable.conditions", sectionLabel: "WITH KEY" },
+        { pathPrefix: "extras.readTable.whereConditions", sectionLabel: "WHERE" }
       ]),
       SELECT: createKeywordAndConditionTemplate([
         { pathPrefix: "extras.select.whereConditions", sectionLabel: "WHERE" },
@@ -19950,6 +20136,10 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     } else if (objectType === "READ_TABLE" && ["with-key", "with-table-key"].includes(keywordLabel) && extras.readTable) {
       conditions = extras.readTable.conditions;
       extrasScope = "readTable";
+    } else if (objectType === "READ_TABLE" && keywordLabel === "where" && extras.readTable) {
+      conditions = extras.readTable.whereConditions;
+      extrasScope = "readTable";
+      sectionName = "whereConditions";
     } else if (objectType === "LOOP_AT_ITAB" && keywordLabel === "where" && extras.loopAtItab) {
       conditions = extras.loopAtItab.conditions;
       extrasScope = "loopAtItab";
@@ -20031,6 +20221,12 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     const extras = sourceObj && sourceObj.extras && typeof sourceObj.extras === "object"
       ? sourceObj.extras
       : {};
+
+    if (String(sourceObj && sourceObj.objectType || "").trim().toUpperCase() === "LOOP_AT_ITAB"
+      && keywordLabel === "group-by" && extras.loopAtItab) {
+      const groupByRaw = String(extras.loopAtItab.groupByRaw || "").trim();
+      return groupByRaw ? [createTemplateExpandedRow(groupByRaw, [])] : null;
+    }
 
     if (extras.message && keywordLabel === "with") {
       const withValues = Array.isArray(extras.message.with) ? extras.message.with : [];
@@ -20287,16 +20483,23 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
   }
 
   function getTemplateSelectFieldSource(sourceObj, fallbackEntry) {
+    const capturedFields = String(fallbackEntry && fallbackEntry.value || "").trim();
     const raw = String(sourceObj && sourceObj.raw || "");
     const selectMatch = raw.match(/^\s*SELECT\b/i);
     if (selectMatch) {
       const start = selectMatch[0].length;
-      const fromIndex = findTemplateTopLevelWord(raw, "FROM", start);
-      if (fromIndex > start) {
-        return raw.slice(start, fromIndex).trim();
+      const boundaries = ["FROM", "INTO", "APPENDING", "PACKAGE"]
+        .map((word) => findTemplateTopLevelWord(raw, word, start))
+        .filter((index) => index >= start);
+      const fieldEnd = boundaries.length ? Math.min(...boundaries) : -1;
+      if (fieldEnd > start) {
+        const fields = raw.slice(start, fieldEnd).trim().replace(/^(?:SINGLE|DISTINCT)\b\s*/i, "").trim();
+        if (fields) {
+          return fields;
+        }
       }
     }
-    return String(fallbackEntry && fallbackEntry.value || "").trim();
+    return capturedFields;
   }
 
   function isTemplateSafeSimpleListItem(value) {
@@ -20340,7 +20543,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     if (type === "SELECT" && (label === "where" || label === "having")) {
       return true;
     }
-    if (type === "READ_TABLE" && (label === "with-key" || label === "with-table-key")) {
+    if (type === "READ_TABLE" && (label === "with-key" || label === "with-table-key" || label === "where")) {
       return true;
     }
     if ((type === "LOOP_AT_ITAB" || type === "MODIFY_ITAB" || type === "DELETE_ITAB") && label === "where") {

@@ -1,7 +1,7 @@
 # ABAP syntax coverage audit
 
 Updated: 2026-09-23
-Branch audited: `codex/abap-compiler-parser`
+Branch audited: `main`
 Scope requested: syntax families already configured in this parser, checked against the SAP ABAP Keyword Documentation `latest` index.
 
 ## Official conclusion
@@ -12,7 +12,7 @@ The requested count of 44 does not match the current config source:
 
 | Measure | Current source count |
 | --- | ---: |
-| `configs/*.json` matcher files | 46 |
+| `configs/*.json` matcher files | 47 |
 | Distinct configured `object` values | 45 |
 | Duplicate configured family | `CALL_METHOD` has separate legacy and expression matchers |
 
@@ -36,6 +36,11 @@ The current `tests/parser-regression.statements.test.js` smoke matrix checks tha
 - `PERFORM ... IF FOUND` is exposed as `extras.performCall.ifFound` and is excluded from condition parsing.
 - `&&=` is recognized even when the operator and operands have no surrounding whitespace.
 - `DO VARYING` without an iteration count and its optional `RANGE` are captured.
+- `READ TABLE` retains secondary `USING KEY` and explicit-connector `WHERE` operands, including the right side of unary `IS NOT INITIAL` predicates.
+- `LOOP AT` retains secondary keys and `GROUP BY` clauses; `LOOP AT GROUP` is separately matched so group identifiers, member filters, nesting, and group-result targets remain distinct.
+- Open SQL `SELECT` retains `UP TO ... ROWS`, `OFFSET`, and `PACKAGE SIZE` operands.
+- Dynamic `CALL METHOD` retains `PARAMETER-TABLE` and `EXCEPTION-TABLE` operands instead of consuming them as part of the target.
+- Viewer Template renders the `READ TABLE ... WHERE` condition and grouped-loop clauses; the regression test edits and clears a condition operand description through the real Viewer runtime harness.
 
 These improvements close specific alternatives; they do not change the overall coverage verdict.
 
@@ -47,9 +52,9 @@ The following are confirmed by reading the current matcher configs, parser helpe
 | --- | --- | --- |
 | Class and method declarations | `CLASS` modifiers such as inheritance, abstract/final, creation visibility, friends, shared-memory and testing options are not covered by named probes. `METHODS`/`CLASS-METHODS` additions such as event handlers, redefinition, `DEFAULT IGNORE/FAIL`, AMDP/table-function forms, preferred parameters, and `VALUE(...)`/multi-token parameter typing lack complete coverage. `METHOD` AMDP implementations are not fully captured. | [CLASS definition](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCLASS_DEFINITION.html), [METHODS](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPMETHODS.html), [CLASS-METHODS](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCLASS-METHODS.html), [METHOD](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPMETHOD.html) |
 | Declarations and selection screens | Type raw capture does not prove all enum, mesh, range, include, indicator, boxed, obsolete header-line, and initial-value forms. `PARAMETERS`/`SELECT-OPTIONS` still lack complete additions and combination probes for `MATCHCODE OBJECT`, `USER-COMMAND`, `VALUE CHECK`, request handlers, logical-database additions, and default range values. `FORM VALUE(...)` parameters need complete typing coverage; `RANGES OCCURS` is not fully modeled. | [DATA](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPDATA.html), [TYPES](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPTYPES.html), [PARAMETERS](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPPARAMETERS.html), [SELECT-OPTIONS](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPSELECT-OPTIONS.html), [FORM parameters](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPFORM_PARAMETERS.html), [RANGES](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPRANGES.html) |
-| Internal tables | `READ TABLE ... WHERE`, `USING KEY`, comparison/result additions, and `LOOP AT ... GROUP BY`/group result forms need coverage. `DELETE TABLE` target capture, deletion range `TO`/`STEP`, and `INSERT`/`MODIFY`/`READ` result additions such as `CASTING` and `ELSE UNASSIGN` remain incomplete. Dynamic `SORT BY (otab)` and some direction/text forms are unmodeled. | [READ TABLE](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPREAD_TABLE.html), [LOOP AT itab](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPLOOP_AT_ITAB.html), [DELETE itab](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPDELETE_ITAB.html), [INSERT itab](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPINSERT_ITAB.html), [MODIFY itab](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPMODIFY_ITAB.html), [SORT itab](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPSORT_ITAB.html) |
-| Open SQL | Host-escape and declared-table evidence distinguish several DML forms, but some no-host forms remain ambiguous. SQL DML client/connection/access options, duplicate-key additions, update indicators, dynamic SET forms, and query-set operators are not comprehensively modeled or tested. `SELECT` joins, multiple sources, grouping/order expressions, `OFFSET`, `PACKAGE SIZE`, and query/result options lack a complete alternatives matrix. | [SELECT](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPSELECT.html), [INSERT source](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPINSERT_SOURCE.html), [DELETE source](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPDELETE_SOURCE.html), [MODIFY source](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPMODIFY_SOURCE.html), [UPDATE](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPUPDATE.html) |
-| Calls, conditions, and block branches | Function-call execution modes and method-call parameter-table forms are not all exposed as structured operands. Functional/chained method expressions and calls through `NEW`, `CAST`, or dynamic receivers lack full probes. `CASE TYPE OF`/`WHEN TYPE`, individual `TRY`/`CATCH`/`CLEANUP` branch bodies, and a uniform `IF`/`ELSEIF`/`ELSE` branch ownership model still need explicit contract tests. | [CALL FUNCTION](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCALL_FUNCTION.html), [CALL METHOD parameter tables](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCALL_METHOD_PARAMETER_TABLES.html), [functional method call](https://help.sap.com/docs/abap-cloud/abap-keyword/meth-functional-method-call), [CASE TYPE OF](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCASE_TYPE.html), [CATCH](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCATCH_TRY.html) |
+| Internal tables | Targeted probes now cover `READ TABLE ... WHERE`, secondary `USING KEY`, grouped `LOOP AT`, and `LOOP AT GROUP` member filters/group-result targets. `DELETE TABLE` target capture, deletion range `TO`/`STEP`, and `INSERT`/`MODIFY`/`READ` result additions such as `CASTING` and `ELSE UNASSIGN` remain incomplete. Dynamic `SORT BY (otab)` and some direction/text forms are unmodeled. | [READ TABLE](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPREAD_TABLE.html), [LOOP AT itab](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPLOOP_AT_ITAB.html), [DELETE itab](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPDELETE_ITAB.html), [INSERT itab](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPINSERT_ITAB.html), [MODIFY itab](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPMODIFY_ITAB.html), [SORT itab](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPSORT_ITAB.html) |
+| Open SQL | Host-escape and declared-table evidence distinguish several DML forms, but some no-host forms remain ambiguous. SQL DML client/connection/access options, duplicate-key additions, update indicators, dynamic SET forms, and query-set operators are not comprehensively modeled or tested. `SELECT` operand capture now has focused `UP TO ... ROWS`, `OFFSET`, and `PACKAGE SIZE` probes, but joins, multiple sources, grouping/order expressions, and other query/result options still lack a complete alternatives matrix. | [SELECT](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPSELECT.html), [INSERT source](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPINSERT_SOURCE.html), [DELETE source](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPDELETE_SOURCE.html), [MODIFY source](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPMODIFY_SOURCE.html), [UPDATE](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPUPDATE.html) |
+| Calls, conditions, and block branches | Dynamic `CALL METHOD` exposes the `PARAMETER-TABLE` and `EXCEPTION-TABLE` operands in targeted probes. Function-call execution modes and other method-call forms are not all exposed as structured operands. Functional/chained method expressions and calls through `NEW`, `CAST`, or dynamic receivers lack full probes. `CASE TYPE OF`/`WHEN TYPE`, individual `TRY`/`CATCH`/`CLEANUP` branch bodies, and a uniform `IF`/`ELSEIF`/`ELSE` branch ownership model still need explicit contract tests. | [CALL FUNCTION](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCALL_FUNCTION.html), [CALL METHOD parameter tables](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCALL_METHOD_PARAMETER_TABLES.html), [functional method call](https://help.sap.com/docs/abap-cloud/abap-keyword/meth-functional-method-call), [CASE TYPE OF](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCASE_TYPE.html), [CATCH](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCATCH_TRY.html) |
 | Other configured and internal grammar families | `APPEND SORTED BY`, general expression operands for `WRITE`/`APPEND`/`CLEAR`, `CLEAR ... IN CHARACTER/BYTE MODE`, structured `MOVE-CORRESPONDING` additions, and many additions of generic grammar families remain without an exhaustive fixture/model matrix. | [APPEND](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPAPPEND.html), [CLEAR](https://help.sap.com/docs/abap-cloud/abap-keyword/clear), [MOVE-CORRESPONDING](https://help.sap.com/docs/abap-cloud/abap-keyword/move-corresponding-for-structures), [WRITE](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenwrite.htm) |
 
 ## Completion criterion
@@ -60,14 +65,13 @@ Do not label this parser as having full syntax coverage until each configured fa
 
 Validation on this checkout:
 
-- `node tests/run.js parser statements` — passed (36 tests). Its runtime smoke matrix parsed 41 representative snippets and asserted coverage of all 46 config matcher files (45 unique object values).
-- `node tests/run.js parser grammar-inventory` — passed (2 tests), validating all 171 recorded forms against their actual source files and parser output.
-- Direct `parseAbapTextDetailed()` execution over the 8 `.abap` example/fixture files — 891 objects, 0 diagnostics.
-- `node tests/run.js full` — passed.
-- `node tests/run.js fast` — passed.
-- `node --check shared/abap-parser.js` — passed.
-- `node scripts/build-viewer-configs.js --check` — passed.
-- `uv run python scripts/build-inline-viewer.py --check` — passed.
-- `git diff --check` — passed.
+- `node tests/run.js fast`: passed, including all 47 configured parser matcher representatives and Viewer/runtime regression suites.
+- `node tests/run.js full`: passed.
+- `node tests/run.js viewer`: passed, including the SAP Viewer contract for READ TABLE conditions, grouped LOOP clauses, and SELECT result additions.
+- Direct `parseAbapTextDetailed()` execution over the 8 `.abap` example/fixture files: 891 nested objects across 103 object types, 0 diagnostics.
+- `node scripts/build-viewer-configs.js --check`: passed.
+- `uv run python scripts/build-inline-viewer.py --check`: passed.
+- `node --check shared/abap-parser.js` and `node --check viewer/app.js`: passed.
+- `git diff --check`: passed.
 
 These checks verify the configured matcher representatives, recorded corpus, and repository regression suites. They do not change the incomplete full-syntax coverage verdict above.

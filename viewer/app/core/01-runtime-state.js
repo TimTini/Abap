@@ -2304,7 +2304,8 @@ const els = {
       PARAMETERS: createKeywordDescriptionTemplate(),
       PERFORM: createKeywordDescriptionTemplate(),
       READ_TABLE: createKeywordAndConditionTemplate([
-        { pathPrefix: "extras.readTable.conditions", sectionLabel: "WITH KEY" }
+        { pathPrefix: "extras.readTable.conditions", sectionLabel: "WITH KEY" },
+        { pathPrefix: "extras.readTable.whereConditions", sectionLabel: "WHERE" }
       ]),
       SELECT: createKeywordAndConditionTemplate([
         { pathPrefix: "extras.select.whereConditions", sectionLabel: "WHERE" },

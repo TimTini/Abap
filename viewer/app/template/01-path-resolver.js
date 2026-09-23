@@ -1425,6 +1425,10 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     } else if (objectType === "READ_TABLE" && ["with-key", "with-table-key"].includes(keywordLabel) && extras.readTable) {
       conditions = extras.readTable.conditions;
       extrasScope = "readTable";
+    } else if (objectType === "READ_TABLE" && keywordLabel === "where" && extras.readTable) {
+      conditions = extras.readTable.whereConditions;
+      extrasScope = "readTable";
+      sectionName = "whereConditions";
     } else if (objectType === "LOOP_AT_ITAB" && keywordLabel === "where" && extras.loopAtItab) {
       conditions = extras.loopAtItab.conditions;
       extrasScope = "loopAtItab";
@@ -1506,6 +1510,12 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     const extras = sourceObj && sourceObj.extras && typeof sourceObj.extras === "object"
       ? sourceObj.extras
       : {};
+
+    if (String(sourceObj && sourceObj.objectType || "").trim().toUpperCase() === "LOOP_AT_ITAB"
+      && keywordLabel === "group-by" && extras.loopAtItab) {
+      const groupByRaw = String(extras.loopAtItab.groupByRaw || "").trim();
+      return groupByRaw ? [createTemplateExpandedRow(groupByRaw, [])] : null;
+    }
 
     if (extras.message && keywordLabel === "with") {
       const withValues = Array.isArray(extras.message.with) ? extras.message.with : [];
@@ -1762,16 +1772,23 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
   }
 
   function getTemplateSelectFieldSource(sourceObj, fallbackEntry) {
+    const capturedFields = String(fallbackEntry && fallbackEntry.value || "").trim();
     const raw = String(sourceObj && sourceObj.raw || "");
     const selectMatch = raw.match(/^\s*SELECT\b/i);
     if (selectMatch) {
       const start = selectMatch[0].length;
-      const fromIndex = findTemplateTopLevelWord(raw, "FROM", start);
-      if (fromIndex > start) {
-        return raw.slice(start, fromIndex).trim();
+      const boundaries = ["FROM", "INTO", "APPENDING", "PACKAGE"]
+        .map((word) => findTemplateTopLevelWord(raw, word, start))
+        .filter((index) => index >= start);
+      const fieldEnd = boundaries.length ? Math.min(...boundaries) : -1;
+      if (fieldEnd > start) {
+        const fields = raw.slice(start, fieldEnd).trim().replace(/^(?:SINGLE|DISTINCT)\b\s*/i, "").trim();
+        if (fields) {
+          return fields;
+        }
       }
     }
-    return String(fallbackEntry && fallbackEntry.value || "").trim();
+    return capturedFields;
   }
 
   function isTemplateSafeSimpleListItem(value) {
@@ -1815,7 +1832,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     if (type === "SELECT" && (label === "where" || label === "having")) {
       return true;
     }
-    if (type === "READ_TABLE" && (label === "with-key" || label === "with-table-key")) {
+    if (type === "READ_TABLE" && (label === "with-key" || label === "with-table-key" || label === "where")) {
       return true;
     }
     if ((type === "LOOP_AT_ITAB" || type === "MODIFY_ITAB" || type === "DELETE_ITAB") && label === "where") {

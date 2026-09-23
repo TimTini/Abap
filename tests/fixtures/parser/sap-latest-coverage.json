@@ -761,6 +761,121 @@
       "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPWRITE-.html",
       "dialect": "not-yet-reviewed",
       "status": "baseline-smoke"
+    },
+    {
+      "id": "read-table-where-explicit-connectors",
+      "configFiles": ["read-table.json"],
+      "expectedType": "READ_TABLE",
+      "source": "READ TABLE lt_rows ASSIGNING <line> WHERE amount >= lv_min AND status <> `X`.",
+      "assertions": {
+        "values.where.value": "amount >= lv_min AND status <> `X`",
+        "extras.readTable.whereRaw": "amount >= lv_min AND status <> `X`",
+        "extras.readTable.whereConditions.1.leftOperand": "status",
+        "extras.readTable.whereConditions.1.rightOperand": "`X`"
+      },
+      "sapUrl": "https://help.sap.com/docs/abap-cloud/abap-keyword/read-table-itab",
+      "dialect": "ABAP 9.13+ and ABAP Cloud",
+      "status": "documented-form"
+    },
+    {
+      "id": "read-table-index-secondary-key",
+      "configFiles": ["read-table.json"],
+      "expectedType": "READ_TABLE",
+      "source": "READ TABLE lt_rows INDEX lv_index USING KEY sec_key ASSIGNING <line>.",
+      "assertions": {
+        "values.index.value": "lv_index",
+        "values.usingKey.value": "sec_key",
+        "extras.readTable.usingKey": "sec_key"
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abapread_table_index.htm",
+      "dialect": "Standard ABAP and ABAP Cloud",
+      "status": "documented-form"
+    },
+    {
+      "id": "loop-at-itab-using-secondary-key",
+      "configFiles": ["loop-at-itab.json"],
+      "expectedType": "LOOP_AT_ITAB",
+      "source": "LOOP AT lt_rows INTO ls_row USING KEY sec_key WHERE carrid = lv_carrier.",
+      "assertions": {
+        "values.usingKey.value": "sec_key",
+        "values.where.value": "carrid = lv_carrier",
+        "extras.loopAtItab.usingKey": "sec_key"
+      },
+      "sapUrl": "https://help.sap.com/docs/abap-cloud/abap-keyword/loop-at-itab-cond",
+      "dialect": "Standard ABAP and ABAP Cloud",
+      "status": "documented-form"
+    },
+    {
+      "id": "loop-at-itab-group-by",
+      "configFiles": ["loop-at-itab.json"],
+      "expectedType": "LOOP_AT_ITAB",
+      "source": "LOOP AT lt_rows INTO ls_row GROUP BY ls_row-carrid ASCENDING WITHOUT MEMBERS.",
+      "assertions": {
+        "values.groupBy.value": "ls_row-carrid ASCENDING WITHOUT MEMBERS",
+        "extras.loopAtItab.groupByRaw": "ls_row-carrid ASCENDING WITHOUT MEMBERS"
+      },
+      "sapUrl": "https://help.sap.com/docs/abap-cloud/abap-keyword/loop-at-itab-group-by?locale=en-US&state=PRODUCTION&version=latest",
+      "dialect": "Standard ABAP and ABAP Cloud",
+      "status": "documented-form"
+    },
+    {
+      "id": "loop-at-group-member-where",
+      "configFiles": ["loop-at-group.json"],
+      "expectedType": "LOOP_AT_ITAB",
+      "source": "LOOP AT GROUP group INTO ls_row WHERE carrid = lv_carrier.",
+      "assertions": {
+        "values.group.value": "group",
+        "values.where.value": "carrid = lv_carrier",
+        "extras.loopAtItab.group": "group",
+        "extras.loopAtItab.isGroupLoop": true
+      },
+      "sapUrl": "https://help.sap.com/docs/abap-cloud/abap-keyword/loop-at-group",
+      "dialect": "Standard ABAP and ABAP Cloud",
+      "status": "documented-form"
+    },
+    {
+      "id": "select-up-to-offset-host-operands",
+      "configFiles": ["select.json"],
+      "expectedType": "SELECT",
+      "source": "SELECT FROM sflight FIELDS carrid ORDER BY carrid INTO TABLE @lt_rows UP TO @lv_limit ROWS OFFSET @lv_offset.",
+      "assertions": {
+        "values.upTo.value": "@lv_limit",
+        "values.offset.value": "@lv_offset",
+        "extras.select.upTo": "@lv_limit",
+        "extras.select.offset": "@lv_offset"
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPSELECT_UP_TO_OFFSET.html",
+      "dialect": "ABAP SQL latest; release-dependent",
+      "status": "documented-form"
+    },
+    {
+      "id": "select-package-size",
+      "configFiles": ["select.json"],
+      "expectedType": "SELECT",
+      "source": "SELECT * INTO TABLE lt_rows PACKAGE SIZE lv_package FROM sflight.",
+      "assertions": {
+        "values.packageSize.value": "lv_package",
+        "extras.select.packageSize": "lv_package"
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPSELECT.html",
+      "dialect": "Standard ABAP; release-dependent",
+      "status": "documented-form"
+    },
+    {
+      "id": "call-method-dynamic-parameter-tables",
+      "configFiles": ["call-method.json"],
+      "expectedType": "CALL_METHOD",
+      "source": "CALL METHOD lo_handler->(lv_method) PARAMETER-TABLE lt_parameters EXCEPTION-TABLE lt_exceptions.",
+      "assertions": {
+        "values.target.value": "lo_handler->(lv_method)",
+        "values.parameterTable.value": "lt_parameters",
+        "values.exceptionTable.value": "lt_exceptions",
+        "extras.callMethod.parameterTable": "lt_parameters",
+        "extras.callMethod.exceptionTable": "lt_exceptions"
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCALL_METHOD_PARAMETER_TABLES.html",
+      "dialect": "Standard ABAP classic dynamic call",
+      "status": "documented-form"
     }
   ]
 }
