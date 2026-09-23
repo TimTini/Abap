@@ -169,7 +169,7 @@ function testConditionExtrasForIfElseifSelectAndPerform() {
     "ELSEIF p_user = p_user OR p_flag = abap_false.",
     "ENDIF.",
     "SELECT bname FROM usr02 WHERE bname = p_user GROUP BY bname HAVING bname = p_user ORDER BY bname.",
-    "PERFORM main IF p_user = p_user AND p_flag = abap_true.",
+    "PERFORM main(zprog) IF FOUND.",
     ""
   ].join("\n");
 
@@ -225,14 +225,31 @@ function testConditionExtrasForIfElseifSelectAndPerform() {
 
   const performObj = findObject(objects, "PERFORM");
   assert(performObj && performObj.extras && performObj.extras.performCall, "Expected PERFORM extras.");
-  assert.strictEqual(performObj.extras.performCall.ifCondition, "p_user = p_user AND p_flag = abap_true");
-  assert.strictEqual(performObj.extras.performCall.ifConditions.length, 2);
-  assert.strictEqual(performObj.extras.performCall.ifConditions[0].rightOperandRef, "p_user");
-  assert(performObj.extras.performCall.ifConditions[0].rightOperandDecl, "Expected decl for PERFORM IF right operand.");
-  assert.strictEqual(performObj.extras.performCall.ifConditions[0].rightOperandDecl.name, "p_user");
-  assert.strictEqual(performObj.extras.performCall.ifConditions[1].rightOperandRef, "abap_true");
-  assert(performObj.extras.performCall.ifConditions[1].rightOperandDecl, "Expected system decl for PERFORM IF right operand.");
-  assert.strictEqual(performObj.extras.performCall.ifConditions[1].rightOperandDecl.objectType, "SYSTEM");
+  assert.strictEqual(performObj.extras.performCall.form, "main");
+  assert.strictEqual(performObj.extras.performCall.program, "zprog");
+  assert.strictEqual(performObj.extras.performCall.ifFound, true);
+  assert.strictEqual(Object.hasOwn(performObj.extras.performCall, "ifCondition"), false);
+  assert.strictEqual(Object.hasOwn(performObj.extras.performCall, "ifConditions"), false);
+
+  const programPerformObj = parse("PERFORM main IN PROGRAM zprog IF FOUND.").objects.find((obj) => obj.objectType === "PERFORM");
+  assert(programPerformObj && programPerformObj.extras && programPerformObj.extras.performCall);
+  assert.strictEqual(programPerformObj.extras.performCall.program, "zprog");
+  assert.strictEqual(programPerformObj.extras.performCall.ifFound, true);
+
+  const invalidPerformObj = parse("PERFORM main IF p_user = p_user.").objects.find((obj) => obj.objectType === "PERFORM");
+  assert(invalidPerformObj && invalidPerformObj.extras && invalidPerformObj.extras.performCall);
+  assert.strictEqual(invalidPerformObj.extras.performCall.ifFound, false);
+  assert.strictEqual(Object.hasOwn(invalidPerformObj.extras.performCall, "ifConditions"), false);
+
+  const internalPerformObj = parse("PERFORM main IF FOUND.").objects.find((obj) => obj.objectType === "PERFORM");
+  assert(internalPerformObj && internalPerformObj.extras && internalPerformObj.extras.performCall);
+  assert.strictEqual(internalPerformObj.extras.performCall.ifFound, false);
+
+  const dynamicPerformObj = parse("PERFORM (lv_subr) IN PROGRAM (lv_prog) IF FOUND.").objects.find((obj) => obj.objectType === "PERFORM");
+  assert(dynamicPerformObj && dynamicPerformObj.extras && dynamicPerformObj.extras.performCall);
+  assert.strictEqual(dynamicPerformObj.extras.performCall.form, "(lv_subr)");
+  assert.strictEqual(dynamicPerformObj.extras.performCall.program, "(lv_prog)");
+  assert.strictEqual(dynamicPerformObj.extras.performCall.ifFound, true);
 }
 
 function testConditionOperatorMatrix() {

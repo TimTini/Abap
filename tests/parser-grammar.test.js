@@ -200,7 +200,7 @@ test("SAP latest declaration variants remain recognized", () => {
     ["DATA", "DATA lr_data TYPE REF TO data.", "refTo", "data"],
     ["TYPES", "TYPES ty_rows TYPE SORTED TABLE OF ty_row WITH NON-UNIQUE KEY id.", "type", "SORTED TABLE OF ty_row WITH NON-UNIQUE KEY id"],
     ["CLASS-DATA", "CLASS-DATA lt_rows TYPE STANDARD TABLE OF ty_row WITH EMPTY KEY.", "type", "STANDARD TABLE OF ty_row WITH EMPTY KEY"],
-    ["STATICS", "STATICS ls_row LIKE LINE OF lt_rows.", "like", "LINE OF lt_rows"],
+    ["STATICS", "STATICS ls_row LIKE LINE OF lt_rows.", "likeLineOf", "lt_rows"],
     ["FIELD-SYMBOLS", "FIELD-SYMBOLS <fs_rows> TYPE ANY TABLE.", "type", "ANY TABLE"],
     ["CONSTANTS", "CONSTANTS gc_names TYPE STANDARD TABLE OF string WITH EMPTY KEY VALUE #( ( `A` ) ).", "type", "STANDARD TABLE OF string WITH EMPTY KEY"],
     ["PARAMETERS", "PARAMETERS p_count TYPE STANDARD TABLE OF i WITH EMPTY KEY DEFAULT VALUE #( ( 5 ) ) OBLIGATORY.", "type", "STANDARD TABLE OF i WITH EMPTY KEY"],
@@ -312,12 +312,14 @@ test("SAP latest transaction, loop, commit, and exception variants retain operan
 });
 
 test("PERFORM IF FOUND is modeled as a guard, not a condition expression", () => {
-  const result = parseAbapTextDetailed("PERFORM optional_form IF FOUND.", configs, "perform-if-found.abap");
+  const result = parseAbapTextDetailed("PERFORM optional_form(zprogram) IF FOUND.", configs, "perform-if-found.abap");
   const perform = result.objects[0];
   assert.equal(perform && perform.objectType, "PERFORM");
   assert.equal(perform.extras.performCall.ifFound, true);
-  assert.equal(perform.extras.performCall.ifCondition, "");
-  assert.deepEqual(perform.extras.performCall.ifConditions, []);
+  assert.equal(perform.extras.performCall.form, "optional_form");
+  assert.equal(perform.extras.performCall.program, "zprogram");
+  assert.equal(perform.extras.performCall.ifCondition, undefined);
+  assert.equal(perform.extras.performCall.ifConditions, undefined);
   assert.equal(perform.values.ifCondition, undefined);
   assert.deepEqual(result.diagnostics, []);
 });

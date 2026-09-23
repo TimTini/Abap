@@ -1794,16 +1794,17 @@
 
   function buildPerformCallExtras({ raw, values }) {
     const map = valuesToFirstValueMap(values);
-    const ifFound = hasKeywordSequence(raw, ["IF", "FOUND"]);
-    const ifCondition = ifFound ? "" : map.ifCondition || "";
+    const formRaw = String(map.form || "").trim();
+    const staticExternalCall = /^([^\s(]+)\(([^()]*)\)$/.exec(formRaw);
+    const dynamicSubroutineCall = /^\(\s*[^()]+\s*\)$/.test(formRaw);
+    const ifFound = hasKeywordSequence(raw, ["IF", "FOUND"])
+      && Boolean(map.program || staticExternalCall || dynamicSubroutineCall);
 
     return {
       performCall: {
-        form: map.form || "",
-        program: map.program || "",
-        ...(ifFound ? { ifFound: true } : {}),
-        ifCondition,
-        ifConditions: parseConditionClauses(ifCondition, { allowImplicitAnd: false }),
+        form: staticExternalCall ? staticExternalCall[1] : (map.form || ""),
+        program: map.program || (staticExternalCall ? staticExternalCall[2] : ""),
+        ifFound,
         using: parseArgumentTokens(map.usingRaw || "").map((value) => ({ value })),
         changing: parseArgumentTokens(map.changingRaw || "").map((value) => ({ value })),
         tables: parseArgumentTokens(map.tablesRaw || "").map((value) => ({ value }))
@@ -3607,7 +3608,6 @@
       }
     }
 
-    annotateConditionClausesWithDecls(performCall ? performCall.ifConditions : null, context);
   }
 
   function annotateIfConditionExtras(ifCondition, context) {

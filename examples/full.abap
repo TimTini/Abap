@@ -153,8 +153,8 @@ FORM main
   cv_text = iv_user.
 ENDFORM.
 
-* PERFORM (IN PROGRAM / USING / CHANGING / IF)
-PERFORM main IN PROGRAM sy-repid USING gv_user p_flag CHANGING lv_text IF p_flag = abap_true.
+* PERFORM (external program / USING / CHANGING / IF FOUND)
+PERFORM main(zabapflow_full_example) USING gv_user p_flag CHANGING lv_text IF FOUND.
 
 * CLASS + CLASS-DATA + METHODS / CLASS-METHODS + METHOD blocks
 CLASS lcl_demo DEFINITION.

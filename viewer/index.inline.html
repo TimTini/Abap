@@ -3812,16 +3812,17 @@
 
   function buildPerformCallExtras({ raw, values }) {
     const map = valuesToFirstValueMap(values);
-    const ifFound = hasKeywordSequence(raw, ["IF", "FOUND"]);
-    const ifCondition = ifFound ? "" : map.ifCondition || "";
+    const formRaw = String(map.form || "").trim();
+    const staticExternalCall = /^([^\s(]+)\(([^()]*)\)$/.exec(formRaw);
+    const dynamicSubroutineCall = /^\(\s*[^()]+\s*\)$/.test(formRaw);
+    const ifFound = hasKeywordSequence(raw, ["IF", "FOUND"])
+      && Boolean(map.program || staticExternalCall || dynamicSubroutineCall);
 
     return {
       performCall: {
-        form: map.form || "",
-        program: map.program || "",
-        ...(ifFound ? { ifFound: true } : {}),
-        ifCondition,
-        ifConditions: parseConditionClauses(ifCondition, { allowImplicitAnd: false }),
+        form: staticExternalCall ? staticExternalCall[1] : (map.form || ""),
+        program: map.program || (staticExternalCall ? staticExternalCall[2] : ""),
+        ifFound,
         using: parseArgumentTokens(map.usingRaw || "").map((value) => ({ value })),
         changing: parseArgumentTokens(map.changingRaw || "").map((value) => ({ value })),
         tables: parseArgumentTokens(map.tablesRaw || "").map((value) => ({ value }))
@@ -5625,7 +5626,6 @@
       }
     }
 
-    annotateConditionClausesWithDecls(performCall ? performCall.ifConditions : null, context);
   }
 
   function annotateIfConditionExtras(ifCondition, context) {
@@ -8253,6 +8253,12 @@
           "capture": "rest"
         },
         {
+          "after": "TYPE LINE OF",
+          "name": "typeLineOf",
+          "label": "type-line-of",
+          "descKey": "typeLineOf"
+        },
+        {
           "after": "TYPE",
           "name": "type",
           "label": "type",
@@ -9076,7 +9082,6 @@
         "USING": "using",
         "CHANGING": "changing",
         "TABLES": "tables",
-        "IF": "if",
         "ON": "on",
         "COMMIT": "commit",
         "ROLLBACK": "rollback"
@@ -9131,12 +9136,6 @@
             "CHANGING",
             "IF"
           ]
-        },
-        {
-          "after": "IF",
-          "name": "ifCondition",
-          "label": "if",
-          "capture": "rest"
         }
       ]
     },
@@ -9623,6 +9622,18 @@
           ]
         },
         {
+          "after": "LIKE REF TO",
+          "name": "likeRefTo",
+          "label": "like-ref-to",
+          "descKey": "likeRefTo"
+        },
+        {
+          "after": "LIKE LINE OF",
+          "name": "likeLineOf",
+          "label": "like-line-of",
+          "descKey": "likeLineOf"
+        },
+        {
           "after": "VALUE",
           "name": "value",
           "label": "value",
@@ -9710,6 +9721,11 @@
             "LENGTH",
             "DECIMALS"
           ]
+        },
+        {
+          "after": "LIKE REF TO",
+          "name": "likeRefTo",
+          "label": "like-ref-to"
         },
         {
           "after": "LIKE",
@@ -19921,11 +19937,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     let extrasScope = "extras";
     let sectionName = "conditions";
 
-    if (objectType === "PERFORM" && keywordLabel === "if" && extras.performCall) {
-      conditions = extras.performCall.ifConditions;
-      extrasScope = "performCall";
-      sectionName = "ifConditions";
-    } else if (objectType === "SELECT" && extras.select) {
+    if (objectType === "SELECT" && extras.select) {
       if (keywordLabel === "where") {
         conditions = extras.select.whereConditions;
         extrasScope = "select.where";
@@ -28801,9 +28813,6 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     if (extras.ifCondition && Array.isArray(extras.ifCondition.conditions)) {
       conditionContainers.push(extras.ifCondition.conditions);
     }
-    if (extras.performCall && Array.isArray(extras.performCall.ifConditions)) {
-      conditionContainers.push(extras.performCall.ifConditions);
-    }
     if (extras.select) {
       if (Array.isArray(extras.select.whereConditions)) {
         conditionContainers.push(extras.select.whereConditions);
@@ -29180,7 +29189,6 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         }
         if (extras.performCall) {
           processAssignSections(extras.performCall, ["using", "changing", "tables"], context);
-          processConditionList(extras.performCall.ifConditions, context);
         }
 
         if (extras.ifCondition) {

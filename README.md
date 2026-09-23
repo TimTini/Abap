@@ -26,6 +26,7 @@ Workflow:
 - Canonical parser source: `shared/abap-parser.js`
 - Guide: `RULES.md`
 - Object model and canonical path guide: `docs/ABAP_OBJECT_MODEL.md`
+- SAP-latest syntax coverage audit and known gaps: `docs/ABAP_SYNTAX_AUDIT.md`
 - Parser coverage report for the default sample: `docs/ABAP_PARSER_GAP_REPORT.md`
 - Unsupported parser groups and implementation checklist: `TODO.md`
 

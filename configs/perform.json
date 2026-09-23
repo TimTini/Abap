@@ -9,7 +9,6 @@
     "USING": "using",
     "CHANGING": "changing",
     "TABLES": "tables",
-    "IF": "if",
     "ON": "on",
     "COMMIT": "commit",
     "ROLLBACK": "rollback"
@@ -25,7 +24,6 @@
     { "after": "IN PROGRAM", "name": "program", "label": "program" },
     { "after": "USING", "name": "usingRaw", "label": "using", "capture": "rest", "stopTokens": ["CHANGING", "TABLES", "IF"] },
     { "after": "CHANGING", "name": "changingRaw", "label": "changing", "capture": "rest", "stopTokens": ["USING", "TABLES", "IF"] },
-    { "after": "TABLES", "name": "tablesRaw", "label": "tables", "capture": "rest", "stopTokens": ["USING", "CHANGING", "IF"] },
-    { "after": "IF", "name": "ifCondition", "label": "if", "capture": "rest" }
+    { "after": "TABLES", "name": "tablesRaw", "label": "tables", "capture": "rest", "stopTokens": ["USING", "CHANGING", "IF"] }
   ]
 }

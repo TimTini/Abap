@@ -15,6 +15,7 @@
   "captureRules": [
     { "after": "FIELD-SYMBOLS", "name": "name", "label": "fs-name", "descKey": "name" },
     { "after": "TYPE REF TO", "name": "refTo", "label": "ref-to", "descKey": "refTo", "capture": "rest" },
+    { "after": "TYPE LINE OF", "name": "typeLineOf", "label": "type-line-of", "descKey": "typeLineOf" },
     { "after": "TYPE", "name": "type", "label": "type", "descKey": "type", "capture": "rest" },
     { "after": "LIKE", "name": "like", "label": "like", "descKey": "like", "capture": "rest" },
     { "after": "STRUCTURE", "name": "structure", "label": "structure", "descKey": "structure", "capture": "rest" }

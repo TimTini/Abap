@@ -1412,11 +1412,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     let extrasScope = "extras";
     let sectionName = "conditions";
 
-    if (objectType === "PERFORM" && keywordLabel === "if" && extras.performCall) {
-      conditions = extras.performCall.ifConditions;
-      extrasScope = "performCall";
-      sectionName = "ifConditions";
-    } else if (objectType === "SELECT" && extras.select) {
+    if (objectType === "SELECT" && extras.select) {
       if (keywordLabel === "where") {
         conditions = extras.select.whereConditions;
         extrasScope = "select.where";

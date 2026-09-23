@@ -1343,8 +1343,7 @@
             "performCall": {
               "changing": [],
               "form": "frm_use_ctx",
-              "ifCondition": "",
-              "ifConditions": [],
+              "ifFound": false,
               "program": "",
               "tables": [],
               "using": [

@@ -1,0 +1,766 @@
+{
+  "source": "SAP ABAP Keyword Documentation latest",
+  "capturedAt": "2026-09-23",
+  "coverage": "baseline smoke only; additional documented syntax branches remain to inventory",
+  "forms": [
+    {
+      "id": "append",
+      "configFiles": [
+        "append.json"
+      ],
+      "expectedType": "APPEND",
+      "source": "APPEND ls_row TO lt_rows.",
+      "assertions": {
+        "raw": "APPEND ls_row TO lt_rows."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPAPPEND.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "assignment",
+      "configFiles": [
+        "assignment.json"
+      ],
+      "expectedType": "ASSIGNMENT",
+      "source": "lv_total = gv_total + 1.",
+      "assertions": {
+        "raw": "lv_total = gv_total + 1."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABENEQUALS_OPERATOR.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "assignment-concatenation",
+      "configFiles": ["assignment.json"],
+      "expectedType": "ASSIGNMENT",
+      "source": "lv_text &&= suffix.",
+      "assertions": {"values.op.value": "&&=", "values.expr.value": "suffix"},
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABENEQUALS_OPERATOR.html",
+      "dialect": "ABAP latest",
+      "status": "documented-form"
+    },
+    {
+      "id": "class-data-table-type",
+      "configFiles": ["class-data.json"],
+      "expectedType": "CLASS-DATA",
+      "source": "CLASS-DATA gt_rows TYPE HASHED TABLE OF sflight WITH UNIQUE KEY carrid.",
+      "assertions": {"values.type.value": "HASHED TABLE OF sflight WITH UNIQUE KEY carrid"},
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCLASS-DATA.html",
+      "dialect": "ABAP latest",
+      "status": "documented-form"
+    },
+    {
+      "id": "statics-like-line-of",
+      "configFiles": ["statics.json"],
+      "expectedType": "STATICS",
+      "source": "STATICS sv_row LIKE LINE OF lt_rows.",
+      "assertions": {"values.likeLineOf.value": "lt_rows"},
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPSTATICS.html",
+      "dialect": "ABAP latest",
+      "status": "documented-form"
+    },
+    {
+      "id": "field-symbols-type-line-of",
+      "configFiles": ["field-symbols.json"],
+      "expectedType": "FIELD-SYMBOLS",
+      "source": "FIELD-SYMBOLS <ls_row> TYPE LINE OF ty_tab.",
+      "assertions": {"values.typeLineOf.value": "ty_tab"},
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPFIELD-SYMBOLS.html",
+      "dialect": "ABAP latest",
+      "status": "documented-form"
+    },
+    {
+      "id": "types-like-ref-to",
+      "configFiles": ["types.json"],
+      "expectedType": "TYPES",
+      "source": "TYPES ty_ref LIKE REF TO cl_demo.",
+      "assertions": {"values.likeRefTo.value": "cl_demo"},
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPTYPES_REFERENCES.html",
+      "dialect": "ABAP latest",
+      "status": "documented-form"
+    },
+    {
+      "id": "call-function",
+      "configFiles": [
+        "call-function.json"
+      ],
+      "expectedType": "CALL_FUNCTION",
+      "source": "CALL FUNCTION 'Z_DEMO' EXPORTING iv_user = p_user IMPORTING ev_text = lv_text.",
+      "assertions": {
+        "raw": "CALL FUNCTION 'Z_DEMO' EXPORTING iv_user = p_user IMPORTING ev_text = lv_text."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCALL_FUNCTION.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "call-method-expression",
+      "configFiles": [
+        "call-method-expression.json"
+      ],
+      "expectedType": "CALL_METHOD",
+      "source": "lv_result = lcl_demo=>get_default( EXPORTING iv_user = p_user ).",
+      "assertions": {
+        "raw": "lv_result = lcl_demo=>get_default( EXPORTING iv_user = p_user )."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCALL_METHOD_FUNCTIONAL.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "call-method-classic",
+      "configFiles": [
+        "call-method.json"
+      ],
+      "expectedType": "CALL_METHOD",
+      "source": "CALL METHOD lo_demo->run EXPORTING iv_user = p_user IMPORTING ev_text = lv_text.",
+      "assertions": {
+        "raw": "CALL METHOD lo_demo->run EXPORTING iv_user = p_user IMPORTING ev_text = lv_text."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCALL_METHOD_STATIC.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "call-transaction",
+      "configFiles": [
+        "call-transaction.json"
+      ],
+      "expectedType": "CALL_TRANSACTION",
+      "source": "CALL TRANSACTION 'SE38'.",
+      "assertions": {
+        "raw": "CALL TRANSACTION 'SE38'."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCALL_TRANSACTION.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "case-when-case",
+      "configFiles": [
+        "case.json"
+      ],
+      "expectedType": "CASE",
+      "source": "CASE lv_kind. WHEN 'A'. ENDCASE.",
+      "assertions": {
+        "raw": "CASE lv_kind."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCASE.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "case-when-when",
+      "configFiles": [
+        "when.json"
+      ],
+      "expectedType": "WHEN",
+      "source": "CASE lv_kind. WHEN 'A'. ENDCASE.",
+      "assertions": {
+        "raw": "WHEN 'A'."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPWHEN.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "try-catch-cleanup-try",
+      "configFiles": [
+        "try.json"
+      ],
+      "expectedType": "TRY",
+      "source": "TRY. CATCH cx_root INTO DATA(lx_root). CLEANUP. ENDTRY.",
+      "assertions": {
+        "raw": "TRY."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPTRY.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "try-catch-cleanup-catch",
+      "configFiles": [
+        "catch.json"
+      ],
+      "expectedType": "CATCH",
+      "source": "TRY. CATCH cx_root INTO DATA(lx_root). CLEANUP. ENDTRY.",
+      "assertions": {
+        "raw": "CATCH cx_root INTO DATA(lx_root)."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCATCH_TRY.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "try-catch-cleanup-cleanup",
+      "configFiles": [
+        "cleanup.json"
+      ],
+      "expectedType": "CLEANUP",
+      "source": "TRY. CATCH cx_root INTO DATA(lx_root). CLEANUP. ENDTRY.",
+      "assertions": {
+        "raw": "CLEANUP."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCLEANUP.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "class-data",
+      "configFiles": [
+        "class-data.json"
+      ],
+      "expectedType": "CLASS-DATA",
+      "source": "CLASS-DATA gv_count TYPE i.",
+      "assertions": {
+        "raw": "CLASS-DATA gv_count TYPE i."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCLASS-DATA.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "class-methods",
+      "configFiles": [
+        "class-methods.json"
+      ],
+      "expectedType": "CLASS-METHODS",
+      "source": "CLASS-METHODS build RETURNING VALUE(rv_text) TYPE string.",
+      "assertions": {
+        "raw": "CLASS-METHODS build RETURNING VALUE(rv_text) TYPE string."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCLASS-METHODS.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "class",
+      "configFiles": [
+        "class.json"
+      ],
+      "expectedType": "CLASS",
+      "source": "CLASS lcl_demo DEFINITION. ENDCLASS.",
+      "assertions": {
+        "raw": "CLASS lcl_demo DEFINITION."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCLASS.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "clear",
+      "configFiles": [
+        "clear.json"
+      ],
+      "expectedType": "CLEAR",
+      "source": "CLEAR lv_text.",
+      "assertions": {
+        "raw": "CLEAR lv_text."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCLEAR.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "constants",
+      "configFiles": [
+        "constants.json"
+      ],
+      "expectedType": "CONSTANTS",
+      "source": "CONSTANTS gc_flag TYPE abap_bool VALUE abap_true.",
+      "assertions": {
+        "raw": "CONSTANTS gc_flag TYPE abap_bool VALUE abap_true."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCONSTANTS.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "data",
+      "configFiles": [
+        "data.json"
+      ],
+      "expectedType": "DATA",
+      "source": "DATA lv_text TYPE string.",
+      "assertions": {
+        "raw": "DATA lv_text TYPE string."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPDATA.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "delete-itab",
+      "configFiles": [
+        "delete-itab.json"
+      ],
+      "expectedType": "DELETE_ITAB",
+      "source": "DELETE lt_rows WHERE id = lv_id.",
+      "assertions": {
+        "raw": "DELETE lt_rows WHERE id = lv_id."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPDELETE_ITAB.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "delete-sql",
+      "configFiles": [
+        "delete-sql.json"
+      ],
+      "expectedType": "DELETE_SQL",
+      "source": "DELETE FROM zrows WHERE id = @lv_id.",
+      "assertions": {
+        "raw": "DELETE FROM zrows WHERE id = @lv_id."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPDELETE_DBTAB.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "do",
+      "configFiles": [
+        "do.json"
+      ],
+      "expectedType": "DO",
+      "source": "DO 2 TIMES. ENDDO.",
+      "assertions": {
+        "raw": "DO 2 TIMES."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPDO.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "if-elseif-else-if",
+      "configFiles": [
+        "if.json"
+      ],
+      "expectedType": "IF",
+      "source": "IF lv_kind = 'A'. ELSEIF lv_kind = 'B'. ELSE. ENDIF.",
+      "assertions": {
+        "raw": "IF lv_kind = 'A'."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPIF.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "if-elseif-else-elseif",
+      "configFiles": [
+        "elseif.json"
+      ],
+      "expectedType": "ELSEIF",
+      "source": "IF lv_kind = 'A'. ELSEIF lv_kind = 'B'. ELSE. ENDIF.",
+      "assertions": {
+        "raw": "ELSEIF lv_kind = 'B'."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPELSEIF.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "if-elseif-else-else",
+      "configFiles": [
+        "else.json"
+      ],
+      "expectedType": "ELSE",
+      "source": "IF lv_kind = 'A'. ELSEIF lv_kind = 'B'. ELSE. ENDIF.",
+      "assertions": {
+        "raw": "ELSE."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPELSE.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "field-symbols",
+      "configFiles": [
+        "field-symbols.json"
+      ],
+      "expectedType": "FIELD-SYMBOLS",
+      "source": "FIELD-SYMBOLS <ls_row> TYPE any.",
+      "assertions": {
+        "raw": "FIELD-SYMBOLS <ls_row> TYPE any."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPFIELD-SYMBOLS.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "form",
+      "configFiles": [
+        "form.json"
+      ],
+      "expectedType": "FORM",
+      "source": "FORM main USING p_user TYPE syuname. ENDFORM.",
+      "assertions": {
+        "raw": "FORM main USING p_user TYPE syuname."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPFORM.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "insert-itab",
+      "configFiles": [
+        "insert-itab.json"
+      ],
+      "expectedType": "INSERT_ITAB",
+      "source": "INSERT ls_row INTO TABLE lt_rows.",
+      "assertions": {
+        "raw": "INSERT ls_row INTO TABLE lt_rows."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPINSERT_ITAB.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "insert-sql",
+      "configFiles": [
+        "insert-sql.json"
+      ],
+      "expectedType": "INSERT_SQL",
+      "source": "INSERT zrows FROM @ls_row.",
+      "assertions": {
+        "raw": "INSERT zrows FROM @ls_row."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPINSERT_DBTAB.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "loop-at-itab",
+      "configFiles": [
+        "loop-at-itab.json"
+      ],
+      "expectedType": "LOOP_AT_ITAB",
+      "source": "LOOP AT lt_rows INTO ls_row. ENDLOOP.",
+      "assertions": {
+        "raw": "LOOP AT lt_rows INTO ls_row."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPLOOP_AT_ITAB.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "method",
+      "configFiles": [
+        "method.json"
+      ],
+      "expectedType": "METHOD",
+      "source": "METHOD run. ENDMETHOD.",
+      "assertions": {
+        "raw": "METHOD run."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPMETHOD.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "methods",
+      "configFiles": [
+        "methods.json"
+      ],
+      "expectedType": "METHODS",
+      "source": "METHODS run IMPORTING iv_user TYPE syuname RETURNING VALUE(rv_text) TYPE string.",
+      "assertions": {
+        "raw": "METHODS run IMPORTING iv_user TYPE syuname RETURNING VALUE(rv_text) TYPE string."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPMETHODS.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "message",
+      "configFiles": [
+        "message.json"
+      ],
+      "expectedType": "MESSAGE",
+      "source": "MESSAGE 'Saved' TYPE 'S'.",
+      "assertions": {
+        "raw": "MESSAGE 'Saved' TYPE 'S'."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPMESSAGE.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "modify-itab",
+      "configFiles": [
+        "modify-itab.json"
+      ],
+      "expectedType": "MODIFY_ITAB",
+      "source": "MODIFY lt_rows FROM ls_row TRANSPORTING name WHERE id = lv_id.",
+      "assertions": {
+        "raw": "MODIFY lt_rows FROM ls_row TRANSPORTING name WHERE id = lv_id."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPMODIFY_ITAB.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "modify-sql",
+      "configFiles": [
+        "modify-sql.json"
+      ],
+      "expectedType": "MODIFY_SQL",
+      "source": "MODIFY zrows FROM @ls_row.",
+      "assertions": {
+        "raw": "MODIFY zrows FROM @ls_row."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPMODIFY_DBTAB.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "move-corresponding",
+      "configFiles": [
+        "move-corresponding.json"
+      ],
+      "expectedType": "MOVE-CORRESPONDING",
+      "source": "MOVE-CORRESPONDING ls_src TO ls_dst.",
+      "assertions": {
+        "raw": "MOVE-CORRESPONDING ls_src TO ls_dst."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPMOVE-CORRESPONDING.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "move",
+      "configFiles": [
+        "move.json"
+      ],
+      "expectedType": "MOVE",
+      "source": "MOVE lv_src TO lv_dst.",
+      "assertions": {
+        "raw": "MOVE lv_src TO lv_dst."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPMOVE_OBS.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "parameters",
+      "configFiles": [
+        "parameters.json"
+      ],
+      "expectedType": "PARAMETERS",
+      "source": "PARAMETERS p_user TYPE syuname.",
+      "assertions": {
+        "raw": "PARAMETERS p_user TYPE syuname."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPPARAMETERS.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "perform",
+      "configFiles": [
+        "perform.json"
+      ],
+      "expectedType": "PERFORM",
+      "source": "PERFORM main USING p_user CHANGING lv_text.",
+      "assertions": {
+        "raw": "PERFORM main USING p_user CHANGING lv_text."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPPERFORM.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "ranges",
+      "configFiles": [
+        "ranges.json"
+      ],
+      "expectedType": "RANGES",
+      "source": "RANGES lr_user FOR sy-uname.",
+      "assertions": {
+        "raw": "RANGES lr_user FOR sy-uname."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPRANGES.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "read-table",
+      "configFiles": [
+        "read-table.json"
+      ],
+      "expectedType": "READ_TABLE",
+      "source": "READ TABLE lt_rows WITH KEY id = lv_id INTO ls_row.",
+      "assertions": {
+        "raw": "READ TABLE lt_rows WITH KEY id = lv_id INTO ls_row."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPREAD_TABLE.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "select-options",
+      "configFiles": [
+        "select-options.json"
+      ],
+      "expectedType": "SELECT-OPTIONS",
+      "source": "SELECT-OPTIONS s_user FOR sy-uname.",
+      "assertions": {
+        "raw": "SELECT-OPTIONS s_user FOR sy-uname."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPSELECT-OPTIONS.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "select",
+      "configFiles": [
+        "select.json"
+      ],
+      "expectedType": "SELECT",
+      "source": "SELECT * FROM usr02 INTO TABLE lt_users WHERE bname = p_user.",
+      "assertions": {
+        "raw": "SELECT * FROM usr02 INTO TABLE lt_users WHERE bname = p_user."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPSELECT.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "sort-itab",
+      "configFiles": [
+        "sort-itab.json"
+      ],
+      "expectedType": "SORT_ITAB",
+      "source": "SORT lt_rows BY id.",
+      "assertions": {
+        "raw": "SORT lt_rows BY id."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPSORT_ITAB.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "statics",
+      "configFiles": [
+        "statics.json"
+      ],
+      "expectedType": "STATICS",
+      "source": "STATICS sv_count TYPE i.",
+      "assertions": {
+        "raw": "STATICS sv_count TYPE i."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPSTATICS.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "types",
+      "configFiles": [
+        "types.json"
+      ],
+      "expectedType": "TYPES",
+      "source": "TYPES ty_text TYPE string.",
+      "assertions": {
+        "raw": "TYPES ty_text TYPE string."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPTYPES.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "update-sql",
+      "configFiles": [
+        "update-sql.json"
+      ],
+      "expectedType": "UPDATE_SQL",
+      "source": "UPDATE zrows SET name = @lv_name WHERE id = @lv_id.",
+      "assertions": {
+        "raw": "UPDATE zrows SET name = @lv_name WHERE id = @lv_id."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPUPDATE.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    },
+    {
+      "id": "delete-itab-adjacent-duplicates",
+      "configFiles": ["delete-itab.json"],
+      "expectedType": "DELETE_ITAB",
+      "source": "DELETE ADJACENT DUPLICATES FROM lt_rows USING KEY primary_key COMPARING ALL FIELDS.",
+      "assertions": {"values.target.value": "lt_rows", "values.comparing.value": "ALL FIELDS", "values.usingKey.value": "primary_key"},
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPDELETE_DUPLICATES.html",
+      "dialect": "ABAP latest",
+      "status": "documented-form"
+    },
+    {
+      "id": "insert-sql-values",
+      "configFiles": ["insert-sql.json"],
+      "expectedType": "INSERT_SQL",
+      "source": "INSERT INTO sflight VALUES @ls_row.",
+      "assertions": {"values.target.value": "sflight", "values.source.value": "@ls_row"},
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPINSERT_DBTAB.html",
+      "dialect": "not-yet-reviewed",
+      "status": "documented-form",
+      "checkReversedConfigs": true
+    },
+    {
+      "id": "delete-sql-work-area",
+      "configFiles": ["delete-sql.json"],
+      "expectedType": "DELETE_SQL",
+      "source": "DELETE sflight FROM @ls_row.",
+      "assertions": {"values.target.value": "sflight", "values.source.value": "@ls_row"},
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPDELETE_SOURCE.html",
+      "dialect": "not-yet-reviewed",
+      "status": "documented-form",
+      "checkReversedConfigs": true
+    },
+    {
+      "id": "delete-sql-table",
+      "configFiles": ["delete-sql.json"],
+      "expectedType": "DELETE_SQL",
+      "source": "DELETE sflight FROM TABLE @lt_rows.",
+      "assertions": {"values.target.value": "sflight", "values.source.value": "TABLE @lt_rows"},
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPDELETE_SOURCE.html",
+      "dialect": "not-yet-reviewed",
+      "status": "documented-form",
+      "checkReversedConfigs": true
+    },
+    {
+      "id": "modify-sql-table",
+      "configFiles": ["modify-sql.json"],
+      "expectedType": "MODIFY_SQL",
+      "source": "MODIFY sflight FROM TABLE @lt_rows.",
+      "assertions": {"values.target.value": "sflight", "values.source.value": "TABLE @lt_rows"},
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPMODIFY_SOURCE.html",
+      "dialect": "not-yet-reviewed",
+      "status": "documented-form",
+      "checkReversedConfigs": true
+    },
+    {
+      "id": "modify-sql-subquery",
+      "configFiles": ["modify-sql.json"],
+      "expectedType": "MODIFY_SQL",
+      "source": "MODIFY sflight FROM ( SELECT * FROM sflight ).",
+      "assertions": {"values.target.value": "sflight", "values.source.value": "( SELECT * FROM sflight )"},
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPMODIFY_SOURCE.html",
+      "dialect": "not-yet-reviewed",
+      "status": "documented-form",
+      "checkReversedConfigs": true
+    },
+    {
+      "id": "write",
+      "configFiles": [
+        "write.json"
+      ],
+      "expectedType": "WRITE",
+      "source": "WRITE 'Saved'.",
+      "assertions": {
+        "raw": "WRITE 'Saved'."
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPWRITE-.html",
+      "dialect": "not-yet-reviewed",
+      "status": "baseline-smoke"
+    }
+  ]
+}

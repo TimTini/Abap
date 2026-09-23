@@ -35,8 +35,7 @@
         "performCall": {
           "changing": [],
           "form": "do_work",
-          "ifCondition": "",
-          "ifConditions": [],
+          "ifFound": false,
           "program": "",
           "tables": [],
           "using": []

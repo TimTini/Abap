@@ -3,6 +3,7 @@
 const path = require("path");
 
 const entries = [
+  { file: "tests/parser-sap-coverage.test.js", suites: ["parser", "fast", "full"], labels: ["sap-coverage"] },
   { file: "tests/parser-regression.statements.test.js", suites: ["parser", "fast", "full"], labels: ["statements"] },
   { file: "tests/parser-regression.conditions.test.js", suites: ["parser", "fast", "full"], labels: ["conditions"] },
   { file: "tests/parser-regression.model.test.js", suites: ["parser", "fast", "full"], labels: ["model"] },

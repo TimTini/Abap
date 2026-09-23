@@ -1139,6 +1139,12 @@
           "capture": "rest"
         },
         {
+          "after": "TYPE LINE OF",
+          "name": "typeLineOf",
+          "label": "type-line-of",
+          "descKey": "typeLineOf"
+        },
+        {
           "after": "TYPE",
           "name": "type",
           "label": "type",
@@ -1962,7 +1968,6 @@
         "USING": "using",
         "CHANGING": "changing",
         "TABLES": "tables",
-        "IF": "if",
         "ON": "on",
         "COMMIT": "commit",
         "ROLLBACK": "rollback"
@@ -2017,12 +2022,6 @@
             "CHANGING",
             "IF"
           ]
-        },
-        {
-          "after": "IF",
-          "name": "ifCondition",
-          "label": "if",
-          "capture": "rest"
         }
       ]
     },
@@ -2509,6 +2508,18 @@
           ]
         },
         {
+          "after": "LIKE REF TO",
+          "name": "likeRefTo",
+          "label": "like-ref-to",
+          "descKey": "likeRefTo"
+        },
+        {
+          "after": "LIKE LINE OF",
+          "name": "likeLineOf",
+          "label": "like-line-of",
+          "descKey": "likeLineOf"
+        },
+        {
           "after": "VALUE",
           "name": "value",
           "label": "value",
@@ -2596,6 +2607,11 @@
             "LENGTH",
             "DECIMALS"
           ]
+        },
+        {
+          "after": "LIKE REF TO",
+          "name": "likeRefTo",
+          "label": "like-ref-to"
         },
         {
           "after": "LIKE",

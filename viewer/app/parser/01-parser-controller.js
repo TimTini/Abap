@@ -158,9 +158,6 @@
     if (extras.ifCondition && Array.isArray(extras.ifCondition.conditions)) {
       conditionContainers.push(extras.ifCondition.conditions);
     }
-    if (extras.performCall && Array.isArray(extras.performCall.ifConditions)) {
-      conditionContainers.push(extras.performCall.ifConditions);
-    }
     if (extras.select) {
       if (Array.isArray(extras.select.whereConditions)) {
         conditionContainers.push(extras.select.whereConditions);
@@ -537,7 +534,6 @@
         }
         if (extras.performCall) {
           processAssignSections(extras.performCall, ["using", "changing", "tables"], context);
-          processConditionList(extras.performCall.ifConditions, context);
         }
 
         if (extras.ifCondition) {

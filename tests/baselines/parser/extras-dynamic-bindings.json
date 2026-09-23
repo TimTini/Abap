@@ -671,52 +671,7 @@
             }
           ],
           "form": "do_something",
-          "ifCondition": "lv_a > 0",
-          "ifConditions": [
-            {
-              "comparisonOperator": ">",
-              "leftOperand": "lv_a",
-              "leftOperandDecl": {
-                "objectType": "DATA",
-                "name": "lv_a",
-                "file": "extras-dynamic-bindings.abap",
-                "lineStart": 2,
-                "raw": "DATA lv_a TYPE i VALUE 1.",
-                "comment": "",
-                "scopeLabel": "GLOBAL",
-                "scopeType": "GLOBAL",
-                "scopeName": "",
-                "structName": "",
-                "structObjectType": "",
-                "structLineStart": 0,
-                "fieldPath": "",
-                "traceFile": "",
-                "traceLineStart": 0,
-                "synthetic": false
-              },
-              "leftOperandRef": "lv_a",
-              "logicalConnector": "",
-              "rightOperand": "0",
-              "rightOperandDecl": {
-                "objectType": "CONDITION_VALUE",
-                "name": "0",
-                "file": "",
-                "lineStart": 0,
-                "raw": "0",
-                "comment": "",
-                "scopeLabel": "CONDITION",
-                "scopeType": "SYSTEM",
-                "scopeName": "",
-                "structName": "",
-                "structObjectType": "",
-                "structLineStart": 0,
-                "fieldPath": "",
-                "traceFile": "",
-                "traceLineStart": 0,
-                "synthetic": false
-              }
-            }
-          ],
+          "ifFound": false,
           "program": "sy-repid",
           "tables": [
             {
@@ -856,10 +811,6 @@
           "label": "changing",
           "text": "CHANGING"
         },
-        "if": {
-          "label": "if",
-          "text": "IF"
-        },
         "in-program": {
           "label": "in-program",
           "text": "IN PROGRAM"
@@ -914,32 +865,6 @@
           "name": "form",
           "userDesc": "",
           "value": "do_something"
-        },
-        "ifCondition": {
-          "codeDesc": "",
-          "decl": {
-            "objectType": "DATA",
-            "name": "lv_a",
-            "file": "extras-dynamic-bindings.abap",
-            "lineStart": 2,
-            "raw": "DATA lv_a TYPE i VALUE 1.",
-            "comment": "",
-            "scopeLabel": "GLOBAL",
-            "scopeType": "GLOBAL",
-            "scopeName": "",
-            "structName": "",
-            "structObjectType": "",
-            "structLineStart": 0,
-            "fieldPath": "",
-            "traceFile": "",
-            "traceLineStart": 0,
-            "synthetic": false
-          },
-          "declRef": "lv_a",
-          "label": "if",
-          "name": "ifCondition",
-          "userDesc": "",
-          "value": "lv_a > 0"
         },
         "program": {
           "codeDesc": "",
