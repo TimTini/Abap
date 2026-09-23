@@ -1211,6 +1211,84 @@ async function assertPerformSourcePickerIsSharedSearchableAndLazy() {
   dom.window.close();
 }
 
+async function assertCompactTemplateHeaderContract() {
+  const fs = require("fs");
+  const path = require("path");
+  const css = fs.readFileSync(
+    path.resolve(__dirname, "..", "viewer", "styles", "viewer.css"),
+    "utf8"
+  );
+
+  assert.match(css, /\.template-block-title-row\s*\{/, "Expected a compact Template title row CSS hook.");
+  assert.match(css, /\.template-block-icon-btn\s*\{/, "Expected compact Template icon button CSS hook.");
+
+  const titleActionsRule = css.match(/\.template-block-title-actions\s*\{[^}]+\}/);
+  assert(titleActionsRule, "Expected compact Template title actions CSS hook.");
+  assert.match(titleActionsRule[0], /max-width:\s*100%/, "Expected title actions to stay inside the block width.");
+  assert.match(titleActionsRule[0], /min-width:\s*0/, "Expected title actions to shrink in a narrow pane.");
+
+  const headerPickerRule = css.match(/\.template-block-header\s+\.perform-source-picker\s*\{[^}]+\}/);
+  assert(headerPickerRule, "Expected the Template header source-picker CSS hook.");
+  assert.match(headerPickerRule[0], /max-width:\s*100%/, "Expected the source picker to stay inside the block width.");
+
+  const pickerRule = css.match(/(?:^|\n)\s*\.perform-source-picker\s*\{[^}]+\}/);
+  assert(pickerRule, "Expected the shared source-picker CSS rule.");
+  assert.match(pickerRule[0], /min-width:\s*0/, "Expected the source picker to shrink in a narrow pane.");
+  const triggerRule = css.match(/(?:^|\n)\s*\.perform-source-trigger\s*\{[^}]+\}/);
+  assert(triggerRule, "Expected the source-picker trigger CSS rule.");
+  assert.match(
+    triggerRule[0],
+    /min-width:\s*0/,
+    "Expected long source summaries to shrink inside a narrow Template pane."
+  );
+
+
+  const dom = await renderFixture([
+    "DATA gv_compact_first TYPE string.",
+    "DATA gv_compact_second TYPE string.",
+    "PERFORM frm_compact USING gv_compact_first.",
+    "PERFORM frm_compact USING gv_compact_second.",
+    "FORM frm_compact USING iv_value TYPE string.",
+    "  CLEAR iv_value.",
+    "ENDFORM."
+  ].join("\n"));
+  const { window } = dom;
+  const { els } = window.AbapViewerRuntime;
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const formTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="FORM"]');
+  const formBlock = formTable && formTable.closest(".template-block");
+  assert(formBlock, "Expected a rendered FORM Template block.");
+
+  const titleRow = formBlock.querySelector(".template-block-title-row");
+  assert(titleRow, "Expected the FORM header to use a compact title row.");
+  const titleActions = titleRow.querySelector(".template-block-title-actions");
+  assert(titleActions, "Expected compact Code/Paths/Copy actions beside the Template title.");
+
+  for (const [action, label] of [["code", "Code"], ["paths", "Paths"], ["copy", "Copy"]]) {
+    const button = titleActions.querySelector(`button[data-template-action="${action}"]`);
+    assert(button, `Expected the compact ${label} action button.`);
+    assert(button.classList.contains("template-block-icon-btn"), `Expected ${label} to use the icon button class.`);
+    assert.strictEqual(button.getAttribute("title"), label, `Expected ${label} to have a tooltip.`);
+    assert.strictEqual(button.getAttribute("aria-label"), label, `Expected ${label} to be accessible by name.`);
+    assert(button.querySelector("svg"), `Expected ${label} to render an inline icon.`);
+  }
+  assert.strictEqual(
+    titleActions.querySelectorAll("button[data-template-action]").length,
+    3,
+    "Expected exactly Code, Paths, and Copy in the compact title actions."
+  );
+
+  const picker = formBlock.querySelector('.perform-source-picker[data-perform-form="FRM_COMPACT"]');
+  assert(picker, "Expected the multi-source FORM to retain its source picker.");
+  assert(!titleRow.contains(picker), "Expected the source picker below the title row.");
+  assert(els.templateCopyAllBtn, "Expected the Template toolbar to retain Copy All.");
+  assert.strictEqual(String(els.templateCopyAllBtn.textContent || "").trim(), "Copy All");
+
+  dom.window.close();
+}
+
 defineFocusedTest(test, "viewer if template contract", ["if-template"], async (t) => {
 assertViewerFixtureDirectoriesStayInSync();
 
@@ -1284,5 +1362,13 @@ defineFocusedTest(test, "viewer perform source picker contracts", ["perform-sour
 
   await t.test("shared popup is lazy, searchable, tree-based, and keyboard accessible", async () => {
     await assertPerformSourcePickerIsSharedSearchableAndLazy();
+  });
+});
+
+defineFocusedTest(test, "viewer compact Template header contracts", ["template-header-compact"], async (t) => {
+  assertViewerFixtureDirectoriesStayInSync();
+
+  await t.test("compact actions stay accessible, source picker stays narrow, and Copy All remains", async () => {
+    await assertCompactTemplateHeaderContract();
   });
 });

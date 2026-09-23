@@ -4109,6 +4109,31 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     return map;
   }
 
+  function createTemplateBlockIconButton(action, title, svgMarkup) {
+    const btn = el("button", {
+      className: "template-block-icon-btn",
+      attrs: {
+        type: "button",
+        title: String(title || ""),
+        "aria-label": String(title || ""),
+        "data-template-action": String(action || "")
+      }
+    });
+    btn.innerHTML = String(svgMarkup || "");
+    const svg = btn.querySelector("svg");
+    if (svg) {
+      svg.setAttribute("aria-hidden", "true");
+      svg.setAttribute("focusable", "false");
+    }
+    return btn;
+  }
+
+  const TEMPLATE_BLOCK_ICON_SVG = {
+    code: '<svg viewBox="0 0 16 16" width="14" height="14"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M5.5 3.5 2.5 8l3 4.5M10.5 3.5l3 4.5-3 4.5"/></svg>',
+    paths: '<svg viewBox="0 0 16 16" width="14" height="14"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M3 4.5h10M3 8h10M3 11.5h7"/></svg>',
+    copy: '<svg viewBox="0 0 16 16" width="14" height="14"><rect x="5.5" y="2.5" width="7.5" height="9.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M3.5 5.5v7.3c0 .7.5 1.2 1.2 1.2h6"/></svg>'
+  };
+
   function buildTemplateBlockElement(item, absIndex, config, interactive) {
     const row = item && typeof item === "object" ? item : null;
     const obj = row && row.obj ? row.obj : null;
@@ -4146,24 +4171,21 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     const left = el("div");
     const label = getObjectLabel(obj);
     const titleText = `${absIndex + 1}. ${String(obj.objectType || "OBJECT")}${label ? ` ${label}` : ""}`;
-    left.appendChild(el("h4", { className: "template-block-title", text: titleText }));
+    const titleRow = el("div", { className: "template-block-title-row" });
+    titleRow.appendChild(el("h4", { className: "template-block-title", text: titleText }));
+    left.appendChild(titleRow);
     const meta = renderMeta(obj);
     left.appendChild(el("div", { className: "template-block-meta", text: meta || "" }));
     header.appendChild(left);
 
     if (isInteractive) {
-      const actions = el("div", { className: "template-block-actions" });
-      const performSourceControl = typeof createPerformSourceControl === "function"
-        ? createPerformSourceControl(obj)
-        : null;
+      const titleActions = el("div", { className: "template-block-title-actions" });
+      titleRow.appendChild(titleActions);
+      const performSourceControl = typeof createPerformSourceControl === "function" ? createPerformSourceControl(obj) : null;
       if (performSourceControl) {
-        actions.appendChild(performSourceControl);
+        left.appendChild(performSourceControl);
       }
-      const codeBtn = el("button", {
-        className: "secondary",
-        text: "Code",
-        attrs: { type: "button", "data-template-action": "code" }
-      });
+      const codeBtn = createTemplateBlockIconButton("code", "Code", TEMPLATE_BLOCK_ICON_SVG.code);
       codeBtn.addEventListener("click", (ev) => {
         if (ev && typeof ev.stopPropagation === "function") {
           ev.stopPropagation();
@@ -4178,26 +4200,18 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
           selectCodeLines(lineStart, lineEnd);
         }
       });
-      actions.appendChild(codeBtn);
+      titleActions.appendChild(codeBtn);
 
-      const pathsBtn = el("button", {
-        className: "secondary",
-        text: "Paths",
-        attrs: { type: "button", "data-template-action": "paths" }
-      });
+      const pathsBtn = createTemplateBlockIconButton("paths", "Paths", TEMPLATE_BLOCK_ICON_SVG.paths);
       pathsBtn.addEventListener("click", (ev) => {
         if (ev && typeof ev.stopPropagation === "function") {
           ev.stopPropagation();
         }
         openTemplatePathDump(templateContextObj, absIndex, obj);
       });
-      actions.appendChild(pathsBtn);
+      titleActions.appendChild(pathsBtn);
 
-      const copyBtn = el("button", {
-        className: "secondary",
-        text: "Copy",
-        attrs: { type: "button", "data-template-action": "copy" }
-      });
+      const copyBtn = createTemplateBlockIconButton("copy", "Copy", TEMPLATE_BLOCK_ICON_SVG.copy);
       copyBtn.addEventListener("click", async (ev) => {
         if (ev && typeof ev.stopPropagation === "function") {
           ev.stopPropagation();
@@ -4214,8 +4228,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
           setError(`Copy failed: ${err && err.message ? err.message : err}`);
         }
       });
-      actions.appendChild(copyBtn);
-      header.appendChild(actions);
+      titleActions.appendChild(copyBtn);
 
       block.addEventListener("click", (ev) => {
         if (typeof selectTemplateBlockFromInteraction === "function") {
