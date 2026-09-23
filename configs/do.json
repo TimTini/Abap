@@ -4,11 +4,20 @@
   "block": { "endKeyword": "ENDDO" },
   "keywordLabels": {
     "DO": "stmt",
-    "TIMES": "times"
+    "TIMES": "times",
+    "VARYING": "varying",
+    "FROM": "from",
+    "NEXT": "next",
+    "RANGE": "range",
+    "UNTIL": "until",
+    "WHILE": "while"
   },
   "keywordPhrases": {},
   "captureRules": [
-    { "after": "DO", "name": "times", "label": "times" }
+    { "after": "DO", "name": "times", "label": "times" },
+    { "after": "VARYING", "name": "varying", "label": "varying", "capture": "rest", "stopTokens": ["FROM"] },
+    { "after": "FROM", "name": "from", "label": "from", "capture": "rest", "stopTokens": ["NEXT"] },
+    { "after": "NEXT", "name": "next", "label": "next", "capture": "rest", "stopTokens": ["RANGE", "UNTIL", "WHILE"] },
+    { "after": "RANGE", "name": "range", "label": "range", "capture": "rest", "stopTokens": ["UNTIL", "WHILE"] }
   ]
 }
-

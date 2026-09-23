@@ -1,0 +1,24 @@
+{
+  "object": "INSERT_SQL",
+  "match": { "startKeyword": "INSERT" },
+  "keywordLabels": {
+    "INSERT": "stmt",
+    "INTO": "into",
+    "VALUES": "values",
+    "FROM": "from",
+    "TABLE": "table",
+    "ACCEPTING": "accepting",
+    "DUPLICATE": "duplicate",
+    "KEYS": "keys"
+  },
+  "keywordPhrases": {
+    "INSERT INTO": "insert-into",
+    "ACCEPTING DUPLICATE KEYS": "accepting-duplicate-keys"
+  },
+  "captureRules": [
+    { "after": "INSERT INTO", "name": "target", "label": "target" },
+    { "after": "INSERT", "name": "target", "label": "target" },
+    { "after": "VALUES", "name": "source", "label": "source", "capture": "rest", "stopTokens": ["ACCEPTING"] },
+    { "after": "FROM", "name": "source", "label": "source", "capture": "rest", "stopTokens": ["ACCEPTING"] }
+  ]
+}

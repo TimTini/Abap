@@ -2,9 +2,11 @@
   "object": "CLEANUP",
   "match": { "startKeyword": "CLEANUP" },
   "keywordLabels": {
-    "CLEANUP": "stmt"
+    "CLEANUP": "stmt",
+    "INTO": "into"
   },
   "keywordPhrases": {},
-  "captureRules": []
+  "captureRules": [
+    { "after": "INTO", "name": "into", "label": "into" }
+  ]
 }
-

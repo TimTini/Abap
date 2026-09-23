@@ -9,15 +9,24 @@
     "WHERE": "where",
     "ADJACENT": "adjacent",
     "DUPLICATES": "duplicates",
-    "COMPARING": "comparing"
+    "COMPARING": "comparing",
+    "USING": "using",
+    "KEY": "key",
+    "ALL": "all",
+    "FIELDS": "fields"
   },
   "keywordPhrases": {
     "ADJACENT DUPLICATES": "adjacent-duplicates",
-    "DELETE ADJACENT DUPLICATES": "delete-adjacent-duplicates"
+    "DELETE ADJACENT DUPLICATES": "delete-adjacent-duplicates",
+    "USING KEY": "using-key",
+    "ALL FIELDS": "all-fields"
   },
   "captureRules": [
     { "after": "DELETE", "name": "target", "label": "target" },
+    { "after": "DELETE ADJACENT DUPLICATES FROM", "name": "target", "label": "target" },
     { "after": "FROM", "name": "from", "label": "from" },
+    { "after": "USING KEY", "name": "usingKey", "label": "using-key" },
+    { "after": "COMPARING", "name": "comparing", "label": "comparing", "capture": "rest" },
     { "after": "INDEX", "name": "index", "label": "index" },
     { "after": "WHERE", "name": "where", "label": "where", "capture": "rest" }
   ]

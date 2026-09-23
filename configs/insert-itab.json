@@ -8,6 +8,8 @@
     "LINES": "lines",
     "OF": "of",
     "INDEX": "index",
+    "FROM": "from",
+    "TO": "to",
     "ASSIGNING": "assigning",
     "REFERENCE": "reference"
   },
@@ -19,6 +21,8 @@
   "captureRules": [
     { "after": "INSERT", "name": "what", "label": "what" },
     { "after": "INSERT LINES OF", "name": "source", "label": "source-itab" },
+    { "after": "FROM", "name": "from", "label": "from" },
+    { "after": "TO", "name": "to", "label": "to" },
     { "after": "INTO TABLE", "name": "intoTable", "label": "into-table" },
     { "after": "INTO", "name": "into", "label": "into" },
     { "after": "INDEX", "name": "index", "label": "index" },

@@ -9,10 +9,16 @@
     "USING": "using",
     "CHANGING": "changing",
     "TABLES": "tables",
-    "IF": "if"
+    "IF": "if",
+    "ON": "on",
+    "COMMIT": "commit",
+    "ROLLBACK": "rollback"
   },
   "keywordPhrases": {
-    "IN PROGRAM": "in-program"
+    "IN PROGRAM": "in-program",
+    "ON COMMIT": "on-commit",
+    "ON ROLLBACK": "on-rollback",
+    "IF FOUND": "if-found"
   },
   "captureRules": [
     { "after": "PERFORM", "name": "form", "label": "form-name", "descKey": "form" },

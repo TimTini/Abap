@@ -325,7 +325,7 @@
           "label": "type-name",
           "name": "type",
           "userDesc": "",
-          "value": "STANDARD"
+          "value": "STANDARD TABLE OF string WITH EMPTY KEY"
         }
       }
     },

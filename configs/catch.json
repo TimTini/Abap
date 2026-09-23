@@ -3,12 +3,14 @@
   "match": { "startKeyword": "CATCH" },
   "keywordLabels": {
     "CATCH": "stmt",
-    "INTO": "into"
+    "INTO": "into",
+    "BEFORE": "before",
+    "UNWIND": "unwind"
   },
-  "keywordPhrases": {},
+  "keywordPhrases": { "BEFORE UNWIND": "before-unwind" },
   "captureRules": [
+    { "after": "CATCH BEFORE UNWIND", "name": "exception", "label": "exception", "capture": "rest", "stopTokens": ["INTO"] },
     { "after": "CATCH", "name": "exception", "label": "exception", "capture": "rest", "stopTokens": ["INTO"] },
     { "after": "INTO", "name": "into", "label": "into" }
   ]
 }
-

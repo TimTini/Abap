@@ -10,6 +10,32 @@
       "keywords": {
         "stmt": {
           "label": "stmt",
+          "text": "REPORT"
+        }
+      },
+      "lineStart": 1,
+      "objectType": "REPORT",
+      "raw": "REPORT z_contract_legacy.",
+      "segmentIndex": 0,
+      "values": {
+        "raw": {
+          "codeDesc": "",
+          "label": "raw",
+          "name": "raw",
+          "userDesc": "",
+          "value": "z_contract_legacy"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "legacy-core.abap",
+      "keywords": {
+        "stmt": {
+          "label": "stmt",
           "text": "PARAMETERS"
         },
         "type": {
@@ -413,7 +439,7 @@
           "label": "type-name",
           "name": "type",
           "userDesc": "",
-          "value": "STANDARD"
+          "value": "STANDARD TABLE OF ty_user"
         }
       }
     },

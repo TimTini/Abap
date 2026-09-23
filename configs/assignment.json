@@ -7,9 +7,9 @@
     "-=": "sub-assign",
     "*=": "mul-assign",
     "/=": "div-assign",
+    "&&=": "concat-assign",
     "?=": "cast"
   },
   "keywordPhrases": {},
   "captureRules": []
 }
-

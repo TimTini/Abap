@@ -13,20 +13,27 @@
     "MODE": "mode",
     "UPDATE": "update",
     "MESSAGES": "messages",
-    "INTO": "into"
+    "INTO": "into",
+    "WITH": "with",
+    "WITHOUT": "without",
+    "AUTHORITY-CHECK": "authority-check",
+    "OPTIONS": "options",
+    "FROM": "from"
   },
   "keywordPhrases": {
     "CALL TRANSACTION": "call-transaction",
     "SKIP FIRST SCREEN": "skip-first-screen",
     "AND RETURN": "and-return",
-    "MESSAGES INTO": "messages-into"
+    "MESSAGES INTO": "messages-into",
+    "WITH AUTHORITY-CHECK": "with-authority-check",
+    "WITHOUT AUTHORITY-CHECK": "without-authority-check"
   },
   "captureRules": [
     { "after": "CALL TRANSACTION", "name": "tcode", "label": "tcode", "descKey": "tcode" },
     { "after": "USING", "name": "using", "label": "using" },
     { "after": "MODE", "name": "mode", "label": "mode" },
     { "after": "UPDATE", "name": "update", "label": "update" },
-    { "after": "MESSAGES INTO", "name": "messagesInto", "label": "messages-into" }
+    { "after": "MESSAGES INTO", "name": "messagesInto", "label": "messages-into" },
+    { "after": "OPTIONS FROM", "name": "options", "label": "options" }
   ]
 }
-

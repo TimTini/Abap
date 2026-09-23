@@ -753,6 +753,12 @@ function testSupportedStatementSmokeMatrix() {
       code: "DELETE lt_rows WHERE id = lv_id.\n"
     },
     {
+      name: "delete-sql",
+      covers: ["delete-sql.json"],
+      expectedTypes: ["DELETE_SQL"],
+      code: "DELETE demo_dbtab FROM @ls_row.\n"
+    },
+    {
       name: "do",
       covers: ["do.json"],
       expectedTypes: ["DO"],
@@ -783,6 +789,12 @@ function testSupportedStatementSmokeMatrix() {
       code: "INSERT ls_row INTO TABLE lt_rows.\n"
     },
     {
+      name: "insert-sql",
+      covers: ["insert-sql.json"],
+      expectedTypes: ["INSERT_SQL"],
+      code: "INSERT demo_dbtab FROM @ls_row.\n"
+    },
+    {
       name: "loop-at-itab",
       covers: ["loop-at-itab.json"],
       expectedTypes: ["LOOP_AT_ITAB"],
@@ -811,6 +823,12 @@ function testSupportedStatementSmokeMatrix() {
       covers: ["modify-itab.json"],
       expectedTypes: ["MODIFY_ITAB"],
       code: "MODIFY lt_rows FROM ls_row TRANSPORTING name WHERE id = lv_id.\n"
+    },
+    {
+      name: "modify-sql",
+      covers: ["modify-sql.json"],
+      expectedTypes: ["MODIFY_SQL"],
+      code: "MODIFY demo_dbtab FROM @ls_row.\n"
     },
     {
       name: "move-corresponding",
@@ -877,6 +895,12 @@ function testSupportedStatementSmokeMatrix() {
       covers: ["types.json"],
       expectedTypes: ["TYPES"],
       code: "TYPES ty_text TYPE string.\n"
+    },
+    {
+      name: "update-sql",
+      covers: ["update-sql.json"],
+      expectedTypes: ["UPDATE_SQL"],
+      code: "UPDATE demo_dbtab SET name = @lv_name.\n"
     },
     {
       name: "write",

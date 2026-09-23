@@ -1,111 +1,22 @@
-# TODO – ABAP parser coverage
+# ABAP parser roadmap
 
-Baseline: `examples/deep_form_demo.abap`, 580 logical statements.
+## Current status (2026-09-23)
 
-- 119 statements chưa được parser nhận diện.
-- 55 nhóm theo từ khóa đầu tiên.
-- Chi tiết từng dòng: `docs/ABAP_PARSER_GAP_REPORT.md`.
+The parser now recognizes the ABAP forms inventoried from this repository's sample programs and parser/viewer fixtures. The measured corpus currently contains 8 `.abap` files, 891 parser objects, and 103 distinct object kinds; none produced unsupported-syntax, unmatched-block, or unterminated-block diagnostics in the checked corpus. See [the syntax inventory](docs/ABAP_SYNTAX_INVENTORY.md) and [the gap report](docs/ABAP_PARSER_GAP_REPORT.md) for coverage evidence and limits.
 
-## Ưu tiên triển khai
+This is a syntax-oriented reader and Viewer data producer, not an ABAP compiler: it does not resolve DDIC types, method/function signatures, macros/includes, release compatibility, or all operand semantics. A parsed node means the syntax family was recognized; it does not certify that the source compiles in a particular SAP system.
 
-### P0 – Sửa nhận diện sai
+## Follow-up priorities
 
-- [ ] Phân biệt SQL `DELETE FROM` với `DELETE_ITAB` (2 trường hợp).
-- [ ] Phân biệt SQL `INSERT ... FROM` với `INSERT_ITAB` (1 trường hợp).
-- [ ] Phân biệt SQL `MODIFY ... FROM` với `MODIFY_ITAB` (1 trường hợp).
+- [ ] Validate parser output against representative programs from the SAP cheat sheets and current official ABAP Keyword Documentation, including syntax not yet used in this repository.
+- [ ] Expand the expression grammar incrementally when new project forms require it; add operator-precedence and malformed-expression tests alongside each addition.
+- [ ] Improve `DELETE FROM` / `MODIFY ... FROM` disambiguation where the source alone is ambiguous. Retain an explicit ambiguous node and diagnostic when table-symbol information is insufficient; do not guess SQL versus internal table.
+- [ ] Consider a real ABAP compiler or SAP syntax-check fixture as an external oracle for syntax validation when a supported environment becomes available. Keep it optional and offline-safe for normal Viewer use.
+- [ ] Add grammar families only when backed by project examples or an explicit new scope request; preserve the stable `parseAbapText` Viewer contract.
 
-### P1 – Luồng điều khiển và vòng lặp
+## Intentionally out of scope for this milestone
 
-- [ ] `RETURN`, `CHECK`, `CONTINUE`, `EXIT`, `ASSERT`.
-- [ ] `WHILE ... ENDWHILE`.
-
-### P1 – Chương trình, event, selection screen và dynpro
-
-- [ ] `REPORT`, `INCLUDE`, `TABLES`.
-- [ ] `SELECTION-SCREEN`, `AT SELECTION-SCREEN`.
-- [ ] `INITIALIZATION`, `LOAD-OF-PROGRAM`, `START-OF-SELECTION`, `END-OF-SELECTION`.
-- [ ] `TOP-OF-PAGE`, `END-OF-PAGE`.
-- [ ] `PUBLIC SECTION`, `EVENTS`, `CLASS-EVENTS`.
-- [ ] `MODULE ... ENDMODULE`, `CALL SCREEN`, `SET SCREEN`, `LEAVE`.
-
-### P1 – Dataset, cursor, LUW và bảo mật
-
-- [ ] `OPEN CURSOR`, `FETCH`, `CLOSE CURSOR`.
-- [ ] `OPEN DATASET`, `READ DATASET`, `TRANSFER`, `CLOSE DATASET`.
-- [ ] `UPDATE`, `COMMIT`, `ROLLBACK`.
-- [ ] `AUTHORITY-CHECK`, `SUBMIT`.
-
-### P2 – OO, dynamic và exception/event
-
-- [ ] `CREATE OBJECT`, `CREATE DATA`.
-- [ ] `ASSIGN`, `UNASSIGN`, `FREE`, `GET REFERENCE`.
-- [ ] `RAISE EXCEPTION`, `RAISE EVENT`, `SET HANDLER`.
-- [ ] Lời gọi static method độc lập, ví dụ `lcl_flight_processor=>raise_run_finished( )`.
-
-### P2 – Internal table, chuỗi và list output
-
-- [ ] `COLLECT`, `DESCRIBE`, `REFRESH`.
-- [ ] `CONCATENATE`, `SPLIT`, `CONDENSE`, `SHIFT`, `TRANSLATE`, `FIND`, `REPLACE`.
-- [ ] `ULINE`, `SKIP`.
-
-## Danh sách đầy đủ theo từ khóa đầu tiên
-
-| Hoàn tất | Nhóm | Số câu |
-|---|---|---:|
-| [ ] | `RETURN` | 9 |
-| [ ] | `SELECTION-SCREEN` | 6 |
-| [ ] | `SET` | 6 |
-| [ ] | `ULINE` | 6 |
-| [ ] | `CHECK` | 5 |
-| [ ] | `CLOSE` | 4 |
-| [ ] | `PUBLIC` | 4 |
-| [ ] | `ASSIGN` | 3 |
-| [ ] | `AT` | 3 |
-| [ ] | `AUTHORITY-CHECK` | 3 |
-| [ ] | `CONDENSE` | 3 |
-| [ ] | `CREATE` | 3 |
-| [ ] | `FREE` | 3 |
-| [ ] | `OPEN` | 3 |
-| [ ] | `RAISE` | 3 |
-| [ ] | `SKIP` | 3 |
-| [ ] | `UNASSIGN` | 3 |
-| [ ] | `ASSERT` | 2 |
-| [ ] | `CONCATENATE` | 2 |
-| [ ] | `CONTINUE` | 2 |
-| [ ] | `ENDMODULE` | 2 |
-| [ ] | `EXIT` | 2 |
-| [ ] | `LEAVE` | 2 |
-| [ ] | `MODULE` | 2 |
-| [ ] | `REPLACE` | 2 |
-| [ ] | `ROLLBACK` | 2 |
-| [ ] | `SHIFT` | 2 |
-| [ ] | `TRANSFER` | 2 |
-| [ ] | `CALL` | 1 |
-| [ ] | `CLASS-EVENTS` | 1 |
-| [ ] | `COLLECT` | 1 |
-| [ ] | `COMMIT` | 1 |
-| [ ] | `DESCRIBE` | 1 |
-| [ ] | `END-OF-PAGE` | 1 |
-| [ ] | `END-OF-SELECTION` | 1 |
-| [ ] | `ENDWHILE` | 1 |
-| [ ] | `EVENTS` | 1 |
-| [ ] | `FETCH` | 1 |
-| [ ] | `FIND` | 1 |
-| [ ] | `GET` | 1 |
-| [ ] | `INCLUDE` | 1 |
-| [ ] | `INITIALIZATION` | 1 |
-| [ ] | `LCL_FLIGHT_PROCESSOR=>RAISE_RUN_FINISHED(` | 1 |
-| [ ] | `LOAD-OF-PROGRAM` | 1 |
-| [ ] | `READ` | 1 |
-| [ ] | `REFRESH` | 1 |
-| [ ] | `REPORT` | 1 |
-| [ ] | `SPLIT` | 1 |
-| [ ] | `START-OF-SELECTION` | 1 |
-| [ ] | `SUBMIT` | 1 |
-| [ ] | `TABLES` | 1 |
-| [ ] | `TOP-OF-PAGE` | 1 |
-| [ ] | `TRANSLATE` | 1 |
-| [ ] | `UPDATE` | 1 |
-| [ ] | `WHILE` | 1 |
-
-Tổng: **55 nhóm / 119 câu lệnh**.
+- Full ABAP language coverage or compiler/type-checker behavior.
+- DDIC/database schema access, semantic name/type resolution, macro expansion, and include expansion.
+- Cloud/Standard release-conformance diagnostics.
+- EML, CDS DDL/DCL, and other artifact languages absent from the current ABAP source corpus.

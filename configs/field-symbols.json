@@ -14,9 +14,9 @@
   },
   "captureRules": [
     { "after": "FIELD-SYMBOLS", "name": "name", "label": "fs-name", "descKey": "name" },
-    { "after": "TYPE REF TO", "name": "refTo", "label": "ref-to", "descKey": "refTo" },
-    { "after": "TYPE", "name": "type", "label": "type", "descKey": "type" },
-    { "after": "LIKE", "name": "like", "label": "like", "descKey": "like" },
-    { "after": "STRUCTURE", "name": "structure", "label": "structure", "descKey": "structure" }
+    { "after": "TYPE REF TO", "name": "refTo", "label": "ref-to", "descKey": "refTo", "capture": "rest" },
+    { "after": "TYPE", "name": "type", "label": "type", "descKey": "type", "capture": "rest" },
+    { "after": "LIKE", "name": "like", "label": "like", "descKey": "like", "capture": "rest" },
+    { "after": "STRUCTURE", "name": "structure", "label": "structure", "descKey": "structure", "capture": "rest" }
   ]
 }

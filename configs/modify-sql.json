@@ -1,0 +1,17 @@
+{
+  "object": "MODIFY_SQL",
+  "match": { "startKeyword": "MODIFY" },
+  "keywordLabels": {
+    "MODIFY": "stmt",
+    "FROM": "from",
+    "USING": "using",
+    "CLIENT": "client"
+  },
+  "keywordPhrases": {
+    "USING CLIENT": "using-client"
+  },
+  "captureRules": [
+    { "after": "MODIFY", "name": "target", "label": "target" },
+    { "after": "FROM", "name": "source", "label": "source", "capture": "rest", "stopTokens": ["ACCEPTING"] }
+  ]
+}

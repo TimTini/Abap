@@ -13,6 +13,15 @@ Capture the current parser/viewer contract and the canonical paths used by templ
 - `viewer/index.inline.html` is generated from `viewer/index.html`.
 - Viewer runtime stays offline; no runtime network requests from `viewer/*`.
 
+## Parser API and syntax layer
+
+- `parseAbapText(content, configs, fileName)` remains the Viewer compatibility API and returns exactly `{ file, objects, decls }`.
+- `parseAbapTextDetailed(content, configs, fileName)` additionally returns a source-positioned `Program` tree and ordered diagnostics. Its nodes are a syntax-oriented migration layer over the current object parser; they are not a complete, independent compiler AST yet.
+- Grammar classification is grouped by statement family and runs before Viewer config selection for the explicitly enumerated forms. Config order must not decide a statement's grammar kind.
+- Lexer spans distinguish comments, literals, pragmas, operators, and statement periods. The AST retains nested expressions, block/branch relationships, and exact source ranges, including multiple statements on one line and chained declaration items.
+- Unsupported syntax remains locatable through `UnsupportedStatement` and `UNSUPPORTED_SYNTAX`; ambiguous SQL/internal-table forms are represented with an ambiguous kind and diagnostic instead of being silently guessed.
+- See [the syntax inventory](ABAP_SYNTAX_INVENTORY.md) for the measured in-repository scope and [the gap report](ABAP_PARSER_GAP_REPORT.md) for what the parser does not validate.
+
 ## Object model
 
 - Base parser output is a sparse `AbapObject` with `id`, `parent`, `objectType`, `file`, `lineStart`, `raw`, `block`, `extras`, `comment`, `keywords`, `values`, and `children`.
@@ -34,7 +43,7 @@ Capture the current parser/viewer contract and the canonical paths used by templ
 
 - `examples/deep_form_demo.abap` is the source-chain / trace sample.
 - `examples/full.abap` is the broad coverage sample.
-- `TABLES` is still not emitted because there is no `configs/tables.json`.
+- The current bounded sample corpus contains 8 ABAP files, 891 parser objects and 103 distinct object kinds. Coverage is not equivalent to compiler or SAP-system syntax validation.
 
 ## Verification
 
@@ -46,6 +55,9 @@ Capture the current parser/viewer contract and the canonical paths used by templ
 - `npm run test:viewer`
 - `node --check shared/abap-parser.js`
 - `node --check viewer/app.js`
+- `node tests/run.js parser`
+- `node tests/run.js fast`
+- `node tests/run.js full`
 
 ## Link sources
 

@@ -43,6 +43,15 @@
   }
 
   const registeredConfigs = [];
+  const genericGrammarConfigs = new Map();
+  const whileStatementConfig = normalizeConfig({
+    object: "WHILE",
+    match: { startKeyword: "WHILE" },
+    extras: { type: "ifCondition" },
+    block: { endKeyword: "ENDWHILE" },
+    keywordLabels: { WHILE: "stmt", AND: "and", OR: "or", NOT: "not", IS: "is", INITIAL: "initial" },
+    captureRules: [{ after: "WHILE", name: "condition", label: "condition", capture: "rest" }]
+  });
 
   function registerConfig(config) {
     registeredConfigs.push(normalizeConfig(config));
@@ -140,18 +149,610 @@
   }
 
   function parseAbapText(content, configs, fileName) {
+    const detailed = parseAbapTextDetailed(content, configs, fileName);
+    return { file: detailed.file, objects: detailed.objects, decls: detailed.decls };
+  }
+
+  function parseAbapTextDetailed(content, configs, fileName) {
+    const source = String(content || "");
     const lines = String(content || "").split(/\r?\n/);
     const statements = collectStatements(lines);
     const list = Array.isArray(configs) ? configs : registeredConfigs;
-    const objects = parseStatements(statements, list, fileName || "");
-
+    const knownInternalTables = collectKnownInternalTables(statements, list, fileName || "");
+    const objects = parseStatements(statements, list, fileName || "", knownInternalTables);
     const decls = attachDeclarationRefs({ statements, objects, fileName: fileName || "" });
+    const lexed = lexAbapSource(source);
+    const tokens = lexed.tokens;
+    const spans = splitStatements(tokens, source);
+    const lineStarts = buildLineStarts(source);
+    const diagnostics = lexed.diagnostics.slice();
+    const statementSpanResolver = createAstSpanResolver(spans, tokens, source);
+    const syntaxNodes = [];
+    const structuralStarts = new Set(["ENDIF", "ENDCASE", "ENDTRY", "ENDDO", "ENDWHILE", "ENDLOOP", "ENDFORM", "ENDMETHOD", "ENDCLASS", "ENDINTERFACE", "ENDMODULE", "ENDFUNCTION", "ENDSELECT"]);
+    for (let index = 0; index < statements.length; index += 1) {
+      const statement = statements[index];
+      const parsed = parseStatement(statement, list, fileName || "", null, () => 0) || [];
+      const span = statementSpanResolver(statement);
+      if (!span) continue;
+      if (parsed.length) {
+        const malformedMessage = getSupportedSyntaxError(statement.raw);
+        if (malformedMessage) {
+          const startLocation = getSourceLocation(source, span.offsetStart, lineStarts);
+          const endLocation = getSourceLocation(source, span.offsetEnd, lineStarts);
+          diagnostics.push({ code: "SYNTAX_ERROR", severity: "error", message: malformedMessage,
+            offsetStart: span.offsetStart, offsetEnd: span.offsetEnd,
+            lineStart: startLocation.line, columnStart: startLocation.column,
+            lineEnd: endLocation.line, columnEnd: endLocation.column });
+        }
+        continue;
+      }
+      const token = tokens.find((candidate) => candidate.offsetStart >= span.offsetStart && candidate.kind !== "comment");
+      const first = token ? token.upper : "";
+      if (structuralStarts.has(first)) continue;
+      const startLocation = getSourceLocation(source, span.offsetStart, lineStarts);
+      const endLocation = getSourceLocation(source, span.offsetEnd, lineStarts);
+      syntaxNodes.push({ kind: "UnsupportedStatement", family: "unsupported", offsetStart: span.offsetStart,
+        offsetEnd: span.offsetEnd, lineStart: startLocation.line, columnStart: startLocation.column,
+        lineEnd: endLocation.line, columnEnd: endLocation.column, raw: span.raw, children: [] });
+      diagnostics.push({ code: "UNSUPPORTED_SYNTAX", severity: "warning",
+        message: `Statement is not supported by this parser: ${first || "<empty>"}.`,
+        offsetStart: span.offsetStart, offsetEnd: span.offsetEnd,
+        lineStart: startLocation.line, columnStart: startLocation.column,
+        lineEnd: endLocation.line, columnEnd: endLocation.column });
+    }
+    const blockAnalysis = collectBlockDiagnostics(tokens, spans, source, lineStarts);
+    diagnostics.push(...blockAnalysis.diagnostics);
+    const diagnosticSpanResolver = createAstSpanResolver(spans, tokens, source);
+    for (const object of collectAllObjects(objects)) {
+      if (!String(object.objectType || "").endsWith("_AMBIGUOUS")) continue;
+      const span = diagnosticSpanResolver(object);
+      if (!span) continue;
+      const location = getSourceLocation(source, span.offsetStart, lineStarts);
+      const endLocation = getSourceLocation(source, span.offsetEnd, lineStarts);
+      diagnostics.push({ code: "AMBIGUOUS_STATEMENT_KIND", severity: "warning",
+        message: `${object.objectType} has syntax shared by multiple ABAP statement families; table symbol information is insufficient to decide.`,
+        offsetStart: span.offsetStart, offsetEnd: span.offsetEnd, lineStart: location.line, columnStart: location.column,
+        lineEnd: endLocation.line, columnEnd: endLocation.column });
+    }
+    const ast = {
+      kind: "Program",
+      children: groupSelectLoopNodes(objectsToAstNodes(objects, spans, tokens, source, lineStarts,
+        createAstSpanResolver(spans, tokens, source), blockAnalysis.terminatorsByStartOffset),
+        blockAnalysis.terminatorsByStartOffset).concat(syntaxNodes)
+        .sort((left, right) => left.offsetStart - right.offsetStart)
+    };
 
     return {
       file: fileName || "",
+      ast,
       objects,
-      decls
+      decls,
+      diagnostics: diagnostics.sort((left, right) => left.offsetStart - right.offsetStart)
     };
+  }
+
+  function getSupportedSyntaxError(raw) {
+    const text = String(raw || "").trim();
+    const tokens = tokenize(text);
+    const first = tokens[0] ? tokens[0].upper : "";
+    if (["IF", "ELSEIF", "WHILE"].includes(first)) {
+      const condition = text.replace(/^[A-Z]+\b/i, "").replace(/\.\s*$/, "").trim();
+      if (!condition) return `${first} requires a condition.`;
+      if (/(?:=|<>|<=|>=|<|>|\bAND|\bOR|\bIS|\bNOT|\bBETWEEN|\bIN)\s*$/i.test(condition)) {
+        return `${first} condition ends before a required operand.`;
+      }
+    }
+    if (["DATA", "TYPES", "CONSTANTS", "STATICS", "PARAMETERS"].includes(first)
+      && /\bTYPE\s*\.\s*$/i.test(text)) {
+      return `${first} declaration has TYPE without a type name.`;
+    }
+    return "";
+  }
+
+  function collectBlockDiagnostics(tokens, spans, source, lineStarts) {
+    const endByStart = new Map([
+      ["IF", "ENDIF"], ["CASE", "ENDCASE"], ["TRY", "ENDTRY"], ["DO", "ENDDO"],
+      ["WHILE", "ENDWHILE"], ["LOOP", "ENDLOOP"], ["FORM", "ENDFORM"],
+      ["METHOD", "ENDMETHOD"], ["CLASS", "ENDCLASS"], ["INTERFACE", "ENDINTERFACE"],
+      ["MODULE", "ENDMODULE"], ["FUNCTION", "ENDFUNCTION"], ["SELECT", "ENDSELECT"]
+    ]);
+    const stack = [];
+    const diagnostics = [];
+    const terminatorsByStartOffset = new Map();
+    for (let spanIndex = 0; spanIndex < spans.length; spanIndex += 1) {
+      const span = spans[spanIndex];
+      const token = tokens.find((candidate) => candidate.offsetStart >= span.offsetStart && candidate.offsetStart < span.offsetEnd && candidate.kind !== "comment");
+      if (!token) continue;
+      const statementText = source.slice(span.offsetStart, span.offsetEnd);
+      if (token.upper === "CLASS" && /\bDEFERRED\b/i.test(statementText)) continue;
+      if (token.upper === "SELECT" && !isSelectLoopHeader(statementText)) continue;
+      if (endByStart.has(token.upper)) {
+        stack.push({ end: endByStart.get(token.upper), span, token });
+        continue;
+      }
+      if (/^END(?:IF|CASE|TRY|DO|WHILE|LOOP|FORM|METHOD|CLASS|INTERFACE|MODULE|FUNCTION|SELECT)$/.test(token.upper)) {
+        const start = stack[stack.length - 1];
+        if (!start || start.end !== token.upper) {
+          const endToken = tokens.find((candidate) => candidate.offsetStart >= span.offsetStart && candidate.kind !== "comment") || token;
+          const location = getSourceLocation(source, endToken.offsetStart, lineStarts);
+          const endLocation = getSourceLocation(source, span.offsetEnd, lineStarts);
+          diagnostics.push({ code: "UNMATCHED_BLOCK_END", severity: "error", message: `Unexpected ${token.upper} without matching ${start ? start.end : "block start"}.`,
+            offsetStart: span.offsetStart, offsetEnd: span.offsetEnd, lineStart: location.line, columnStart: location.column,
+            lineEnd: endLocation.line, columnEnd: endLocation.column });
+        } else {
+          const matched = stack.pop();
+          terminatorsByStartOffset.set(matched.span.offsetStart, span);
+        }
+      }
+    }
+    for (const open of stack) {
+      const location = getSourceLocation(source, open.span.offsetStart, lineStarts);
+      const endLocation = getSourceLocation(source, open.span.offsetEnd, lineStarts);
+      diagnostics.push({ code: "UNTERMINATED_BLOCK", severity: "error", message: `Block starting here is missing ${open.end}.`,
+        offsetStart: open.span.offsetStart, offsetEnd: open.span.offsetEnd, lineStart: location.line, columnStart: location.column,
+        lineEnd: endLocation.line, columnEnd: endLocation.column });
+    }
+    return { diagnostics, terminatorsByStartOffset };
+  }
+
+  function isSelectLoopHeader(statementText) {
+    const text = String(statementText || "");
+    if (/\bSELECT\s+SINGLE\b/i.test(text)) return false;
+    if (/\b(?:COUNT|SUM|MIN|MAX|AVG)\s*\(/i.test(text) && !/\bGROUP\s+BY\b/i.test(text)) return false;
+    if (/\b(?:INTO|APPENDING)\s+(?:CORRESPONDING\s+FIELDS\s+OF\s+)?TABLE\b/i.test(text)
+      && !/\bPACKAGE\s+SIZE\b/i.test(text)) return false;
+    return true;
+  }
+
+  function objectsToAstNodes(objects, spans, tokens, source, lineStarts,
+    spanResolver = createAstSpanResolver(spans, tokens, source), terminatorsByStartOffset = new Map()) {
+    const nodes = [];
+    for (let index = 0; index < objects.length; index += 1) {
+      const object = objects[index];
+      const node = objectToAstNode(object, spans, tokens, source, lineStarts, spanResolver, terminatorsByStartOffset);
+      if (String(object.objectType || "").toUpperCase() === "IF") {
+        while (index + 1 < objects.length && ["ELSEIF", "ELSE"].includes(String(objects[index + 1].objectType || "").toUpperCase())) {
+          const branch = objects[++index];
+          node.branches.push(objectToAstNode(branch, spans, tokens, source, lineStarts, spanResolver, terminatorsByStartOffset));
+          if (String(branch.objectType || "").toUpperCase() === "ELSE") break;
+        }
+      }
+      nodes.push(node);
+    }
+    return nodes;
+  }
+
+  function createAstSpanResolver(spans, tokens, source) {
+    const spansByLine = new Map();
+    for (let index = 0; index < spans.length; index += 1) {
+      const line = spans[index].lineStart;
+      if (!spansByLine.has(line)) spansByLine.set(line, []);
+      spansByLine.get(line).push(index);
+    }
+    const consumedThrough = new Map();
+
+    return (object) => {
+      const line = Number(object && object.lineStart || 0);
+      const sameLine = spansByLine.get(line) || [];
+      const objectTokens = lexAbapSource(String(object && object.raw || "")).tokens
+        .filter((token) => token.kind !== "comment");
+      const segmentIndex = Number(object && object.segmentIndex);
+      const preferredIndex = Number.isInteger(segmentIndex) && segmentIndex >= 0 && segmentIndex < sameLine.length
+        ? sameLine[segmentIndex] : -1;
+      const candidates = preferredIndex >= 0
+        ? [preferredIndex, ...spans.map((_, index) => index).filter((index) => index !== preferredIndex)]
+        : spans.map((_, index) => index);
+      for (const spanIndex of candidates) {
+        const span = spans[spanIndex];
+        const sourceTokens = tokens.filter((token) => token.kind !== "comment"
+          && token.offsetStart >= span.offsetStart && token.offsetEnd <= span.offsetEnd);
+        const searchFrom = consumedThrough.get(spanIndex) || 0;
+        const range = findAstTokenRange(sourceTokens, objectTokens, searchFrom);
+        if (!range) continue;
+        consumedThrough.set(spanIndex, range.endIndex + 1);
+        return {
+          offsetStart: sourceTokens[range.startIndex].offsetStart,
+          offsetEnd: sourceTokens[range.endIndex].offsetEnd,
+          lineStart: sourceTokens[range.startIndex].lineStart,
+          lineEnd: sourceTokens[range.endIndex].lineEnd,
+          raw: source.slice(sourceTokens[range.startIndex].offsetStart, sourceTokens[range.endIndex].offsetEnd),
+          spanIndex
+        };
+      }
+      const lineSpanIndex = spans.findIndex((span) => span.lineStart <= line && span.lineEnd >= line);
+      return lineSpanIndex >= 0 ? { ...spans[lineSpanIndex], spanIndex: lineSpanIndex } : null;
+    };
+  }
+
+  function findAstTokenRange(sourceTokens, objectTokens, searchFrom) {
+    if (!sourceTokens.length || !objectTokens.length) return null;
+    const candidates = [objectTokens, objectTokens.slice(1)];
+    for (const expected of candidates) {
+      if (!expected.length) continue;
+      for (let startIndex = searchFrom; startIndex < sourceTokens.length; startIndex += 1) {
+        if (!sameAbapToken(sourceTokens[startIndex], expected[0])) continue;
+        let sourceIndex = startIndex;
+        let expectedIndex = 0;
+        let lastMatchedIndex = startIndex;
+        while (sourceIndex < sourceTokens.length && expectedIndex < expected.length) {
+          if (sameAbapToken(sourceTokens[sourceIndex], expected[expectedIndex])
+            || (expected[expectedIndex].raw === "." && sourceTokens[sourceIndex].raw === ",")) {
+            lastMatchedIndex = sourceIndex;
+            expectedIndex += 1;
+            sourceIndex += 1;
+          } else if ([",", ":"].includes(sourceTokens[sourceIndex].raw)) {
+            sourceIndex += 1;
+          } else {
+            break;
+          }
+        }
+        if (expectedIndex === expected.length) return { startIndex, endIndex: lastMatchedIndex };
+      }
+    }
+    return null;
+  }
+
+  function sameAbapToken(left, right) {
+    return String(left && left.upper || left && left.raw || "").toUpperCase()
+      === String(right && right.upper || right && right.raw || "").toUpperCase();
+  }
+
+  function objectToAstNode(object, spans, tokens, source, lineStarts, spanResolver, terminatorsByStartOffset = new Map()) {
+    const objectLine = Number(object && object.lineStart || 0);
+    const raw = spanResolver(object);
+    const mappedKind = {
+      DATA: "Declaration",
+      TYPES: "TypeDeclaration",
+      CONSTANTS: "ConstantDeclaration",
+      FIELD_SYMBOLS: "FieldSymbolDeclaration",
+      ASSIGNMENT: "Assignment",
+      WRITE: "Write",
+      IF: "If",
+      ELSEIF: "ElseIf",
+      ELSE: "Else",
+      LOOP_AT_ITAB: "Loop",
+      LOOP: "Loop",
+      WHILE: "While",
+      READ_TABLE: "ReadTable",
+      APPEND: "Append",
+      MODIFY_ITAB: "ModifyItab",
+      DELETE_ITAB: "DeleteItab",
+      SELECT: "Select",
+      PERFORM: "Perform",
+      FORM: "Form",
+      METHOD: "Method",
+      CLASS: "Class"
+    }[String(object && object.objectType || "").toUpperCase()]
+      || String(object && object.objectType || "Unknown").toLowerCase().replace(/(^|_)([a-z])/g, (_, p, c) => c.toUpperCase());
+    const start = raw ? raw.offsetStart : sourceOffsetForLine(source, objectLine);
+    const end = raw ? raw.offsetEnd : start;
+    const location = getSourceLocation(source, start, lineStarts);
+    const endLocation = getSourceLocation(source, end, lineStarts);
+    const node = {
+      kind: mappedKind,
+      family: getAstFamily(object && object.objectType),
+      offsetStart: start,
+      offsetEnd: end,
+      lineStart: location.line,
+      columnStart: location.column,
+      lineEnd: endLocation.line,
+      columnEnd: endLocation.column,
+      raw: raw ? source.slice(raw.offsetStart, raw.offsetEnd) : String(object && object.raw || ""),
+      children: objectsToAstNodes(object && Array.isArray(object.children) ? object.children : [], spans, tokens, source, lineStarts, spanResolver, terminatorsByStartOffset),
+      branches: []
+    };
+    const expressionText = object && object.values && object.values.expr && object.values.expr.value;
+    const conditionText = object && object.values && object.values.condition && object.values.condition.value
+      || findStringProperty(object && object.extras, "conditionRaw");
+    if (expressionText) node.expression = parseExpressionTree(expressionText);
+    if (conditionText) node.condition = parseExpressionTree(conditionText);
+    const pairedTerminator = terminatorsByStartOffset.get(start);
+    if (pairedTerminator) {
+      node.terminator = { kind: String(object.block && object.block.endKeyword || "ENDSELECT").toUpperCase(),
+        offsetStart: pairedTerminator.offsetStart, offsetEnd: pairedTerminator.offsetEnd, raw: pairedTerminator.raw };
+    } else if (object && object.block && object.block.endKeyword
+      && !(String(object.objectType || "").toUpperCase() === "CLASS" && /\bDEFERRED\b/i.test(object.raw || ""))) {
+      const endRaw = String(object.block.endRaw || "").trim().toUpperCase();
+      if (endRaw) {
+        const terminatorSpan = spans.find((span) => span.lineStart >= objectLine && span.raw.trim().toUpperCase() === endRaw);
+        if (terminatorSpan) node.terminator = { kind: object.block.endKeyword,
+          offsetStart: terminatorSpan.offsetStart, offsetEnd: terminatorSpan.offsetEnd, raw: terminatorSpan.raw };
+      }
+    }
+    return node;
+  }
+
+  function groupSelectLoopNodes(nodes, terminatorsByStartOffset) {
+    for (const node of nodes) {
+      node.children = groupSelectLoopNodes(node.children || [], terminatorsByStartOffset);
+      node.branches = (node.branches || []).map((branch) => ({
+        ...branch, children: groupSelectLoopNodes(branch.children || [], terminatorsByStartOffset)
+      }));
+    }
+    const roots = [];
+    const stack = [];
+    const append = (node) => (stack.length ? stack[stack.length - 1].body : roots).push(node);
+    for (const node of nodes) {
+      if (node.kind === "Select" && terminatorsByStartOffset.has(node.offsetStart)) {
+        append(node);
+        stack.push({ node, body: [] });
+        continue;
+      }
+      const active = stack[stack.length - 1];
+      if (node.kind === "Endselect" && active
+        && terminatorsByStartOffset.get(active.node.offsetStart).offsetStart === node.offsetStart) {
+        active.node.children.push(...active.body);
+        active.node.terminator = { kind: "ENDSELECT", offsetStart: node.offsetStart,
+          offsetEnd: node.offsetEnd, raw: node.raw };
+        stack.pop();
+        continue;
+      }
+      append(node);
+    }
+    return roots;
+  }
+
+  function getAstFamily(objectType) {
+    const kind = String(objectType || "").toUpperCase();
+    if (["DATA", "TYPES", "CONSTANTS", "RANGES", "STATICS", "PARAMETERS", "SELECT-OPTIONS", "FIELD-SYMBOLS", "CLASS-DATA", "METHODS", "CLASS-METHODS", "CLASS", "INTERFACE", "PUBLIC_SECTION", "PRIVATE_SECTION", "PROTECTED_SECTION"].includes(kind)) return "declarations";
+    if (["IF", "ELSEIF", "ELSE", "CASE", "WHEN", "TRY", "CATCH", "CLEANUP", "DO", "WHILE", "LOOP", "LOOP_AT_ITAB", "EXIT", "CHECK", "CONTINUE", "RETURN"].includes(kind)) return "control-flow";
+    if (["APPEND", "INSERT_ITAB", "MODIFY_ITAB", "DELETE_ITAB", "READ_TABLE", "SORT_ITAB", "COLLECT"].includes(kind)) return "internal-tables";
+    if (["SELECT", "DELETE_SQL", "INSERT_SQL", "MODIFY_SQL", "UPDATE_SQL", "DELETE_AMBIGUOUS", "MODIFY_AMBIGUOUS", "OPEN_CURSOR", "FETCH", "CLOSE_CURSOR"].includes(kind)) return "database-sql";
+    if (["FORM", "PERFORM", "METHOD", "CALL_METHOD", "CALL_FUNCTION", "CALL_TRANSACTION", "SUBMIT", "CALL_SCREEN", "SET_SCREEN", "LEAVE_SCREEN", "MODULE"].includes(kind)) return "calls-and-procedures";
+    if (["ASSIGN", "UNASSIGN", "CREATE_DATA", "CREATE_OBJECT", "GET_REFERENCE", "FREE"].includes(kind)) return "dynamic-data";
+    if (["CONCATENATE", "SPLIT", "CONDENSE", "REPLACE", "SHIFT", "TRANSLATE", "FIND"].includes(kind)) return "string-processing";
+    if (["OPEN_DATASET", "READ_DATASET", "TRANSFER", "CLOSE_DATASET"].includes(kind)) return "dataset-io";
+    return "statements";
+  }
+
+  function findStringProperty(value, propertyName) {
+    if (!value || typeof value !== "object") return "";
+    if (typeof value[propertyName] === "string") return value[propertyName];
+    for (const child of Object.values(value)) {
+      const found = findStringProperty(child, propertyName);
+      if (found) return found;
+    }
+    return "";
+  }
+
+  function parseExpressionTree(expressionText) {
+    const tokens = lexAbapSource(String(expressionText || "")).tokens
+      .filter((token) => token.kind !== "comment" && token.kind !== "pragma" && token.kind !== "period");
+    let index = 0;
+    const operatorPrecedence = new Map([
+      ["EQUIV", 1], ["OR", 2], ["AND", 3], ["=", 4], ["==", 4], ["<>", 4], ["<", 4], [">", 4],
+      ["<=", 4], [">=", 4], ["IS", 4], ["BETWEEN", 4], ["NOT", 4], ["IN", 4], ["CP", 4], ["NP", 4],
+      ["CO", 4], ["CN", 4], ["CA", 4], ["NA", 4], ["LIKE", 4], ["?=", 4], ["&&", 5], ["+", 5],
+      ["-", 5], ["*", 6], ["/", 6], ["DIV", 6], ["MOD", 6]
+    ]);
+    const current = () => tokens[index];
+    const consume = () => tokens[index++];
+    const precedence = (token) => operatorPrecedence.get(token ? token.upper : "") || 0;
+
+    function primary() {
+      const token = current();
+      if (!token) return null;
+      if (["NOT", "+", "-"].includes(token.upper)) {
+        consume();
+        return { kind: "UnaryExpression", operator: token.upper, argument: parse(7) };
+      }
+      if (token.raw === "(") {
+        consume();
+        const expression = parse(1);
+        if (current() && current().raw === ")") consume();
+        return { kind: "GroupExpression", expression };
+      }
+      consume();
+      if (["literal", "template", "number"].includes(token.kind)) return { kind: "Literal", value: token.raw };
+      return { kind: "Identifier", name: token.raw };
+    }
+
+    function parse(minimum) {
+      let left = primary();
+      while (current() && precedence(current()) >= minimum) {
+        const operator = consume().upper;
+        const level = operatorPrecedence.get(operator);
+        if (operator === "IS") {
+          const negated = current() && current().upper === "NOT";
+          if (negated) consume();
+          const predicate = current() ? consume().upper : "";
+          left = { kind: "PredicateExpression", predicate, negated, operand: left };
+          continue;
+        }
+        if (operator === "BETWEEN" || (operator === "NOT" && current() && current().upper === "BETWEEN")) {
+          const negated = operator === "NOT";
+          if (negated) consume();
+          const lower = parse(level + 1);
+          if (current() && current().upper === "AND") consume();
+          const upper = parse(level + 1);
+          left = { kind: "RangePredicate", negated, operand: left, lower, upper };
+          continue;
+        }
+        const right = parse(level + 1);
+        const logical = ["AND", "OR", "EQUIV"].includes(operator);
+        left = { kind: logical ? "LogicalExpression" : "BinaryExpression", operator, left, right };
+      }
+      return left;
+    }
+
+    return parse(1);
+  }
+
+  function sourceOffsetForLine(source, line) {
+    if (!line || line <= 1) return 0;
+    let offset = 0;
+    for (let current = 1; current < line && offset < source.length; current += 1) {
+      const newline = source.indexOf("\n", offset);
+      if (newline < 0) return source.length;
+      offset = newline + 1;
+    }
+    return offset;
+  }
+
+  function buildLineStarts(source) {
+    const starts = [0];
+    for (let index = 0; index < source.length; index += 1) {
+      if (source[index] === "\n") starts.push(index + 1);
+    }
+    return starts;
+  }
+
+  function getSourceLocation(source, offset, lineStarts = buildLineStarts(source)) {
+    const bounded = Math.max(0, Math.min(source.length, offset));
+    let low = 0;
+    let high = lineStarts.length;
+    while (low + 1 < high) {
+      const middle = Math.floor((low + high) / 2);
+      if (lineStarts[middle] <= bounded) low = middle;
+      else high = middle;
+    }
+    return { line: low + 1, column: bounded - lineStarts[low] + 1 };
+  }
+
+  function lexAbapSource(sourceText) {
+    const source = String(sourceText || "");
+    const lineStarts = buildLineStarts(source);
+    const tokens = [];
+    const diagnostics = [];
+    let index = 0;
+
+    const emit = (kind, start, end) => {
+      const startLocation = getSourceLocation(source, start, lineStarts);
+      const endLocation = getSourceLocation(source, end, lineStarts);
+      const raw = source.slice(start, end);
+      tokens.push({
+        kind, raw, upper: raw.toUpperCase(), offsetStart: start, offsetEnd: end,
+        lineStart: startLocation.line, columnStart: startLocation.column,
+        lineEnd: endLocation.line, columnEnd: endLocation.column
+      });
+    };
+
+    while (index < source.length) {
+      const char = source[index];
+      if (/\s/.test(char)) { index += 1; continue; }
+      const linePrefix = source.slice(source.lastIndexOf("\n", index - 1) + 1, index);
+      if (char === "*" && !linePrefix.trim()) {
+        const end = source.indexOf("\n", index);
+        const finish = end < 0 ? source.length : end;
+        emit("comment", index, finish); index = finish; continue;
+      }
+      if (char === '"') {
+        const end = source.indexOf("\n", index);
+        const finish = end < 0 ? source.length : end;
+        emit("comment", index, finish); index = finish; continue;
+      }
+      if (char === "'" || char === "`") {
+        const start = index++;
+        let closed = false;
+        while (index < source.length) {
+          if (source[index] === "\n" || source[index] === "\r") break;
+          if (source[index] === char) {
+            if (source[index + 1] === char) { index += 2; continue; }
+            index += 1; closed = true; break;
+          }
+          index += 1;
+        }
+        emit("literal", start, index);
+        if (!closed) tokens[tokens.length - 1].unterminated = true;
+        if (!closed) diagnostics.push(makeLexDiagnostic("UNTERMINATED_LITERAL", "Unterminated text literal.", source, start, index, lineStarts));
+        continue;
+      }
+      if (char === "|") {
+        const start = index++;
+        let closed = false;
+        let braceDepth = 0;
+        while (index < source.length) {
+          const current = source[index];
+          if (current === "{" && source[index - 1] !== "\\") braceDepth += 1;
+          if (current === "}" && braceDepth > 0) braceDepth -= 1;
+          if (current === "|" && source[index + 1] === "|") { index += 2; continue; }
+          if (current === "|" && braceDepth === 0) { index += 1; closed = true; break; }
+          index += 1;
+        }
+        emit("template", start, index);
+        if (!closed) diagnostics.push(makeLexDiagnostic("UNTERMINATED_TEMPLATE", "Unterminated string template.", source, start, index, lineStarts));
+        continue;
+      }
+      if (char === "#" && source[index + 1] === "#") {
+        const start = index; index += 2;
+        while (index < source.length && /[A-Za-z0-9_]/.test(source[index])) index += 1;
+        emit("pragma", start, index); continue;
+      }
+      if (/\d/.test(char)) {
+        const start = index++;
+        while (index < source.length && /[\d_]/.test(source[index])) index += 1;
+        if (source[index] === "." && /\d/.test(source[index + 1] || "")) {
+          index += 1; while (index < source.length && /[\d_]/.test(source[index])) index += 1;
+        }
+        emit("number", start, index); continue;
+      }
+      if (char === "<") {
+        const close = source.indexOf(">", index + 1);
+        if (close > index + 1 && /^[A-Za-z_][A-Za-z0-9_]*$/.test(source.slice(index + 1, close))) {
+          const start = index; index = close + 1; emit("identifier", start, index); continue;
+        }
+      }
+      if (/[A-Za-z_]/.test(char)) {
+        const start = index++;
+        while (index < source.length && /[A-Za-z0-9_~\/\\-]/.test(source[index])) index += 1;
+        emit("identifier", start, index); continue;
+      }
+      const start = index;
+      const multi = ["->*", "->", "=>", "<=", ">=", "<>", "==", "&&=", "&&", "+=", "-=", "*=", "/="]
+        .find((operator) => source.startsWith(operator, index));
+      if (multi) index += multi.length;
+      else index += 1;
+      const raw = source.slice(start, index);
+      const kind = raw === "." ? "period" : /^[(),:]$/.test(raw) ? "punctuation" : "operator";
+      emit(kind, start, index);
+    }
+    return { tokens, diagnostics };
+  }
+
+  function makeLexDiagnostic(code, message, source, start, end, lineStarts = buildLineStarts(source)) {
+    const startLocation = getSourceLocation(source, start, lineStarts);
+    const endLocation = getSourceLocation(source, end, lineStarts);
+    return { code, severity: "error", message, offsetStart: start, offsetEnd: end,
+      lineStart: startLocation.line, columnStart: startLocation.column,
+      lineEnd: endLocation.line, columnEnd: endLocation.column };
+  }
+
+  function splitStatements(tokens, sourceText) {
+    const source = String(sourceText || "");
+    const lineStarts = buildLineStarts(source);
+    const result = [];
+    let startToken = null;
+    let previousToken = null;
+    let nesting = 0;
+    for (const token of tokens) {
+      if (token.kind === "comment") continue;
+      if (startToken && previousToken && previousToken.unterminated && token.lineStart > previousToken.lineEnd) {
+        result.push({ offsetStart: startToken.offsetStart, offsetEnd: previousToken.offsetEnd,
+          lineStart: startToken.lineStart, lineEnd: previousToken.lineEnd,
+          raw: source.slice(startToken.offsetStart, previousToken.offsetEnd) });
+        startToken = null;
+        nesting = 0;
+      }
+      if (!startToken) startToken = token;
+      if (token.raw === "(" || token.raw === "{") nesting += 1;
+      if (token.raw === ")" || token.raw === "}") nesting = Math.max(0, nesting - 1);
+      if (token.kind === "period" && nesting === 0) {
+        const loc = getSourceLocation(source, token.offsetEnd, lineStarts);
+        result.push({ offsetStart: startToken.offsetStart, offsetEnd: token.offsetEnd,
+          lineStart: startToken.lineStart, lineEnd: loc.line,
+          raw: source.slice(startToken.offsetStart, token.offsetEnd) });
+        startToken = null;
+      }
+      previousToken = token;
+    }
+    if (startToken) {
+      const last = tokens.filter((token) => token.kind !== "comment").at(-1);
+      const loc = getSourceLocation(source, last ? last.offsetEnd : startToken.offsetEnd, lineStarts);
+      result.push({ offsetStart: startToken.offsetStart, offsetEnd: last ? last.offsetEnd : startToken.offsetEnd,
+        lineStart: startToken.lineStart, lineEnd: loc.line,
+        raw: source.slice(startToken.offsetStart, last ? last.offsetEnd : startToken.offsetEnd) });
+    }
+    return result;
   }
 
   function pickPreferredStatementComment(statementBuffer) {
@@ -302,7 +903,7 @@
 
       const trailing = source.slice(segmentStart).trim();
       if (trailing) {
-        segments.push({ code: trailing, terminated: false });
+        segments.push({ code: trailing, terminated: inSingleQuote || inBacktick });
       }
 
       return segments;
@@ -462,7 +1063,121 @@
     return { code: text, comment: "" };
   }
 
-  function parseStatements(statements, configs, fileName) {
+  const projectStatementGrammar = [
+    ["PUBLIC SECTION", "PUBLIC_SECTION"], ["PRIVATE SECTION", "PRIVATE_SECTION"], ["PROTECTED SECTION", "PROTECTED_SECTION"],
+    ["CLASS-EVENTS", "CLASS_EVENTS"], ["SELECTION-SCREEN", "SELECTION_SCREEN"], ["MOVE-CORRESPONDING", "MOVE-CORRESPONDING"],
+    ["CALL TRANSACTION", "CALL_TRANSACTION"], ["AT SELECTION-SCREEN", "AT_SELECTION_SCREEN"],
+    ["START-OF-SELECTION", "START_OF_SELECTION"], ["END-OF-SELECTION", "END_OF_SELECTION"],
+    ["LOAD-OF-PROGRAM", "LOAD_OF_PROGRAM"], ["TOP-OF-PAGE", "TOP_OF_PAGE"], ["END-OF-PAGE", "END_OF_PAGE"],
+    ["AUTHORITY-CHECK", "AUTHORITY_CHECK"], ["OPEN CURSOR", "OPEN_CURSOR"], ["CLOSE CURSOR", "CLOSE_CURSOR"],
+    ["GET REFERENCE", "GET_REFERENCE"], ["CREATE OBJECT", "CREATE_OBJECT"], ["CREATE DATA", "CREATE_DATA"],
+    ["OPEN DATASET", "OPEN_DATASET"], ["CLOSE DATASET", "CLOSE_DATASET"], ["READ DATASET", "READ_DATASET"],
+    ["RAISE EXCEPTION", "RAISE_EXCEPTION"], ["RAISE EVENT", "RAISE_EVENT"], ["SET HANDLER", "SET_HANDLER"],
+    ["CALL SCREEN", "CALL_SCREEN"], ["LEAVE SCREEN", "LEAVE_SCREEN"], ["SET SCREEN", "SET_SCREEN"],
+    ["DESCRIBE TABLE", "DESCRIBE_TABLE"], ["COMMIT WORK", "COMMIT_WORK"], ["ROLLBACK WORK", "ROLLBACK_WORK"],
+    ["ENDSELECT", "ENDSELECT"], ["ENDMODULE", "ENDMODULE"], ["INITIALIZATION", "INITIALIZATION"],
+    ["START-OF-SELECTION", "START_OF_SELECTION"], ["END-OF-SELECTION", "END_OF_SELECTION"],
+    ["INCLUDE", "INCLUDE"], ["REPORT", "REPORT"], ["TABLES", "TABLES"], ["RANGES", "RANGES"],
+    ["STATICS", "STATICS"], ["MOVE", "MOVE"], ["EVENTS", "EVENTS"],
+    ["MODULE", "MODULE", "ENDMODULE"], ["ASSERT", "ASSERT"], ["RETURN", "RETURN"], ["CONTINUE", "CONTINUE"],
+    ["CHECK", "CHECK"], ["EXIT", "EXIT"], ["AUTHORITY-CHECK", "AUTHORITY_CHECK"],
+    ["FETCH", "FETCH"], ["TRANSFER", "TRANSFER"], ["COLLECT", "COLLECT"], ["REFRESH", "REFRESH"], ["ASSIGN", "ASSIGN"],
+    ["UNASSIGN", "UNASSIGN"], ["FREE", "FREE"], ["CONDENSE", "CONDENSE"], ["CONCATENATE", "CONCATENATE"],
+    ["SPLIT", "SPLIT"], ["SHIFT", "SHIFT"], ["TRANSLATE", "TRANSLATE"], ["FIND", "FIND"],
+    ["REPLACE", "REPLACE"], ["ULINE", "ULINE"], ["SKIP", "SKIP"], ["SUBMIT", "SUBMIT"],
+    ["WHILE", "WHILE", "ENDWHILE"]
+  ].map(([phrase, object, endKeyword]) => ({ phrase, object, endKeyword: endKeyword || "" }));
+
+  function collectKnownInternalTables(statements, configs, fileName) {
+    const names = new Set();
+    const declarationStarts = new Set(["DATA", "TYPES", "STATICS", "FIELD-SYMBOLS"]);
+    for (const statement of statements) {
+      const start = getStatementStartKeyword(statement.raw);
+      if (!declarationStarts.has(start)) continue;
+      const objects = parseStatement(statement, configs, fileName, null, () => 0) || [];
+      for (const object of objects) {
+        const name = object && object.values && object.values.name && object.values.name.value;
+        if (name && /\b(?:STANDARD|SORTED|HASHED)?\s*TABLE\b|\bTABLE\s+OF\b/i.test(object.raw || "")) names.add(String(name).toUpperCase());
+      }
+    }
+    return names;
+  }
+
+  function parseProjectGrammarStatement(tokens, statement, configs, fileName, parentId, nextId, knownInternalTables) {
+    const first = tokens[0] ? tokens[0].upper : "";
+    const second = tokens[1] ? tokens[1].upper : "";
+    let descriptor = null;
+    const hasHostEscape = tokens.some((token) => String(token.raw || "").startsWith("@"));
+    const tableAt = knownInternalTables.has(String(tokens[2] && tokens[2].raw || "").toUpperCase());
+    if (first === "MODIFY" && second === "SCREEN") {
+      descriptor = { phrase: "MODIFY SCREEN", object: "MODIFY_SCREEN" };
+    } else if (first === "DELETE") {
+      if (second === "FROM") {
+        descriptor = tableAt ? { phrase: "DELETE", object: "DELETE_ITAB" }
+          : hasHostEscape ? { phrase: "DELETE", object: "DELETE_SQL" }
+            : { phrase: "DELETE", object: "DELETE_AMBIGUOUS" };
+      } else if (hasHostEscape && tokens.some((token) => token.upper === "FROM")) {
+        descriptor = { phrase: "DELETE", object: "DELETE_SQL" };
+      } else if (second === "ADJACENT" || second === "TABLE" || second === "INDEX" || second === "WHERE" || knownInternalTables.has(String(tokens[1] && tokens[1].raw || "").toUpperCase())) {
+        descriptor = { phrase: "DELETE", object: "DELETE_ITAB" };
+      }
+    } else if (first === "INSERT") {
+      const raw = String(statement.raw || "");
+      if (/\bINTO\s+TABLE\b/i.test(raw) || /^INSERT\s+(?:LINES\s+OF|INITIAL\s+LINE|VALUE\b)/i.test(raw)) {
+        descriptor = { phrase: "INSERT", object: "INSERT_ITAB" };
+      } else if (/\bFROM\b/i.test(raw) || /^INSERT\s+INTO\b/i.test(raw)) {
+        descriptor = { phrase: "INSERT", object: "INSERT_SQL" };
+      }
+    } else if (first === "MODIFY") {
+      if (second === "TABLE" || knownInternalTables.has(String(tokens[1] && tokens[1].raw || "").toUpperCase())
+        || tokens.some((token) => ["INDEX", "TRANSPORTING", "USING", "WHERE"].includes(token.upper))) {
+        descriptor = { phrase: "MODIFY", object: "MODIFY_ITAB" };
+      } else if (hasHostEscape || hasModifySubquerySource(tokens)) {
+        descriptor = { phrase: "MODIFY", object: "MODIFY_SQL" };
+      } else if (tokens.some((token) => token.upper === "FROM")) {
+        descriptor = { phrase: "MODIFY", object: "MODIFY_AMBIGUOUS" };
+      }
+    } else if (first === "UPDATE") {
+      descriptor = { phrase: "UPDATE", object: "UPDATE_SQL" };
+    }
+
+    if (!descriptor) {
+      descriptor = projectStatementGrammar.find((candidate) => matchesTokens(tokens, 0, candidate.phrase.split(/\s+/))) || null;
+    }
+    if (!descriptor) return null;
+    const existing = configs.filter((config) => config.object === descriptor.object)
+      .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)))[0];
+    const config = existing || getGenericGrammarConfig(descriptor);
+    return buildObjectFromRaw(statement.raw, config, statement, fileName, nextId(), parentId);
+  }
+
+  function hasModifySubquerySource(tokens) {
+    const fromIndex = tokens.findIndex((token) => token.upper === "FROM");
+    return fromIndex >= 0
+      && tokens[fromIndex + 1] && tokens[fromIndex + 1].raw === "("
+      && tokens[fromIndex + 2] && tokens[fromIndex + 2].upper === "SELECT";
+  }
+
+  function getGenericGrammarConfig(descriptor) {
+    if (genericGrammarConfigs.has(descriptor.object)) return genericGrammarConfigs.get(descriptor.object);
+    const phraseTokens = descriptor.phrase.split(/\s+/);
+    const keywordLabels = Object.fromEntries(phraseTokens.map((word, index) => [word, index === 0 ? "stmt" : "clause"]));
+    const captureName = descriptor.object === "ASSERT" || descriptor.object === "CHECK" || descriptor.object === "WHILE"
+      ? "condition" : "raw";
+    const config = normalizeConfig({
+      object: descriptor.object,
+      match: { startPhrase: descriptor.phrase },
+      ...(descriptor.endKeyword ? { block: { endKeyword: descriptor.endKeyword } } : {}),
+      ...(captureName === "condition" ? { extras: { type: "ifCondition" } } : {}),
+      keywordLabels,
+      keywordPhrases: { [descriptor.phrase]: "stmt" },
+      captureRules: [{ after: descriptor.phrase, name: captureName, label: captureName, capture: "rest" }]
+    });
+    genericGrammarConfigs.set(descriptor.object, config);
+    return config;
+  }
+
+  function parseStatements(statements, configs, fileName, knownInternalTables = new Set()) {
     const roots = [];
     const stack = [];
     let nextId = 1;
@@ -495,7 +1210,7 @@
       }
 
       const parentId = currentFrame ? currentFrame.node.id : null;
-      const parsedList = parseStatement(statement, configs, fileName, parentId, () => nextId++);
+      const parsedList = parseStatement(statement, configs, fileName, parentId, () => nextId++, knownInternalTables);
       if (!parsedList || !parsedList.length) {
         continue;
       }
@@ -516,7 +1231,8 @@
           };
         }
         targetList.push(node);
-        if (node.block && node.block.endKeyword) {
+        if (node.block && node.block.endKeyword
+          && !(node.objectType === "CLASS" && /\bDEFERRED\b/i.test(statement.raw || ""))) {
           stack.push({ node, endKeyword: node.block.endKeyword });
         }
       }
@@ -533,16 +1249,39 @@
     return tokens[0].upper;
   }
 
-  function parseStatement(statement, configs, fileName, parentId, nextId) {
+  function parseStatement(statement, configs, fileName, parentId, nextId, knownInternalTables = new Set()) {
     const tokens = tokenize(statement.raw);
     if (tokens.length === 0) {
       return null;
     }
 
-    for (const config of configs) {
-      if (!matchesConfig(tokens, config, statement.raw)) {
-        continue;
-      }
+    if (tokens[0].upper === "WHILE") {
+      const object = buildObjectFromRaw(statement.raw, whileStatementConfig, statement, fileName, nextId(), parentId);
+      return object ? [object] : null;
+    }
+
+    if (isStaticMethodCallStatement(statement.raw)) {
+      const methodConfig = configs.filter((config) => String(config.match && config.match.type || "").toLowerCase() === "methodcallexpr")
+        .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)))[0];
+      const object = methodConfig
+        ? buildObjectFromRaw(statement.raw, methodConfig, statement, fileName, nextId(), parentId)
+        : null;
+      if (object) return [object];
+    }
+
+    if (isMethodCallExpressionStatement(statement.raw)) {
+      const methodConfig = configs.filter((config) => String(config.match && config.match.type || "").toLowerCase() === "methodcallexpr")
+        .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)))[0];
+      const object = methodConfig
+        ? buildObjectFromRaw(statement.raw, methodConfig, statement, fileName, nextId(), parentId)
+        : null;
+      if (object) return [object];
+    }
+
+    const grammarObject = parseProjectGrammarStatement(tokens, statement, configs, fileName, parentId, nextId, knownInternalTables);
+    if (grammarObject) return [grammarObject];
+
+    for (const config of getOrderedMatchingConfigs(tokens, configs, statement.raw)) {
 
       const startKeyword = config.match && config.match.startKeyword;
       if (startKeyword && isChainedStatementStart(statement.raw, startKeyword)) {
@@ -632,6 +1371,26 @@
     return null;
   }
 
+  function isStaticMethodCallStatement(raw) {
+    return /^[A-Za-z_][A-Za-z0-9_]*=>[A-Za-z_][A-Za-z0-9_]*(?:~[A-Za-z_][A-Za-z0-9_]*)?\s*\([\s\S]*\)\s*\.?$/.test(String(raw || "").trim());
+  }
+
+  function getOrderedMatchingConfigs(tokens, configs, raw) {
+    return configs.filter((config) => matchesConfig(tokens, config, raw)).sort((left, right) => {
+      const leftMatch = left.match || {};
+      const rightMatch = right.match || {};
+      const leftPriority = leftMatch.type ? 2 : 0;
+      const rightPriority = rightMatch.type ? 2 : 0;
+      if (leftPriority !== rightPriority) return rightPriority - leftPriority;
+      const leftPhraseLength = (leftMatch.startTokens || []).length;
+      const rightPhraseLength = (rightMatch.startTokens || []).length;
+      if (leftPhraseLength !== rightPhraseLength) return rightPhraseLength - leftPhraseLength;
+      const leftKey = `${leftMatch.startKeyword || ""}|${left.object || ""}|${JSON.stringify(left)}`;
+      const rightKey = `${rightMatch.startKeyword || ""}|${right.object || ""}|${JSON.stringify(right)}`;
+      return leftKey.localeCompare(rightKey);
+    });
+  }
+
   function detectStructMarkerFromTokens(tokens, startKeyword) {
     if (!startKeyword || !Array.isArray(tokens) || tokens.length < 4) {
       return null;
@@ -681,7 +1440,7 @@
     const match = config.match || {};
     const matchType = match.type ? String(match.type).trim().toLowerCase() : "";
     if (matchType === "assignment") {
-      return isAssignmentStatement(tokens) && !isMethodCallExpressionStatement(raw);
+      return isAssignmentStatement(tokens, raw) && !isMethodCallExpressionStatement(raw);
     }
     if (matchType === "methodcallexpr") {
       return isMethodCallExpressionStatement(raw);
@@ -719,11 +1478,26 @@
     const matchType = match.type ? String(match.type).trim().toLowerCase() : "";
     let valueEntries = [];
     if (matchType === "assignment") {
-      valueEntries = captureAssignmentValues(tokens, commentText);
+      valueEntries = captureAssignmentValues(tokens, commentText, raw);
     } else if (matchType === "methodcallexpr") {
       valueEntries = captureMethodCallExpressionValues(raw, commentText);
     } else {
       valueEntries = captureValues(tokens, config, commentText);
+    }
+    const performIfFound = config.object === "PERFORM" && hasKeywordSequence(raw, ["IF", "FOUND"]);
+    if (performIfFound) {
+      valueEntries = valueEntries.filter((entry) => entry.name !== "ifCondition");
+    }
+    if (config.object === "DO" && hasKeywordSequence(raw, ["DO", "VARYING"])) {
+      valueEntries = valueEntries.filter((entry) => entry.name !== "times");
+    }
+    if (/_SQL$/.test(String(config.object || ""))) {
+      const capturedNames = new Set();
+      valueEntries = valueEntries.filter((entry) => {
+        if (capturedNames.has(entry.name)) return false;
+        capturedNames.add(entry.name);
+        return true;
+      });
     }
 
     const keywords = groupEntriesByKey(keywordEntries, "label");
@@ -759,14 +1533,27 @@
     });
   }
 
-  function isAssignmentStatement(tokens) {
-    if (!Array.isArray(tokens) || tokens.length < 3) {
+  function isAssignmentStatement(tokens, raw) {
+    if (!Array.isArray(tokens)) {
       return false;
     }
 
-    const op = tokens[1] && tokens[1].upper ? tokens[1].upper : "";
-    const assignmentOps = new Set(["=", "+=", "-=", "*=", "/=", "?="]);
-    return assignmentOps.has(op);
+    const assignmentOps = new Set(["=", "+=", "-=", "*=", "/=", "&&=", "?="]);
+    if (tokens.length >= 3 && assignmentOps.has(tokens[1] && tokens[1].upper)) {
+      return true;
+    }
+    const lexicalTokens = getAssignmentLexicalTokens(raw);
+    return lexicalTokens.length >= 3 && assignmentOps.has(lexicalTokens[1].raw);
+  }
+
+  function getAssignmentLexicalTokens(raw) {
+    return lexAbapSource(String(raw || "")).tokens
+      .filter((token) => token.kind !== "period" && token.kind !== "comment");
+  }
+
+  function hasKeywordSequence(raw, expected) {
+    const words = tokenize(raw).map((token) => token.upper);
+    return words.some((word, index) => expected.every((expectedWord, offset) => words[index + offset] === expectedWord));
   }
 
   function isMethodCallExpressionStatement(raw) {
@@ -1005,14 +1792,16 @@
     };
   }
 
-  function buildPerformCallExtras({ values }) {
+  function buildPerformCallExtras({ raw, values }) {
     const map = valuesToFirstValueMap(values);
-    const ifCondition = map.ifCondition || "";
+    const ifFound = hasKeywordSequence(raw, ["IF", "FOUND"]);
+    const ifCondition = ifFound ? "" : map.ifCondition || "";
 
     return {
       performCall: {
         form: map.form || "",
         program: map.program || "",
+        ...(ifFound ? { ifFound: true } : {}),
         ifCondition,
         ifConditions: parseConditionClauses(ifCondition, { allowImplicitAnd: false }),
         using: parseArgumentTokens(map.usingRaw || "").map((value) => ({ value })),
@@ -4060,15 +4849,19 @@
     return values;
   }
 
-  function captureAssignmentValues(tokens, commentText) {
-    if (!Array.isArray(tokens) || tokens.length < 3) {
+  function captureAssignmentValues(tokens, commentText, raw) {
+    let assignmentTokens = tokens;
+    if (Array.isArray(tokens) && tokens.length < 3) {
+      assignmentTokens = getAssignmentLexicalTokens(raw);
+    }
+    if (!Array.isArray(assignmentTokens) || assignmentTokens.length < 3) {
       return [];
     }
 
     const statementDesc = commentText || "";
-    const target = tokens[0] ? tokens[0].raw : "";
-    const op = tokens[1] ? tokens[1].raw : "";
-    const expr = tokens
+    const target = assignmentTokens[0] ? assignmentTokens[0].raw : "";
+    const op = assignmentTokens[1] ? assignmentTokens[1].raw : "";
+    const expr = assignmentTokens
       .slice(2)
       .map((t) => t.raw)
       .join(" ")
@@ -4140,6 +4933,20 @@
     if (assignmentMatch) {
       receivingTarget = assignmentMatch[1].trim();
       callExpr = assignmentMatch[2].trim();
+    }
+
+    const staticCallMatch = callExpr.match(
+      /^([A-Za-z_][A-Za-z0-9_]*=>[A-Za-z_][A-Za-z0-9_]*(?:~[A-Za-z_][A-Za-z0-9_]*)?)\s*\(([\s\S]*)\)$/i
+    );
+    if (staticCallMatch) {
+      const argsRaw = staticCallMatch[2].trim();
+      return {
+        receivingTarget,
+        callExpr,
+        callTarget: staticCallMatch[1],
+        argsRaw,
+        sectionRawByName: parseMethodCallExpressionSectionRaw(argsRaw)
+      };
     }
 
     const targetMatch = callExpr.match(
@@ -4277,6 +5084,9 @@
     normalizeConfig,
     registerConfig,
     getConfigs,
-    parseAbapText
+    parseAbapText,
+    parseAbapTextDetailed,
+    lexAbapSource,
+    splitStatements
   };
 });

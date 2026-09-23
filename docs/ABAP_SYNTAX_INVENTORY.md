@@ -1,0 +1,209 @@
+# ABAP syntax inventory for the current parser
+
+This inventory is the bounded target for the parser work: it contains representative forms from every committed `.abap` file under `examples/` and `tests/fixtures/`. Inline ABAP strings in parser unit tests remain direct test evidence rather than inventory rows because they do not have a standalone ABAP source file/line. It is not a claim of complete ABAP language coverage. `supported` means the current parser recognizes the intended broad construct; `misclassified` means it recognizes the text as the wrong kind; `missing` means the statement is currently omitted or not represented; `structural` means the form is a declaration/block boundary rather than an executable statement node.
+
+## Reference snapshots
+
+- SAP ABAP Keyword Documentation (latest landing page): https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABENABAP.html
+- SAP-samples/abap-cheat-sheets main snapshot: https://github.com/SAP-samples/abap-cheat-sheets/tree/02481ae352dab5c659cf39cff1dae93173dd2709
+- SAP-samples/abap-cheat-sheets v816 snapshot: https://github.com/SAP-samples/abap-cheat-sheets/tree/69700003ec1f01bd720c055d85e7fbef456fc506
+
+The two cheat-sheet snapshots are evidence and examples, not parser specifications. The current project also contains classic/Standard ABAP forms (for example dynpro and dataset statements), while the upstream `main` cheat sheets primarily target ABAP Cloud. Dialect is recorded per row; the parser is a syntax reader and does not enforce release or Cloud restrictions. EML and CDS artifacts are not included because they are not present in the project's current ABAP source corpus.
+
+## Forms
+
+| source | line | rawForm | family | expectedKind | status | dialect | documentation |
+| --- | ---: | --- | --- | --- | --- | --- | --- |
+| examples/full.abap | 7 | PARAMETERS p_user TYPE syuname | declarations | PARAMETERS | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenparameters.htm |
+| examples/full.abap | 13 | SELECT-OPTIONS s_bukrs FOR t001-bukrs | declarations | SELECT_OPTIONS | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenselect-options.htm |
+| examples/full.abap | 16 | TYPES: BEGIN OF ty_row | declarations | TYPES | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abentypes.htm |
+| examples/full.abap | 28 | DATA: gt_rows TYPE ty_rows | declarations | DATA | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abendata.htm |
+| examples/full.abap | 35 | CONSTANTS gc_default_bukrs TYPE t001-bukrs | declarations | CONSTANTS | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenconstants.htm |
+| examples/full.abap | 36 | RANGES r_bukrs FOR t001-bukrs | declarations | RANGES | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenranges.htm |
+| examples/full.abap | 37 | FIELD-SYMBOLS <fs_row> TYPE ty_row | declarations | FIELD_SYMBOLS | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenfield-symbols.htm |
+| examples/full.abap | 38 | STATICS sv_once TYPE abap_bool | declarations | STATICS | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenstatics.htm |
+| examples/full.abap | 41 | gv_cnt = 1 | assignments | Assignment | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenassignment.htm |
+| examples/full.abap | 49 | CLEAR gs_row | data-operations | CLEAR | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenclear.htm |
+| examples/full.abap | 50 | MOVE gv_user TO gs_row-bukrs | data-operations | MOVE | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenmove.htm |
+| examples/full.abap | 51 | MOVE-CORRESPONDING gs_row TO gs_row | data-operations | MOVE_CORRESPONDING | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenmove-corresponding.htm |
+| examples/full.abap | 54 | APPEND INITIAL LINE TO gt_rows | internal-tables | APPEND | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenappend_itab.htm |
+| examples/full.abap | 56 | INSERT gs_row INTO TABLE gt_rows | internal-tables | INSERT_ITAB | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abeninsert_itab.htm |
+| examples/full.abap | 57 | MODIFY gt_rows FROM gs_row | internal-tables | MODIFY_ITAB | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenmodify_itab.htm |
+| examples/full.abap | 58 | READ TABLE gt_rows WITH KEY bukrs = gc_default_bukrs | internal-tables | READ_TABLE | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenread_table.htm |
+| examples/full.abap | 60 | DELETE gt_rows INDEX 1 | internal-tables | DELETE_ITAB | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abendelete_itab.htm |
+| examples/full.abap | 61 | DELETE ADJACENT DUPLICATES FROM gt_rows COMPARING bukrs | internal-tables | DELETE_ITAB | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abendelete_adjacent_duplicates.htm |
+| examples/full.abap | 62 | SORT gt_rows BY bukrs | internal-tables | SORT_ITAB | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abensort_itab.htm |
+| examples/full.abap | 65 | LOOP AT gt_rows ASSIGNING <fs_row> | blocks | LOOP_AT_ITAB | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenloop_at_itab.htm |
+| examples/full.abap | 69 | DO 2 TIMES | blocks | DO | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abendo.htm |
+| examples/full.abap | 74 | IF gv_cnt > 0 AND p_flag = abap_true | blocks | IF | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenif.htm |
+| examples/full.abap | 76 | ELSEIF gv_cnt = 0 | blocks | ELSEIF | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenelseif.htm |
+| examples/full.abap | 83 | CASE gv_cnt | blocks | CASE | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abencase.htm |
+| examples/full.abap | 91 | TRY | blocks | TRY | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abentry.htm |
+| examples/full.abap | 100 | SELECT bukrs butxt | database-sql | SELECT | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenselect.htm |
+| examples/full.abap | 106 | CALL FUNCTION 'Z_DEMO_FM' | calls | CALL_FUNCTION | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abencall_function.htm |
+| examples/full.abap | 120 | CALL METHOD lo_demo->do_something | calls | CALL_METHOD | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abencall_method.htm |
+| examples/full.abap | 133 | CALL TRANSACTION 'SE38' | calls | CALL_TRANSACTION | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abencall_transaction.htm |
+| examples/full.abap | 148 | FORM main | procedures | FORM | structural | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenform.htm |
+| examples/full.abap | 157 | PERFORM main IN PROGRAM sy-repid | procedures | PERFORM | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenperform.htm |
+| examples/full.abap | 160 | CLASS lcl_demo DEFINITION | declarations | CLASS | structural | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenclass.htm |
+| examples/full.abap | 173 | METHOD do_something | procedures | METHOD | structural | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenmethod.htm |
+| examples/deep_form_demo.abap | 165 | SELECTION-SCREEN BEGIN OF BLOCK b01 | declarations | SELECTION_SCREEN | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenselection-screen.htm |
+| examples/deep_form_demo.abap | 433 | LOAD-OF-PROGRAM | events | LOAD_OF_PROGRAM | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenload-of-program.htm |
+| examples/deep_form_demo.abap | 436 | INITIALIZATION | events | INITIALIZATION | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abeninitialization.htm |
+| examples/deep_form_demo.abap | 448 | AT SELECTION-SCREEN OUTPUT | events | AT_SELECTION_SCREEN | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenat_selection-screen.htm |
+| examples/deep_form_demo.abap | 457 | MODIFY SCREEN | screen | MODIFY_SCREEN | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenmodify_screen.htm |
+| examples/deep_form_demo.abap | 480 | START-OF-SELECTION | events | START_OF_SELECTION | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenstart-of-selection.htm |
+| examples/deep_form_demo.abap | 485 | ASSERT gv_program_loaded = abap_true | assertions | ASSERT | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenassert.htm |
+| examples/deep_form_demo.abap | 569 | CALL SCREEN 0100 | screen | CALL_SCREEN | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abencall_screen.htm |
+| examples/deep_form_demo.abap | 578 | END-OF-SELECTION | events | END_OF_SELECTION | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenend-of-selection.htm |
+| examples/deep_form_demo.abap | 605 | MODULE status_0100 OUTPUT | screen | MODULE | structural | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenmodule.htm |
+| examples/deep_form_demo.abap | 613 | SET SCREEN 0 | screen | SET_SCREEN | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenset_screen.htm |
+| examples/deep_form_demo.abap | 624 | FORM frm_initialize_run | procedures | FORM | structural | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenform.htm |
+| examples/deep_form_demo.abap | 730 | AUTHORITY-CHECK OBJECT 'S_PROGRAM' | authorization | AUTHORITY_CHECK | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenauthority-check.htm |
+| examples/deep_form_demo.abap | 824 | OPEN CURSOR @gv_cursor FOR | database-sql | OPEN_CURSOR | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenopen_cursor.htm |
+| examples/deep_form_demo.abap | 858 | FETCH NEXT CURSOR @gv_cursor | database-sql | FETCH | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenfetch.htm |
+| examples/deep_form_demo.abap | 863 | EXIT | control-flow | EXIT | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenexit.htm |
+| examples/deep_form_demo.abap | 866 | CHECK lt_batch IS NOT INITIAL | control-flow | CHECK | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abencheck.htm |
+| examples/deep_form_demo.abap | 909 | CONTINUE | control-flow | CONTINUE | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abencontinue.htm |
+| examples/deep_form_demo.abap | 978 | DESCRIBE TABLE gt_priority LINES gv_priority_copy_to | data-operations | DESCRIBE_TABLE | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abendescribe_table.htm |
+| examples/deep_form_demo.abap | 1048 | COLLECT ls_summary INTO gt_summary | internal-tables | COLLECT | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abencollect.htm |
+| examples/deep_form_demo.abap | 1131 | ASSIGN COMPONENT 'ROUTE_TEXT' | data-operations | ASSIGN | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenassign.htm |
+| examples/deep_form_demo.abap | 1473 | CONCATENATE ls_flight-cityfrom | string-processing | CONCATENATE | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenconcatenate.htm |
+| examples/deep_form_demo.abap | 1478 | SPLIT lv_route AT '->' | string-processing | SPLIT | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abensplit.htm |
+| examples/deep_form_demo.abap | 1483 | SHIFT lv_from LEFT DELETING LEADING space | string-processing | SHIFT | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenshift.htm |
+| examples/deep_form_demo.abap | 1487 | TRANSLATE lv_upper TO UPPER CASE | string-processing | TRANSLATE | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abentranslate.htm |
+| examples/deep_form_demo.abap | 1489 | FIND FIRST OCCURRENCE OF '->' | string-processing | FIND | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenfind.htm |
+| examples/deep_form_demo.abap | 1494 | REPLACE FIRST OCCURRENCE OF '->' | string-processing | REPLACE | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenreplace.htm |
+| examples/deep_form_demo.abap | 1511 | CREATE DATA gr_flight | data-operations | CREATE_DATA | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abencreate_data.htm |
+| examples/deep_form_demo.abap | 1526 | GET REFERENCE OF <ls_dynamic_flight> INTO gr_any | data-operations | GET_REFERENCE | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenget_reference.htm |
+| examples/deep_form_demo.abap | 1536 | UNASSIGN <lv_component> | data-operations | UNASSIGN | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenunassign.htm |
+| examples/deep_form_demo.abap | 1554 | OPEN DATASET p_file | dataset-io | OPEN_DATASET | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenopen_dataset.htm |
+| examples/deep_form_demo.abap | 1568 | TRANSFER lv_line TO p_file | dataset-io | TRANSFER | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abentransfer.htm |
+| examples/deep_form_demo.abap | 1607 | WHILE lv_count < p_prev | blocks | WHILE | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenwhile.htm |
+| examples/deep_form_demo.abap | 1609 | READ DATASET p_file INTO lv_line | dataset-io | READ_DATASET | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenread_dataset.htm |
+| examples/deep_form_demo.abap | 1650 | DELETE FROM sflight | database-sql | DELETE_SQL | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abendelete_dbtab.htm |
+| examples/deep_form_demo.abap | 1656 | INSERT sflight FROM @ls_demo | database-sql | INSERT_SQL | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abeninsert_dbtab.htm |
+| examples/deep_form_demo.abap | 1668 | MODIFY sflight FROM @ls_demo | database-sql | MODIFY_SQL | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenmodify_dbtab.htm |
+| examples/deep_form_demo.abap | 1676 | ROLLBACK WORK | transaction-control | ROLLBACK_WORK | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenrollback_work.htm |
+| examples/deep_form_demo.abap | 1692 | COMMIT WORK AND WAIT | transaction-control | COMMIT_WORK | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abencommit_work.htm |
+| examples/deep_form_demo.abap | 1704 | SUBMIT (sy-repid) | calls | SUBMIT | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abensubmit.htm |
+| examples/deep_form_demo.abap | 1 | REPORT zflight_operations_overview | program-structure | REPORT | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenreport.htm |
+| examples/deep_form_demo.abap | 250 | PUBLIC SECTION | declarations | PUBLIC_SECTION | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenpublic.htm |
+| examples/deep_form_demo.abap | 262 | METHOD constructor | procedures | METHOD | structural | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenmethod.htm |
+| examples/deep_form_demo.abap | 275 | EVENTS flight_processed | events | EVENTS | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenevents.htm |
+| examples/deep_form_demo.abap | 279 | CLASS-EVENTS run_finished | events | CLASS_EVENTS | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenclass-events.htm |
+| examples/deep_form_demo.abap | 303 | RAISE EXCEPTION TYPE lcx_invalid_capacity | exceptions | RAISE_EXCEPTION | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenraise_exception.htm |
+| examples/deep_form_demo.abap | 347 | RAISE EVENT flight_processed | events | RAISE_EVENT | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenraise_event.htm |
+| examples/deep_form_demo.abap | 353 | RAISE EVENT run_finished | events | RAISE_EVENT | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenraise_event.htm |
+| examples/deep_form_demo.abap | 576 | lcl_flight_processor=>raise_run_finished( | calls | CALL_METHOD | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abencall_method.htm |
+| examples/deep_form_demo.abap | 584 | TOP-OF-PAGE | events | TOP_OF_PAGE | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abentop-of-page.htm |
+| examples/deep_form_demo.abap | 589 | ULINE | list-output | ULINE | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenuline.htm |
+| examples/deep_form_demo.abap | 614 | LEAVE SCREEN | dynpro | LEAVE_SCREEN | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenleave_screen.htm |
+| examples/deep_form_demo.abap | 642 | REFRESH: | internal-tables | REFRESH | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenrefresh_itab.htm |
+| examples/deep_form_demo.abap | 780 | SET HANDLER go_handler->on_flight_processed | events | SET_HANDLER | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenset_handler.htm |
+| examples/deep_form_demo.abap | 776 | CREATE OBJECT go_processor | object-creation | CREATE_OBJECT | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abencreate_object.htm |
+| examples/deep_form_demo.abap | 872 | CLOSE CURSOR @gv_cursor | database-sql | CLOSE_CURSOR | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenclose_cursor.htm |
+| examples/deep_form_demo.abap | 875 | CATCH cx_sy_open_sql_db | blocks | CATCH | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abencatch.htm |
+| examples/deep_form_demo.abap | 612 | WHEN 'BACK' OR 'EXIT' OR 'CANC' | blocks | WHEN | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenwhen.htm |
+| examples/deep_form_demo.abap | 1369 | ENDSELECT | blocks | ENDSELECT | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenendselect.htm |
+| examples/deep_form_demo.abap | 591 | END-OF-PAGE | events | END_OF_PAGE | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenend-of-page.htm |
+| examples/deep_form_demo.abap | 1541 | FREE gr_any | dynamic-data | FREE | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenfree.htm |
+| examples/deep_form_demo.abap | 1576 | CLOSE DATASET p_file | dataset-io | CLOSE_DATASET | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenclose_dataset.htm |
+| examples/deep_form_demo.abap | 463 | MESSAGE 'Minimum free seats cannot be negative' | messages | MESSAGE | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenmessage.htm |
+| examples/deep_form_demo.abap | 1756 | SKIP 2 | list-output | SKIP | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenskip.htm |
+| examples/deep_form_demo.abap | 1797 | ELSE | blocks | ELSE | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenelse.htm |
+| examples/full.abap | 162 | CLASS-DATA gv_class_user TYPE syuname | declarations | CLASS_DATA | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenclass-data.htm |
+| examples/full.abap | 163 | METHODS do_something | declarations | METHODS | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenmethods.htm |
+| examples/full.abap | 168 | CLASS-METHODS get_default | declarations | CLASS_METHODS | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenclass-methods.htm |
+| examples/full.abap | 95 | CLEANUP | blocks | CLEANUP | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abencleanup.htm |
+| examples/deep_form_demo.abap | 21 | INCLUDE <icon> | program-structure | INCLUDE | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abeninclude.htm |
+| examples/deep_form_demo.abap | 24 | TABLES: | declarations | TABLES | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abentables.htm |
+| examples/deep_form_demo.abap | 418 | CONDENSE rv_route | string-processing | CONDENSE | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abencondense.htm |
+| examples/deep_form_demo.abap | 423 | WRITE: / sy-uline | list-output | WRITE | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenwrite.htm |
+| examples/deep_form_demo.abap | 496 | RETURN | control-flow | RETURN | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenreturn.htm |
+| examples/deep_form_demo.abap | 1659 | UPDATE sflight | database-sql | UPDATE_SQL | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenupdate_dbtab.htm |
+
+## Additional corpus constructs
+
+The representative forms above do not exhaust all distinct node kinds in the two examples. These additional rows close that gap; repeated occurrences of already listed kinds remain covered by the same family-level contract.
+
+| examples/full.abap | 4 | REPORT zabapflow_full_example | program-structure | REPORT | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenreport.htm |
+| examples/full.abap | 78 | ELSE | blocks | ELSE | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenelse.htm |
+| examples/full.abap | 84 | WHEN 1 | blocks | WHEN | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenwhen.htm |
+| examples/full.abap | 93 | CATCH cx_root | blocks | CATCH | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abencatch.htm |
+| examples/full.abap | 161 | PUBLIC SECTION | declarations | PUBLIC_SECTION | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenpublic.htm |
+| examples/deep_form_demo.abap | 32 | gc_status_open | declarations | CONSTANTS | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenconstants.htm |
+| examples/deep_form_demo.abap | 49 | BEGIN OF ty_request | declarations | TYPES | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abentypes.htm |
+| examples/deep_form_demo.abap | 160 | CLASS lcx_invalid_capacity DEFINITION DEFERRED | declarations | CLASS | structural | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenclass.htm |
+| examples/deep_form_demo.abap | 167 | s_carr FOR sflight-carrid | declarations | SELECT_OPTIONS | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenselect-options.htm |
+| examples/deep_form_demo.abap | 172 | p_minfr TYPE i DEFAULT 5 | declarations | PARAMETERS | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenparameters.htm |
+| examples/deep_form_demo.abap | 197 | gs_request | declarations | DATA | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abendata.htm |
+| examples/deep_form_demo.abap | 237 | <ls_audit> | declarations | FIELD_SYMBOLS | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenfield-symbols.htm |
+| examples/deep_form_demo.abap | 255 | METHODS constructor | declarations | METHODS | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenmethods.htm |
+| examples/deep_form_demo.abap | 264 | seatsmax = iv_seatsmax | assignments | ASSIGNMENT | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenassignment.htm |
+| examples/deep_form_demo.abap | 292 | CLASS-METHODS raise_run_finished | declarations | CLASS_METHODS | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenclass-methods.htm |
+| examples/deep_form_demo.abap | 301 | IF rs_flight-seatsocc > rs_flight-seatsmax | blocks | IF | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenif.htm |
+| examples/deep_form_demo.abap | 382 | PERFORM frm_add_audit | procedures | PERFORM | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenperform.htm |
+| examples/deep_form_demo.abap | 445 | APPEND s_date | internal-tables | APPEND | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenappend_itab.htm |
+| examples/deep_form_demo.abap | 450 | LOOP AT SCREEN | blocks | LOOP_AT_ITAB | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenloop_at_itab.htm |
+| examples/deep_form_demo.abap | 611 | CASE sy-ucomm | blocks | CASE | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abencase.htm |
+| examples/deep_form_demo.abap | 626 | gs_request | data-operations | CLEAR | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenclear.htm |
+| examples/deep_form_demo.abap | 667 | READ TABLE s_date INDEX 1 | internal-tables | READ_TABLE | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenread_table.htm |
+| examples/deep_form_demo.abap | 709 | ELSEIF is_request-date_high | blocks | ELSEIF | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenelseif.htm |
+| examples/deep_form_demo.abap | 798 | SELECT SINGLE FROM scarr | database-sql | SELECT | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenselect.htm |
+| examples/deep_form_demo.abap | 822 | TRY | blocks | TRY | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abentry.htm |
+| examples/deep_form_demo.abap | 854 | DO | blocks | DO | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abendo.htm |
+| examples/deep_form_demo.abap | 868 | INSERT LINES OF lt_batch INTO TABLE gt_db_flights | internal-tables | INSERT_ITAB | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abeninsert_itab.htm |
+| examples/deep_form_demo.abap | 885 | SORT gt_db_flights BY carrid connid fldate | internal-tables | SORT_ITAB | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abensort_itab.htm |
+| examples/deep_form_demo.abap | 959 | DELETE TABLE gt_priority FROM ls_flight | internal-tables | DELETE_ITAB | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abendelete_itab.htm |
+| examples/deep_form_demo.abap | 1014 | MODIFY gt_report FROM ls_flight INDEX 1 | internal-tables | MODIFY_ITAB | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenmodify_itab.htm |
+| examples/deep_form_demo.abap | 1229 | CALL FUNCTION 'DATE_COMPUTE_DAY' | calls | CALL_FUNCTION | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abencall_function.htm |
+| tests/fixtures/parser/extras-dynamic-bindings.abap | 1 | DATA lv_dest TYPE rfcdest VALUE 'NONE'. | declarations | DATA | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abendata.htm |
+| tests/fixtures/parser/extras-dynamic-bindings.abap | 7 | CALL FUNCTION 'Z_DEMO_FM' | calls | CALL_FUNCTION | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abencall_function.htm |
+| tests/fixtures/parser/extras-dynamic-bindings.abap | 19 | PERFORM do_something IN PROGRAM sy-repid | procedures | PERFORM | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenperform.htm |
+| tests/fixtures/parser/legacy-core.abap | 1 | REPORT z_contract_legacy. | program-structure | REPORT | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenreport.htm |
+| tests/fixtures/parser/legacy-core.abap | 3 | PARAMETERS p_user TYPE xubname. | declarations | PARAMETERS | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenparameters.htm |
+| tests/fixtures/parser/legacy-core.abap | 6 | TYPES: | declarations | TYPES | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abentypes.htm |
+| tests/fixtures/parser/legacy-core.abap | 12 | DATA gt_users TYPE STANDARD TABLE OF ty_user. | declarations | DATA | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abendata.htm |
+| tests/fixtures/parser/legacy-core.abap | 15 | lv_a = 1. | assignments | ASSIGNMENT | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenassignment.htm |
+| tests/fixtures/parser/legacy-core.abap | 21 | CALL METHOD lcl_demo=>get_default( | calls | CALL_METHOD | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abencall_method.htm |
+| tests/fixtures/parser/legacy-core.abap | 27 | READ TABLE gt_users INTO gs_ctx | internal-tables | READ_TABLE | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenread_table.htm |
+| tests/fixtures/parser/legacy-core.abap | 30 | IF p_user = p_user AND p_flag = abap_true. | blocks | IF | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenif.htm |
+| tests/fixtures/parser/legacy-core.abap | 31 | PERFORM frm_use_ctx USING gs_ctx. | procedures | PERFORM | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenperform.htm |
+| tests/fixtures/parser/legacy-core.abap | 34 | FORM frm_use_ctx USING is_ctx TYPE ty_user. | procedures | FORM | structural | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenform.htm |
+| tests/fixtures/parser/multiline-and-comments.abap | 1 | REPORT z_contract_comments. | program-structure | REPORT | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenreport.htm |
+| tests/fixtures/parser/multiline-and-comments.abap | 4 | PERFORM do_work. | procedures | PERFORM | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenperform.htm |
+| tests/fixtures/parser/multiline-and-comments.abap | 7 | lv_text TYPE string VALUE | declarations | DATA | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abendata.htm |
+| tests/fixtures/parser/multiline-and-comments.abap | 10 | lv_message = 'A"B'. | assignments | ASSIGNMENT | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenassignment.htm |
+| tests/fixtures/parser/multiline-and-comments.abap | 13 | FORM do_work. | procedures | FORM | structural | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenform.htm |
+| tests/fixtures/parser/multiline-and-comments.abap | 14 | IF lv_text IS NOT INITIAL OR | blocks | IF | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenif.htm |
+| tests/fixtures/parser/parameters-variants.abap | 1 | PARAMETERS p_user TYPE syuname DEFAULT sy-uname OBLIGATORY. | declarations | PARAMETERS | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenparameters.htm |
+| tests/fixtures/viewer/multi-statement-navigation.abap | 1 | REPORT z_viewer_multi. | program-structure | REPORT | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenreport.htm |
+| tests/fixtures/viewer/multi-statement-navigation.abap | 3 | DATA lv_a TYPE i. | declarations | DATA | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abendata.htm |
+| tests/fixtures/viewer/multi-statement-navigation.abap | 4 | lv_a = 1. | assignments | ASSIGNMENT | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenassignment.htm |
+| tests/fixtures/viewer/perform-trace-struct.abap | 1 | REPORT z_viewer_trace. | program-structure | REPORT | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenreport.htm |
+| tests/fixtures/viewer/perform-trace-struct.abap | 3 | TYPES: BEGIN OF ty_ctx, | declarations | TYPES | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abentypes.htm |
+| tests/fixtures/viewer/perform-trace-struct.abap | 8 | DATA gs_ctx TYPE ty_ctx. | declarations | DATA | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abendata.htm |
+| tests/fixtures/viewer/perform-trace-struct.abap | 9 | PARAMETERS p_user TYPE xubname. | declarations | PARAMETERS | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenparameters.htm |
+| tests/fixtures/viewer/perform-trace-struct.abap | 11 | START-OF-SELECTION. | events | START_OF_SELECTION | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenstart-of-selection.htm |
+| tests/fixtures/viewer/perform-trace-struct.abap | 12 | gs_ctx-uname = p_user. | assignments | ASSIGNMENT | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenassignment.htm |
+| tests/fixtures/viewer/perform-trace-struct.abap | 14 | PERFORM frm_outer USING gs_ctx. | procedures | PERFORM | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenperform.htm |
+| tests/fixtures/viewer/perform-trace-struct.abap | 16 | FORM frm_outer USING is_ctx TYPE ty_ctx. | procedures | FORM | structural | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenform.htm |
+| tests/fixtures/viewer/perform-trace-struct.abap | 17 | IF is_ctx-uname IS NOT INITIAL. | blocks | IF | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenif.htm |
+
+## SAP latest syntax probes
+
+The parser smoke matrix covers every committed matcher configuration once. These focused probes cover additional alternatives discovered in the SAP latest keyword documentation; they are targeted regression checks and do not claim every grammar production has a fixture.
+
+| Family | Probe forms | Regression test | SAP reference |
+| --- | --- | --- | --- |
+| Assignments | `&&=` string concatenation assignment, including adjacent operator/operand tokens | `SAP latest call and assignment variants retain statement families`; `assignment operator tokens are recognized without whitespace` | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABENEQUALS_OPERATOR.html |
+| Declarations | full table type expressions, `REF TO`, `LIKE LINE OF`, generic `ANY TABLE`, parameter/default and select-option additions | `SAP latest declaration variants remain recognized` | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPDATA.html |
+| Internal tables | `INSERT LINES OF ... FROM ... TO`, keyed `READ TABLE`, duplicate deletion with `USING KEY` and `COMPARING ALL FIELDS`, `MODIFY ... VALUE #( ... )`, stable/text sort | `SAP latest internal-table syntax variants retain statement families`; `SAP latest internal-table additions retain their operands` | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPINSERT_ITAB.html; https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPDELETE_ITAB.html; https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPSORT_ITAB.html |
+| Calls | update-task and destination function calls, dynamic method with parameter/exception tables, transaction BDC options | `SAP latest call and assignment variants retain statement families` | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCALL_FUNCTION.html; https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCALL_METHOD.html; https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCALL_TRANSACTION.html |
+| Control flow and exceptions | `DO ... VARYING` with and without a `TIMES` count, optional `RANGE`, `PERFORM ... IF FOUND`, `PERFORM ... ON COMMIT/ROLLBACK`, `CASE TYPE OF`, `CATCH BEFORE UNWIND`, `CLEANUP INTO` | `SAP latest transaction, loop, commit, and exception variants retain operands`; `PERFORM IF FOUND is modeled as a guard, not a condition expression`; `DO VARYING supports an omitted TIMES count and RANGE operand` | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPDO.html; https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPPERFORM_ON_COMMIT.html; https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPPERFORM.html; https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCASE.html; https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCATCH_TRY.html; https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCLEANUP.html |
+| Open SQL DML | `DELETE target FROM @wa` / `TABLE @itab`, `INSERT ... VALUES`, `MODIFY ... FROM TABLE` / parenthesized `SELECT`, `UPDATE ... SET ... WHERE` | `DELETE database-table source variants are classified as Open SQL`; `Open SQL DML variants retain target, source, and clause operands` | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPDELETE_SOURCE.html; https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPINSERT_SOURCE.html; https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPMODIFY_SOURCE.html; https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPUPDATE.html |
+
+## Known remaining coverage work
+
+The focused probes above do not enumerate all alternatives, optional additions, obsolete forms, or release-specific branches on the 45 unique configured object types (46 config files; `CALL_METHOD` has two matchers). Keep a type marked complete only after its SAP syntax forms have named positive fixtures and relevant near-neighbor classification checks.

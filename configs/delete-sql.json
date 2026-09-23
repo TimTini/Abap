@@ -1,0 +1,25 @@
+{
+  "object": "DELETE_SQL",
+  "match": { "startKeyword": "DELETE" },
+  "keywordLabels": {
+    "DELETE": "stmt",
+    "FROM": "from",
+    "WHERE": "where",
+    "ORDER": "order",
+    "BY": "by",
+    "OFFSET": "offset",
+    "UP": "up",
+    "TO": "to"
+  },
+  "keywordPhrases": {
+    "DELETE FROM": "delete-from",
+    "ORDER BY": "order-by",
+    "UP TO": "up-to"
+  },
+  "captureRules": [
+    { "after": "DELETE FROM", "name": "target", "label": "target" },
+    { "after": "DELETE", "name": "target", "label": "target" },
+    { "after": "FROM", "name": "source", "label": "source", "capture": "rest", "stopTokens": ["WHERE", "ORDER", "UP"] },
+    { "after": "WHERE", "name": "where", "label": "where", "capture": "rest", "stopTokens": ["ORDER", "UP"] }
+  ]
+}

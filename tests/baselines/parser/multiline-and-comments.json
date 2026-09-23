@@ -4,6 +4,32 @@
     {
       "block": null,
       "children": [],
+      "comment": "",
+      "extras": null,
+      "file": "multiline-and-comments.abap",
+      "keywords": {
+        "stmt": {
+          "label": "stmt",
+          "text": "REPORT"
+        }
+      },
+      "lineStart": 1,
+      "objectType": "REPORT",
+      "raw": "REPORT z_contract_comments.",
+      "segmentIndex": 0,
+      "values": {
+        "raw": {
+          "codeDesc": "",
+          "label": "raw",
+          "name": "raw",
+          "userDesc": "",
+          "value": "z_contract_comments"
+        }
+      }
+    },
+    {
+      "block": null,
+      "children": [],
       "comment": "leading-comment",
       "extras": {
         "performCall": {

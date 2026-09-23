@@ -69,7 +69,9 @@ async function assertViewerFixture(fileName) {
 
     els.rightTabTemplateBtn.click();
     await new Promise((resolve) => window.setTimeout(resolve, 0));
-    const secondTemplateBlock = els.templatePreviewOutput.querySelector('.template-block[data-template-index="1"]');
+    const secondDataObject = dataObjects[1];
+    const secondTemplateBlock = Array.from(els.templatePreviewOutput.querySelectorAll(".template-block"))
+      .find((block) => Number(block.getAttribute("data-template-index")) === state.renderObjects.indexOf(secondDataObject));
     assert(secondTemplateBlock, "Expected the second template block to exist.");
     const codeButton = secondTemplateBlock.querySelector('button[data-template-action="code"]');
     assert(codeButton, "Expected template block to expose a code button.");

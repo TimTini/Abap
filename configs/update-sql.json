@@ -1,0 +1,21 @@
+{
+  "object": "UPDATE_SQL",
+  "match": { "startKeyword": "UPDATE" },
+  "keywordLabels": {
+    "UPDATE": "stmt",
+    "SET": "set",
+    "FROM": "from",
+    "WHERE": "where",
+    "CLIENT": "client",
+    "SPECIFIED": "specified"
+  },
+  "keywordPhrases": {
+    "CLIENT SPECIFIED": "client-specified"
+  },
+  "captureRules": [
+    { "after": "UPDATE", "name": "target", "label": "target" },
+    { "after": "SET", "name": "set", "label": "set", "capture": "rest", "stopTokens": ["WHERE"] },
+    { "after": "FROM", "name": "source", "label": "source", "capture": "rest" },
+    { "after": "WHERE", "name": "where", "label": "where", "capture": "rest" }
+  ]
+}

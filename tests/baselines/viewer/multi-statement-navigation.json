@@ -2,10 +2,11 @@
   "errorText": "",
   "rightTab": "template",
   "dataSummary": {
-    "objectCount": 4,
+    "objectCount": 5,
     "declCount": 2,
-    "renderObjectCount": 4,
+    "renderObjectCount": 5,
     "firstObjectTypes": [
+      "REPORT",
       "DATA",
       "DATA",
       "ASSIGNMENT",
@@ -27,9 +28,9 @@
   "templateBlocks": [
     {
       "index": "0",
-      "lineStart": 3,
+      "lineStart": 1,
       "selected": false,
-      "textPreview": "DATA |  |  |  |  | "
+      "textPreview": "REPORT |  |  |  |  | "
     },
     {
       "index": "1",
@@ -39,12 +40,18 @@
     },
     {
       "index": "2",
+      "lineStart": 3,
+      "selected": false,
+      "textPreview": "DATA |  |  |  |  | "
+    },
+    {
+      "index": "3",
       "lineStart": 4,
       "selected": false,
       "textPreview": "Đích |  |  |  |  | "
     },
     {
-      "index": "3",
+      "index": "4",
       "lineStart": 4,
       "selected": false,
       "textPreview": "Đích |  |  |  |  | "

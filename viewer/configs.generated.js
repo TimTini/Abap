@@ -103,6 +103,7 @@
         "-=": "sub-assign",
         "*=": "mul-assign",
         "/=": "div-assign",
+        "&&=": "concat-assign",
         "?=": "cast"
       },
       "keywordPhrases": {},
@@ -330,13 +331,20 @@
         "MODE": "mode",
         "UPDATE": "update",
         "MESSAGES": "messages",
-        "INTO": "into"
+        "INTO": "into",
+        "WITH": "with",
+        "WITHOUT": "without",
+        "AUTHORITY-CHECK": "authority-check",
+        "OPTIONS": "options",
+        "FROM": "from"
       },
       "keywordPhrases": {
         "CALL TRANSACTION": "call-transaction",
         "SKIP FIRST SCREEN": "skip-first-screen",
         "AND RETURN": "and-return",
-        "MESSAGES INTO": "messages-into"
+        "MESSAGES INTO": "messages-into",
+        "WITH AUTHORITY-CHECK": "with-authority-check",
+        "WITHOUT AUTHORITY-CHECK": "without-authority-check"
       },
       "captureRules": [
         {
@@ -364,6 +372,11 @@
           "after": "MESSAGES INTO",
           "name": "messagesInto",
           "label": "messages-into"
+        },
+        {
+          "after": "OPTIONS FROM",
+          "name": "options",
+          "label": "options"
         }
       ]
     },
@@ -397,10 +410,23 @@
       },
       "keywordLabels": {
         "CATCH": "stmt",
-        "INTO": "into"
+        "INTO": "into",
+        "BEFORE": "before",
+        "UNWIND": "unwind"
       },
-      "keywordPhrases": {},
+      "keywordPhrases": {
+        "BEFORE UNWIND": "before-unwind"
+      },
       "captureRules": [
+        {
+          "after": "CATCH BEFORE UNWIND",
+          "name": "exception",
+          "label": "exception",
+          "capture": "rest",
+          "stopTokens": [
+            "INTO"
+          ]
+        },
         {
           "after": "CATCH",
           "name": "exception",
@@ -448,25 +474,52 @@
           "after": "TYPE REF TO",
           "name": "refTo",
           "label": "ref-to",
-          "descKey": "refTo"
+          "descKey": "refTo",
+          "capture": "rest",
+          "stopTokens": [
+            "VALUE",
+            "LENGTH",
+            "DECIMALS",
+            "READ-ONLY"
+          ]
         },
         {
           "after": "TYPE",
           "name": "type",
           "label": "type-name",
-          "descKey": "type"
+          "descKey": "type",
+          "capture": "rest",
+          "stopTokens": [
+            "VALUE",
+            "LENGTH",
+            "DECIMALS",
+            "READ-ONLY"
+          ]
         },
         {
           "after": "LIKE",
           "name": "like",
           "label": "like-name",
-          "descKey": "like"
+          "descKey": "like",
+          "capture": "rest",
+          "stopTokens": [
+            "VALUE",
+            "LENGTH",
+            "DECIMALS",
+            "READ-ONLY"
+          ]
         },
         {
           "after": "VALUE",
           "name": "value",
           "label": "value",
-          "descKey": "value"
+          "descKey": "value",
+          "capture": "rest",
+          "stopTokens": [
+            "LENGTH",
+            "DECIMALS",
+            "READ-ONLY"
+          ]
         },
         {
           "after": "LENGTH",
@@ -602,10 +655,17 @@
         "startKeyword": "CLEANUP"
       },
       "keywordLabels": {
-        "CLEANUP": "stmt"
+        "CLEANUP": "stmt",
+        "INTO": "into"
       },
       "keywordPhrases": {},
-      "captureRules": []
+      "captureRules": [
+        {
+          "after": "INTO",
+          "name": "into",
+          "label": "into"
+        }
+      ]
     },
     {
       "_sourceFile": "clear.json",
@@ -661,19 +721,32 @@
           "after": "TYPE REF TO",
           "name": "refTo",
           "label": "ref-to",
-          "descKey": "refTo"
+          "descKey": "refTo",
+          "capture": "rest"
         },
         {
           "after": "TYPE",
           "name": "type",
           "label": "type-name",
-          "descKey": "type"
+          "descKey": "type",
+          "capture": "rest",
+          "stopTokens": [
+            "VALUE",
+            "LENGTH",
+            "DECIMALS"
+          ]
         },
         {
           "after": "LIKE",
           "name": "like",
           "label": "like-name",
-          "descKey": "like"
+          "descKey": "like",
+          "capture": "rest",
+          "stopTokens": [
+            "VALUE",
+            "LENGTH",
+            "DECIMALS"
+          ]
         },
         {
           "after": "VALUE",
@@ -746,25 +819,52 @@
           "after": "TYPE REF TO",
           "name": "refTo",
           "label": "ref-to",
-          "descKey": "refTo"
+          "descKey": "refTo",
+          "capture": "rest",
+          "stopTokens": [
+            "VALUE",
+            "LENGTH",
+            "DECIMALS",
+            "READ-ONLY"
+          ]
         },
         {
           "after": "TYPE",
           "name": "type",
           "label": "type-name",
-          "descKey": "type"
+          "descKey": "type",
+          "capture": "rest",
+          "stopTokens": [
+            "VALUE",
+            "LENGTH",
+            "DECIMALS",
+            "READ-ONLY"
+          ]
         },
         {
           "after": "LIKE",
           "name": "like",
           "label": "like-name",
-          "descKey": "like"
+          "descKey": "like",
+          "capture": "rest",
+          "stopTokens": [
+            "VALUE",
+            "LENGTH",
+            "DECIMALS",
+            "READ-ONLY"
+          ]
         },
         {
           "after": "VALUE",
           "name": "value",
           "label": "value",
-          "descKey": "value"
+          "descKey": "value",
+          "capture": "rest",
+          "stopTokens": [
+            "LENGTH",
+            "DECIMALS",
+            "READ-ONLY"
+          ]
         },
         {
           "after": "LENGTH",
@@ -794,11 +894,17 @@
         "WHERE": "where",
         "ADJACENT": "adjacent",
         "DUPLICATES": "duplicates",
-        "COMPARING": "comparing"
+        "COMPARING": "comparing",
+        "USING": "using",
+        "KEY": "key",
+        "ALL": "all",
+        "FIELDS": "fields"
       },
       "keywordPhrases": {
         "ADJACENT DUPLICATES": "adjacent-duplicates",
-        "DELETE ADJACENT DUPLICATES": "delete-adjacent-duplicates"
+        "DELETE ADJACENT DUPLICATES": "delete-adjacent-duplicates",
+        "USING KEY": "using-key",
+        "ALL FIELDS": "all-fields"
       },
       "captureRules": [
         {
@@ -807,9 +913,25 @@
           "label": "target"
         },
         {
+          "after": "DELETE ADJACENT DUPLICATES FROM",
+          "name": "target",
+          "label": "target"
+        },
+        {
           "after": "FROM",
           "name": "from",
           "label": "from"
+        },
+        {
+          "after": "USING KEY",
+          "name": "usingKey",
+          "label": "using-key"
+        },
+        {
+          "after": "COMPARING",
+          "name": "comparing",
+          "label": "comparing",
+          "capture": "rest"
         },
         {
           "after": "INDEX",
@@ -825,6 +947,61 @@
       ]
     },
     {
+      "_sourceFile": "delete-sql.json",
+      "object": "DELETE_SQL",
+      "match": {
+        "startKeyword": "DELETE"
+      },
+      "keywordLabels": {
+        "DELETE": "stmt",
+        "FROM": "from",
+        "WHERE": "where",
+        "ORDER": "order",
+        "BY": "by",
+        "OFFSET": "offset",
+        "UP": "up",
+        "TO": "to"
+      },
+      "keywordPhrases": {
+        "DELETE FROM": "delete-from",
+        "ORDER BY": "order-by",
+        "UP TO": "up-to"
+      },
+      "captureRules": [
+        {
+          "after": "DELETE FROM",
+          "name": "target",
+          "label": "target"
+        },
+        {
+          "after": "DELETE",
+          "name": "target",
+          "label": "target"
+        },
+        {
+          "after": "FROM",
+          "name": "source",
+          "label": "source",
+          "capture": "rest",
+          "stopTokens": [
+            "WHERE",
+            "ORDER",
+            "UP"
+          ]
+        },
+        {
+          "after": "WHERE",
+          "name": "where",
+          "label": "where",
+          "capture": "rest",
+          "stopTokens": [
+            "ORDER",
+            "UP"
+          ]
+        }
+      ]
+    },
+    {
       "_sourceFile": "do.json",
       "object": "DO",
       "match": {
@@ -835,7 +1012,13 @@
       },
       "keywordLabels": {
         "DO": "stmt",
-        "TIMES": "times"
+        "TIMES": "times",
+        "VARYING": "varying",
+        "FROM": "from",
+        "NEXT": "next",
+        "RANGE": "range",
+        "UNTIL": "until",
+        "WHILE": "while"
       },
       "keywordPhrases": {},
       "captureRules": [
@@ -843,6 +1026,45 @@
           "after": "DO",
           "name": "times",
           "label": "times"
+        },
+        {
+          "after": "VARYING",
+          "name": "varying",
+          "label": "varying",
+          "capture": "rest",
+          "stopTokens": [
+            "FROM"
+          ]
+        },
+        {
+          "after": "FROM",
+          "name": "from",
+          "label": "from",
+          "capture": "rest",
+          "stopTokens": [
+            "NEXT"
+          ]
+        },
+        {
+          "after": "NEXT",
+          "name": "next",
+          "label": "next",
+          "capture": "rest",
+          "stopTokens": [
+            "RANGE",
+            "UNTIL",
+            "WHILE"
+          ]
+        },
+        {
+          "after": "RANGE",
+          "name": "range",
+          "label": "range",
+          "capture": "rest",
+          "stopTokens": [
+            "UNTIL",
+            "WHILE"
+          ]
         }
       ]
     },
@@ -913,25 +1135,29 @@
           "after": "TYPE REF TO",
           "name": "refTo",
           "label": "ref-to",
-          "descKey": "refTo"
+          "descKey": "refTo",
+          "capture": "rest"
         },
         {
           "after": "TYPE",
           "name": "type",
           "label": "type",
-          "descKey": "type"
+          "descKey": "type",
+          "capture": "rest"
         },
         {
           "after": "LIKE",
           "name": "like",
           "label": "like",
-          "descKey": "like"
+          "descKey": "like",
+          "capture": "rest"
         },
         {
           "after": "STRUCTURE",
           "name": "structure",
           "label": "structure",
-          "descKey": "structure"
+          "descKey": "structure",
+          "capture": "rest"
         }
       ]
     },
@@ -1046,6 +1272,8 @@
         "LINES": "lines",
         "OF": "of",
         "INDEX": "index",
+        "FROM": "from",
+        "TO": "to",
         "ASSIGNING": "assigning",
         "REFERENCE": "reference"
       },
@@ -1064,6 +1292,16 @@
           "after": "INSERT LINES OF",
           "name": "source",
           "label": "source-itab"
+        },
+        {
+          "after": "FROM",
+          "name": "from",
+          "label": "from"
+        },
+        {
+          "after": "TO",
+          "name": "to",
+          "label": "to"
         },
         {
           "after": "INTO TABLE",
@@ -1089,6 +1327,57 @@
           "after": "REFERENCE INTO",
           "name": "refInto",
           "label": "reference-into"
+        }
+      ]
+    },
+    {
+      "_sourceFile": "insert-sql.json",
+      "object": "INSERT_SQL",
+      "match": {
+        "startKeyword": "INSERT"
+      },
+      "keywordLabels": {
+        "INSERT": "stmt",
+        "INTO": "into",
+        "VALUES": "values",
+        "FROM": "from",
+        "TABLE": "table",
+        "ACCEPTING": "accepting",
+        "DUPLICATE": "duplicate",
+        "KEYS": "keys"
+      },
+      "keywordPhrases": {
+        "INSERT INTO": "insert-into",
+        "ACCEPTING DUPLICATE KEYS": "accepting-duplicate-keys"
+      },
+      "captureRules": [
+        {
+          "after": "INSERT INTO",
+          "name": "target",
+          "label": "target"
+        },
+        {
+          "after": "INSERT",
+          "name": "target",
+          "label": "target"
+        },
+        {
+          "after": "VALUES",
+          "name": "source",
+          "label": "source",
+          "capture": "rest",
+          "stopTokens": [
+            "ACCEPTING"
+          ]
+        },
+        {
+          "after": "FROM",
+          "name": "source",
+          "label": "source",
+          "capture": "rest",
+          "stopTokens": [
+            "ACCEPTING"
+          ]
         }
       ]
     },
@@ -1367,7 +1656,13 @@
         {
           "after": "FROM",
           "name": "from",
-          "label": "from"
+          "label": "from",
+          "capture": "rest",
+          "stopTokens": [
+            "INDEX",
+            "TRANSPORTING",
+            "WHERE"
+          ]
         },
         {
           "after": "INDEX",
@@ -1388,6 +1683,38 @@
           "name": "where",
           "label": "where",
           "capture": "rest"
+        }
+      ]
+    },
+    {
+      "_sourceFile": "modify-sql.json",
+      "object": "MODIFY_SQL",
+      "match": {
+        "startKeyword": "MODIFY"
+      },
+      "keywordLabels": {
+        "MODIFY": "stmt",
+        "FROM": "from",
+        "USING": "using",
+        "CLIENT": "client"
+      },
+      "keywordPhrases": {
+        "USING CLIENT": "using-client"
+      },
+      "captureRules": [
+        {
+          "after": "MODIFY",
+          "name": "target",
+          "label": "target"
+        },
+        {
+          "after": "FROM",
+          "name": "source",
+          "label": "source",
+          "capture": "rest",
+          "stopTokens": [
+            "ACCEPTING"
+          ]
         }
       ]
     },
@@ -1462,6 +1789,9 @@
       "keywordLabels": {
         "PARAMETERS": "stmt",
         "TYPE": "type",
+        "LIKE": "like",
+        "REF": "ref",
+        "TO": "to",
         "DEFAULT": "default",
         "OBLIGATORY": "obligatory",
         "AS": "as",
@@ -1498,16 +1828,96 @@
           "descKey": "name"
         },
         {
+          "after": "TYPE REF TO",
+          "name": "refTo",
+          "label": "ref-to",
+          "descKey": "refTo",
+          "capture": "rest",
+          "stopTokens": [
+            "DEFAULT",
+            "OBLIGATORY",
+            "USER-COMMAND",
+            "AS",
+            "VISIBLE",
+            "LENGTH",
+            "NO-DISPLAY",
+            "LOWER",
+            "MEMORY",
+            "MODIF",
+            "DECIMALS",
+            "VALUE",
+            "MATCHCODE",
+            "MODIF",
+            "NO-EXTENSION"
+          ]
+        },
+        {
           "after": "TYPE",
           "name": "type",
           "label": "type-name",
-          "descKey": "type"
+          "descKey": "type",
+          "capture": "rest",
+          "stopTokens": [
+            "DEFAULT",
+            "OBLIGATORY",
+            "USER-COMMAND",
+            "AS",
+            "VISIBLE",
+            "LENGTH",
+            "NO-DISPLAY",
+            "LOWER",
+            "MEMORY",
+            "MODIF",
+            "DECIMALS",
+            "VALUE",
+            "MATCHCODE",
+            "NO-EXTENSION"
+          ]
+        },
+        {
+          "after": "LIKE",
+          "name": "like",
+          "label": "like-name",
+          "descKey": "like",
+          "capture": "rest",
+          "stopTokens": [
+            "DEFAULT",
+            "OBLIGATORY",
+            "USER-COMMAND",
+            "AS",
+            "VISIBLE",
+            "LENGTH",
+            "NO-DISPLAY",
+            "LOWER",
+            "MEMORY",
+            "MODIF",
+            "DECIMALS",
+            "VALUE",
+            "MATCHCODE",
+            "NO-EXTENSION"
+          ]
         },
         {
           "after": "DEFAULT",
           "name": "default",
           "label": "default-value",
-          "descKey": "default"
+          "descKey": "default",
+          "capture": "rest",
+          "stopTokens": [
+            "OBLIGATORY",
+            "USER-COMMAND",
+            "AS",
+            "VISIBLE",
+            "LENGTH",
+            "NO-DISPLAY",
+            "LOWER",
+            "MEMORY",
+            "MODIF",
+            "DECIMALS",
+            "VALUE",
+            "MATCHCODE",
+            "NO-EXTENSION"
+          ]
         },
         {
           "after": "LENGTH",
@@ -1552,10 +1962,16 @@
         "USING": "using",
         "CHANGING": "changing",
         "TABLES": "tables",
-        "IF": "if"
+        "IF": "if",
+        "ON": "on",
+        "COMMIT": "commit",
+        "ROLLBACK": "rollback"
       },
       "keywordPhrases": {
-        "IN PROGRAM": "in-program"
+        "IN PROGRAM": "in-program",
+        "ON COMMIT": "on-commit",
+        "ON ROLLBACK": "on-rollback",
+        "IF FOUND": "if-found"
       },
       "captureRules": [
         {
@@ -1785,12 +2201,39 @@
         {
           "after": "FOR",
           "name": "for",
-          "label": "for"
+          "label": "for",
+          "capture": "rest",
+          "stopTokens": [
+            "DEFAULT",
+            "OBLIGATORY",
+            "NO-EXTENSION",
+            "NO",
+            "LOWER",
+            "MEMORY",
+            "MODIF",
+            "VISIBLE",
+            "LENGTH",
+            "VALUE",
+            "MATCHCODE"
+          ]
         },
         {
           "after": "DEFAULT",
           "name": "default",
-          "label": "default"
+          "label": "default",
+          "capture": "rest",
+          "stopTokens": [
+            "OBLIGATORY",
+            "NO-EXTENSION",
+            "NO",
+            "LOWER",
+            "MEMORY",
+            "MODIF",
+            "VISIBLE",
+            "LENGTH",
+            "VALUE",
+            "MATCHCODE"
+          ]
         },
         {
           "after": "LENGTH",
@@ -2033,25 +2476,48 @@
           "after": "TYPE REF TO",
           "name": "refTo",
           "label": "ref-to",
-          "descKey": "refTo"
+          "descKey": "refTo",
+          "capture": "rest",
+          "stopTokens": [
+            "VALUE",
+            "LENGTH",
+            "DECIMALS"
+          ]
         },
         {
           "after": "TYPE",
           "name": "type",
           "label": "type-name",
-          "descKey": "type"
+          "descKey": "type",
+          "capture": "rest",
+          "stopTokens": [
+            "VALUE",
+            "LENGTH",
+            "DECIMALS"
+          ]
         },
         {
           "after": "LIKE",
           "name": "like",
           "label": "like-name",
-          "descKey": "like"
+          "descKey": "like",
+          "capture": "rest",
+          "stopTokens": [
+            "VALUE",
+            "LENGTH",
+            "DECIMALS"
+          ]
         },
         {
           "after": "VALUE",
           "name": "value",
           "label": "value",
-          "descKey": "value"
+          "descKey": "value",
+          "capture": "rest",
+          "stopTokens": [
+            "LENGTH",
+            "DECIMALS"
+          ]
         },
         {
           "after": "LENGTH",
@@ -2115,14 +2581,78 @@
           "label": "type-name"
         },
         {
+          "after": "TYPE REF TO",
+          "name": "refTo",
+          "label": "ref-to",
+          "capture": "rest"
+        },
+        {
           "after": "TYPE",
           "name": "type",
-          "label": "type"
+          "label": "type",
+          "capture": "rest",
+          "stopTokens": [
+            "VALUE",
+            "LENGTH",
+            "DECIMALS"
+          ]
         },
         {
           "after": "LIKE",
           "name": "like",
-          "label": "like"
+          "label": "like",
+          "capture": "rest",
+          "stopTokens": [
+            "VALUE",
+            "LENGTH",
+            "DECIMALS"
+          ]
+        }
+      ]
+    },
+    {
+      "_sourceFile": "update-sql.json",
+      "object": "UPDATE_SQL",
+      "match": {
+        "startKeyword": "UPDATE"
+      },
+      "keywordLabels": {
+        "UPDATE": "stmt",
+        "SET": "set",
+        "FROM": "from",
+        "WHERE": "where",
+        "CLIENT": "client",
+        "SPECIFIED": "specified"
+      },
+      "keywordPhrases": {
+        "CLIENT SPECIFIED": "client-specified"
+      },
+      "captureRules": [
+        {
+          "after": "UPDATE",
+          "name": "target",
+          "label": "target"
+        },
+        {
+          "after": "SET",
+          "name": "set",
+          "label": "set",
+          "capture": "rest",
+          "stopTokens": [
+            "WHERE"
+          ]
+        },
+        {
+          "after": "FROM",
+          "name": "source",
+          "label": "source",
+          "capture": "rest"
+        },
+        {
+          "after": "WHERE",
+          "name": "where",
+          "label": "where",
+          "capture": "rest"
         }
       ]
     },

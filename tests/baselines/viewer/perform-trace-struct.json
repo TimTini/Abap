@@ -2,16 +2,18 @@
   "errorText": "",
   "rightTab": "template",
   "dataSummary": {
-    "objectCount": 10,
+    "objectCount": 12,
     "declCount": 8,
-    "renderObjectCount": 10,
+    "renderObjectCount": 12,
     "firstObjectTypes": [
+      "REPORT",
       "TYPES",
       "TYPES",
       "TYPES",
       "TYPES",
       "DATA",
       "PARAMETERS",
+      "START_OF_SELECTION",
       "ASSIGNMENT",
       "ASSIGNMENT",
       "PERFORM",
@@ -33,75 +35,75 @@
   "templateBlocks": [
     {
       "index": "0",
+      "lineStart": 1,
+      "selected": false,
+      "textPreview": "REPORT |  |  |  |  | "
+    },
+    {
+      "index": "1",
       "lineStart": 3,
       "selected": false,
       "textPreview": "TYPES |  |  |  |  | "
     },
     {
-      "index": "1",
+      "index": "2",
       "lineStart": 4,
       "selected": false,
       "textPreview": "TYPES |  |  |  |  | "
     },
     {
-      "index": "2",
+      "index": "3",
       "lineStart": 5,
       "selected": false,
       "textPreview": "TYPES |  |  |  |  | "
     },
     {
-      "index": "3",
+      "index": "4",
       "lineStart": 6,
       "selected": false,
       "textPreview": "TYPES |  |  |  |  | "
     },
     {
-      "index": "4",
+      "index": "5",
       "lineStart": 8,
       "selected": false,
       "textPreview": "DATA |  |  |  |  | "
     },
     {
-      "index": "5",
+      "index": "6",
       "lineStart": 9,
       "selected": false,
       "textPreview": "PARAMETERS |  |  |  |  | "
     },
     {
-      "index": "6",
+      "index": "7",
+      "lineStart": 11,
+      "selected": false,
+      "textPreview": "START-OF-SELECTION |  |  |  |  | "
+    },
+    {
+      "index": "8",
       "lineStart": 12,
       "selected": false,
       "textPreview": "Đích |  |  |  |  | "
     },
     {
-      "index": "7",
+      "index": "9",
       "lineStart": 13,
       "selected": false,
       "textPreview": "Đích |  |  |  |  | "
     },
     {
-      "index": "8",
+      "index": "10",
       "lineStart": 14,
       "selected": false,
       "textPreview": "PERFORM |  |  |  |  | "
     },
     {
-      "index": "9",
+      "index": "11",
       "lineStart": 16,
       "selected": false,
       "textPreview": "FORM |  |  |  |  | "
-    },
-    {
-      "index": "10",
-      "lineStart": 17,
-      "selected": false,
-      "textPreview": "Điều kiện trái |  |  |  |  | "
-    },
-    {
-      "index": "11",
-      "lineStart": 18,
-      "selected": false,
-      "textPreview": "Đích |  |  |  |  | "
     }
   ],
   "descriptionSummary": "",

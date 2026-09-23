@@ -17,7 +17,8 @@
     { "after": "TYPES BEGIN OF", "name": "name", "label": "type-name" },
     { "after": "TYPES END OF", "name": "name", "label": "type-name" },
     { "after": "TYPES", "name": "name", "label": "type-name" },
-    { "after": "TYPE", "name": "type", "label": "type" },
-    { "after": "LIKE", "name": "like", "label": "like" }
+    { "after": "TYPE REF TO", "name": "refTo", "label": "ref-to", "capture": "rest" },
+    { "after": "TYPE", "name": "type", "label": "type", "capture": "rest", "stopTokens": ["VALUE", "LENGTH", "DECIMALS"] },
+    { "after": "LIKE", "name": "like", "label": "like", "capture": "rest", "stopTokens": ["VALUE", "LENGTH", "DECIMALS"] }
   ]
 }
