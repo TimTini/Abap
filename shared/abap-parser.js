@@ -2852,7 +2852,7 @@
       }
 
       const operatorUpper = String(clause.comparisonOperator || "").toUpperCase();
-      const skipRightAnnotation = operatorUpper === "IS" && isUnaryIsPredicate(clause.rightOperand);
+      const skipRightAnnotation = (operatorUpper === "IS" || operatorUpper === "IS NOT") && isUnaryIsPredicate(clause.rightOperand);
       const rightRef = skipRightAnnotation ? "" : extractFirstIdentifierFromExpression(clause.rightOperand);
       if (rightRef) {
         clause.rightOperandRef = rightRef;
@@ -3189,7 +3189,10 @@
         continue;
       }
 
-      const rightStart = opIndex + 1;
+      const isNotOperator = String(tokens[opIndex].upper || "").toUpperCase() === "IS"
+        && String(tokens[opIndex + 1] && tokens[opIndex + 1].upper || "").toUpperCase() === "NOT";
+      const operatorEnd = isNotOperator ? opIndex + 1 : opIndex;
+      const rightStart = operatorEnd + 1;
       if (rightStart >= tokens.length) {
         break;
       }
@@ -3231,7 +3234,11 @@
 
       const leftOperand = leftTokens.map((token) => token.raw).join(" ").trim();
       const rightOperand = rightTokens.map((token) => token.raw).join(" ").trim();
-      const comparisonOperator = String(tokens[opIndex].raw || "").trim();
+      const comparisonOperator = tokens
+        .slice(opIndex, operatorEnd + 1)
+        .map((token) => token.raw)
+        .join(" ")
+        .trim();
       if (!leftOperand || !rightOperand || !comparisonOperator) {
         break;
       }

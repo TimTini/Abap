@@ -383,8 +383,8 @@ function testIsInitialAndIsNotInitialConditions() {
       },
       {
         leftOperand: "lv_b",
-        rightOperand: "NOT INITIAL",
-        comparisonOperator: "IS",
+        rightOperand: "INITIAL",
+        comparisonOperator: "IS NOT",
         logicalConnector: ""
       }
     ]
@@ -397,9 +397,9 @@ function testIsInitialAndIsNotInitialConditions() {
   assert(ifObj.extras.ifCondition.conditions[0].rightOperandDecl, "Expected synthetic decl for INITIAL.");
   assert.strictEqual(ifObj.extras.ifCondition.conditions[0].rightOperandDecl.objectType, "SYSTEM");
   assert.strictEqual(ifObj.extras.ifCondition.conditions[0].rightOperandDecl.name, "INITIAL");
-  assert(ifObj.extras.ifCondition.conditions[1].rightOperandDecl, "Expected synthetic decl for NOT INITIAL.");
+  assert(ifObj.extras.ifCondition.conditions[1].rightOperandDecl, "Expected synthetic decl for INITIAL after IS NOT.");
   assert.strictEqual(ifObj.extras.ifCondition.conditions[1].rightOperandDecl.objectType, "SYSTEM");
-  assert.strictEqual(ifObj.extras.ifCondition.conditions[1].rightOperandDecl.name, "NOT INITIAL");
+  assert.strictEqual(ifObj.extras.ifCondition.conditions[1].rightOperandDecl.name, "INITIAL");
 
   const readObj = findObject(objects, "READ_TABLE");
   assert(readObj && readObj.extras && readObj.extras.readTable, "Expected READ_TABLE extras for IS INITIAL patterns.");
@@ -419,8 +419,8 @@ function testIsInitialAndIsNotInitialConditions() {
       },
       {
         leftOperand: "col_b",
-        rightOperand: "NOT INITIAL",
-        comparisonOperator: "IS",
+        rightOperand: "INITIAL",
+        comparisonOperator: "IS NOT",
         logicalConnector: ""
       }
     ]
@@ -429,8 +429,8 @@ function testIsInitialAndIsNotInitialConditions() {
   assert.strictEqual(readObj.extras.readTable.conditions[1].rightOperandRef, undefined);
   assert(readObj.extras.readTable.conditions[0].rightOperandDecl, "Expected synthetic decl for READ INITIAL.");
   assert.strictEqual(readObj.extras.readTable.conditions[0].rightOperandDecl.name, "INITIAL");
-  assert(readObj.extras.readTable.conditions[1].rightOperandDecl, "Expected synthetic decl for READ NOT INITIAL.");
-  assert.strictEqual(readObj.extras.readTable.conditions[1].rightOperandDecl.name, "NOT INITIAL");
+  assert(readObj.extras.readTable.conditions[1].rightOperandDecl, "Expected synthetic decl for READ INITIAL after IS NOT.");
+  assert.strictEqual(readObj.extras.readTable.conditions[1].rightOperandDecl.name, "INITIAL");
 }
 
 function testImplicitSplitOnlyForReadTable() {

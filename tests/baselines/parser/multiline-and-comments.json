@@ -331,7 +331,7 @@
               "conditionRaw": "lv_text IS NOT INITIAL OR lv_other = |C|",
               "conditions": [
                 {
-                  "comparisonOperator": "IS",
+                  "comparisonOperator": "IS NOT",
                   "leftOperand": "lv_text",
                   "leftOperandDecl": {
                     "objectType": "DATA",
@@ -353,10 +353,10 @@
                   },
                   "leftOperandRef": "lv_text",
                   "logicalConnector": "OR",
-                  "rightOperand": "NOT INITIAL",
+                  "rightOperand": "INITIAL",
                   "rightOperandDecl": {
                     "objectType": "SYSTEM",
-                    "name": "NOT INITIAL",
+                    "name": "INITIAL",
                     "file": "",
                     "lineStart": 0,
                     "raw": "",

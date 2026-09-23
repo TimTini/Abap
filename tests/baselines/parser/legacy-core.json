@@ -1620,7 +1620,7 @@
               "conditionRaw": "is_ctx-uname IS NOT INITIAL",
               "conditions": [
                 {
-                  "comparisonOperator": "IS",
+                  "comparisonOperator": "IS NOT",
                   "leftOperand": "is_ctx-uname",
                   "leftOperandDecl": {
                     "objectType": "CONDITION_VALUE",
@@ -1642,10 +1642,10 @@
                   },
                   "leftOperandRef": "is_ctx-uname",
                   "logicalConnector": "",
-                  "rightOperand": "NOT INITIAL",
+                  "rightOperand": "INITIAL",
                   "rightOperandDecl": {
                     "objectType": "SYSTEM",
-                    "name": "NOT INITIAL",
+                    "name": "INITIAL",
                     "file": "",
                     "lineStart": 0,
                     "raw": "",

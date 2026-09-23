@@ -17,8 +17,8 @@ This file is the local source of truth for future AI/code agents working in this
 - Detailed condition parsing lives in `extras.*.conditions`.
 - Implicit clause split (without explicit `AND`/`OR`) is allowed only for `READ TABLE ... WITH KEY`.
 - For `IF/ELSEIF/PERFORM IF/SELECT WHERE-HAVING/LOOP-MODIFY-DELETE WHERE`, split only by explicit connectors.
-- Unary `IS` predicates (`INITIAL`, `NOT INITIAL`, `ASSIGNED`, `BOUND`, `SUPPLIED`, `REQUESTED`) must keep right operand represented in condition model.
-  - Right side should have a synthetic `SYSTEM` decl (e.g. `INITIAL`, `NOT INITIAL`) so right-side desc/finalDesc handling remains consistent.
+- Unary `IS` predicates (`INITIAL`, `ASSIGNED`, `BOUND`, `SUPPLIED`, `REQUESTED`) must keep right operand represented in condition model.
+  - `IS NOT` is a compound comparison operator; right side stays the unary predicate (e.g. `INITIAL`), with a synthetic `SYSTEM` decl so right-side desc/finalDesc handling remains consistent.
 - `ELSE` is a sibling branch of its matching `IF`; statements after it belong to `ELSE` until `ENDIF`.
 
 ## 3) Description + FinalDesc Rules

@@ -70,7 +70,7 @@ async function assertIfInitialUsesConditionTemplate() {
     [
       ["Điều kiện trái", "Toán tử", "Điều kiện phải", "Kết nối"],
       ["lv_a", "IS", "INITIAL", "OR"],
-      ["lv_b", "IS", "NOT INITIAL"]
+      ["lv_b", "IS NOT", "INITIAL"]
     ],
     "Expected each IF clause to stay on its own row without repeating the previous connector."
   );
@@ -219,7 +219,7 @@ async function assertFormSourceTraceUsesRootDeclarations() {
   assertTemplateRows(innerForm, "IF iv_inner IS INITIAL OR is_inner-city IS NOT INITIAL.", [
     ["Điều kiện trái", "Toán tử", "Điều kiện phải", "Kết nối"],
     ["gv_root", "IS", "INITIAL", "OR"],
-    ["gs_root-city", "IS", "NOT INITIAL"]
+    ["gs_root-city", "IS NOT", "INITIAL"]
   ]);
   assertTemplateRows(innerForm, "IF iv_inner = cv_inner AND is_inner-city = is_inner-name.", [
     ["Điều kiện trái", "Toán tử", "Điều kiện phải", "Kết nối"],
