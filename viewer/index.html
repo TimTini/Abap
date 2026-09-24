@@ -3,27 +3,27 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.09.24-r88">
-  <meta name="abap-viewer-updated-at" content="2026-09-24 12:05:38">
-  <meta name="abap-viewer-updated-note" content="Keep comments on their owners; expose TABLES descriptions in Data.">
+  <meta name="abap-viewer-version" content="v2026.09.24-r89">
+  <meta name="abap-viewer-updated-at" content="2026-09-24 13:15:59">
+  <meta name="abap-viewer-updated-note" content="Compact mobile layout; move controls into header.">
   <title>ABAP Parser Viewer</title>
     <link rel="stylesheet" href="./styles/viewer.css">
 </head>
 <body>
   <div class="container">
     <header id="appHeader">
-      <h1>ABAP Parser Viewer</h1>
-      <p>Paste ABAP code (or JSON output) and click Render.</p>
-      <p class="build-info" id="buildInfo">Updated: manual timestamp not set.</p>
+      <div class="app-header-copy">
+        <h1>ABAP Parser Viewer</h1>
+        <p>Paste ABAP code (or JSON output) and click Render.</p>
+        <p class="build-info" id="buildInfo">Updated: manual timestamp not set.</p>
+      </div>
+      <div class="controls app-controls" id="appControls">
+        <button type="button" id="parseBtn">Render</button>
+        <label class="toggle"><input type="checkbox" id="themeToggle" checked>dark</label>
+        <button type="button" id="descBtn" class="secondary">Data</button>
+        <button type="button" id="settingsBtn" class="secondary">Settings</button>
+      </div>
     </header>
-
-    <div class="controls" id="appControls">
-      <button type="button" id="parseBtn">Render</button>
-      <label class="toggle"><input type="checkbox" id="themeToggle" checked>dark</label>
-      <button type="button" id="descBtn" class="secondary">Data</button>
-      <button type="button" id="settingsBtn" class="secondary">Settings</button>
-      <span class="muted hint">Tip: use Template or Data to inspect parsed declarations and jump to source lines.</span>
-    </div>
 
     <div class="layout" id="mainLayout">
       <div class="panel">
@@ -63,7 +63,7 @@
         <div id="templatePreviewPanel">
           <div class="template-controls">
             <span class="template-key-mode">
-              Template key mode
+              <span class="template-key-label">Template key mode</span>
               <span id="templateKeyMode" class="template-key-badge">AUTO: objectType -&gt; DEFAULT</span>
             </span>
             <label class="template-copy-mode">
