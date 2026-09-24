@@ -1058,6 +1058,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     "call-function": ["name", "function-name"],
     "call-method": ["target", "name"],
     "delete-adjacent-duplicates": ["target"],
+    "delete-table": ["target"],
     "in-program": ["program"],
     "loop-at": ["itab"],
     "modify-table": ["itab", "itabOrDbtab"],

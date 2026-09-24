@@ -999,6 +999,7 @@
       },
       "keywordLabels": {
         "DELETE": "stmt",
+        "TABLE": "table",
         "FROM": "from",
         "INDEX": "index",
         "WHERE": "where",
@@ -1013,10 +1014,16 @@
       "keywordPhrases": {
         "ADJACENT DUPLICATES": "adjacent-duplicates",
         "DELETE ADJACENT DUPLICATES": "delete-adjacent-duplicates",
+        "DELETE TABLE": "delete-table",
         "USING KEY": "using-key",
         "ALL FIELDS": "all-fields"
       },
       "captureRules": [
+        {
+          "after": "DELETE TABLE",
+          "name": "target",
+          "label": "target"
+        },
         {
           "after": "DELETE",
           "name": "target",
@@ -2681,12 +2688,9 @@
         "ASCENDING": "ascending",
         "DESCENDING": "descending",
         "AS": "as",
-        "TEXT": "text",
-        "USING": "using",
-        "KEY": "key"
+        "TEXT": "text"
       },
       "keywordPhrases": {
-        "USING KEY": "using-key",
         "AS TEXT": "as-text"
       },
       "captureRules": [
@@ -2705,11 +2709,6 @@
             "DESCENDING",
             "USING"
           ]
-        },
-        {
-          "after": "USING KEY",
-          "name": "usingKey",
-          "label": "using-key"
         }
       ]
     },

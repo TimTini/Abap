@@ -9,9 +9,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.09.24-r89">
-  <meta name="abap-viewer-updated-at" content="2026-09-24 13:15:59">
-  <meta name="abap-viewer-updated-note" content="Compact mobile layout; move controls into header.">
+  <meta name="abap-viewer-version" content="v2026.09.24-r90">
+  <meta name="abap-viewer-updated-at" content="2026-09-24 14:37:06">
+  <meta name="abap-viewer-updated-note" content="Preserve traced descriptions for DELETE TABLE operands.">
   <title>ABAP Parser Viewer</title>
     <style>
 /* inlined from: ./styles/viewer.css */
@@ -8409,6 +8409,7 @@
       },
       "keywordLabels": {
         "DELETE": "stmt",
+        "TABLE": "table",
         "FROM": "from",
         "INDEX": "index",
         "WHERE": "where",
@@ -8423,10 +8424,16 @@
       "keywordPhrases": {
         "ADJACENT DUPLICATES": "adjacent-duplicates",
         "DELETE ADJACENT DUPLICATES": "delete-adjacent-duplicates",
+        "DELETE TABLE": "delete-table",
         "USING KEY": "using-key",
         "ALL FIELDS": "all-fields"
       },
       "captureRules": [
+        {
+          "after": "DELETE TABLE",
+          "name": "target",
+          "label": "target"
+        },
         {
           "after": "DELETE",
           "name": "target",
@@ -10091,12 +10098,9 @@
         "ASCENDING": "ascending",
         "DESCENDING": "descending",
         "AS": "as",
-        "TEXT": "text",
-        "USING": "using",
-        "KEY": "key"
+        "TEXT": "text"
       },
       "keywordPhrases": {
-        "USING KEY": "using-key",
         "AS TEXT": "as-text"
       },
       "captureRules": [
@@ -10115,11 +10119,6 @@
             "DESCENDING",
             "USING"
           ]
-        },
-        {
-          "after": "USING KEY",
-          "name": "usingKey",
-          "label": "using-key"
         }
       ]
     },
@@ -20308,6 +20307,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     "call-function": ["name", "function-name"],
     "call-method": ["target", "name"],
     "delete-adjacent-duplicates": ["target"],
+    "delete-table": ["target"],
     "in-program": ["program"],
     "loop-at": ["itab"],
     "modify-table": ["itab", "itabOrDbtab"],

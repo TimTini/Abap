@@ -7,18 +7,13 @@
     "ASCENDING": "ascending",
     "DESCENDING": "descending",
     "AS": "as",
-    "TEXT": "text",
-    "USING": "using",
-    "KEY": "key"
+    "TEXT": "text"
   },
   "keywordPhrases": {
-    "USING KEY": "using-key",
     "AS TEXT": "as-text"
   },
   "captureRules": [
     { "after": "SORT", "name": "itab", "label": "itab" },
-    { "after": "BY", "name": "by", "label": "by", "capture": "rest", "stopTokens": ["ASCENDING", "DESCENDING", "USING"] },
-    { "after": "USING KEY", "name": "usingKey", "label": "using-key" }
+    { "after": "BY", "name": "by", "label": "by", "capture": "rest", "stopTokens": ["ASCENDING", "DESCENDING", "USING"] }
   ]
 }
-

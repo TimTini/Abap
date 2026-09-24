@@ -244,6 +244,26 @@ test("SAP latest internal-table syntax variants retain statement families", () =
   }
 });
 
+test("SORT does not treat USING KEY as a supported table addition", () => {
+  const result = parseAbapTextDetailed("SORT lt_rows USING KEY sec_key.", configs, "sort-unsupported-key.abap");
+  const sort = result.objects[0];
+
+  assert.equal(sort && sort.objectType, "SORT_ITAB");
+  assert.equal(sort.values.usingKey, undefined);
+});
+
+test("DELETE TABLE captures the internal table after TABLE", () => {
+  const result = parseAbapTextDetailed([
+    "DATA FA TYPE STANDARD TABLE OF i WITH EMPTY KEY.",
+    "DELETE TABLE FA FROM 1."
+  ].join("\n"), configs, "delete-table-itab.abap");
+  const deletion = result.objects.find((object) => object.objectType === "DELETE_ITAB");
+
+  assert.equal(deletion && deletion.values.target.value, "FA");
+  assert.equal(deletion && deletion.values.target.decl.name, "FA");
+  assert.deepEqual(result.diagnostics, []);
+});
+
 test("CLASS-DATA internal tables classify subsequent DML as internal-table operations", () => {
   const result = parseAbapTextDetailed([
     "CLASS-DATA gt_rows TYPE STANDARD TABLE OF ty_row WITH EMPTY KEY.",

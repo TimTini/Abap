@@ -1094,6 +1094,33 @@ async function assertTemplateFallbackAllowlistCoversExistingItabOperands() {
   }
 }
 
+async function assertDeleteTableTargetKeepsPerformDescriptionInTemplate() {
+  const source = [
+    "TYPES ty_rows TYPE STANDARD TABLE OF i WITH EMPTY KEY.",
+    'DATA A TYPE ty_rows. "Name',
+    "PERFORM process_rows CHANGING A.",
+    "FORM process_rows CHANGING FA TYPE ty_rows.",
+    "  DELETE TABLE FA FROM 1.",
+    "ENDFORM."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const allObjects = state.renderObjects.flatMap((object) => [object, ...(object.children || [])]);
+  const deletion = allObjects.find((object) => object.objectType === "DELETE_ITAB");
+  assert(deletion, "Expected DELETE TABLE to render as DELETE_ITAB.");
+  assert.strictEqual(deletion.values.target.value, "FA");
+  const table = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="DELETE_ITAB"]');
+  const cell = table && findTemplateCellByText(table, "Name");
+  assert(cell, "Expected DELETE TABLE FA to display its caller description in Template.");
+  assert.strictEqual(cell.__templateCellMeta?.declCandidates?.[0]?.name, "A");
+
+  dom.window.close();
+}
+
 async function assertTemplateResolverWarnsOnceWithCellMetadata() {
   const dom = await renderFixture("APPEND a TO b.");
   const { window } = dom;
@@ -1525,6 +1552,10 @@ assertViewerFixtureDirectoriesStayInSync();
 
   await t.test("template row description keeps nested perform trace", async () => {
     await assertTemplateRowDescriptionKeepsNestedPerformTrace();
+  });
+
+  await t.test("DELETE TABLE template keeps the traced FORM parameter description", async () => {
+    await assertDeleteTableTargetKeepsPerformDescriptionInTemplate();
   });
 
   await t.test("template perform source edit does not bleed across sources", async () => {

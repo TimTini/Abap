@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>PERFORM description chain · ABAP Viewer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: #0b1220;
+      color: #e5edf8;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-width: 360px;
+      min-height: 100vh;
+      margin: 0;
+      background:
+        radial-gradient(ellipse at 18% 0%, rgba(18, 117, 129, .2), transparent 34rem),
+        #0b1220;
+    }
+
+    .page {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      height: 100vh;
+      height: 100dvh;
+      min-height: 0;
+      padding: 22px clamp(14px, 2.5vw, 36px) 28px;
+      gap: 18px;
+    }
+
+    .intro {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .eyebrow {
+      margin: 0 0 5px;
+      color: #54d4c3;
+      font-size: 11px;
+      font-weight: 750;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(21px, 2vw, 29px);
+      line-height: 1.15;
+      letter-spacing: -.035em;
+    }
+
+    .subtitle {
+      margin: 7px 0 0;
+      color: #9eacc0;
+      font-size: 13px;
+    }
+
+    .chain {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+      color: #c4d1e1;
+      font-family: Consolas, "Cascadia Code", monospace;
+      font-size: 12px;
+    }
+
+    .chain span {
+      padding: 7px 10px;
+      border: 1px solid #26374c;
+      border-radius: 8px;
+      background: rgba(17, 29, 45, .86);
+    }
+
+    .chain b {
+      color: #55d7c3;
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    .workbench {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      min-height: 0;
+      overflow: hidden;
+      border: 1px solid #28384d;
+      border-radius: 14px;
+      background: #101a29;
+      box-shadow: 0 18px 60px rgba(0, 0, 0, .26);
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      min-height: 54px;
+      padding: 9px 13px;
+      border-bottom: 1px solid #26364a;
+      background: #121e2e;
+    }
+
+    .toolbar-label {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-width: 0;
+      color: #d6e1ee;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      background: #50d7aa;
+      box-shadow: 0 0 12px rgba(80, 215, 170, .6);
+    }
+
+    #status {
+      overflow: hidden;
+      color: #91a3b9;
+      font-size: 11px;
+      font-weight: 450;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #status[data-state="error"] { color: #ff9b9b; }
+
+    .actions {
+      display: flex;
+      flex: 0 0 auto;
+      align-items: center;
+      gap: 7px;
+    }
+
+    button {
+      min-height: 33px;
+      padding: 6px 11px;
+      border: 1px solid #33475e;
+      border-radius: 7px;
+      background: #19283a;
+      color: #d6e2ef;
+      font: inherit;
+      font-size: 11px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+
+    button:hover { border-color: #5b7898; background: #20334a; }
+
+    button[aria-pressed="true"] {
+      border-color: #2a9e99;
+      background: #123b42;
+      color: #9ef5e5;
+    }
+
+    button:focus-visible { outline: 2px solid #69d7c9; outline-offset: 2px; }
+
+    .viewer-frame {
+      width: 166.667%;
+      min-height: 0;
+      height: 166.667%;
+      border: 0;
+      background: #111827;
+      transform: scale(.6);
+      transform-origin: top left;
+    }
+
+    @media (max-width: 780px) {
+      .page { padding: 9px 8px; gap: 8px; }
+      .intro { align-items: flex-start; flex-direction: column; gap: 7px; }
+      .subtitle { display: none; }
+      .chain { justify-content: flex-start; gap: 4px; font-size: 10px; }
+      .chain span { padding: 4px 6px; }
+      .workbench { min-height: 0; }
+      .toolbar { align-items: center; min-height: 42px; padding: 6px 8px; }
+      .toolbar-label { flex: 1; min-width: 0; gap: 7px; font-size: 10px; }
+      #status { max-width: 34vw; }
+      .actions { width: auto; gap: 5px; }
+      button { min-height: 30px; padding: 5px 8px; }
+      .viewer-frame { min-height: 0; }
+    }
+
+    @media (max-width: 480px) {
+      .chain { display: none; }
+      .intro { align-items: center; flex-direction: row; min-height: 34px; }
+      h1 { font-size: 17px; }
+      .eyebrow { margin-bottom: 3px; font-size: 9px; }
+      .toolbar { flex-wrap: wrap; }
+      .toolbar-label { width: 100%; flex: 1 1 100%; }
+      #status { max-width: 74vw; }
+      .actions { width: 100%; justify-content: flex-end; }
+      .viewer-frame { width: 100%; height: 100%; transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="intro">
+      <div>
+        <p class="eyebrow">ABAP Parser Viewer · live demo</p>
+        <h1>PERFORM description chain</h1>
+        <p class="subtitle">Theo mô tả A → FA qua lời gọi FORM và các cú pháp bảng trong Viewer thật.</p>
+      </div>
+      <div class="chain" aria-label="Luồng mô tả">
+        <span>A · Name</span><b aria-hidden="true">→</b>
+        <span>PERFORM CHANGING A</span><b aria-hidden="true">→</b>
+        <span>FORM CHANGING FA</span><b aria-hidden="true">→</b>
+        <span>READ TABLE · LOOP AT FA</span>
+      </div>
+    </header>
+
+    <section class="workbench" aria-label="Viewer ABAP thật">
+      <div class="toolbar">
+        <div class="toolbar-label">
+          <span class="live-dot" aria-hidden="true"></span>
+          <span>Viewer, parser và template thật</span>
+          <span id="status" role="status" aria-live="polite">Đang nạp Viewer…</span>
+        </div>
+        <div class="actions" aria-label="Chọn màn hình Viewer">
+          <button id="showTemplate" type="button" aria-pressed="true">Template</button>
+          <button id="showData" type="button" aria-pressed="false">Data</button>
+          <button id="reloadDemo" type="button" title="Nạp và parse lại ví dụ">Nạp lại ví dụ</button>
+        </div>
+      </div>
+      <iframe
+        id="viewerFrame"
+        class="viewer-frame"
+        title="ABAP Parser Viewer thật với ví dụ PERFORM description chain"
+        src="../viewer/index.html"
+      ></iframe>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const sample = [
+        "TYPES: BEGIN OF ty_row,",
+        "         id TYPE i,",
+        "         group_id TYPE i,",
+        "         name TYPE string,",
+        "         note TYPE string,",
+        "       END OF ty_row.",
+        "TYPES ty_rows TYPE STANDARD TABLE OF ty_row WITH NON-UNIQUE KEY id WITH NON-UNIQUE SORTED KEY by_name COMPONENTS name.",
+        'DATA A TYPE ty_rows. "Name',
+        "DATA lt_source TYPE ty_rows.",
+        "DATA ls_row TYPE ty_row.",
+        "DATA lr_row TYPE REF TO ty_row.",
+        "FIELD-SYMBOLS <ls_row> TYPE ty_row.",
+        "PERFORM PROCESS_ROWS CHANGING A.",
+        "FORM PROCESS_ROWS CHANGING FA TYPE ty_rows.",
+        "  READ TABLE FA WITH KEY id = 1 INTO ls_row.",
+        "  READ TABLE FA WITH TABLE KEY by_name COMPONENTS name = 'ALPHA' TRANSPORTING NO FIELDS.",
+        "  READ TABLE FA INDEX 1 USING KEY by_name ASSIGNING <ls_row>.",
+        "  READ TABLE FA INDEX 1 REFERENCE INTO lr_row.",
+        "  READ TABLE FA ASSIGNING <ls_row> WHERE id > 0 AND name IS NOT INITIAL.",
+        "  LOOP AT FA INTO ls_row.",
+        "  ENDLOOP.",
+        "  LOOP AT FA ASSIGNING <ls_row> FROM 1 TO 10 WHERE id > 0.",
+        "  ENDLOOP.",
+        "  LOOP AT FA REFERENCE INTO lr_row USING KEY by_name WHERE name = 'ALPHA'.",
+        "  ENDLOOP.",
+        "  LOOP AT FA INTO ls_row GROUP BY ( group_id = ls_row-id ) ASCENDING INTO DATA(ls_group).",
+        "    LOOP AT GROUP ls_group INTO DATA(ls_member).",
+        "    ENDLOOP.",
+        "  ENDLOOP.",
+        "  APPEND ls_row TO FA.",
+        "  APPEND INITIAL LINE TO FA ASSIGNING <ls_row>.",
+        "  APPEND LINES OF lt_source FROM 1 TO 3 STEP 2 USING KEY by_name TO FA.",
+        "  INSERT ls_row INTO TABLE FA.",
+        "  INSERT ls_row INTO FA INDEX 1 REFERENCE INTO lr_row.",
+        "  INSERT LINES OF lt_source FROM 1 TO 3 INTO TABLE FA.",
+        "  MODIFY TABLE FA FROM ls_row.",
+        "  MODIFY FA FROM ls_row INDEX 1 TRANSPORTING note.",
+        "  MODIFY FA FROM ls_row TRANSPORTING note WHERE id > 0.",
+        "  DELETE TABLE FA FROM ls_row.",
+        "  DELETE FA INDEX 1.",
+        "  DELETE FA USING KEY by_name WHERE name = 'OBSOLETE'.",
+        "  SORT FA BY name ASCENDING AS TEXT.",
+        "  DELETE ADJACENT DUPLICATES FROM FA COMPARING name.",
+        "  ls_row = FA[ id = 1 ].",
+        "  CLEAR FA.",
+        "ENDFORM."
+      ].join("\n");
+      const frame = document.getElementById("viewerFrame");
+      const status = document.getElementById("status");
+      const templateButton = document.getElementById("showTemplate");
+      const dataButton = document.getElementById("showData");
+      let viewerDocument = null;
+
+      const pause = (milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+
+      function setStatus(message, state) {
+        status.textContent = message;
+        status.dataset.state = state || "ready";
+      }
+
+      function setVisiblePanel(panel) {
+        const isData = panel === "data";
+        templateButton.setAttribute("aria-pressed", String(!isData));
+        dataButton.setAttribute("aria-pressed", String(isData));
+        if (!viewerDocument) return;
+
+        const target = viewerDocument.getElementById(isData ? "rightTabDescBtn" : "rightTabTemplateBtn");
+        if (target) target.click();
+      }
+
+      async function waitForViewer() {
+        for (let attempt = 0; attempt < 100; attempt += 1) {
+          try {
+            const doc = frame.contentDocument;
+            if (doc && doc.readyState === "complete" && doc.getElementById("parseBtn")) return doc;
+          } catch (error) {
+            throw new Error("Không truy cập được iframe Viewer. Hãy mở mockup qua máy chủ HTTP cục bộ của repo.");
+          }
+          await pause(100);
+        }
+        throw new Error("Viewer chưa tải xong. Hãy tải lại trang mockup.");
+      }
+
+      async function loadAndParse() {
+        setStatus("Đang parse bằng parser của Viewer…");
+        try {
+          viewerDocument = await waitForViewer();
+          const input = viewerDocument.getElementById("inputText");
+          const renderButton = viewerDocument.getElementById("parseBtn");
+          if (!input || !renderButton) throw new Error("Không tìm thấy ô Input hoặc nút Render của Viewer.");
+
+          input.value = sample;
+          input.dispatchEvent(new frame.contentWindow.Event("input", { bubbles: true }));
+          renderButton.click();
+          await pause(60);
+
+          const runtime = frame.contentWindow.AbapViewerRuntime;
+          const objects = runtime && runtime.state && runtime.state.data && runtime.state.data.objects;
+          const flatten = (nodes) => nodes.flatMap((object) => [object, ...flatten(object.children || [])]);
+          const allObjects = Array.isArray(objects) ? flatten(objects) : [];
+          const dataA = allObjects.find((object) => object.objectType === "DATA" && /\bA\b/.test(object.raw || ""));
+          const form = allObjects.find((object) => object.objectType === "FORM" && /PROCESS_ROWS/.test(object.raw || ""));
+          if (!dataA || dataA.values?.name?.codeDesc !== "Name" || !form) {
+            throw new Error("Parser chưa giữ được mô tả Name từ DATA A sang FORM.");
+          }
+
+          const formObjects = flatten(form.children || []);
+          const faUses = formObjects.filter((object) => /\bFA\b/.test(object.raw || ""));
+          const unboundFaUses = faUses.filter((object) => !Object.values(object.values || {}).some((value) => {
+            const entries = Array.isArray(value) ? value : [value];
+            return entries.some((entry) => entry && entry.declRef === "FA");
+          }));
+          const deleteTable = formObjects.find((object) => /^DELETE TABLE\s+FA\b/.test(object.raw || ""));
+          if (unboundFaUses.length || !deleteTable || deleteTable.values?.target?.declRef !== "FA") {
+            throw new Error("Một cú pháp đang làm mất binding của FA, gồm cả DELETE TABLE.");
+          }
+
+          setVisiblePanel("template");
+          await pause(40);
+          const expectedTypes = ["READ_TABLE", "LOOP_AT_ITAB", "APPEND", "INSERT_ITAB", "MODIFY_ITAB", "DELETE_ITAB", "SORT_ITAB", "CLEAR"];
+          const missingTypes = expectedTypes.filter((type) => !allObjects.some((object) => object.objectType === type));
+          if (missingTypes.length) throw new Error(`Parser chưa dựng đủ cấu trúc itab: ${missingTypes.join(", ")}.`);
+          setStatus("Đã parse code thật · READ/LOOP và các thao tác itab đã lên Template.");
+        } catch (error) {
+          viewerDocument = null;
+          setStatus(error && error.message ? error.message : String(error), "error");
+        }
+      }
+
+      templateButton.addEventListener("click", () => setVisiblePanel("template"));
+      dataButton.addEventListener("click", () => setVisiblePanel("data"));
+      document.getElementById("reloadDemo").addEventListener("click", () => { void loadAndParse(); });
+      frame.addEventListener("load", () => { void loadAndParse(); });
+    })();
+  </script>
+</body>
+</html>

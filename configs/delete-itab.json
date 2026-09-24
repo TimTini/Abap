@@ -4,6 +4,7 @@
   "extras": { "type": "deleteItab" },
   "keywordLabels": {
     "DELETE": "stmt",
+    "TABLE": "table",
     "FROM": "from",
     "INDEX": "index",
     "WHERE": "where",
@@ -18,10 +19,12 @@
   "keywordPhrases": {
     "ADJACENT DUPLICATES": "adjacent-duplicates",
     "DELETE ADJACENT DUPLICATES": "delete-adjacent-duplicates",
+    "DELETE TABLE": "delete-table",
     "USING KEY": "using-key",
     "ALL FIELDS": "all-fields"
   },
   "captureRules": [
+    { "after": "DELETE TABLE", "name": "target", "label": "target" },
     { "after": "DELETE", "name": "target", "label": "target" },
     { "after": "DELETE ADJACENT DUPLICATES FROM", "name": "target", "label": "target" },
     { "after": "FROM", "name": "from", "label": "from" },
