@@ -1511,6 +1511,36 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       ? sourceObj.extras
       : {};
 
+    if (String(sourceObj && sourceObj.objectType || "").trim().toUpperCase() === "CONCATENATE" && extras.concatenate) {
+      const concatenate = extras.concatenate;
+      const renderOperand = (label, entry) => {
+        const row = buildTemplateSemanticValueRow(entry, ownerContext);
+        return createTemplateExpandedRow(row.text, row.declCandidates, row.provenance, label);
+      };
+      if (keywordLabel === "concatenate") {
+        if (concatenate.variant === "linesOf") {
+          return concatenate.linesOf ? [renderOperand("LINES OF", {
+            value: concatenate.linesOf,
+            valueDecl: concatenate.linesOfDecl
+          })] : null;
+        }
+        const sources = Array.isArray(concatenate.sources) ? concatenate.sources : [];
+        return sources.map((entry) => renderOperand("Source", entry));
+      }
+      if (keywordLabel === "into") {
+        return concatenate.target ? [renderOperand("Target", {
+          value: concatenate.target,
+          valueDecl: concatenate.targetDecl
+        })] : null;
+      }
+      if (keywordLabel === "separated-by") {
+        return concatenate.separator ? [renderOperand("Separator", {
+          value: concatenate.separator,
+          valueDecl: concatenate.separatorDecl
+        })] : null;
+      }
+    }
+
     if (String(sourceObj && sourceObj.objectType || "").trim().toUpperCase() === "LOOP_AT_ITAB"
       && keywordLabel === "group-by" && extras.loopAtItab) {
       const groupByRaw = String(extras.loopAtItab.groupByRaw || "").trim();
@@ -1829,6 +1859,9 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
   function shouldSkipConditionKeywordInTemplateRows(objectType, keywordLabel) {
     const type = String(objectType || "").trim().toUpperCase();
     const label = normalizeTemplatePairToken(keywordLabel);
+    if (type === "CONCATENATE" && label === "lines-of") {
+      return true;
+    }
     if (type === "SELECT" && (label === "where" || label === "having")) {
       return true;
     }

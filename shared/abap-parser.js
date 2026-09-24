@@ -44,6 +44,20 @@
 
   const registeredConfigs = [];
   const genericGrammarConfigs = new Map();
+  const declarationCommentObjects = new Set([
+    "CLASS-DATA",
+    "CLASS-METHODS",
+    "CONSTANTS",
+    "DATA",
+    "FIELD-SYMBOLS",
+    "FORM",
+    "METHODS",
+    "PARAMETERS",
+    "RANGES",
+    "SELECT-OPTIONS",
+    "STATICS",
+    "TYPES"
+  ]);
   const whileStatementConfig = normalizeConfig({
     object: "WHILE",
     match: { startKeyword: "WHILE" },
@@ -1082,15 +1096,15 @@
     ["MODULE", "MODULE", "ENDMODULE"], ["ASSERT", "ASSERT"], ["RETURN", "RETURN"], ["CONTINUE", "CONTINUE"],
     ["CHECK", "CHECK"], ["EXIT", "EXIT"], ["AUTHORITY-CHECK", "AUTHORITY_CHECK"],
     ["FETCH", "FETCH"], ["TRANSFER", "TRANSFER"], ["COLLECT", "COLLECT"], ["REFRESH", "REFRESH"], ["ASSIGN", "ASSIGN"],
-    ["UNASSIGN", "UNASSIGN"], ["FREE", "FREE"], ["CONDENSE", "CONDENSE"], ["CONCATENATE", "CONCATENATE"],
+    ["UNASSIGN", "UNASSIGN"], ["FREE", "FREE"], ["CONDENSE", "CONDENSE"],
     ["SPLIT", "SPLIT"], ["SHIFT", "SHIFT"], ["TRANSLATE", "TRANSLATE"], ["FIND", "FIND"],
-    ["REPLACE", "REPLACE"], ["ULINE", "ULINE"], ["SKIP", "SKIP"], ["SUBMIT", "SUBMIT"],
+    ["REPLACE", "REPLACE"], ["CONCATENATE", "CONCATENATE"], ["ULINE", "ULINE"], ["SKIP", "SKIP"], ["SUBMIT", "SUBMIT"],
     ["WHILE", "WHILE", "ENDWHILE"]
   ].map(([phrase, object, endKeyword]) => ({ phrase, object, endKeyword: endKeyword || "" }));
 
   function collectKnownInternalTables(statements, configs, fileName) {
     const names = new Set();
-    const declarationStarts = new Set(["DATA", "TYPES", "STATICS", "FIELD-SYMBOLS"]);
+    const declarationStarts = new Set(["DATA", "TYPES", "STATICS", "CLASS-DATA", "FIELD-SYMBOLS"]);
     for (const statement of statements) {
       const start = getStatementStartKeyword(statement.raw);
       if (!declarationStarts.has(start)) continue;
@@ -1278,7 +1292,10 @@
       if (object) return [object];
     }
 
-    const grammarObject = parseProjectGrammarStatement(tokens, statement, configs, fileName, parentId, nextId, knownInternalTables);
+    const hasConcatenateConfig = tokens[0].upper === "CONCATENATE"
+      && configs.some((config) => config.object === "CONCATENATE");
+    const grammarObject = hasConcatenateConfig ? null
+      : parseProjectGrammarStatement(tokens, statement, configs, fileName, parentId, nextId, knownInternalTables);
     if (grammarObject) return [grammarObject];
 
     for (const config of getOrderedMatchingConfigs(tokens, configs, statement.raw)) {
@@ -1618,6 +1635,10 @@
       return buildAppendExtras(context);
     }
 
+    if (extrasConfig.type === "concatenate") {
+      return buildConcatenateExtras(context);
+    }
+
     if (extrasConfig.type === "message") {
       return buildMessageExtras(context);
     }
@@ -1794,12 +1815,38 @@
     };
   }
 
+  function buildConcatenateExtras({ raw, values }) {
+    const map = valuesToFirstValueMap(values);
+    const linesOf = String(map.linesOf || "").trim();
+    const sourcesRaw = linesOf ? "" : String(map.sourcesRaw || "").trim();
+    const upperRaw = String(raw || "").toUpperCase();
+
+    return {
+      concatenate: {
+        variant: linesOf ? "linesOf" : "sources",
+        sources: linesOf ? [] : parseArgumentTokens(sourcesRaw).map((value) => ({ value })),
+        sourcesRaw,
+        linesOf,
+        target: map.target || "",
+        separator: map.separator || "",
+        inCharacterMode: /\bIN\s+CHARACTER\s+MODE\b/.test(upperRaw),
+        inByteMode: /\bIN\s+BYTE\s+MODE\b/.test(upperRaw),
+        respectingBlanks: /\bRESPECTING\s+BLANKS\b/.test(upperRaw)
+      }
+    };
+  }
+
   function buildPerformCallExtras({ raw, values }) {
     const map = valuesToFirstValueMap(values);
     const formRaw = String(map.form || "").trim();
     const staticExternalCall = /^([^\s(]+)\(([^()]*)\)$/.exec(formRaw);
     const dynamicSubroutineCall = /^\(\s*[^()]+\s*\)$/.test(formRaw);
-    const ifFound = hasKeywordSequence(raw, ["IF", "FOUND"])
+    const rawWords = tokenize(raw).map((token) => token.upper);
+    const ifFoundIndex = rawWords.findIndex((word, index) => word === "IF" && rawWords[index + 1] === "FOUND");
+    const firstParameterIndex = rawWords.findIndex((word) => ["USING", "CHANGING", "TABLES"].includes(word));
+    const ifFoundBeforeParameters = ifFoundIndex >= 0
+      && (firstParameterIndex < 0 || ifFoundIndex < firstParameterIndex);
+    const ifFound = ifFoundBeforeParameters
       && Boolean(map.program || staticExternalCall || dynamicSubroutineCall);
 
     return {
@@ -3412,6 +3459,9 @@
       if (objectType === "WRITE" && ["position", "formatraw"].includes(entryName)) {
         return;
       }
+      if (objectType === "CONCATENATE" && entryName === "sourcesraw") {
+        return;
+      }
       const ref = extractFirstIdentifierFromExpression(entry.value);
       if (!ref) {
         return;
@@ -3495,6 +3545,10 @@
     if (extras.write) {
       annotateWriteExtras(extras.write, context);
     }
+
+    if (extras.concatenate) {
+      annotateConcatenateExtras(extras.concatenate, context);
+    }
   }
 
   function annotateScalarDataOperand(container, key, context) {
@@ -3555,6 +3609,29 @@
     }
     const format = Array.isArray(write.format) ? write.format : [];
     for (const entry of format) {
+      if (!entry || typeof entry !== "object") {
+        continue;
+      }
+      const ref = extractFirstIdentifierFromExpression(entry.value);
+      if (!ref) {
+        continue;
+      }
+      entry.valueRef = ref;
+      const decl = resolveDecl(ref, context);
+      if (decl) {
+        entry.valueDecl = decl;
+      }
+    }
+  }
+
+  function annotateConcatenateExtras(concatenate, context) {
+    if (!concatenate || typeof concatenate !== "object") {
+      return;
+    }
+    for (const key of ["target", "separator", "linesOf"]) {
+      annotateScalarDataOperand(concatenate, key, context);
+    }
+    for (const entry of Array.isArray(concatenate.sources) ? concatenate.sources : []) {
       if (!entry || typeof entry !== "object") {
         continue;
       }
@@ -4846,13 +4923,17 @@
           continue;
         }
         const userDesc = resolveUserDesc(descMap, bestRule.descKey, captured.upper);
+        const codeDesc = declarationCommentObjects.has(String(config.object || "").toUpperCase())
+          && bestRule.name !== "name"
+          ? ""
+          : statementDesc;
 
         values.push({
           name: bestRule.name,
           value: captured.raw,
           label: bestRule.label || bestRule.name,
           userDesc: userDesc || "",
-          codeDesc: statementDesc
+          codeDesc
         });
       }
 

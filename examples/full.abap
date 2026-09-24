@@ -153,8 +153,8 @@ FORM main
   cv_text = iv_user.
 ENDFORM.
 
-* PERFORM (external program / USING / CHANGING / IF FOUND)
-PERFORM main(zabapflow_full_example) USING gv_user p_flag CHANGING lv_text IF FOUND.
+* PERFORM (optional external subroutine / IF FOUND)
+PERFORM optional_hook IN PROGRAM zoptional_extension IF FOUND.
 
 * CLASS + CLASS-DATA + METHODS / CLASS-METHODS + METHOD blocks
 CLASS lcl_demo DEFINITION.

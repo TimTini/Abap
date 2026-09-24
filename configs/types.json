@@ -20,6 +20,7 @@
     { "after": "TYPE REF TO", "name": "refTo", "label": "ref-to", "capture": "rest" },
     { "after": "TYPE", "name": "type", "label": "type", "capture": "rest", "stopTokens": ["VALUE", "LENGTH", "DECIMALS"] },
     { "after": "LIKE REF TO", "name": "likeRefTo", "label": "like-ref-to" },
+    { "after": "LIKE LINE OF", "name": "likeLineOf", "label": "like-line-of" },
     { "after": "LIKE", "name": "like", "label": "like", "capture": "rest", "stopTokens": ["VALUE", "LENGTH", "DECIMALS"] }
   ]
 }

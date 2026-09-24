@@ -169,7 +169,7 @@ function testConditionExtrasForIfElseifSelectAndPerform() {
     "ELSEIF p_user = p_user OR p_flag = abap_false.",
     "ENDIF.",
     "SELECT bname FROM usr02 WHERE bname = p_user GROUP BY bname HAVING bname = p_user ORDER BY bname.",
-    "PERFORM main(zprog) IF FOUND.",
+    "PERFORM main IN PROGRAM zprog IF FOUND.",
     ""
   ].join("\n");
 
@@ -236,14 +236,41 @@ function testConditionExtrasForIfElseifSelectAndPerform() {
   assert.strictEqual(programPerformObj.extras.performCall.program, "zprog");
   assert.strictEqual(programPerformObj.extras.performCall.ifFound, true);
 
-  const invalidPerformObj = parse("PERFORM main IF p_user = p_user.").objects.find((obj) => obj.objectType === "PERFORM");
-  assert(invalidPerformObj && invalidPerformObj.extras && invalidPerformObj.extras.performCall);
-  assert.strictEqual(invalidPerformObj.extras.performCall.ifFound, false);
-  assert.strictEqual(Object.hasOwn(invalidPerformObj.extras.performCall, "ifConditions"), false);
+  const internalPerformWithParams = parse([
+    "DATA p_user TYPE string.",
+    "PERFORM main USING p_user."
+  ].join("\n")).objects.find((obj) => obj.objectType === "PERFORM");
+  assert(internalPerformWithParams && internalPerformWithParams.extras && internalPerformWithParams.extras.performCall);
+  assert.strictEqual(internalPerformWithParams.extras.performCall.ifFound, false);
+  assert.strictEqual(internalPerformWithParams.extras.performCall.using[0].value, "p_user");
+  assert.strictEqual(internalPerformWithParams.extras.performCall.using[0].valueDecl.name, "p_user");
 
-  const internalPerformObj = parse("PERFORM main IF FOUND.").objects.find((obj) => obj.objectType === "PERFORM");
-  assert(internalPerformObj && internalPerformObj.extras && internalPerformObj.extras.performCall);
-  assert.strictEqual(internalPerformObj.extras.performCall.ifFound, false);
+  const externalPerformWithParams = parse([
+    "DATA p_user TYPE string.",
+    "PERFORM main IN PROGRAM zprog IF FOUND USING p_user."
+  ].join("\n")).objects.find((obj) => obj.objectType === "PERFORM");
+  assert(externalPerformWithParams && externalPerformWithParams.extras && externalPerformWithParams.extras.performCall);
+  assert.strictEqual(externalPerformWithParams.extras.performCall.ifFound, true);
+  assert.strictEqual(externalPerformWithParams.extras.performCall.using[0].value, "p_user");
+  assert.strictEqual(externalPerformWithParams.extras.performCall.using[0].valueDecl.name, "p_user");
+
+  const legacyStaticExternalWithParams = parse([
+    "DATA p_user TYPE string.",
+    "PERFORM main(zprog) IF FOUND USING p_user."
+  ].join("\n")).objects.find((obj) => obj.objectType === "PERFORM");
+  assert(legacyStaticExternalWithParams && legacyStaticExternalWithParams.extras && legacyStaticExternalWithParams.extras.performCall);
+  assert.strictEqual(legacyStaticExternalWithParams.extras.performCall.ifFound, true);
+  assert.strictEqual(legacyStaticExternalWithParams.extras.performCall.form, "main");
+  assert.strictEqual(legacyStaticExternalWithParams.extras.performCall.program, "zprog");
+  assert.strictEqual(legacyStaticExternalWithParams.extras.performCall.using[0].value, "p_user");
+
+  const externalPerformWithInvalidTrailingIfFound = parse([
+    "DATA p_user TYPE string.",
+    "PERFORM main(zprog) USING p_user IF FOUND."
+  ].join("\n")).objects.find((obj) => obj.objectType === "PERFORM");
+  assert(externalPerformWithInvalidTrailingIfFound && externalPerformWithInvalidTrailingIfFound.extras && externalPerformWithInvalidTrailingIfFound.extras.performCall);
+  assert.strictEqual(externalPerformWithInvalidTrailingIfFound.extras.performCall.ifFound, false);
+  assert.strictEqual(externalPerformWithInvalidTrailingIfFound.extras.performCall.using[0].value, "p_user");
 
   const dynamicPerformObj = parse("PERFORM (lv_subr) IN PROGRAM (lv_prog) IF FOUND.").objects.find((obj) => obj.objectType === "PERFORM");
   assert(dynamicPerformObj && dynamicPerformObj.extras && dynamicPerformObj.extras.performCall);

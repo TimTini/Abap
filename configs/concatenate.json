@@ -1,0 +1,51 @@
+{
+  "object": "CONCATENATE",
+  "match": { "startKeyword": "CONCATENATE" },
+  "extras": { "type": "concatenate" },
+  "keywordLabels": {
+    "CONCATENATE": "concatenate",
+    "LINES": "lines",
+    "OF": "of",
+    "INTO": "into",
+    "SEPARATED": "separated",
+    "BY": "by",
+    "IN": "in",
+    "CHARACTER": "character",
+    "BYTE": "byte",
+    "MODE": "mode",
+    "RESPECTING": "respecting",
+    "BLANKS": "blanks"
+  },
+  "keywordPhrases": {
+    "CONCATENATE": "concatenate",
+    "LINES OF": "lines-of",
+    "SEPARATED BY": "separated-by",
+    "IN CHARACTER MODE": "in-character-mode",
+    "IN BYTE MODE": "in-byte-mode",
+    "RESPECTING BLANKS": "respecting-blanks"
+  },
+  "captureRules": [
+    { "after": "CONCATENATE LINES OF", "name": "linesOf", "label": "lines-of" },
+    {
+      "after": "CONCATENATE",
+      "name": "sourcesRaw",
+      "label": "sources",
+      "capture": "rest",
+      "stopTokens": ["INTO", "SEPARATED", "IN", "RESPECTING"]
+    },
+    {
+      "after": "INTO",
+      "name": "target",
+      "label": "target",
+      "capture": "rest",
+      "stopTokens": ["SEPARATED", "IN", "RESPECTING"]
+    },
+    {
+      "after": "SEPARATED BY",
+      "name": "separator",
+      "label": "separator",
+      "capture": "rest",
+      "stopTokens": ["IN", "RESPECTING"]
+    }
+  ]
+}

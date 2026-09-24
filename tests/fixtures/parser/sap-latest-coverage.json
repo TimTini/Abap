@@ -1,6 +1,6 @@
 {
   "source": "SAP ABAP Keyword Documentation latest",
-  "capturedAt": "2026-09-23",
+  "capturedAt": "2026-09-24",
   "coverage": "baseline smoke only; additional documented syntax branches remain to inventory",
   "forms": [
     {
@@ -75,9 +75,59 @@
       "id": "types-like-ref-to",
       "configFiles": ["types.json"],
       "expectedType": "TYPES",
-      "source": "TYPES ty_ref LIKE REF TO cl_demo.",
-      "assertions": {"values.likeRefTo.value": "cl_demo"},
+      "source": "DATA lv_source TYPE string. TYPES ty_ref LIKE REF TO lv_source.",
+      "assertions": {"values.likeRefTo.value": "lv_source"},
       "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPTYPES_REFERENCES.html",
+      "dialect": "ABAP latest",
+      "status": "documented-form"
+    },
+    {
+      "id": "types-like-line-of",
+      "configFiles": ["types.json"],
+      "expectedType": "TYPES",
+      "source": "TYPES ty_row LIKE LINE OF lt_rows.",
+      "assertions": {"values.likeLineOf.value": "lt_rows"},
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPTYPES.html",
+      "dialect": "ABAP latest",
+      "status": "documented-form"
+    },
+    {
+      "id": "class-data-like-ref-to",
+      "configFiles": ["class-data.json"],
+      "expectedType": "CLASS-DATA",
+      "source": "CLASS-DATA lr_demo TYPE REF TO cl_demo.",
+      "assertions": {"values.refTo.value": "cl_demo"},
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCLASS-DATA.html",
+      "dialect": "ABAP latest",
+      "status": "documented-form"
+    },
+    {
+      "id": "class-data-like-line-of",
+      "configFiles": ["class-data.json"],
+      "expectedType": "CLASS-DATA",
+      "source": "CLASS-DATA ls_row LIKE LINE OF gt_rows.",
+      "assertions": {"values.likeLineOf.value": "gt_rows"},
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCLASS-DATA.html",
+      "dialect": "ABAP latest",
+      "status": "documented-form"
+    },
+    {
+      "id": "field-symbols-like-ref-to",
+      "configFiles": ["field-symbols.json"],
+      "expectedType": "FIELD-SYMBOLS",
+      "source": "DATA lv_source TYPE string. FIELD-SYMBOLS <fs_demo> LIKE REF TO lv_source.",
+      "assertions": {"values.likeRefTo.value": "lv_source"},
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPFIELD-SYMBOLS.html",
+      "dialect": "ABAP latest",
+      "status": "documented-form"
+    },
+    {
+      "id": "field-symbols-like-line-of",
+      "configFiles": ["field-symbols.json"],
+      "expectedType": "FIELD-SYMBOLS",
+      "source": "FIELD-SYMBOLS <fs_row> LIKE LINE OF lt_rows.",
+      "assertions": {"values.likeLineOf.value": "lt_rows"},
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPFIELD-SYMBOLS.html",
       "dialect": "ABAP latest",
       "status": "documented-form"
     },
@@ -136,6 +186,51 @@
       "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCALL_TRANSACTION.html",
       "dialect": "not-yet-reviewed",
       "status": "baseline-smoke"
+    },
+    {
+      "id": "concatenate-character-mode",
+      "configFiles": ["concatenate.json"],
+      "expectedType": "CONCATENATE",
+      "source": "CONCATENATE lv_left lv_right INTO lv_result SEPARATED BY lv_separator IN CHARACTER MODE.",
+      "assertions": {
+        "extras.concatenate.variant": "sources",
+        "extras.concatenate.target": "lv_result",
+        "extras.concatenate.separator": "lv_separator",
+        "extras.concatenate.inCharacterMode": true,
+        "extras.concatenate.inByteMode": false
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCONCATENATE.html",
+      "dialect": "Standard ABAP",
+      "status": "documented-form"
+    },
+    {
+      "id": "concatenate-lines-of-respecting-blanks",
+      "configFiles": ["concatenate.json"],
+      "expectedType": "CONCATENATE",
+      "source": "CONCATENATE LINES OF lt_parts INTO lv_result SEPARATED BY space RESPECTING BLANKS.",
+      "assertions": {
+        "extras.concatenate.variant": "linesOf",
+        "extras.concatenate.linesOf": "lt_parts",
+        "extras.concatenate.respectingBlanks": true
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCONCATENATE.html",
+      "dialect": "Standard ABAP",
+      "status": "documented-form"
+    },
+    {
+      "id": "concatenate-lines-of-byte-mode",
+      "configFiles": ["concatenate.json"],
+      "expectedType": "CONCATENATE",
+      "source": "CONCATENATE LINES OF lt_bytes INTO lv_xstring IN BYTE MODE.",
+      "assertions": {
+        "extras.concatenate.variant": "linesOf",
+        "extras.concatenate.linesOf": "lt_bytes",
+        "extras.concatenate.target": "lv_xstring",
+        "extras.concatenate.inByteMode": true
+      },
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCONCATENATE.html",
+      "dialect": "Standard ABAP",
+      "status": "documented-form"
     },
     {
       "id": "case-when-case",

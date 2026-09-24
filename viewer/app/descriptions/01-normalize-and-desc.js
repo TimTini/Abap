@@ -730,6 +730,96 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     return canonicalKeys.concat(aliasKeys);
   }
 
+  function parseLegacyNameOverrideKey(key) {
+    const match = String(key || "").trim().toUpperCase().match(/^([A-Z0-9_-]+):NAME:([A-Z0-9_<>-]+)$/);
+    return match ? { objectType: match[1], name: match[2] } : null;
+  }
+
+  function isScopedDeclForOverride(decl) {
+    if (!decl || typeof decl !== "object") {
+      return false;
+    }
+    if (isPathDeclForOverrideKey(decl)) {
+      return true;
+    }
+    const scopeType = normalizeKeyToken(decl.scopeType);
+    const scopeLabel = normalizeKeyToken(decl.scopeLabel);
+    return Boolean(scopeLabel)
+      && scopeType !== "GLOBAL"
+      && scopeLabel !== "GLOBAL"
+      && scopeType !== "SYSTEM"
+      && scopeLabel !== "SYSTEM";
+  }
+
+  function shouldUseLegacyDeclOverrideLookup(decl) {
+    return !isScopedDeclForOverride(decl);
+  }
+
+  function findScopedDeclsForLegacyKey(decls, objectType, name) {
+    const typeUpper = normalizeKeyToken(objectType);
+    const nameUpper = normalizeKeyToken(name);
+    const matches = (Array.isArray(decls) ? decls : []).filter((decl) => (
+      decl
+      && normalizeKeyToken(decl.objectType) === typeUpper
+      && normalizeKeyToken(decl.name) === nameUpper
+    ));
+    return matches.length === 1 && isScopedDeclForOverride(matches[0]) && getDeclKey(matches[0])
+      ? matches
+      : [];
+  }
+
+  function applyMigratedOverrideEntry(overrides, key, entry) {
+    if (!overrides || typeof overrides !== "object" || !key) {
+      return false;
+    }
+    const normalized = normalizeDescOverrideEntry(entry);
+    if (!normalized.text) {
+      return false;
+    }
+    const existing = normalizeDescOverrideEntry(overrides[key]);
+    if (existing.text.trim()) {
+      return false;
+    }
+    overrides[key] = normalized.noNormalize
+      ? { text: normalized.text, noNormalize: true }
+      : normalized.text;
+    return true;
+  }
+
+  function migrateLegacyNameOverrideBucket(decls, source, destination) {
+    if (!source || typeof source !== "object") {
+      return false;
+    }
+    let changed = false;
+    for (const [key, entry] of Object.entries({ ...source })) {
+      const parsed = parseLegacyNameOverrideKey(key);
+      if (!parsed) {
+        continue;
+      }
+      const matches = findScopedDeclsForLegacyKey(decls, parsed.objectType, parsed.name);
+      if (matches.length !== 1) {
+        // Preserve shared keys when the declaration set cannot identify one safe scoped target.
+        continue;
+      }
+      applyMigratedOverrideEntry(destination, getDeclKey(matches[0]), entry);
+      delete source[key];
+      changed = true;
+    }
+    return changed;
+  }
+
+  function migrateScopedDescriptionOverrides(decls) {
+    const destination = state.descOverrides && typeof state.descOverrides === "object"
+      ? state.descOverrides
+      : null;
+    if (!destination) {
+      return false;
+    }
+    const currentChanged = migrateLegacyNameOverrideBucket(decls, destination, destination);
+    const legacyChanged = migrateLegacyNameOverrideBucket(decls, state.descOverridesLegacy, destination);
+    return currentChanged || legacyChanged;
+  }
+
   function getDeclOverrideLookupKeys(decl) {
     const keys = [];
     const pushKey = (value) => {
@@ -751,7 +841,9 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     } else {
       pushKey(getDeclKey(decl));
     }
-    pushKey(getLegacyDeclKey(decl));
+    if (shouldUseLegacyDeclOverrideLookup(decl)) {
+      pushKey(getLegacyDeclKey(decl));
+    }
     pushKey(getDeclFallbackKey(decl));
     return keys;
   }
@@ -866,7 +958,11 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     }
 
     const legacyKey = getLegacyDeclKey(decl);
-    if (legacyKey && Object.prototype.hasOwnProperty.call(state.descOverridesLegacy || {}, legacyKey)) {
+    if (
+      legacyKey
+      && shouldUseLegacyDeclOverrideLookup(decl)
+      && Object.prototype.hasOwnProperty.call(state.descOverridesLegacy || {}, legacyKey)
+    ) {
       return { text: String(state.descOverridesLegacy[legacyKey] || ""), noNormalize: false };
     }
 
@@ -2092,6 +2188,7 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     renderDeclDescPanelUi,
     getDeclKey,
     getDeclOverrideLookupKeys,
+    migrateScopedDescriptionOverrides,
     getPerformFormalParamKey,
     cloneDeclWithPerformChainOverride,
     getDeclOverrideStorageKey,

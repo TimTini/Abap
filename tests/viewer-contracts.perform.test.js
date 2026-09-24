@@ -12,6 +12,7 @@ const {
   settleViewerUi,
   waitForViewerUi
 } = require("./helpers/viewer-contract-test-helpers");
+const { loadViewerDom } = require("./helpers/viewer-harness");
 
 async function assertIfInitialUsesConditionTemplate() {
   const dom = await renderFixture([
@@ -808,6 +809,144 @@ async function assertDataCatalogTracesNestedPerformAndEditsSelectedChain() {
   dom.window.close();
 }
 
+async function assertSpacedChainedDataKeepsNestedPerformDescriptions() {
+  const source = [
+    'data : gv_root TYPE string, "Root description',
+    '       gv_other TYPE c LENGTH 12. "Other description',
+    "PERFORM frm_outer USING gv_root.",
+    "FORM frm_outer USING iv_outer TYPE string.",
+    "  PERFORM frm_inner USING iv_outer.",
+    "ENDFORM.",
+    "FORM frm_inner USING iv_inner TYPE string.",
+    "  WRITE iv_inner.",
+    "ENDFORM."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+
+  const dataObjects = (state.data.objects || []).filter((object) => object && object.objectType === "DATA");
+  assert.strictEqual(dataObjects.length, 2, "Expected spaced/lowercase DATA chain to create both declarations.");
+  assert.deepStrictEqual(Array.from(dataObjects, (object) => object.values.name.value), ["gv_root", "gv_other"]);
+  assert.deepStrictEqual(Array.from(dataObjects, (object) => object.values.type.value), ["string", "c"]);
+
+  els.rightTabDescBtn.click();
+  await waitForViewerUi(window);
+  const globalGroup = findDataDeclGroup(els, "GLOBAL");
+  const rootRow = findDataDeclRow(globalGroup, "gv_root");
+  assert(rootRow, "Expected gv_root in the Viewer Data tab.");
+  assert.strictEqual(
+    String(rootRow.querySelector('[data-column="effective-description"]')?.textContent || "").trim(),
+    "Root description"
+  );
+
+  const innerGroup = findDataDeclGroup(els, "FORM:FRM_INNER");
+  const innerRow = findDataDeclRow(innerGroup, "iv_inner");
+  assert(innerRow, "Expected the inner FORM parameter in the Viewer Data tab.");
+  assert.strictEqual(
+    String(innerRow.querySelector('[data-column="trace"]')?.textContent || "").trim(),
+    "iv_inner ← iv_outer ← gv_root"
+  );
+  assert.strictEqual(
+    String(innerRow.querySelector('[data-column="effective-description"]')?.textContent || "").trim(),
+    "Root description"
+  );
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+  const rootDataTable = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="DATA"]'))
+    .find((table) => getTemplateTableRows(table).some((row) => row.includes("Root description")));
+  assert(rootDataTable, "Expected the root DATA declaration Template block.");
+  assert.deepStrictEqual(
+    getTemplateTableRows(rootDataTable),
+    [["DATA", "Root description"], ["TYPE", "string"]],
+    "A declaration comment must describe the data name without replacing its TYPE operand."
+  );
+  const innerWriteTable = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="WRITE"]'))
+    .find((table) => getTemplateTableRows(table).some((row) => row.includes("Root description")));
+  assert(innerWriteTable, "The WRITE inside the nested PERFORM chain must retain the root declaration description in Template.");
+
+  dom.window.close();
+}
+
+async function assertScopedDescriptionOverridesDoNotBleedAcrossForms() {
+  const dom = await loadViewerDom();
+  const { window } = dom;
+  const { els, state, services, constants } = window.AbapViewerRuntime;
+  const ambiguousLegacyKey = "DATA:NAME:LV_TEXT";
+  const ambiguousParamLegacyKey = "FORM_PARAM:NAME:IV_SHARED";
+  const globalCollisionLegacyKey = "DATA:NAME:LV_COLLISION";
+  const uniqueLegacyKey = "DATA:NAME:LV_UNIQUE";
+  const source = [
+    "DATA lv_collision TYPE string.",
+    "FORM form_collision.",
+    "  DATA lv_collision TYPE string.",
+    "ENDFORM.",
+    "FORM form_a.",
+    "  DATA lv_text TYPE string.",
+    "ENDFORM.",
+    "FORM form_b.",
+    "  DATA lv_text TYPE string.",
+    "ENDFORM.",
+    "FORM form_c USING iv_shared TYPE string.",
+    "ENDFORM.",
+    "FORM form_d USING iv_shared TYPE string.",
+    "ENDFORM.",
+    "FORM form_unique.",
+    "  DATA lv_unique TYPE string.",
+    "ENDFORM."
+  ].join("\n");
+
+  state.descOverrides[ambiguousLegacyKey] = "Ambiguous old description";
+  state.descOverrides[ambiguousParamLegacyKey] = "Ambiguous parameter description";
+  state.descOverrides[globalCollisionLegacyKey] = "Global collision description";
+  state.descOverridesLegacy[ambiguousLegacyKey] = "Ambiguous v1 description";
+  state.descOverridesLegacy[uniqueLegacyKey] = "Unique old description";
+  els.inputText.value = source;
+  els.parseBtn.click();
+  await waitForViewerUi(window);
+
+  const decls = state.data.decls || [];
+  const findDecl = (formName, name) => decls.find((decl) => (
+    String(decl.scopeLabel || "").toUpperCase() === `FORM:${formName.toUpperCase()}`
+    && String(decl.name || "").toUpperCase() === name.toUpperCase()
+  ));
+  const formA = findDecl("form_a", "lv_text");
+  const formB = findDecl("form_b", "lv_text");
+  const localCollision = findDecl("form_collision", "lv_collision");
+  const globalCollision = decls.find((decl) => (
+    String(decl.scopeLabel || "").toUpperCase() === "GLOBAL"
+    && String(decl.name || "").toUpperCase() === "LV_COLLISION"
+  ));
+  const formC = findDecl("form_c", "iv_shared");
+  const formD = findDecl("form_d", "iv_shared");
+  const unique = findDecl("form_unique", "lv_unique");
+  assert(formA && formB && formC && formD && localCollision && globalCollision && unique, "Expected duplicate locals/FORM parameters, a global/local name collision, and one uniquely scoped declaration.");
+
+  const descriptions = services.descriptions;
+  assert.strictEqual(descriptions.getDeclOverrideEntry(formA).text, "");
+  assert.strictEqual(descriptions.getDeclOverrideEntry(formB).text, "");
+  assert.strictEqual(descriptions.getDeclOverrideEntry(formC).text, "");
+  assert.strictEqual(descriptions.getDeclOverrideEntry(formD).text, "");
+  assert.strictEqual(descriptions.getDeclOverrideEntry(localCollision).text, "");
+  assert.strictEqual(descriptions.getDeclOverrideEntry(globalCollision).text, "Global collision description");
+  assert.strictEqual(
+    state.descOverrides[ambiguousLegacyKey],
+    "Ambiguous old description",
+    "Ambiguous shared legacy data should remain stored while scoped lookups ignore it."
+  );
+  assert.strictEqual(state.descOverrides[ambiguousParamLegacyKey], "Ambiguous parameter description");
+  assert.strictEqual(state.descOverridesLegacy[ambiguousLegacyKey], "Ambiguous v1 description");
+
+  const uniqueScopedKey = descriptions.getDeclOverrideStorageKey(unique);
+  assert.strictEqual(state.descOverrides[uniqueScopedKey], "Unique old description");
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(state.descOverridesLegacy, uniqueLegacyKey), false);
+  const savedLegacyBucket = JSON.parse(window.localStorage.getItem(constants.DESC_STORAGE_KEY_LEGACY_V1) || "{}");
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(savedLegacyBucket, uniqueLegacyKey), false);
+
+  dom.window.close();
+}
+
 async function assertDataCatalogSourceSelectorStaysSynchronized() {
   const source = [
     "DATA gv_a TYPE string. \"Root A",
@@ -1344,8 +1483,20 @@ assertViewerFixtureDirectoriesStayInSync();
     await assertDataCatalogTracesNestedPerformAndEditsSelectedChain();
   });
 
+  await t.test("spaced chained DATA descriptions survive nested PERFORM in Data and Template", async () => {
+    await assertSpacedChainedDataKeepsNestedPerformDescriptions();
+  });
+
   await t.test("data catalog source selector stays synchronized", async () => {
     await assertDataCatalogSourceSelectorStaysSynchronized();
+  });
+});
+
+defineFocusedTest(test, "viewer scoped description override contract", ["description-scope"], async (t) => {
+  assertViewerFixtureDirectoriesStayInSync();
+
+  await t.test("legacy descriptions migrate only when a single scoped target exists", async () => {
+    await assertScopedDescriptionOverridesDoNotBleedAcrossForms();
   });
 });
 

@@ -16,7 +16,10 @@
   const normalizeParsedJson = runtime.requireServiceMethod("output", "normalizeParsedJson");
   const rebuildInputGutter = runtime.requireServiceMethod("output", "rebuildInputGutter");
   const renderDeclDescPanelUi = runtime.requireServiceMethod("descriptions", "renderDeclDescPanelUi");
+  const migrateScopedDescriptionOverrides = runtime.requireServiceMethod("descriptions", "migrateScopedDescriptionOverrides");
   const rebuildConstantInitializerIndex = runtime.requireServiceMethod("descriptions", "rebuildConstantInitializerIndex");
+  const saveDescOverrides = runtime.requireServiceMethod("runtimeState", "saveDescOverrides");
+  const saveLegacyDescOverrides = runtime.requireServiceMethod("runtimeState", "saveLegacyDescOverrides");
   const buildPerformCallPathRegistry = runtime.requireServiceMethod("performSources", "buildPerformCallPathRegistry");
   const buildRenderableObjects = runtime.requireServiceMethod("performSources", "buildRenderableObjects");
   const resetTemplateVirtualState = runtime.requireServiceMethod("template", "resetTemplateVirtualState");
@@ -627,8 +630,12 @@
       }
     }
 
-        augmentSyntheticStructFieldDecls(state.data);
-        rebuildConstantInitializerIndex(state.data);
+    augmentSyntheticStructFieldDecls(state.data);
+    rebuildConstantInitializerIndex(state.data);
+    if (migrateScopedDescriptionOverrides(state.data && state.data.decls)) {
+      saveDescOverrides();
+      saveLegacyDescOverrides();
+    }
 
     resetTemplateSelectionStateMain();
     state.performSourceRegistry = buildPerformCallPathRegistry(state.data && state.data.objects);

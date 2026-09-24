@@ -2501,6 +2501,14 @@ const els = {
     }
   }
 
+  function saveLegacyDescOverrides() {
+    try {
+      localStorage.setItem(DESC_STORAGE_KEY_LEGACY_V1, JSON.stringify(state.descOverridesLegacy || {}));
+    } catch {
+      // ignore
+    }
+  }
+
   function loadStorageArray(key) {
     try {
       const raw = localStorage.getItem(key);
@@ -3152,6 +3160,7 @@ const els = {
     loadDescOverrides,
     loadLegacyDescOverrides,
     saveDescOverrides,
+    saveLegacyDescOverrides,
     normalizeSettings,
     loadSettings,
     saveSettings,

@@ -199,9 +199,14 @@ test("SAP latest declaration variants remain recognized", () => {
     ["DATA", "DATA lt_rows TYPE HASHED TABLE OF ty_row WITH UNIQUE KEY id.", "type", "HASHED TABLE OF ty_row WITH UNIQUE KEY id"],
     ["DATA", "DATA lr_data TYPE REF TO data.", "refTo", "data"],
     ["TYPES", "TYPES ty_rows TYPE SORTED TABLE OF ty_row WITH NON-UNIQUE KEY id.", "type", "SORTED TABLE OF ty_row WITH NON-UNIQUE KEY id"],
+    ["TYPES", "TYPES ty_row LIKE LINE OF lt_rows.", "likeLineOf", "lt_rows"],
     ["CLASS-DATA", "CLASS-DATA lt_rows TYPE STANDARD TABLE OF ty_row WITH EMPTY KEY.", "type", "STANDARD TABLE OF ty_row WITH EMPTY KEY"],
+    ["CLASS-DATA", "CLASS-DATA lr_demo TYPE REF TO cl_demo.", "refTo", "cl_demo"],
+    ["CLASS-DATA", "CLASS-DATA ls_row LIKE LINE OF gt_rows.", "likeLineOf", "gt_rows"],
     ["STATICS", "STATICS ls_row LIKE LINE OF lt_rows.", "likeLineOf", "lt_rows"],
     ["FIELD-SYMBOLS", "FIELD-SYMBOLS <fs_rows> TYPE ANY TABLE.", "type", "ANY TABLE"],
+    ["FIELD-SYMBOLS", "DATA lv_source TYPE string. FIELD-SYMBOLS <fs_demo> LIKE REF TO lv_source.", "likeRefTo", "lv_source"],
+    ["FIELD-SYMBOLS", "FIELD-SYMBOLS <fs_row> LIKE LINE OF lt_rows.", "likeLineOf", "lt_rows"],
     ["CONSTANTS", "CONSTANTS gc_names TYPE STANDARD TABLE OF string WITH EMPTY KEY VALUE #( ( `A` ) ).", "type", "STANDARD TABLE OF string WITH EMPTY KEY"],
     ["PARAMETERS", "PARAMETERS p_count TYPE STANDARD TABLE OF i WITH EMPTY KEY DEFAULT VALUE #( ( 5 ) ) OBLIGATORY.", "type", "STANDARD TABLE OF i WITH EMPTY KEY"],
     ["SELECT-OPTIONS", "SELECT-OPTIONS s_date FOR ls_range-date NO-EXTENSION.", "for", "ls_range-date"],
@@ -210,9 +215,10 @@ test("SAP latest declaration variants remain recognized", () => {
   ];
   for (const [expected, source, valueName, value] of cases) {
     const result = parseAbapTextDetailed(source, configs, "declaration-variants.abap");
-    assert.equal(result.objects[0] && result.objects[0].objectType, expected, source);
+    const object = flatten(result.objects).find((entry) => entry.objectType === expected);
+    assert.ok(object, `${source}: expected ${expected}`);
     assert.deepEqual(result.diagnostics, [], source);
-    if (valueName) assert.equal(result.objects[0].values[valueName].value, value, source);
+    if (valueName) assert.equal(object.values[valueName].value, value, source);
   }
 });
 
@@ -233,6 +239,15 @@ test("SAP latest internal-table syntax variants retain statement families", () =
     assert.equal(result.objects[0] && result.objects[0].objectType, expected, source);
     assert.deepEqual(result.diagnostics, [], source);
   }
+});
+
+test("CLASS-DATA internal tables classify subsequent DML as internal-table operations", () => {
+  const result = parseAbapTextDetailed([
+    "CLASS-DATA gt_rows TYPE STANDARD TABLE OF ty_row WITH EMPTY KEY.",
+    "DELETE gt_rows WHERE id = lv_id."
+  ].join("\n"), configs, "class-data-internal-table.abap");
+  assert.deepEqual(result.objects.map((object) => object.objectType), ["CLASS-DATA", "DELETE_ITAB"]);
+  assert.deepEqual(result.diagnostics, []);
 });
 
 test("SAP latest internal-table additions retain their operands", () => {
@@ -426,7 +441,7 @@ test("SAP latest transaction, loop, commit, and exception variants retain operan
 });
 
 test("PERFORM IF FOUND is modeled as a guard, not a condition expression", () => {
-  const result = parseAbapTextDetailed("PERFORM optional_form(zprogram) IF FOUND.", configs, "perform-if-found.abap");
+  const result = parseAbapTextDetailed("PERFORM optional_form IN PROGRAM zprogram IF FOUND.", configs, "perform-if-found.abap");
   const perform = result.objects[0];
   assert.equal(perform && perform.objectType, "PERFORM");
   assert.equal(perform.extras.performCall.ifFound, true);

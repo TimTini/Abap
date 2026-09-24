@@ -9,9 +9,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.09.23-r84">
-  <meta name="abap-viewer-updated-at" content="2026-09-23 19:52:58">
-  <meta name="abap-viewer-updated-note" content="Compact Template block actions as title icons; retain Copy All.">
+  <meta name="abap-viewer-version" content="v2026.09.24-r86">
+  <meta name="abap-viewer-updated-at" content="2026-09-24 00:39:29">
+  <meta name="abap-viewer-updated-note" content="Restore parser captures, scoped overrides, and CONCATENATE Template rows.">
   <title>ABAP Parser Viewer</title>
     <style>
 /* inlined from: ./styles/viewer.css */
@@ -2107,6 +2107,20 @@
 
   const registeredConfigs = [];
   const genericGrammarConfigs = new Map();
+  const declarationCommentObjects = new Set([
+    "CLASS-DATA",
+    "CLASS-METHODS",
+    "CONSTANTS",
+    "DATA",
+    "FIELD-SYMBOLS",
+    "FORM",
+    "METHODS",
+    "PARAMETERS",
+    "RANGES",
+    "SELECT-OPTIONS",
+    "STATICS",
+    "TYPES"
+  ]);
   const whileStatementConfig = normalizeConfig({
     object: "WHILE",
     match: { startKeyword: "WHILE" },
@@ -3145,15 +3159,15 @@
     ["MODULE", "MODULE", "ENDMODULE"], ["ASSERT", "ASSERT"], ["RETURN", "RETURN"], ["CONTINUE", "CONTINUE"],
     ["CHECK", "CHECK"], ["EXIT", "EXIT"], ["AUTHORITY-CHECK", "AUTHORITY_CHECK"],
     ["FETCH", "FETCH"], ["TRANSFER", "TRANSFER"], ["COLLECT", "COLLECT"], ["REFRESH", "REFRESH"], ["ASSIGN", "ASSIGN"],
-    ["UNASSIGN", "UNASSIGN"], ["FREE", "FREE"], ["CONDENSE", "CONDENSE"], ["CONCATENATE", "CONCATENATE"],
+    ["UNASSIGN", "UNASSIGN"], ["FREE", "FREE"], ["CONDENSE", "CONDENSE"],
     ["SPLIT", "SPLIT"], ["SHIFT", "SHIFT"], ["TRANSLATE", "TRANSLATE"], ["FIND", "FIND"],
-    ["REPLACE", "REPLACE"], ["ULINE", "ULINE"], ["SKIP", "SKIP"], ["SUBMIT", "SUBMIT"],
+    ["REPLACE", "REPLACE"], ["CONCATENATE", "CONCATENATE"], ["ULINE", "ULINE"], ["SKIP", "SKIP"], ["SUBMIT", "SUBMIT"],
     ["WHILE", "WHILE", "ENDWHILE"]
   ].map(([phrase, object, endKeyword]) => ({ phrase, object, endKeyword: endKeyword || "" }));
 
   function collectKnownInternalTables(statements, configs, fileName) {
     const names = new Set();
-    const declarationStarts = new Set(["DATA", "TYPES", "STATICS", "FIELD-SYMBOLS"]);
+    const declarationStarts = new Set(["DATA", "TYPES", "STATICS", "CLASS-DATA", "FIELD-SYMBOLS"]);
     for (const statement of statements) {
       const start = getStatementStartKeyword(statement.raw);
       if (!declarationStarts.has(start)) continue;
@@ -3341,7 +3355,10 @@
       if (object) return [object];
     }
 
-    const grammarObject = parseProjectGrammarStatement(tokens, statement, configs, fileName, parentId, nextId, knownInternalTables);
+    const hasConcatenateConfig = tokens[0].upper === "CONCATENATE"
+      && configs.some((config) => config.object === "CONCATENATE");
+    const grammarObject = hasConcatenateConfig ? null
+      : parseProjectGrammarStatement(tokens, statement, configs, fileName, parentId, nextId, knownInternalTables);
     if (grammarObject) return [grammarObject];
 
     for (const config of getOrderedMatchingConfigs(tokens, configs, statement.raw)) {
@@ -3681,6 +3698,10 @@
       return buildAppendExtras(context);
     }
 
+    if (extrasConfig.type === "concatenate") {
+      return buildConcatenateExtras(context);
+    }
+
     if (extrasConfig.type === "message") {
       return buildMessageExtras(context);
     }
@@ -3857,12 +3878,38 @@
     };
   }
 
+  function buildConcatenateExtras({ raw, values }) {
+    const map = valuesToFirstValueMap(values);
+    const linesOf = String(map.linesOf || "").trim();
+    const sourcesRaw = linesOf ? "" : String(map.sourcesRaw || "").trim();
+    const upperRaw = String(raw || "").toUpperCase();
+
+    return {
+      concatenate: {
+        variant: linesOf ? "linesOf" : "sources",
+        sources: linesOf ? [] : parseArgumentTokens(sourcesRaw).map((value) => ({ value })),
+        sourcesRaw,
+        linesOf,
+        target: map.target || "",
+        separator: map.separator || "",
+        inCharacterMode: /\bIN\s+CHARACTER\s+MODE\b/.test(upperRaw),
+        inByteMode: /\bIN\s+BYTE\s+MODE\b/.test(upperRaw),
+        respectingBlanks: /\bRESPECTING\s+BLANKS\b/.test(upperRaw)
+      }
+    };
+  }
+
   function buildPerformCallExtras({ raw, values }) {
     const map = valuesToFirstValueMap(values);
     const formRaw = String(map.form || "").trim();
     const staticExternalCall = /^([^\s(]+)\(([^()]*)\)$/.exec(formRaw);
     const dynamicSubroutineCall = /^\(\s*[^()]+\s*\)$/.test(formRaw);
-    const ifFound = hasKeywordSequence(raw, ["IF", "FOUND"])
+    const rawWords = tokenize(raw).map((token) => token.upper);
+    const ifFoundIndex = rawWords.findIndex((word, index) => word === "IF" && rawWords[index + 1] === "FOUND");
+    const firstParameterIndex = rawWords.findIndex((word) => ["USING", "CHANGING", "TABLES"].includes(word));
+    const ifFoundBeforeParameters = ifFoundIndex >= 0
+      && (firstParameterIndex < 0 || ifFoundIndex < firstParameterIndex);
+    const ifFound = ifFoundBeforeParameters
       && Boolean(map.program || staticExternalCall || dynamicSubroutineCall);
 
     return {
@@ -5475,6 +5522,9 @@
       if (objectType === "WRITE" && ["position", "formatraw"].includes(entryName)) {
         return;
       }
+      if (objectType === "CONCATENATE" && entryName === "sourcesraw") {
+        return;
+      }
       const ref = extractFirstIdentifierFromExpression(entry.value);
       if (!ref) {
         return;
@@ -5558,6 +5608,10 @@
     if (extras.write) {
       annotateWriteExtras(extras.write, context);
     }
+
+    if (extras.concatenate) {
+      annotateConcatenateExtras(extras.concatenate, context);
+    }
   }
 
   function annotateScalarDataOperand(container, key, context) {
@@ -5618,6 +5672,29 @@
     }
     const format = Array.isArray(write.format) ? write.format : [];
     for (const entry of format) {
+      if (!entry || typeof entry !== "object") {
+        continue;
+      }
+      const ref = extractFirstIdentifierFromExpression(entry.value);
+      if (!ref) {
+        continue;
+      }
+      entry.valueRef = ref;
+      const decl = resolveDecl(ref, context);
+      if (decl) {
+        entry.valueDecl = decl;
+      }
+    }
+  }
+
+  function annotateConcatenateExtras(concatenate, context) {
+    if (!concatenate || typeof concatenate !== "object") {
+      return;
+    }
+    for (const key of ["target", "separator", "linesOf"]) {
+      annotateScalarDataOperand(concatenate, key, context);
+    }
+    for (const entry of Array.isArray(concatenate.sources) ? concatenate.sources : []) {
       if (!entry || typeof entry !== "object") {
         continue;
       }
@@ -6909,13 +6986,17 @@
           continue;
         }
         const userDesc = resolveUserDesc(descMap, bestRule.descKey, captured.upper);
+        const codeDesc = declarationCommentObjects.has(String(config.object || "").toUpperCase())
+          && bestRule.name !== "name"
+          ? ""
+          : statementDesc;
 
         values.push({
           name: bestRule.name,
           value: captured.raw,
           label: bestRule.label || bestRule.name,
           userDesc: userDesc || "",
-          codeDesc: statementDesc
+          codeDesc
         });
       }
 
@@ -7695,6 +7776,18 @@
           ]
         },
         {
+          "after": "LIKE REF TO",
+          "name": "likeRefTo",
+          "label": "like-ref-to",
+          "descKey": "likeRefTo"
+        },
+        {
+          "after": "LIKE LINE OF",
+          "name": "likeLineOf",
+          "label": "like-line-of",
+          "descKey": "likeLineOf"
+        },
+        {
           "after": "LIKE",
           "name": "like",
           "label": "like-name",
@@ -7886,6 +7979,78 @@
           "after": "WITH",
           "name": "with",
           "label": "with"
+        }
+      ]
+    },
+    {
+      "_sourceFile": "concatenate.json",
+      "object": "CONCATENATE",
+      "match": {
+        "startKeyword": "CONCATENATE"
+      },
+      "extras": {
+        "type": "concatenate"
+      },
+      "keywordLabels": {
+        "CONCATENATE": "concatenate",
+        "LINES": "lines",
+        "OF": "of",
+        "INTO": "into",
+        "SEPARATED": "separated",
+        "BY": "by",
+        "IN": "in",
+        "CHARACTER": "character",
+        "BYTE": "byte",
+        "MODE": "mode",
+        "RESPECTING": "respecting",
+        "BLANKS": "blanks"
+      },
+      "keywordPhrases": {
+        "CONCATENATE": "concatenate",
+        "LINES OF": "lines-of",
+        "SEPARATED BY": "separated-by",
+        "IN CHARACTER MODE": "in-character-mode",
+        "IN BYTE MODE": "in-byte-mode",
+        "RESPECTING BLANKS": "respecting-blanks"
+      },
+      "captureRules": [
+        {
+          "after": "CONCATENATE LINES OF",
+          "name": "linesOf",
+          "label": "lines-of"
+        },
+        {
+          "after": "CONCATENATE",
+          "name": "sourcesRaw",
+          "label": "sources",
+          "capture": "rest",
+          "stopTokens": [
+            "INTO",
+            "SEPARATED",
+            "IN",
+            "RESPECTING"
+          ]
+        },
+        {
+          "after": "INTO",
+          "name": "target",
+          "label": "target",
+          "capture": "rest",
+          "stopTokens": [
+            "SEPARATED",
+            "IN",
+            "RESPECTING"
+          ]
+        },
+        {
+          "after": "SEPARATED BY",
+          "name": "separator",
+          "label": "separator",
+          "capture": "rest",
+          "stopTokens": [
+            "IN",
+            "RESPECTING"
+          ]
         }
       ]
     },
@@ -8348,6 +8513,18 @@
           "label": "type",
           "descKey": "type",
           "capture": "rest"
+        },
+        {
+          "after": "LIKE REF TO",
+          "name": "likeRefTo",
+          "label": "like-ref-to",
+          "descKey": "likeRefTo"
+        },
+        {
+          "after": "LIKE LINE OF",
+          "name": "likeLineOf",
+          "label": "like-line-of",
+          "descKey": "likeLineOf"
         },
         {
           "after": "LIKE",
@@ -9956,6 +10133,11 @@
           "after": "LIKE REF TO",
           "name": "likeRefTo",
           "label": "like-ref-to"
+        },
+        {
+          "after": "LIKE LINE OF",
+          "name": "likeLineOf",
+          "label": "like-line-of"
         },
         {
           "after": "LIKE",
@@ -12698,6 +12880,14 @@ const els = {
     }
   }
 
+  function saveLegacyDescOverrides() {
+    try {
+      localStorage.setItem(DESC_STORAGE_KEY_LEGACY_V1, JSON.stringify(state.descOverridesLegacy || {}));
+    } catch {
+      // ignore
+    }
+  }
+
   function loadStorageArray(key) {
     try {
       const raw = localStorage.getItem(key);
@@ -13349,6 +13539,7 @@ const els = {
     loadDescOverrides,
     loadLegacyDescOverrides,
     saveDescOverrides,
+    saveLegacyDescOverrides,
     normalizeSettings,
     loadSettings,
     saveSettings,
@@ -15331,6 +15522,96 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     return canonicalKeys.concat(aliasKeys);
   }
 
+  function parseLegacyNameOverrideKey(key) {
+    const match = String(key || "").trim().toUpperCase().match(/^([A-Z0-9_-]+):NAME:([A-Z0-9_<>-]+)$/);
+    return match ? { objectType: match[1], name: match[2] } : null;
+  }
+
+  function isScopedDeclForOverride(decl) {
+    if (!decl || typeof decl !== "object") {
+      return false;
+    }
+    if (isPathDeclForOverrideKey(decl)) {
+      return true;
+    }
+    const scopeType = normalizeKeyToken(decl.scopeType);
+    const scopeLabel = normalizeKeyToken(decl.scopeLabel);
+    return Boolean(scopeLabel)
+      && scopeType !== "GLOBAL"
+      && scopeLabel !== "GLOBAL"
+      && scopeType !== "SYSTEM"
+      && scopeLabel !== "SYSTEM";
+  }
+
+  function shouldUseLegacyDeclOverrideLookup(decl) {
+    return !isScopedDeclForOverride(decl);
+  }
+
+  function findScopedDeclsForLegacyKey(decls, objectType, name) {
+    const typeUpper = normalizeKeyToken(objectType);
+    const nameUpper = normalizeKeyToken(name);
+    const matches = (Array.isArray(decls) ? decls : []).filter((decl) => (
+      decl
+      && normalizeKeyToken(decl.objectType) === typeUpper
+      && normalizeKeyToken(decl.name) === nameUpper
+    ));
+    return matches.length === 1 && isScopedDeclForOverride(matches[0]) && getDeclKey(matches[0])
+      ? matches
+      : [];
+  }
+
+  function applyMigratedOverrideEntry(overrides, key, entry) {
+    if (!overrides || typeof overrides !== "object" || !key) {
+      return false;
+    }
+    const normalized = normalizeDescOverrideEntry(entry);
+    if (!normalized.text) {
+      return false;
+    }
+    const existing = normalizeDescOverrideEntry(overrides[key]);
+    if (existing.text.trim()) {
+      return false;
+    }
+    overrides[key] = normalized.noNormalize
+      ? { text: normalized.text, noNormalize: true }
+      : normalized.text;
+    return true;
+  }
+
+  function migrateLegacyNameOverrideBucket(decls, source, destination) {
+    if (!source || typeof source !== "object") {
+      return false;
+    }
+    let changed = false;
+    for (const [key, entry] of Object.entries({ ...source })) {
+      const parsed = parseLegacyNameOverrideKey(key);
+      if (!parsed) {
+        continue;
+      }
+      const matches = findScopedDeclsForLegacyKey(decls, parsed.objectType, parsed.name);
+      if (matches.length !== 1) {
+        // Preserve shared keys when the declaration set cannot identify one safe scoped target.
+        continue;
+      }
+      applyMigratedOverrideEntry(destination, getDeclKey(matches[0]), entry);
+      delete source[key];
+      changed = true;
+    }
+    return changed;
+  }
+
+  function migrateScopedDescriptionOverrides(decls) {
+    const destination = state.descOverrides && typeof state.descOverrides === "object"
+      ? state.descOverrides
+      : null;
+    if (!destination) {
+      return false;
+    }
+    const currentChanged = migrateLegacyNameOverrideBucket(decls, destination, destination);
+    const legacyChanged = migrateLegacyNameOverrideBucket(decls, state.descOverridesLegacy, destination);
+    return currentChanged || legacyChanged;
+  }
+
   function getDeclOverrideLookupKeys(decl) {
     const keys = [];
     const pushKey = (value) => {
@@ -15352,7 +15633,9 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     } else {
       pushKey(getDeclKey(decl));
     }
-    pushKey(getLegacyDeclKey(decl));
+    if (shouldUseLegacyDeclOverrideLookup(decl)) {
+      pushKey(getLegacyDeclKey(decl));
+    }
     pushKey(getDeclFallbackKey(decl));
     return keys;
   }
@@ -15467,7 +15750,11 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     }
 
     const legacyKey = getLegacyDeclKey(decl);
-    if (legacyKey && Object.prototype.hasOwnProperty.call(state.descOverridesLegacy || {}, legacyKey)) {
+    if (
+      legacyKey
+      && shouldUseLegacyDeclOverrideLookup(decl)
+      && Object.prototype.hasOwnProperty.call(state.descOverridesLegacy || {}, legacyKey)
+    ) {
       return { text: String(state.descOverridesLegacy[legacyKey] || ""), noNormalize: false };
     }
 
@@ -16693,6 +16980,7 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     renderDeclDescPanelUi,
     getDeclKey,
     getDeclOverrideLookupKeys,
+    migrateScopedDescriptionOverrides,
     getPerformFormalParamKey,
     cloneDeclWithPerformChainOverride,
     getDeclOverrideStorageKey,
@@ -20267,6 +20555,36 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       ? sourceObj.extras
       : {};
 
+    if (String(sourceObj && sourceObj.objectType || "").trim().toUpperCase() === "CONCATENATE" && extras.concatenate) {
+      const concatenate = extras.concatenate;
+      const renderOperand = (label, entry) => {
+        const row = buildTemplateSemanticValueRow(entry, ownerContext);
+        return createTemplateExpandedRow(row.text, row.declCandidates, row.provenance, label);
+      };
+      if (keywordLabel === "concatenate") {
+        if (concatenate.variant === "linesOf") {
+          return concatenate.linesOf ? [renderOperand("LINES OF", {
+            value: concatenate.linesOf,
+            valueDecl: concatenate.linesOfDecl
+          })] : null;
+        }
+        const sources = Array.isArray(concatenate.sources) ? concatenate.sources : [];
+        return sources.map((entry) => renderOperand("Source", entry));
+      }
+      if (keywordLabel === "into") {
+        return concatenate.target ? [renderOperand("Target", {
+          value: concatenate.target,
+          valueDecl: concatenate.targetDecl
+        })] : null;
+      }
+      if (keywordLabel === "separated-by") {
+        return concatenate.separator ? [renderOperand("Separator", {
+          value: concatenate.separator,
+          valueDecl: concatenate.separatorDecl
+        })] : null;
+      }
+    }
+
     if (String(sourceObj && sourceObj.objectType || "").trim().toUpperCase() === "LOOP_AT_ITAB"
       && keywordLabel === "group-by" && extras.loopAtItab) {
       const groupByRaw = String(extras.loopAtItab.groupByRaw || "").trim();
@@ -20585,6 +20903,9 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
   function shouldSkipConditionKeywordInTemplateRows(objectType, keywordLabel) {
     const type = String(objectType || "").trim().toUpperCase();
     const label = normalizeTemplatePairToken(keywordLabel);
+    if (type === "CONCATENATE" && label === "lines-of") {
+      return true;
+    }
     if (type === "SELECT" && (label === "where" || label === "having")) {
       return true;
     }
@@ -28932,7 +29253,10 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
   const normalizeParsedJson = runtime.requireServiceMethod("output", "normalizeParsedJson");
   const rebuildInputGutter = runtime.requireServiceMethod("output", "rebuildInputGutter");
   const renderDeclDescPanelUi = runtime.requireServiceMethod("descriptions", "renderDeclDescPanelUi");
+  const migrateScopedDescriptionOverrides = runtime.requireServiceMethod("descriptions", "migrateScopedDescriptionOverrides");
   const rebuildConstantInitializerIndex = runtime.requireServiceMethod("descriptions", "rebuildConstantInitializerIndex");
+  const saveDescOverrides = runtime.requireServiceMethod("runtimeState", "saveDescOverrides");
+  const saveLegacyDescOverrides = runtime.requireServiceMethod("runtimeState", "saveLegacyDescOverrides");
   const buildPerformCallPathRegistry = runtime.requireServiceMethod("performSources", "buildPerformCallPathRegistry");
   const buildRenderableObjects = runtime.requireServiceMethod("performSources", "buildRenderableObjects");
   const resetTemplateVirtualState = runtime.requireServiceMethod("template", "resetTemplateVirtualState");
@@ -29543,8 +29867,12 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       }
     }
 
-        augmentSyntheticStructFieldDecls(state.data);
-        rebuildConstantInitializerIndex(state.data);
+    augmentSyntheticStructFieldDecls(state.data);
+    rebuildConstantInitializerIndex(state.data);
+    if (migrateScopedDescriptionOverrides(state.data && state.data.decls)) {
+      saveDescOverrides();
+      saveLegacyDescOverrides();
+    }
 
     resetTemplateSelectionStateMain();
     state.performSourceRegistry = buildPerformCallPathRegistry(state.data && state.data.objects);

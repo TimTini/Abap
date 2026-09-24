@@ -19,6 +19,8 @@
     { "after": "CLASS-DATA", "name": "name", "label": "attr-name", "descKey": "name" },
     { "after": "TYPE REF TO", "name": "refTo", "label": "ref-to", "descKey": "refTo", "capture": "rest", "stopTokens": ["VALUE", "LENGTH", "DECIMALS", "READ-ONLY"] },
     { "after": "TYPE", "name": "type", "label": "type-name", "descKey": "type", "capture": "rest", "stopTokens": ["VALUE", "LENGTH", "DECIMALS", "READ-ONLY"] },
+    { "after": "LIKE REF TO", "name": "likeRefTo", "label": "like-ref-to", "descKey": "likeRefTo" },
+    { "after": "LIKE LINE OF", "name": "likeLineOf", "label": "like-line-of", "descKey": "likeLineOf" },
     { "after": "LIKE", "name": "like", "label": "like-name", "descKey": "like", "capture": "rest", "stopTokens": ["VALUE", "LENGTH", "DECIMALS", "READ-ONLY"] },
     { "after": "VALUE", "name": "value", "label": "value", "descKey": "value", "capture": "rest", "stopTokens": ["LENGTH", "DECIMALS", "READ-ONLY"] },
     { "after": "LENGTH", "name": "length", "label": "length" },

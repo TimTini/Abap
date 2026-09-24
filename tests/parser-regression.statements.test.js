@@ -3,6 +3,7 @@
 const assert = require("assert");
 const { test } = require("node:test");
 const { defineFocusedTest } = require("./helpers/test-focus");
+const parser = require("./helpers/source-parser");
 const {
   assertHasObjectTypes,
   findObject,
@@ -55,13 +56,24 @@ function testDecimalLiteralDoesNotSplitStatement() {
 }
 
 function testChainedDataStatementSingleLine() {
-  const result = parse("DATA: lv_a TYPE i, lv_b TYPE i.\n");
-  const objects = flattenObjects(result.objects);
-  const dataObjects = findObjects(objects, "DATA");
+  const cases = [
+    { source: "DATA: lv_a TYPE i, lv_b TYPE c.", types: ["i", "c"] },
+    { source: "DATA : lv_a TYPE i, lv_b TYPE c.", types: ["i", "c"] },
+    { source: "data : lv_a type i, lv_b type c.", types: ["i", "c"] },
+    { source: "data : a type i, b type c.", names: ["a", "b"], types: ["i", "c"] }
+  ];
 
-  assert.strictEqual(dataObjects.length, 2, "Expected chained DATA statement to split into two DATA objects.");
-  assert.strictEqual(getValue(dataObjects[0].values, "name"), "lv_a");
-  assert.strictEqual(getValue(dataObjects[1].values, "name"), "lv_b");
+  for (const { source, names = ["lv_a", "lv_b"], types } of cases) {
+    const result = parse(`${source}\n`);
+    const objects = flattenObjects(result.objects);
+    const dataObjects = findObjects(objects, "DATA");
+
+    assert.strictEqual(dataObjects.length, 2, `${source}: Expected chained DATA to split into two DATA objects.`);
+    assert.strictEqual(getValue(dataObjects[0].values, "name"), names[0]);
+    assert.strictEqual(getValue(dataObjects[0].values, "type"), types[0]);
+    assert.strictEqual(getValue(dataObjects[1].values, "name"), names[1]);
+    assert.strictEqual(getValue(dataObjects[1].values, "type"), types[1]);
+  }
 }
 
 function testChainedDataStatementAcrossLines() {
@@ -90,6 +102,42 @@ function testChainedDataStatementKeepsCommaInsideTemplateLiteral() {
   assert.strictEqual(getValue(dataObjects[0].values, "value"), "|A, B|");
   assert.strictEqual(getValue(dataObjects[1].values, "name"), "lv_other");
   assert.strictEqual(getValue(dataObjects[1].values, "value"), "|C|");
+}
+
+function testDeclarationCommentsDoNotReplaceTypeOperands() {
+  const declarations = [
+    ["DATA", "DATA gv_root TYPE string.", "gv_root"],
+    ["CLASS-DATA", "CLASS-DATA gv_class TYPE string.", "gv_class"],
+    ["CONSTANTS", "CONSTANTS gc_text TYPE string VALUE 'x'.", "gc_text"],
+    ["FIELD-SYMBOLS", "FIELD-SYMBOLS <fs_text> TYPE string.", "<fs_text>"],
+    ["PARAMETERS", "PARAMETERS p_text TYPE string.", "p_text"],
+    ["RANGES", "RANGES r_text FOR sy-uname.", "r_text"],
+    ["SELECT-OPTIONS", "SELECT-OPTIONS so_text FOR sy-uname.", "so_text"],
+    ["STATICS", "STATICS sv_text TYPE string.", "sv_text"],
+    ["TYPES", "TYPES ty_text TYPE string.", "ty_text"],
+    ["FORM", "FORM do_work USING iv_value TYPE string.", "do_work"],
+    ["METHODS", "METHODS do_work IMPORTING iv_value TYPE string.", "do_work"],
+    ["CLASS-METHODS", "CLASS-METHODS build RETURNING VALUE(rv_text) TYPE string.", "build"]
+  ];
+
+  for (const [objectType, source, name] of declarations) {
+    const result = parse(`${source} "Declaration description\n`);
+    const declaration = findObject(flattenObjects(result.objects), objectType);
+
+    assert(declaration, `Expected ${objectType} to be recognized.`);
+    assert.strictEqual(getValueEntry(declaration.values, "name").codeDesc, "Declaration description");
+    for (const [key, entryOrList] of Object.entries(declaration.values)) {
+      if (key === "name") continue;
+      const entries = Array.isArray(entryOrList) ? entryOrList : [entryOrList];
+      for (const entry of entries) {
+        assert.strictEqual(
+          entry.codeDesc,
+          "",
+          `The inline comment on ${objectType} ${name} must not replace its ${key} operand.`
+        );
+      }
+    }
+  }
 }
 
 function testChainedConstantsKeepItemCommentsWithoutHeaderLeak() {
@@ -663,6 +711,12 @@ function testElseStartsSiblingBranch() {
 function testSupportedStatementSmokeMatrix() {
   const cases = [
     {
+      name: "concatenate",
+      covers: ["concatenate.json"],
+      expectedTypes: ["CONCATENATE"],
+      code: "CONCATENATE lv_left lv_right INTO lv_result SEPARATED BY space.\n"
+    },
+    {
       name: "append",
       covers: ["append.json"],
       expectedTypes: ["APPEND"],
@@ -948,6 +1002,63 @@ function assertWhereClean(select, label) {
   }
 }
 
+function testConcatenateStatementModel() {
+  const code = [
+    "DATA lv_left TYPE string.",
+    "DATA lv_right TYPE string.",
+    "DATA lv_result TYPE string.",
+    "DATA lv_separator TYPE string.",
+    "DATA lt_parts TYPE TABLE OF string.",
+    "DATA lt_bytes TYPE TABLE OF x.",
+    "DATA lv_xstring TYPE xstring.",
+    "CONCATENATE lv_left lv_right INTO lv_result SEPARATED BY lv_separator IN CHARACTER MODE.",
+    "CONCATENATE: lv_left '->' lv_right INTO lv_result SEPARATED BY lv_separator IN CHARACTER MODE,",
+    "  lv_right INTO lv_result RESPECTING BLANKS.",
+    "CONCATENATE LINES OF lt_parts INTO lv_result SEPARATED BY space RESPECTING BLANKS.",
+    "CONCATENATE LINES OF lt_bytes INTO lv_xstring IN BYTE MODE."
+  ].join("\n");
+  const objects = flattenObjects(parse(code).objects);
+  const concatenates = findObjects(objects, "CONCATENATE");
+
+  assert.strictEqual(concatenates.length, 5);
+  assert.deepStrictEqual(
+    concatenates[0].extras.concatenate.sources.map((entry) => entry.value),
+    ["lv_left", "lv_right"]
+  );
+  assert.strictEqual(concatenates[0].extras.concatenate.sources[0].valueDecl.name, "lv_left");
+  assert.strictEqual(concatenates[0].extras.concatenate.targetDecl.name, "lv_result");
+  assert.strictEqual(concatenates[0].extras.concatenate.separatorDecl.name, "lv_separator");
+  assert.strictEqual(concatenates[0].extras.concatenate.inCharacterMode, true);
+  assert.strictEqual(concatenates[0].extras.concatenate.inByteMode, false);
+
+  assert.strictEqual(concatenates[1].raw, "CONCATENATE lv_left '->' lv_right INTO lv_result SEPARATED BY lv_separator IN CHARACTER MODE.");
+  assert.deepStrictEqual(
+    concatenates[1].extras.concatenate.sources.map((entry) => entry.value),
+    ["lv_left", "'->'", "lv_right"]
+  );
+  assert.strictEqual(concatenates[1].extras.concatenate.inCharacterMode, true);
+  assert.strictEqual(concatenates[2].extras.concatenate.sources[0].value, "lv_right");
+  assert.strictEqual(concatenates[2].extras.concatenate.respectingBlanks, true);
+
+  assert.strictEqual(concatenates[3].extras.concatenate.variant, "linesOf");
+  assert.strictEqual(concatenates[3].extras.concatenate.linesOfDecl.name, "lt_parts");
+  assert.strictEqual(concatenates[3].extras.concatenate.respectingBlanks, true);
+
+  assert.strictEqual(concatenates[4].extras.concatenate.variant, "linesOf");
+  assert.strictEqual(concatenates[4].extras.concatenate.linesOfDecl.name, "lt_bytes");
+  assert.strictEqual(concatenates[4].extras.concatenate.targetDecl.name, "lv_xstring");
+  assert.strictEqual(concatenates[4].extras.concatenate.inByteMode, true);
+}
+
+function testConcatenateWithoutRegisteredConfigs() {
+  const result = parser.parseAbapTextDetailed("CONCATENATE lv_left lv_right INTO lv_result.");
+  const concatenates = findObjects(flattenObjects(result.objects), "CONCATENATE");
+
+  assert.strictEqual(concatenates.length, 1);
+  assert.strictEqual(concatenates[0].raw, "CONCATENATE lv_left lv_right INTO lv_result.");
+  assert(!result.diagnostics.some((diagnostic) => diagnostic.code === "UNSUPPORTED_SYNTAX"));
+}
+
 function testSelectOpenSqlFieldsWhereIntoFromDeepSample() {
   const samplePath = path.join(__dirname, "..", "examples", "deep_form_demo.abap");
   const sample = fs.readFileSync(samplePath, "utf8");
@@ -1106,6 +1217,10 @@ defineFocusedTest(test, "parser statements regression", ["statements"], async (t
     testChainedDataStatementKeepsCommaInsideTemplateLiteral();
   });
 
+  await t.test("declaration comments do not replace type operands", () => {
+    testDeclarationCommentsDoNotReplaceTypeOperands();
+  });
+
   await t.test("chained constants keep item comments without header leak", () => {
     testChainedConstantsKeepItemCommentsWithoutHeaderLeak();
   });
@@ -1216,6 +1331,14 @@ defineFocusedTest(test, "parser statements regression", ["statements"], async (t
 
   await t.test("else starts sibling branch", () => {
     testElseStartsSiblingBranch();
+  });
+
+  await t.test("concatenate statements retain operands, variants, modes, and decl refs", () => {
+    testConcatenateStatementModel();
+  });
+
+  await t.test("concatenate remains recognized without registered configs", () => {
+    testConcatenateWithoutRegisteredConfigs();
   });
 
   await t.test("supported statement smoke matrix", () => {

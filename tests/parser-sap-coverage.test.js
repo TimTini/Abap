@@ -35,7 +35,7 @@ defineFocusedTest(test, "SAP syntax inventory covers each configured parser matc
 
   const configs = loadConfigs(configsDir);
   const configsByFile = new Map(configs.map((config) => [config._sourceFile, config]));
-  assert.equal(new Set(configs.map((config) => config.object)).size, 45);
+  assert.equal(new Set(configs.map((config) => config.object)).size, 46);
 
   for (const form of inventory.forms) {
     assert.match(form.sapUrl, /^https:\/\/help\.sap\.com\/(?:doc\/abapdocu_latest_index_htm\/latest\/en-US\/[^\s]+\.html?|docs\/abap-cloud\/abap-keyword\/[a-z0-9-]+(?:\?[^\s]+)?)$/i);

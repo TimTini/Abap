@@ -28,7 +28,9 @@ defineFocusedTest(test, "Viewer renders SAP READ TABLE, grouped LOOP and SELECT 
     "  LOOP AT GROUP group INTO DATA(member) WHERE table_line <> lv_skip.",
     "    WRITE member.",
     "  ENDLOOP.",
-    "ENDLOOP."
+    "ENDLOOP.",
+    "CONCATENATE lv_carrier lv_skip INTO lv_carrier SEPARATED BY ' -> '.",
+    "CONCATENATE LINES OF lt_rows INTO lv_carrier SEPARATED BY space."
   ].join("\n");
   const dom = await renderFixture(source);
   const { window } = dom;
@@ -38,10 +40,16 @@ defineFocusedTest(test, "Viewer renders SAP READ TABLE, grouped LOOP and SELECT 
   const read = objects.find((object) => object.objectType === "READ_TABLE");
   const selects = objects.filter((object) => object.objectType === "SELECT");
   const packageSelect = selects.find((object) => /PACKAGE SIZE/i.test(object.raw));
+  const concatenates = objects.filter((object) => object.objectType === "CONCATENATE");
   const groupedLoop = objects.find((object) => object.objectType === "LOOP_AT_ITAB" && /GROUP BY/i.test(object.raw));
   const memberLoop = groupedLoop && groupedLoop.children.find((object) => /LOOP AT GROUP/i.test(object.raw));
 
   assert(read, "Expected the parser result to contain READ TABLE.");
+  assert.equal(concatenates.length, 2);
+  assert.deepEqual(concatenates[0].extras.concatenate.sources.map((entry) => entry.value), ["lv_carrier", "lv_skip"]);
+  assert.equal(concatenates[0].extras.concatenate.targetDecl.name, "lv_carrier");
+  assert.equal(concatenates[1].extras.concatenate.variant, "linesOf");
+  assert.equal(concatenates[1].extras.concatenate.linesOfDecl.name, "lt_rows");
   assert.equal(read.extras.readTable.whereConditions.length, 2);
   assert.equal(selects.length, 3);
   assert.deepEqual(selects.map((object) => object.values.fields.value), ["*", "carrid", "carrid"]);
@@ -76,6 +84,24 @@ defineFocusedTest(test, "Viewer renders SAP READ TABLE, grouped LOOP and SELECT 
   assert(memberRows.some((row) => row.includes("group")), "Expected the group-result target in the nested loop Template.");
   assert(memberRows.some((row) => row.includes("WHERE")), "Expected the nested member filter clause in Template.");
   assert(memberRows.some((row) => row.join(" ").includes("Skip marker")), "Expected the nested member filter operand in Template.");
+
+  els.templatePreviewOutput.scrollTop = els.templatePreviewOutput.scrollHeight - els.templatePreviewOutput.clientHeight;
+  els.templatePreviewOutput.dispatchEvent(new window.Event("scroll"));
+  await waitForViewerUi(window);
+  const concatenateTables = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="CONCATENATE"]'));
+  assert.equal(concatenateTables.length, 2, "Expected the Viewer to render both CONCATENATE variants.");
+  const concatenateRows = getTemplateTableRows(concatenateTables[0]);
+  const concatenateLinesRows = getTemplateTableRows(concatenateTables[1]);
+  assert(concatenateRows.some((row) => row[0] === "Source" && row[1] === "lv_carrier"), "Expected CONCATENATE source operands to render as editable rows.");
+  assert.equal(concatenateRows.filter((row) => row[0] === "Source").length, 2, "Expected both CONCATENATE sources to render separately.");
+  assert(concatenateRows.some((row) => row[0] === "Source" && row[1] === "Skip marker"), "Expected source declaration descriptions to resolve in Template.");
+  assert(concatenateRows.some((row) => row[0] === "Target" && row[1] === "lv_carrier"), "Expected CONCATENATE target to render in Template.");
+  assert(concatenateRows.some((row) => row[0] === "Separator" && row[1] === "' -> '"), "Expected CONCATENATE separator to render in Template.");
+  assert(concatenateLinesRows.some((row) => row[0] === "LINES OF" && row[1] === "lt_rows"), "Expected CONCATENATE LINES OF operand to render once.");
+  assert.equal(concatenateLinesRows.filter((row) => row[0] === "LINES OF").length, 1, "Expected CONCATENATE LINES OF not to duplicate its table operand.");
+  assert(concatenateLinesRows.some((row) => row[0] === "Target" && row[1] === "lv_carrier"), "Expected CONCATENATE LINES OF target to render in Template.");
+  const sourceCell = findTemplateCellByText(concatenateTables[0], "lv_carrier");
+  assert(sourceCell && sourceCell.classList.contains("template-preview-editable"), "Expected CONCATENATE source declaration to remain editable in Template.");
 
   const declaration = read.extras.readTable.whereConditions[0].rightOperandDecl;
   assert.equal(declaration.name, "lv_skip");

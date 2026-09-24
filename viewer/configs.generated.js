@@ -523,6 +523,18 @@
           ]
         },
         {
+          "after": "LIKE REF TO",
+          "name": "likeRefTo",
+          "label": "like-ref-to",
+          "descKey": "likeRefTo"
+        },
+        {
+          "after": "LIKE LINE OF",
+          "name": "likeLineOf",
+          "label": "like-line-of",
+          "descKey": "likeLineOf"
+        },
+        {
           "after": "LIKE",
           "name": "like",
           "label": "like-name",
@@ -714,6 +726,78 @@
           "after": "WITH",
           "name": "with",
           "label": "with"
+        }
+      ]
+    },
+    {
+      "_sourceFile": "concatenate.json",
+      "object": "CONCATENATE",
+      "match": {
+        "startKeyword": "CONCATENATE"
+      },
+      "extras": {
+        "type": "concatenate"
+      },
+      "keywordLabels": {
+        "CONCATENATE": "concatenate",
+        "LINES": "lines",
+        "OF": "of",
+        "INTO": "into",
+        "SEPARATED": "separated",
+        "BY": "by",
+        "IN": "in",
+        "CHARACTER": "character",
+        "BYTE": "byte",
+        "MODE": "mode",
+        "RESPECTING": "respecting",
+        "BLANKS": "blanks"
+      },
+      "keywordPhrases": {
+        "CONCATENATE": "concatenate",
+        "LINES OF": "lines-of",
+        "SEPARATED BY": "separated-by",
+        "IN CHARACTER MODE": "in-character-mode",
+        "IN BYTE MODE": "in-byte-mode",
+        "RESPECTING BLANKS": "respecting-blanks"
+      },
+      "captureRules": [
+        {
+          "after": "CONCATENATE LINES OF",
+          "name": "linesOf",
+          "label": "lines-of"
+        },
+        {
+          "after": "CONCATENATE",
+          "name": "sourcesRaw",
+          "label": "sources",
+          "capture": "rest",
+          "stopTokens": [
+            "INTO",
+            "SEPARATED",
+            "IN",
+            "RESPECTING"
+          ]
+        },
+        {
+          "after": "INTO",
+          "name": "target",
+          "label": "target",
+          "capture": "rest",
+          "stopTokens": [
+            "SEPARATED",
+            "IN",
+            "RESPECTING"
+          ]
+        },
+        {
+          "after": "SEPARATED BY",
+          "name": "separator",
+          "label": "separator",
+          "capture": "rest",
+          "stopTokens": [
+            "IN",
+            "RESPECTING"
+          ]
         }
       ]
     },
@@ -1176,6 +1260,18 @@
           "label": "type",
           "descKey": "type",
           "capture": "rest"
+        },
+        {
+          "after": "LIKE REF TO",
+          "name": "likeRefTo",
+          "label": "like-ref-to",
+          "descKey": "likeRefTo"
+        },
+        {
+          "after": "LIKE LINE OF",
+          "name": "likeLineOf",
+          "label": "like-line-of",
+          "descKey": "likeLineOf"
         },
         {
           "after": "LIKE",
@@ -2784,6 +2880,11 @@
           "after": "LIKE REF TO",
           "name": "likeRefTo",
           "label": "like-ref-to"
+        },
+        {
+          "after": "LIKE LINE OF",
+          "name": "likeLineOf",
+          "label": "like-line-of"
         },
         {
           "after": "LIKE",
