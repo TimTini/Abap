@@ -669,6 +669,97 @@ async function assertLegacyTemplateImportAddsMissingSpecificConfigs() {
   dom.window.close();
 }
 
+async function assertLoopStatementCommentStaysAtObjectLevel() {
+  const source = [
+    'TABLES sflight. "Flight work area description',
+    'DATA lt_rows TYPE TABLE OF string. "Table declaration description',
+    'DATA ls_row TYPE string. "Work area description',
+    'LOOP AT lt_rows INTO ls_row. "Loop statement description',
+    "ENDLOOP."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const { els, state } = window.AbapViewerRuntime;
+  const runtimeState = window.AbapViewerRuntime.services.runtimeState;
+  const objects = [];
+  const pending = Array.isArray(state.data && state.data.objects) ? state.data.objects.slice() : [];
+  while (pending.length) {
+    const object = pending.pop();
+    if (!object) continue;
+    objects.push(object);
+    if (Array.isArray(object.children)) pending.push(...object.children);
+  }
+
+  const tables = objects.find((object) => object.objectType === "TABLES");
+  assert(tables, "Expected the Viewer parser result to contain the TABLES declaration.");
+  assert.strictEqual(tables.comment, "Flight work area description");
+  assert.strictEqual(tables.values.name.codeDesc, "Flight work area description");
+
+  assert(window.AbapViewerRuntime.constants.DECL_TYPE_OPTIONS.includes("TABLES"));
+  assert(window.AbapViewerRuntime.constants.DEFAULT_SETTINGS.declFilterTypes.includes("TABLES"));
+  assert.deepStrictEqual(
+    Array.from(runtimeState.normalizeSettings({ declFilterTypes: ["TABLES"] }).declFilterTypes),
+    ["TABLES"]
+  );
+  els.settingsBtn.click();
+  const tablesFilter = els.settingsDeclTypes.querySelector('input[type="checkbox"][value="TABLES"]');
+  assert(tablesFilter, "Expected settings to expose a TABLES declaration filter.");
+  assert(tablesFilter.checked, "Expected TABLES to be enabled in the default declaration filters.");
+  els.settingsModal.hidden = true;
+
+  const legacyDefaultSettings = cloneTestJson(window.AbapViewerRuntime.constants.DEFAULT_SETTINGS);
+  legacyDefaultSettings.declFilterTypes = legacyDefaultSettings.declFilterTypes.filter((type) => type !== "TABLES");
+  window.localStorage.setItem(
+    window.AbapViewerRuntime.constants.SETTINGS_STORAGE_KEY_V1,
+    JSON.stringify(legacyDefaultSettings)
+  );
+  window.localStorage.removeItem(window.AbapViewerRuntime.constants.TABLES_FILTER_MIGRATION_STORAGE_KEY);
+  const migratedSettings = runtimeState.loadSettings();
+  assert(
+    migratedSettings.declFilterTypes.includes("TABLES"),
+    "Expected existing default Viewer settings to migrate and show TABLES in Data."
+  );
+  runtimeState.saveSettings({
+    ...migratedSettings,
+    declFilterTypes: migratedSettings.declFilterTypes.filter((type) => type !== "TABLES")
+  });
+  assert(
+    !runtimeState.loadSettings().declFilterTypes.includes("TABLES"),
+    "Expected a saved opt-out of TABLES to remain disabled after reloading settings."
+  );
+  assert.deepStrictEqual(
+    Array.from(runtimeState.normalizeSettings({ declFilterTypes: ["DATA"] }).declFilterTypes),
+    ["DATA"],
+    "Expected custom declaration filters to retain their prior selection."
+  );
+  window.localStorage.removeItem(window.AbapViewerRuntime.constants.TABLES_FILTER_MIGRATION_STORAGE_KEY);
+  runtimeState.saveSettings({ ...migratedSettings, declFilterTypes: ["DATA"] });
+  assert.deepStrictEqual(
+    Array.from(runtimeState.loadSettings().declFilterTypes),
+    ["DATA"],
+    "Expected a stored custom declaration filter to remain unchanged on the first migration check."
+  );
+
+  const loop = objects.find((object) => object.objectType === "LOOP_AT_ITAB");
+  assert(loop, "Expected the Viewer parser result to contain LOOP_AT_ITAB.");
+  assert.strictEqual(loop.comment, "Loop statement description");
+  assert.strictEqual(loop.values.itab.codeDesc || "", "");
+  assert.strictEqual(loop.values.into.codeDesc || "", "");
+
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+  const loopTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="LOOP_AT_ITAB"]');
+  const tablesTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="TABLES"]');
+  assert(tablesTable, "Expected the Viewer Template to render TABLES.");
+  assert(tablesTable.textContent.includes("Flight work area description"));
+  assert.deepStrictEqual(getTemplateTableRows(loopTable), [
+    ["LOOP AT", "Table declaration description"],
+    ["INTO", "Work area description"]
+  ]);
+  assert(!loopTable.textContent.includes("Loop statement description"));
+  dom.window.close();
+}
+
 defineFocusedTest(test, "viewer config export contracts", ["config-export"], async (t) => {
 assertViewerFixtureDirectoriesStayInSync();
 
@@ -702,5 +793,9 @@ assertViewerFixtureDirectoriesStayInSync();
 
   await t.test("legacy template import adds missing specific configs", async () => {
     await assertLegacyTemplateImportAddsMissingSpecificConfigs();
+  });
+
+  await t.test("LOOP comment describes its object, not the INTO work area", async () => {
+    await assertLoopStatementCommentStaysAtObjectLevel();
   });
 });

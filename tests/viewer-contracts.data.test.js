@@ -16,6 +16,7 @@ const {
 
 async function assertDataCatalogGroupsEverySourceDeclaration() {
   const source = [
+    'TABLES sflight. "Flight work area description',
     "TYPES ty_code TYPE string.",
     "DATA gv_root TYPE ty_code. \"Root description",
     "CONSTANTS gc_kind TYPE string VALUE 'A'. \"Kind description",
@@ -42,6 +43,9 @@ async function assertDataCatalogGroupsEverySourceDeclaration() {
   assert(globalGroup, "Expected a Global declaration group.");
   assert(formGroup, "Expected a FORM:FRM_CATALOG declaration group.");
   assert(findDataDeclRow(globalGroup, "ty_code"), "Expected TYPES in the Global group.");
+  const tablesRow = findDataDeclRow(globalGroup, "sflight");
+  assert(tablesRow, "Expected TABLES work area in the Global group.");
+  assert(String(tablesRow.querySelector('[data-column="code-description"]')?.textContent || "").includes("Flight work area description"));
   assert(findDataDeclRow(globalGroup, "gv_root"), "Expected DATA in the Global group.");
   assert(findDataDeclRow(globalGroup, "gc_kind"), "Expected CONSTANTS in the Global group.");
   assert(findDataDeclRow(formGroup, "iv_value"), "Expected FORM_PARAM in the FORM group.");

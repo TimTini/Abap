@@ -47,15 +47,18 @@
   const declarationCommentObjects = new Set([
     "CLASS-DATA",
     "CLASS-METHODS",
+    "CLASS",
     "CONSTANTS",
     "DATA",
     "FIELD-SYMBOLS",
     "FORM",
+    "METHOD",
     "METHODS",
     "PARAMETERS",
     "RANGES",
     "SELECT-OPTIONS",
     "STATICS",
+    "TABLES",
     "TYPES"
   ]);
   const whileStatementConfig = normalizeConfig({
@@ -508,7 +511,7 @@
 
   function getAstFamily(objectType) {
     const kind = String(objectType || "").toUpperCase();
-    if (["DATA", "TYPES", "CONSTANTS", "RANGES", "STATICS", "PARAMETERS", "SELECT-OPTIONS", "FIELD-SYMBOLS", "CLASS-DATA", "METHODS", "CLASS-METHODS", "CLASS", "INTERFACE", "PUBLIC_SECTION", "PRIVATE_SECTION", "PROTECTED_SECTION"].includes(kind)) return "declarations";
+    if (["DATA", "TYPES", "CONSTANTS", "RANGES", "STATICS", "PARAMETERS", "SELECT-OPTIONS", "FIELD-SYMBOLS", "CLASS-DATA", "METHODS", "CLASS-METHODS", "TABLES", "CLASS", "INTERFACE", "PUBLIC_SECTION", "PRIVATE_SECTION", "PROTECTED_SECTION"].includes(kind)) return "declarations";
     if (["IF", "ELSEIF", "ELSE", "CASE", "WHEN", "TRY", "CATCH", "CLEANUP", "DO", "WHILE", "LOOP", "LOOP_AT_ITAB", "EXIT", "CHECK", "CONTINUE", "RETURN"].includes(kind)) return "control-flow";
     if (["APPEND", "INSERT_ITAB", "MODIFY_ITAB", "DELETE_ITAB", "READ_TABLE", "SORT_ITAB", "COLLECT"].includes(kind)) return "internal-tables";
     if (["SELECT", "DELETE_SQL", "INSERT_SQL", "MODIFY_SQL", "UPDATE_SQL", "DELETE_AMBIGUOUS", "MODIFY_AMBIGUOUS", "OPEN_CURSOR", "FETCH", "CLOSE_CURSOR"].includes(kind)) return "database-sql";
@@ -1294,7 +1297,9 @@
 
     const hasConcatenateConfig = tokens[0].upper === "CONCATENATE"
       && configs.some((config) => config.object === "CONCATENATE");
-    const grammarObject = hasConcatenateConfig ? null
+    const hasConfiguredTablesDeclaration = tokens[0].upper === "TABLES"
+      && configs.some((config) => config.object === "TABLES");
+    const grammarObject = hasConcatenateConfig || hasConfiguredTablesDeclaration ? null
       : parseProjectGrammarStatement(tokens, statement, configs, fileName, parentId, nextId, knownInternalTables);
     if (grammarObject) return [grammarObject];
 
@@ -1495,9 +1500,9 @@
     const matchType = match.type ? String(match.type).trim().toLowerCase() : "";
     let valueEntries = [];
     if (matchType === "assignment") {
-      valueEntries = captureAssignmentValues(tokens, commentText, raw);
+      valueEntries = captureAssignmentValues(tokens, raw);
     } else if (matchType === "methodcallexpr") {
-      valueEntries = captureMethodCallExpressionValues(raw, commentText);
+      valueEntries = captureMethodCallExpressionValues(raw);
     } else {
       valueEntries = captureValues(tokens, config, commentText);
     }
@@ -3029,7 +3034,7 @@
     }
 
     const type = obj.objectType;
-    if (["DATA", "CONSTANTS", "PARAMETERS", "SELECT-OPTIONS", "TYPES", "RANGES", "STATICS", "CLASS-DATA", "FIELD-SYMBOLS"].includes(type)) {
+    if (["DATA", "CONSTANTS", "PARAMETERS", "SELECT-OPTIONS", "TYPES", "RANGES", "STATICS", "CLASS-DATA", "FIELD-SYMBOLS", "TABLES"].includes(type)) {
       const name = getFirstValue(obj.values, "name");
       return name ? [name] : [];
     }
@@ -4923,10 +4928,8 @@
           continue;
         }
         const userDesc = resolveUserDesc(descMap, bestRule.descKey, captured.upper);
-        const codeDesc = declarationCommentObjects.has(String(config.object || "").toUpperCase())
-          && bestRule.name !== "name"
-          ? ""
-          : statementDesc;
+        const isDeclaration = declarationCommentObjects.has(String(config.object || "").toUpperCase());
+        const codeDesc = isDeclaration && bestRule.name === "name" ? statementDesc : "";
 
         values.push({
           name: bestRule.name,
@@ -4943,7 +4946,7 @@
     return values;
   }
 
-  function captureAssignmentValues(tokens, commentText, raw) {
+  function captureAssignmentValues(tokens, raw) {
     let assignmentTokens = tokens;
     if (Array.isArray(tokens) && tokens.length < 3) {
       assignmentTokens = getAssignmentLexicalTokens(raw);
@@ -4952,7 +4955,6 @@
       return [];
     }
 
-    const statementDesc = commentText || "";
     const target = assignmentTokens[0] ? assignmentTokens[0].raw : "";
     const op = assignmentTokens[1] ? assignmentTokens[1].raw : "";
     const expr = assignmentTokens
@@ -4962,19 +4964,18 @@
       .trim();
 
     return [
-      { name: "target", value: target, label: "target", userDesc: "", codeDesc: statementDesc },
-      { name: "op", value: op, label: "op", userDesc: "", codeDesc: statementDesc },
-      { name: "expr", value: expr, label: "expr", userDesc: "", codeDesc: statementDesc }
+      { name: "target", value: target, label: "target", userDesc: "", codeDesc: "" },
+      { name: "op", value: op, label: "op", userDesc: "", codeDesc: "" },
+      { name: "expr", value: expr, label: "expr", userDesc: "", codeDesc: "" }
     ];
   }
 
-  function captureMethodCallExpressionValues(raw, commentText) {
+  function captureMethodCallExpressionValues(raw) {
     const parsed = parseMethodCallExpressionFromRaw(raw);
     if (!parsed) {
       return [];
     }
 
-    const statementDesc = commentText || "";
     const values = [];
     const addEntry = (name, value, label) => {
       const text = String(value || "").trim();
@@ -4986,7 +4987,7 @@
         value: text,
         label: label || name,
         userDesc: "",
-        codeDesc: statementDesc
+        codeDesc: ""
       });
     };
 

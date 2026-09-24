@@ -134,6 +134,7 @@ const els = {
   const DESC_STORAGE_KEY_V2 = "abap-parser-viewer.declDescOverrides.v2";
   const DESC_STORAGE_KEY_LEGACY_V1 = "abap-parser-viewer.descOverrides.v1";
   const SETTINGS_STORAGE_KEY_V1 = "abap-parser-viewer.settings.v1";
+  const TABLES_FILTER_MIGRATION_STORAGE_KEY = "abap-parser-viewer.settings-migration.tables-filter.v1";
   const TEMPLATE_CONFIG_STORAGE_KEY_V1 = "abap-parser-viewer.templateConfig.v1";
   const THEME_STORAGE_KEY_V1 = "abap-parser-viewer.theme.v1";
   const LAYOUT_SPLIT_STORAGE_KEY_V1 = "abap-parser-viewer.layoutSplit.v1";
@@ -158,6 +159,7 @@ const els = {
     "STATICS",
     "CLASS-DATA",
     "FIELD-SYMBOLS",
+    "TABLES",
     "FORM_PARAM",
     "METHOD_PARAM"
   ];
@@ -185,6 +187,7 @@ const els = {
       "STATICS",
       "CLASS-DATA",
       "FIELD-SYMBOLS",
+      "TABLES",
       "FORM_PARAM",
       "METHOD_PARAM"
     ],
@@ -2566,7 +2569,34 @@ const els = {
   }
 
   function loadSettings() {
-    return normalizeSettings(loadStorageObject(SETTINGS_STORAGE_KEY_V1));
+    const storedSettings = loadStorageObject(SETTINGS_STORAGE_KEY_V1);
+    const settings = normalizeSettings(storedSettings);
+    let migrationDone = false;
+    try {
+      migrationDone = localStorage.getItem(TABLES_FILTER_MIGRATION_STORAGE_KEY) === "1";
+    } catch {
+      return settings;
+    }
+    if (migrationDone) {
+      return settings;
+    }
+
+    const storedFilters = Array.isArray(storedSettings.declFilterTypes)
+      ? storedSettings.declFilterTypes.map((type) => String(type || "").trim().toUpperCase())
+      : [];
+    const previousDefaults = DEFAULT_SETTINGS.declFilterTypes.filter((type) => type !== "TABLES");
+    const hadPreviousDefaults = storedFilters.length === previousDefaults.length
+      && previousDefaults.every((type, index) => storedFilters[index] === type);
+    if (hadPreviousDefaults) {
+      settings.declFilterTypes = DEFAULT_SETTINGS.declFilterTypes.slice();
+      saveSettings(settings);
+    }
+    try {
+      localStorage.setItem(TABLES_FILTER_MIGRATION_STORAGE_KEY, "1");
+    } catch {
+      // ignore unavailable storage
+    }
+    return settings;
   }
 
   function saveSettings(settings) {
@@ -3133,6 +3163,7 @@ const els = {
     DESC_STORAGE_KEY_V2,
     DESC_STORAGE_KEY_LEGACY_V1,
     SETTINGS_STORAGE_KEY_V1,
+    TABLES_FILTER_MIGRATION_STORAGE_KEY,
     TEMPLATE_CONFIG_STORAGE_KEY_V1,
     THEME_STORAGE_KEY_V1,
     LAYOUT_SPLIT_STORAGE_KEY_V1,

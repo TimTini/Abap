@@ -24,6 +24,9 @@ This file is the local source of truth for future AI/code agents working in this
 
 ## 3) Description + FinalDesc Rules
 
+- A code comment describes its parsed statement and stays on `object.comment`; do not copy it into arbitrary captured operands (`INTO`, `TO`, condition values, targets, etc.).
+- On declaration/header objects, also attach that comment to the declared entity's `values.name.codeDesc` so it can serve as that entity's description. Current declaration/header kinds are `CLASS`, `CLASS-DATA`, `CLASS-METHODS`, `CONSTANTS`, `DATA`, `FIELD-SYMBOLS`, `FORM`, `METHOD`, `METHODS`, `PARAMETERS`, `RANGES`, `SELECT-OPTIONS`, `STATICS`, `TABLES`, and `TYPES`.
+- For non-declaration statements, keep statement comments on the object; `values.*.codeDesc` must not inherit them. Comments must not become descriptions of a LOOP `INTO` target or other individual operands.
 - Description precedence for a decl-like value:
   - `userDesc` override
   - fallback `codeDesc`

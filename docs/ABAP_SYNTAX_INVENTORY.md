@@ -117,7 +117,7 @@ The two cheat-sheet snapshots are evidence and examples, not parser specificatio
 | examples/full.abap | 168 | CLASS-METHODS get_default | declarations | CLASS_METHODS | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenclass-methods.htm |
 | examples/full.abap | 95 | CLEANUP | blocks | CLEANUP | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abencleanup.htm |
 | examples/deep_form_demo.abap | 21 | INCLUDE <icon> | program-structure | INCLUDE | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abeninclude.htm |
-| examples/deep_form_demo.abap | 24 | TABLES: | declarations | TABLES | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abentables.htm |
+| examples/deep_form_demo.abap | 26 | sflight | declarations | TABLES | supported | Standard ABAP, obsolete | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abentables.htm |
 | examples/deep_form_demo.abap | 418 | CONDENSE rv_route | string-processing | CONDENSE | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abencondense.htm |
 | examples/deep_form_demo.abap | 423 | WRITE: / sy-uline | list-output | WRITE | supported | Standard ABAP | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenwrite.htm |
 | examples/deep_form_demo.abap | 496 | RETURN | control-flow | RETURN | supported | Standard and Cloud | https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/abenreturn.htm |

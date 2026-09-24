@@ -109,6 +109,7 @@ function testDeclarationCommentsDoNotReplaceTypeOperands() {
     ["DATA", "DATA gv_root TYPE string.", "gv_root"],
     ["CLASS-DATA", "CLASS-DATA gv_class TYPE string.", "gv_class"],
     ["CONSTANTS", "CONSTANTS gc_text TYPE string VALUE 'x'.", "gc_text"],
+    ["CLASS", "CLASS lcl_demo DEFINITION.", "lcl_demo"],
     ["FIELD-SYMBOLS", "FIELD-SYMBOLS <fs_text> TYPE string.", "<fs_text>"],
     ["PARAMETERS", "PARAMETERS p_text TYPE string.", "p_text"],
     ["RANGES", "RANGES r_text FOR sy-uname.", "r_text"],
@@ -116,8 +117,10 @@ function testDeclarationCommentsDoNotReplaceTypeOperands() {
     ["STATICS", "STATICS sv_text TYPE string.", "sv_text"],
     ["TYPES", "TYPES ty_text TYPE string.", "ty_text"],
     ["FORM", "FORM do_work USING iv_value TYPE string.", "do_work"],
+    ["METHOD", "METHOD do_work.", "do_work"],
     ["METHODS", "METHODS do_work IMPORTING iv_value TYPE string.", "do_work"],
-    ["CLASS-METHODS", "CLASS-METHODS build RETURNING VALUE(rv_text) TYPE string.", "build"]
+    ["CLASS-METHODS", "CLASS-METHODS build RETURNING VALUE(rv_text) TYPE string.", "build"],
+    ["TABLES", "TABLES sflight.", "sflight"]
   ];
 
   for (const [objectType, source, name] of declarations) {
@@ -156,6 +159,24 @@ function testChainedConstantsKeepItemCommentsWithoutHeaderLeak() {
   assert.strictEqual(objects[1].comment, "Trạng thái chưa có khách");
   assert.strictEqual(getValueEntry(objects[0].values, "name").codeDesc, "Giá trị boolean đúng");
   assert.strictEqual(getValueEntry(objects[1].values, "name").codeDesc, "Trạng thái chưa có khách");
+}
+
+function testChainedTablesCommentsDescribeEachWorkArea() {
+  const code = [
+    "TABLES:",
+    '  sflight, "Flight work area',
+    '  spfli. "Route work area',
+    ""
+  ].join("\n");
+  const tables = findObjects(flattenObjects(parse(code).objects), "TABLES");
+
+  assert.strictEqual(tables.length, 2, "Expected chained TABLES work areas to split into separate declarations.");
+  assert.strictEqual(getValueEntry(tables[0].values, "name").value, "sflight");
+  assert.strictEqual(tables[0].comment, "Flight work area");
+  assert.strictEqual(getValueEntry(tables[0].values, "name").codeDesc, "Flight work area");
+  assert.strictEqual(getValueEntry(tables[1].values, "name").value, "spfli");
+  assert.strictEqual(tables[1].comment, "Route work area");
+  assert.strictEqual(getValueEntry(tables[1].values, "name").codeDesc, "Route work area");
 }
 
 function testChainedConstantsUseSingleInternalCommentForNextItem() {
@@ -625,7 +646,7 @@ function testStatementCommentPrefersFirstInline() {
 
   const formEntry = getValueEntry(perform.values, "form");
   assert(formEntry, "Expected values.form entry.");
-  assert.strictEqual(formEntry.codeDesc, "first-inline");
+  assert.strictEqual(formEntry.codeDesc, "");
 }
 
 function testStatementCommentFallsBackToSingleLeadingLine() {
@@ -643,7 +664,7 @@ function testStatementCommentFallsBackToSingleLeadingLine() {
 
   const formEntry = getValueEntry(perform.values, "form");
   assert(formEntry, "Expected values.form entry.");
-  assert.strictEqual(formEntry.codeDesc, "leading-comment");
+  assert.strictEqual(formEntry.codeDesc, "");
 }
 
 function testStatementCommentIgnoresLeadingCommentBlock() {
@@ -951,6 +972,12 @@ function testSupportedStatementSmokeMatrix() {
       code: "STATICS sv_count TYPE i.\n"
     },
     {
+      name: "tables",
+      covers: ["tables.json"],
+      expectedTypes: ["TABLES"],
+      code: "TABLES sflight.\n"
+    },
+    {
       name: "types",
       covers: ["types.json"],
       expectedTypes: ["TYPES"],
@@ -970,6 +997,10 @@ function testSupportedStatementSmokeMatrix() {
     }
   ];
 
+  const declarationCommentObjects = new Set([
+    "CLASS-DATA", "CLASS-METHODS", "CLASS", "CONSTANTS", "DATA", "FIELD-SYMBOLS", "FORM",
+    "METHOD", "METHODS", "PARAMETERS", "RANGES", "SELECT-OPTIONS", "STATICS", "TABLES", "TYPES"
+  ]);
   const coveredConfigFiles = new Set();
   for (const smokeCase of cases) {
     for (const configFile of smokeCase.covers) {
@@ -978,6 +1009,45 @@ function testSupportedStatementSmokeMatrix() {
     const result = parse(smokeCase.code);
     const objects = flattenObjects(result.objects);
     assertHasObjectTypes(objects, smokeCase.expectedTypes, smokeCase.name);
+
+    const statementComment = `Statement comment: ${smokeCase.name}`;
+    const commentedResult = parse(`" ${statementComment}\n${smokeCase.code}`);
+    const commentedObjects = flattenObjects(commentedResult.objects);
+    const owner = commentedObjects.find((object) => (
+      object.objectType === smokeCase.expectedTypes[0]
+      && object.comment === statementComment
+    ));
+    assert(owner, `${smokeCase.name}: expected the comment to stay on the parsed statement object.`);
+
+    const visitedCodeDescNodes = new WeakSet();
+    const assertCodeDescOwnership = (value, pathParts) => {
+      if (Array.isArray(value)) {
+        value.forEach((item, index) => assertCodeDescOwnership(item, [...pathParts, String(index)]));
+        return;
+      }
+      if (!value || typeof value !== "object") {
+        return;
+      }
+      if (visitedCodeDescNodes.has(value)) {
+        return;
+      }
+      visitedCodeDescNodes.add(value);
+      if (typeof value.codeDesc === "string") {
+        const isDeclaredName = declarationCommentObjects.has(owner.objectType)
+          && pathParts[0] === "values"
+          && pathParts[1] === "name";
+        assert.strictEqual(
+          value.codeDesc,
+          isDeclaredName ? statementComment : "",
+          `${smokeCase.name}: a statement comment must stay on the object or the declared name, not ${pathParts.join(".")}.`
+        );
+      }
+      for (const [key, nested] of Object.entries(value)) {
+        assertCodeDescOwnership(nested, [...pathParts, key]);
+      }
+    };
+    assertCodeDescOwnership(owner.values, ["values"]);
+    assertCodeDescOwnership(owner.extras, ["extras"]);
   }
 
   assert.deepStrictEqual(
@@ -985,6 +1055,51 @@ function testSupportedStatementSmokeMatrix() {
     getConfigFileNames(),
     "Smoke matrix must cover every parser config file."
   );
+}
+
+function testLoopCommentDoesNotBecomeIntoTargetDescription() {
+  const source = [
+    'DATA lt_rows TYPE STANDARD TABLE OF string. "Rows collection',
+    'DATA ls_row TYPE string. "Current row',
+    'LOOP AT lt_rows INTO ls_row. "Process each row',
+    "ENDLOOP."
+  ].join("\n");
+  const loop = findObject(flattenObjects(parse(source).objects), "LOOP_AT_ITAB");
+
+  assert(loop, "Expected LOOP_AT_ITAB to be recognized.");
+  assert.strictEqual(loop.comment, "Process each row");
+  assert.strictEqual(getValueEntry(loop.values, "itab").codeDesc || "", "");
+  assert.strictEqual(getValueEntry(loop.values, "into").codeDesc || "", "");
+}
+
+function testProjectGrammarCommentsStayOnTheirStatementObjects() {
+  const cases = [
+    { objectType: "ASSERT", statement: "ASSERT lv_ok = abap_true." },
+    { objectType: "CHECK", statement: "CHECK lv_ok = abap_true." },
+    { objectType: "WHILE", statement: "WHILE lv_ok = abap_true.\nENDWHILE." },
+    { objectType: "COMMIT_WORK", statement: "COMMIT WORK." },
+    { objectType: "CREATE_OBJECT", statement: "CREATE OBJECT lo_demo." },
+    { objectType: "READ_DATASET", statement: "READ DATASET lv_file INTO lv_line." },
+    { objectType: "MODULE", statement: "MODULE main INPUT.\nENDMODULE." }
+  ];
+
+  for (const testCase of cases) {
+    const statementComment = `Comment for ${testCase.objectType}`;
+    const firstPeriod = testCase.statement.indexOf(".");
+    const commentedSource = firstPeriod < 0
+      ? `${testCase.statement} "${statementComment}`
+      : `${testCase.statement.slice(0, firstPeriod + 1)} "${statementComment}\n${testCase.statement.slice(firstPeriod + 1).trimStart()}`;
+    const object = findObject(flattenObjects(parse(commentedSource).objects), testCase.objectType);
+
+    assert(object, `Expected generic grammar to recognize ${testCase.objectType}.`);
+    assert.strictEqual(object.comment, statementComment);
+    for (const entryOrList of Object.values(object.values || {})) {
+      const entries = Array.isArray(entryOrList) ? entryOrList : [entryOrList];
+      for (const entry of entries) {
+        assert.strictEqual(entry.codeDesc || "", "", `${testCase.objectType}: comment must not describe captured operand ${entry.name}.`);
+      }
+    }
+  }
 }
 
 function assertWhereClean(select, label) {
@@ -1225,6 +1340,10 @@ defineFocusedTest(test, "parser statements regression", ["statements"], async (t
     testChainedConstantsKeepItemCommentsWithoutHeaderLeak();
   });
 
+  await t.test("chained TABLES comments describe each work area", () => {
+    testChainedTablesCommentsDescribeEachWorkArea();
+  });
+
   await t.test("chained constants use single internal comment for next item", () => {
     testChainedConstantsUseSingleInternalCommentForNextItem();
   });
@@ -1343,5 +1462,13 @@ defineFocusedTest(test, "parser statements regression", ["statements"], async (t
 
   await t.test("supported statement smoke matrix", () => {
     testSupportedStatementSmokeMatrix();
+  });
+
+  await t.test("loop statement comments do not describe INTO targets", () => {
+    testLoopCommentDoesNotBecomeIntoTargetDescription();
+  });
+
+  await t.test("project grammar comments stay on generic statement objects", () => {
+    testProjectGrammarCommentsStayOnTheirStatementObjects();
   });
 });

@@ -2811,6 +2811,24 @@
       ]
     },
     {
+      "_sourceFile": "tables.json",
+      "object": "TABLES",
+      "match": {
+        "startKeyword": "TABLES"
+      },
+      "keywordLabels": {
+        "TABLES": "stmt"
+      },
+      "captureRules": [
+        {
+          "after": "TABLES",
+          "name": "name",
+          "label": "work-area",
+          "descKey": "name"
+        }
+      ]
+    },
+    {
       "_sourceFile": "try.json",
       "object": "TRY",
       "match": {

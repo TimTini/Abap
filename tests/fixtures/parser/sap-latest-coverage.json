@@ -62,6 +62,16 @@
       "status": "documented-form"
     },
     {
+      "id": "tables-work-area",
+      "configFiles": ["tables.json"],
+      "expectedType": "TABLES",
+      "source": "TABLES sflight. \"Flight work area description",
+      "assertions": {"values.name.value": "sflight", "values.name.codeDesc": "Flight work area description"},
+      "sapUrl": "https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABENTABLES.html",
+      "dialect": "Standard ABAP, obsolete",
+      "status": "documented-form"
+    },
+    {
       "id": "field-symbols-type-line-of",
       "configFiles": ["field-symbols.json"],
       "expectedType": "FIELD-SYMBOLS",

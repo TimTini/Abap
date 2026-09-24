@@ -121,7 +121,7 @@ test("WHILE is represented as a block and the detailed AST groups ELSE branches"
 
 test("grammar families classify repository statement forms and separate SQL from internal-table DML", () => {
   const source = [
-    "REPORT z_demo.", "INITIALIZATION.", "ASSERT lv_ok = abap_true.", "RETURN.",
+    "REPORT z_demo.", "TABLES sflight.", "INITIALIZATION.", "ASSERT lv_ok = abap_true.", "RETURN.",
     "ASSIGN COMPONENT lv_name OF STRUCTURE ls_row TO <lv_value>.", "UNASSIGN <lv_value>.",
     "CREATE DATA lr_data TYPE i.", "GET REFERENCE OF lv_value INTO lr_data.", "FREE lr_data.",
     "CONCATENATE lv_a lv_b INTO lv_text.", "SPLIT lv_text AT ',' INTO lv_a lv_b.",
@@ -140,6 +140,9 @@ test("grammar families classify repository statement forms and separate SQL from
     "INSERT_ITAB", "MODIFY_SQL", "MODIFY_ITAB"]) {
     assert.ok(types.includes(expected), `expected ${expected}; received ${types.join(", ")}`);
   }
+  const tables = result.ast.children.find((node) => node.kind === "Tables");
+  assert.ok(tables, "expected TABLES to have a structured AST node");
+  assert.equal(tables.family, "declarations");
 });
 
 test("syntactically ambiguous MODIFY without a table key or SQL host marker stays neutral", () => {
