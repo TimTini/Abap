@@ -6035,12 +6035,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
 
 
 
-  function openViewerConfigExportModal() {
-    const modal = openTemplateDynamicModal("Export Viewer Config", { contentClass: "template-runtime-modal-content" });
-    const error = document.createElement("div");
-    error.className = "template-error";
-    modal.body.appendChild(error);
-
+  function appendViewerConfigSectionPicker(container, sections) {
     const selectAllLabel = document.createElement("label");
     selectAllLabel.className = "toggle";
     const selectAllInput = document.createElement("input");
@@ -6049,12 +6044,12 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     selectAllInput.setAttribute("data-config-select-all", "true");
     selectAllLabel.appendChild(selectAllInput);
     selectAllLabel.appendChild(document.createTextNode("Select all"));
-    modal.body.appendChild(selectAllLabel);
+    container.appendChild(selectAllLabel);
 
     const sectionInputs = [];
     const sectionList = document.createElement("div");
     sectionList.className = "controls";
-    for (const section of VIEWER_CONFIG_SECTION_DEFS_V1) {
+    for (const section of sections) {
       const label = document.createElement("label");
       label.className = "toggle";
       const input = document.createElement("input");
@@ -6067,7 +6062,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       sectionList.appendChild(label);
       sectionInputs.push(input);
     }
-    modal.body.appendChild(sectionList);
+    container.appendChild(sectionList);
 
     const syncSelectAll = () => {
       selectAllInput.checked = sectionInputs.every((input) => input.checked);
@@ -6082,6 +6077,18 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     for (const input of sectionInputs) {
       input.addEventListener("change", syncSelectAll);
     }
+    return sectionInputs;
+  }
+
+
+
+  function openViewerConfigExportModal() {
+    const modal = openTemplateDynamicModal("Export Viewer Config", { contentClass: "template-runtime-modal-content" });
+    const error = document.createElement("div");
+    error.className = "template-error";
+    modal.body.appendChild(error);
+
+    const sectionInputs = appendViewerConfigSectionPicker(modal.body, VIEWER_CONFIG_SECTION_DEFS_V1);
 
     const exportButton = document.createElement("button");
     exportButton.type = "button";
@@ -6400,6 +6407,42 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
 
 
 
+  function applyViewerConfigImport(validation, sections) {
+    let storageSnapshot = null;
+    let stateSnapshot = null;
+    try {
+      storageSnapshot = getViewerConfigStorageSnapshot();
+      stateSnapshot = getViewerConfigStateSnapshot();
+      writePreparedViewerConfigSections(validation.prepared, sections);
+      applyPreparedViewerConfigSections(validation.prepared, sections);
+    } catch (err) {
+      let rollbackError = "";
+      try {
+        if (storageSnapshot) {
+          restoreViewerConfigStorageSnapshot(storageSnapshot);
+        }
+        if (stateSnapshot) {
+          restoreViewerConfigStateSnapshot(stateSnapshot);
+        }
+      } catch (restoreErr) {
+        rollbackError = ` Rollback also failed: ${restoreErr && restoreErr.message ? restoreErr.message : restoreErr}`;
+      }
+      const message = `Import failed and was rolled back: ${err && err.message ? err.message : err}.${rollbackError}`;
+      setTemplateConfigError(message);
+      return { applied: false, error: message };
+    }
+
+    if (validation.unknownSections.length) {
+      setTemplateConfigError(`Import warning: ignored unknown sections: ${validation.unknownSections.join(", ")}.`);
+    } else {
+      setTemplateConfigError("");
+    }
+    setError("");
+    return { applied: true, error: "" };
+  }
+
+
+
   function importViewerConfigObject(value) {
     const validation = validateAndPrepareViewerConfigBundle(value);
     if (!validation.valid) {
@@ -6415,37 +6458,43 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       return false;
     }
 
-    let storageSnapshot = null;
-    let stateSnapshot = null;
-    try {
-      storageSnapshot = getViewerConfigStorageSnapshot();
-      stateSnapshot = getViewerConfigStateSnapshot();
-      writePreparedViewerConfigSections(validation.prepared, validation.knownSections);
-      applyPreparedViewerConfigSections(validation.prepared, validation.knownSections);
-    } catch (err) {
-      let rollbackError = "";
-      try {
-        if (storageSnapshot) {
-          restoreViewerConfigStorageSnapshot(storageSnapshot);
-        }
-        if (stateSnapshot) {
-          restoreViewerConfigStateSnapshot(stateSnapshot);
-        }
-      } catch (restoreErr) {
-        rollbackError = ` Rollback also failed: ${restoreErr && restoreErr.message ? restoreErr.message : restoreErr}`;
-      }
-      setTemplateConfigError(
-        `Import failed and was rolled back: ${err && err.message ? err.message : err}.${rollbackError}`
-      );
+    return applyViewerConfigImport(validation, validation.knownSections).applied;
+  }
+
+
+
+  function openViewerConfigImportModal(value) {
+    const validation = validateAndPrepareViewerConfigBundle(value);
+    if (!validation.valid) {
+      setTemplateConfigError(`Import failed: ${validation.errors.join("\n")}`);
       return false;
     }
 
-    if (validation.unknownSections.length) {
-      setTemplateConfigError(`Import warning: ignored unknown sections: ${validation.unknownSections.join(", ")}.`);
-    } else {
-      setTemplateConfigError("");
-    }
-    setError("");
+    const modal = openTemplateDynamicModal("Import Viewer Config", { contentClass: "template-runtime-modal-content" });
+    const error = document.createElement("div");
+    error.className = "template-error";
+    modal.body.appendChild(error);
+    const sectionInputs = appendViewerConfigSectionPicker(modal.body, validation.knownSections);
+
+    const importButton = document.createElement("button");
+    importButton.type = "button";
+    importButton.className = "secondary";
+    importButton.textContent = "Import selected";
+    importButton.addEventListener("click", () => {
+      const selectedKeys = new Set(sectionInputs.filter((input) => input.checked).map((input) => input.value));
+      if (!selectedKeys.size) {
+        error.textContent = "Select at least one config section.";
+        return;
+      }
+      const selectedSections = validation.knownSections.filter((section) => selectedKeys.has(section.key));
+      const result = applyViewerConfigImport(validation, selectedSections);
+      if (!result.applied) {
+        error.textContent = result.error;
+        return;
+      }
+      closeTemplateDynamicModal();
+    });
+    modal.actions.prepend(importButton);
     return true;
   }
 
@@ -6484,7 +6533,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         }
         return;
       }
-      importViewerConfigObject(parsed);
+      openViewerConfigImportModal(parsed);
     } catch (err) {
       setTemplateConfigError(`Import JSON parse error: ${err && err.message ? err.message : err}`);
     }

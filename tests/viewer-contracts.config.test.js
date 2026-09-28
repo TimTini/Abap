@@ -169,11 +169,6 @@ async function assertGroupedConfigRoundTripsStateStorageAndDom() {
   window.AbapViewerRuntime.services.runtimeState.applyTheme("dark");
   window.AbapViewerRuntime.services.runtimeState.applyLayoutSplit(35);
 
-  let confirmationText = "";
-  window.confirm = (message) => {
-    confirmationText = String(message || "");
-    return true;
-  };
   const groupedConfigFile = {
     name: "abap-viewer-config.json",
     async text() {
@@ -187,9 +182,19 @@ async function assertGroupedConfigRoundTripsStateStorageAndDom() {
   els.templateImportInput.dispatchEvent(new window.Event("change", { bubbles: true }));
   await waitForViewerUi(window);
   await waitForViewerUi(window);
+  const importModal = Array.from(window.document.querySelectorAll(".modal"))
+    .find((modal) => !modal.hidden && String(modal.textContent || "").includes("Import Viewer Config"));
+  assert(importModal, "Expected Import config to open a section-selection modal.");
   for (const label of ["Templates", "Description settings", "Description overrides", "Appearance", "Template UI"]) {
-    assert(confirmationText.includes(label), `Expected import confirmation to list ${label}.`);
+    assert(String(importModal.textContent || "").includes(label), `Expected import modal section ${label}.`);
   }
+  const selectAll = importModal.querySelector('input[data-config-select-all="true"]');
+  assert(selectAll && selectAll.checked, "Expected Select all to default to checked for import.");
+  const importButton = Array.from(importModal.querySelectorAll("button"))
+    .find((button) => String(button.textContent || "").trim() === "Import selected");
+  assert(importButton, "Expected import modal to expose Import selected.");
+  importButton.click();
+  await waitForViewerUi(window);
 
   assert.strictEqual(state.templateConfig.templates.DEFAULT.Z97.text, "ROUNDTRIP_TEMPLATE");
   assert.strictEqual(state.settings.normalizeDeclDesc, false);
@@ -259,6 +264,111 @@ async function assertGroupedConfigRoundTripsStateStorageAndDom() {
   assert.deepStrictEqual(cloneTestJson(state.descOverrides), preservedOverrides);
   assert.strictEqual(state.theme, "light");
   assert.strictEqual(state.layoutLeftPane, 58);
+
+  dom.window.close();
+}
+
+async function assertGroupedConfigImportAppliesOnlySelectedSections() {
+  const dom = await renderFixture("DATA lv_selective_import TYPE string.\nlv_selective_import = 'A'.");
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { api, els, state } = runtime;
+  const runtimeState = window.AbapViewerRuntime.services.runtimeState;
+
+  state.templateConfig.templates.DEFAULT["Z96"] = { text: "IMPORTED_TEMPLATE" };
+  state.settings = {
+    normalizeDeclDesc: false,
+    declFilterTypes: ["DATA"],
+    structDescTemplate: "IMPORTED_SETTINGS",
+    nameTemplatesByCode: cloneTestJson(state.settings.nameTemplatesByCode)
+  };
+  state.descOverrides = { "imported-key": { text: "Imported override", noNormalize: true } };
+  runtimeState.applyTheme("light");
+  runtimeState.applyLayoutSplit(58);
+  state.templateGuiHiddenTypes = new window.Set(["IF"]);
+  window.localStorage.setItem(VIEWER_CONFIG_STORAGE_KEYS.formEditorPct, "66");
+  const imported = api.buildViewerConfigBundle(VIEWER_CONFIG_SECTION_KEYS, "2026-07-15T07:08:09.000Z");
+
+  state.templateConfig.templates.DEFAULT["Z96"] = { text: "PRESERVED_TEMPLATE" };
+  state.settings = {
+    normalizeDeclDesc: true,
+    declFilterTypes: ["TYPES"],
+    structDescTemplate: "PRESERVED_SETTINGS",
+    nameTemplatesByCode: cloneTestJson(state.settings.nameTemplatesByCode)
+  };
+  state.descOverrides = { "preserved-key": { text: "Preserved override", noNormalize: true } };
+  runtimeState.applyTheme("dark");
+  runtimeState.applyLayoutSplit(42);
+  state.templateGuiHiddenTypes = new window.Set(["DATA"]);
+  window.localStorage.setItem(VIEWER_CONFIG_STORAGE_KEYS.formEditorPct, "35");
+  const preservedStorage = {
+    templates: JSON.stringify(state.templateConfig),
+    descriptionSettings: JSON.stringify(state.settings),
+    descriptionOverrides: JSON.stringify(state.descOverrides),
+    hiddenObjectTypes: JSON.stringify(["DATA"])
+  };
+  window.localStorage.setItem(VIEWER_CONFIG_STORAGE_KEYS.templates, preservedStorage.templates);
+  window.localStorage.setItem(VIEWER_CONFIG_STORAGE_KEYS.descriptionSettings, preservedStorage.descriptionSettings);
+  window.localStorage.setItem(VIEWER_CONFIG_STORAGE_KEYS.descriptionOverrides, preservedStorage.descriptionOverrides);
+  window.localStorage.setItem(VIEWER_CONFIG_STORAGE_KEYS.hiddenObjectTypes, preservedStorage.hiddenObjectTypes);
+
+  const groupedConfigFile = {
+    name: "abap-viewer-config.json",
+    async text() {
+      return JSON.stringify(imported);
+    }
+  };
+  Object.defineProperty(els.templateImportInput, "files", {
+    configurable: true,
+    value: [groupedConfigFile]
+  });
+  els.templateImportInput.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await waitForViewerUi(window);
+  await waitForViewerUi(window);
+
+  const importModal = Array.from(window.document.querySelectorAll(".modal"))
+    .find((modal) => !modal.hidden && String(modal.textContent || "").includes("Import Viewer Config"));
+  assert(importModal, "Expected grouped import to open a section-selection modal.");
+  for (const label of ["Templates", "Description settings", "Description overrides", "Appearance", "Template UI"]) {
+    assert(String(importModal.textContent || "").includes(label), `Expected import modal section ${label}.`);
+  }
+
+  const sectionInputs = Array.from(importModal.querySelectorAll('input[data-config-section]'));
+  assert.strictEqual(sectionInputs.length, VIEWER_CONFIG_SECTION_KEYS.length);
+  const selectAll = importModal.querySelector('input[data-config-select-all="true"]');
+  assert(selectAll && selectAll.checked, "Expected grouped import to default to all sections selected.");
+  for (const input of sectionInputs) {
+    input.checked = input.value === "appearance";
+    input.dispatchEvent(new window.Event("change", { bubbles: true }));
+  }
+  assert.strictEqual(selectAll.checked, false, "Expected selecting one section to clear Select all.");
+
+  const importButton = Array.from(importModal.querySelectorAll("button"))
+    .find((button) => String(button.textContent || "").trim() === "Import selected");
+  assert(importButton, "Expected grouped import modal to expose Import selected.");
+  importButton.click();
+  await waitForViewerUi(window);
+
+  assert.strictEqual(state.templateConfig.templates.DEFAULT.Z96.text, "PRESERVED_TEMPLATE");
+  assert.strictEqual(state.settings.normalizeDeclDesc, true);
+  assert.deepStrictEqual(Array.from(state.settings.declFilterTypes), ["TYPES"]);
+  assert.strictEqual(state.settings.structDescTemplate, "PRESERVED_SETTINGS");
+  assert.deepStrictEqual(cloneTestJson(state.descOverrides), {
+    "preserved-key": { text: "Preserved override", noNormalize: true }
+  });
+  assert.deepStrictEqual(Array.from(state.templateGuiHiddenTypes.values()), ["DATA"]);
+  assert.strictEqual(window.localStorage.getItem(VIEWER_CONFIG_STORAGE_KEYS.formEditorPct), "35");
+  assert.strictEqual(window.localStorage.getItem(VIEWER_CONFIG_STORAGE_KEYS.templates), preservedStorage.templates);
+  assert.strictEqual(window.localStorage.getItem(VIEWER_CONFIG_STORAGE_KEYS.descriptionSettings), preservedStorage.descriptionSettings);
+  assert.strictEqual(window.localStorage.getItem(VIEWER_CONFIG_STORAGE_KEYS.descriptionOverrides), preservedStorage.descriptionOverrides);
+  assert.strictEqual(window.localStorage.getItem(VIEWER_CONFIG_STORAGE_KEYS.hiddenObjectTypes), preservedStorage.hiddenObjectTypes);
+
+  assert.strictEqual(state.theme, "light");
+  assert.strictEqual(state.layoutLeftPane, 58);
+  assert.strictEqual(window.document.documentElement.getAttribute("data-theme"), "light");
+  assert.strictEqual(window.document.documentElement.style.getPropertyValue("--layout-left-pane"), "58%");
+  assert.strictEqual(window.localStorage.getItem(VIEWER_CONFIG_STORAGE_KEYS.theme), "light");
+  assert.strictEqual(window.localStorage.getItem(VIEWER_CONFIG_STORAGE_KEYS.layout), "58");
 
   dom.window.close();
 }
@@ -769,6 +879,10 @@ assertViewerFixtureDirectoriesStayInSync();
 
   await t.test("grouped config round trips state storage and dom", async () => {
     await assertGroupedConfigRoundTripsStateStorageAndDom();
+  });
+
+  await t.test("grouped config import applies only selected sections", async () => {
+    await assertGroupedConfigImportAppliesOnlySelectedSections();
   });
 
   await t.test("grouped config import validates and rolls back", async () => {
