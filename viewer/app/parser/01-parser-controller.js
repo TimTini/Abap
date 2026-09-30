@@ -16,6 +16,7 @@
   const normalizeParsedJson = runtime.requireServiceMethod("output", "normalizeParsedJson");
   const rebuildInputGutter = runtime.requireServiceMethod("output", "rebuildInputGutter");
   const renderDeclDescPanelUi = runtime.requireServiceMethod("descriptions", "renderDeclDescPanelUi");
+  const replaceIdentifiersOutsideLiterals = runtime.requireServiceMethod("descriptions", "replaceIdentifiersOutsideLiterals");
   const migrateScopedDescriptionOverrides = runtime.requireServiceMethod("descriptions", "migrateScopedDescriptionOverrides");
   const rebuildConstantInitializerIndex = runtime.requireServiceMethod("descriptions", "rebuildConstantInitializerIndex");
   const saveDescOverrides = runtime.requireServiceMethod("runtimeState", "saveDescOverrides");
@@ -60,12 +61,18 @@
       return null;
     }
 
-    const match = text.match(/(^|[^A-Za-z0-9_<>])([A-Za-z_][A-Za-z0-9_]*-[A-Za-z_][A-Za-z0-9_]*(?:-[A-Za-z_][A-Za-z0-9_]*)*)/);
-    if (!match || !match[2]) {
+    const matches = text.matchAll(/(^|[^A-Za-z0-9_<>])((?:<[^<>]+>|[A-Za-z_][A-Za-z0-9_]*)-[A-Za-z_][A-Za-z0-9_]*(?:-[A-Za-z_][A-Za-z0-9_]*)*)/g);
+    let fullRef = "";
+    for (const match of matches) {
+      const candidate = String(match[2] || "").trim();
+      if (candidate && replaceIdentifiersOutsideLiterals(text, { [candidate.toUpperCase()]: "" }) !== text) {
+        fullRef = candidate;
+        break;
+      }
+    }
+    if (!fullRef) {
       return null;
     }
-
-    const fullRef = String(match[2] || "").trim();
     const dash = fullRef.indexOf("-");
     if (dash <= 0 || dash >= fullRef.length - 1) {
       return null;
@@ -78,8 +85,8 @@
     }
 
     const structUpper = normalizeDeclKeyTokenForSynthetic(structName);
-    // Skip ABAP system fields (SY-*) and field symbols (<fs>-*) in this synthetic flow.
-    if (structUpper === "SY" || structName.startsWith("<")) {
+    // System fields are not structure declarations in the Viewer catalog.
+    if (structUpper === "SY") {
       return null;
     }
 
@@ -208,7 +215,11 @@
     const candidates = index.byNameUpper.get(candidate.structUpper) || [];
     const usableCandidates = candidates.filter((decl) => {
       const objectType = normalizeDeclKeyTokenForSynthetic(decl && decl.objectType);
-      return objectType !== "STRUCT_FIELD" && objectType !== "PATH_DECL" && objectType !== "SYSTEM";
+      const scopeId = Number(decl && decl.scopeId) || 0;
+      return objectType !== "STRUCT_FIELD"
+        && objectType !== "PATH_DECL"
+        && objectType !== "SYSTEM"
+        && (!scopeId || (context && context.scopeIds instanceof Set && context.scopeIds.has(scopeId)));
     });
     if (!usableCandidates.length) {
       return null;
@@ -459,6 +470,23 @@
 
     const index = buildSyntheticDeclIndex(data);
     const createdDecls = [];
+    const objectsById = new Map();
+    walkObjects(data.objects, (obj) => {
+      if (obj && obj.id) {
+        objectsById.set(obj.id, obj);
+      }
+    });
+    const collectScopeIds = (obj) => {
+      const scopeIds = new Set([0]);
+      let current = obj;
+      while (current) {
+        if (["FORM", "METHOD", "CLASS"].includes(String(current.objectType || "").toUpperCase()) && current.id) {
+          scopeIds.add(Number(current.id));
+        }
+        current = current.parent ? objectsById.get(current.parent) : null;
+      }
+      return scopeIds;
+    };
 
     const processAssignSections = (container, sections, context) => {
       for (const sectionName of sections) {
@@ -504,7 +532,8 @@
         const context = {
           file: String(obj.file || ""),
           lineStart: Number(obj.lineStart || 0) || 0,
-          scopeHints: collectScopeHintsFromObjectForSynthetic(obj)
+          scopeHints: collectScopeHintsFromObjectForSynthetic(obj),
+          scopeIds: collectScopeIds(obj)
         };
 
         const values = obj.values && typeof obj.values === "object" ? obj.values : null;

@@ -1642,6 +1642,16 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     );
   }
 
+  function extractInlineFieldSymbolName(text) {
+    const match = String(text || "").trim().match(/^FIELD-SYMBOL\s*\(\s*([^()]*)\s*\)\s*$/i);
+    if (!match) {
+      return null;
+    }
+
+    const candidate = String(match[1] || "").trim();
+    return /^<[^<>]+>$/.test(candidate) ? candidate : "";
+  }
+
   function extractIdentifierCandidate(text) {
     let raw = String(text || "").trim();
     if (!raw) {
@@ -1667,11 +1677,17 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       return sysMatch[0].toUpperCase();
     }
 
+    // An inline field symbol name must include ABAP's angle brackets. Do not
+    // mistake the FIELD-SYMBOL keyword for a hyphenated field path otherwise.
+    const inlineFieldSymbolName = extractInlineFieldSymbolName(raw);
+    if (inlineFieldSymbolName !== null) {
+      return inlineFieldSymbolName;
+    }
+
     // Inline decls before field-path: FIELD-SYMBOL(<fs>) looks like path FIELD-SYMBOL.
     const inlinePatterns = [
       /@?DATA\s*\(\s*([^)]+)\s*\)/i,
-      /@?FINAL\s*\(\s*([^)]+)\s*\)/i,
-      /FIELD-SYMBOL\s*\(\s*(<[^>]+>)\s*\)/i
+      /@?FINAL\s*\(\s*([^)]+)\s*\)/i
     ];
     for (const regex of inlinePatterns) {
       const match = regex.exec(raw);
@@ -1702,12 +1718,17 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       return "";
     }
 
+    const valueText = String(entry.value || "").trim();
+    const inlineFieldSymbolName = extractInlineFieldSymbolName(valueText);
+    if (inlineFieldSymbolName !== null) {
+      return inlineFieldSymbolName;
+    }
+
     const fromDeclRef = String(entry.declRef || "").trim();
     if (fromDeclRef) {
       return fromDeclRef;
     }
 
-    const valueText = String(entry.value || "").trim();
     const identifier = extractIdentifierCandidate(valueText);
     if (identifier) {
       return identifier;
@@ -2096,6 +2117,26 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     register(value.decl && value.decl.name);
     register(extractIdentifierCandidate(rawValueText));
 
+    const decl = value.decl;
+    const structName = decl.synthetic && String(decl.objectType || "").toUpperCase() === "STRUCT_FIELD"
+      ? String(decl.structName || "")
+      : "";
+    if (structName) {
+      const prefix = `${structName.toUpperCase()}-`;
+      for (const match of rawValueText.matchAll(VALUE_LEVEL_IDENTIFIER_REGEX)) {
+        const identifier = match[0];
+        if (!identifier.toUpperCase().startsWith(prefix)) {
+          continue;
+        }
+        const fieldPath = identifier.slice(structName.length + 1);
+        if (!/^[A-Za-z_][A-Za-z0-9_]*(?:-[A-Za-z_][A-Za-z0-9_]*)*$/.test(fieldPath)) {
+          continue;
+        }
+        const fieldDecl = { ...decl, name: identifier, fieldPath, comment: "" };
+        map[normalizeValueIdentifierKey(identifier)] = String(getFinalDeclDesc(fieldDecl) || identifier).trim();
+      }
+    }
+
     return Object.keys(map).length ? map : null;
   }
 
@@ -2118,31 +2159,66 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       return token;
     });
 
+    const replaceTemplateExpressions = (template) => {
+      let result = "";
+      let start = 0;
+      for (let index = 0; index < template.length; index += 1) {
+        if (template[index] === "\\") {
+          index += 1;
+          continue;
+        }
+        if (template[index] !== "{") {
+          continue;
+        }
+        let end = index + 1;
+        while (end < template.length && template[end] !== "}") {
+          if (template[end] === "\\") {
+            end += 1;
+          }
+          end += 1;
+        }
+        if (end >= template.length) {
+          break;
+        }
+        result += template.slice(start, index + 1);
+        result += replaceIdentifiersOutsideLiterals(template.slice(index + 1, end), replacementMap);
+        result += "}";
+        start = end + 1;
+        index = end;
+      }
+      return result + template.slice(start);
+    };
+
     while (i < length) {
       const ch = text[i];
 
-      if (ch === "'" || ch === "|") {
+      if (ch === "'" || ch === "`" || ch === "|") {
         const quote = ch;
         const start = i;
         i += 1;
         while (i < length) {
+          if (quote === "|" && text[i] === "\\" && i + 1 < length) {
+            i += 2;
+            continue;
+          }
           if (text[i] !== quote) {
             i += 1;
             continue;
           }
-          if (quote === "'" && i + 1 < length && text[i + 1] === "'") {
+          if ((quote === "'" || quote === "`") && i + 1 < length && text[i + 1] === quote) {
             i += 2;
             continue;
           }
           i += 1;
           break;
         }
-        out += text.slice(start, i);
+        const literal = text.slice(start, i);
+        out += quote === "|" ? replaceTemplateExpressions(literal) : literal;
         continue;
       }
 
       const start = i;
-      while (i < length && text[i] !== "'" && text[i] !== "|") {
+      while (i < length && text[i] !== "'" && text[i] !== "`" && text[i] !== "|") {
         i += 1;
       }
       out += replaceSegment(text.slice(start, i));
@@ -2216,6 +2292,7 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     ensureConditionClauseDeclsWithSynthetic,
     isDeclLikeObject,
     hasValueLevelDescFields,
+    replaceIdentifiersOutsideLiterals,
     resolveValueLevelFinalDesc
   });
 })(window);

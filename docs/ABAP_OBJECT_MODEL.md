@@ -28,7 +28,8 @@ Capture the current parser/viewer contract and the canonical paths used by templ
 - Declaration binding enriches `values.*.declRef`, `values.*.decl`, `extras.*` argument items with `valueDecl` and `originDecls`, and condition operands with `leftOperandDecl` / `rightOperandDecl`.
 - Unary `IS` predicates keep a synthetic right-side `SYSTEM` decl so the right operand stays visible in the model.
 - `values.condition` stays backward-compatible as a single string plus first identifier decl binding; detailed condition parsing lives in `extras.*.conditions`.
-- `finalDesc` is value-aware for value entries; use `values.<name>.finalDesc` when the template needs the resolved value text.
+- In Viewer Template cells, use `values.<name>.decl.finalDesc` (or the corresponding `extras.*.decl.finalDesc`) for an operand known to reference declared data. Use `values.<name>.finalDesc` when the cell must retain the resolved value text, including literals, unresolved identifiers, operators, and other expression parts.
+- These `finalDesc` paths describe Viewer Template resolver behavior. `finalDesc` is not a stored parser JSON field, and `decl` does not guarantee a root/application declaration; value-entry paths can resolve through their expression-aware value description.
 - For traced `PERFORM` params, use `originDecls[]` and the selected FORM source chain instead of assuming `decl` always points at the local `FORM_PARAM`.
 
 ## FORM source-chain behavior

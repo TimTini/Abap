@@ -7,6 +7,7 @@ const {
   assertViewerFixtureDirectoriesStayInSync,
   cloneTestJson,
   findVisibleConfigExportModal,
+  getDeclOverrideStorageKeyFromRuntime,
   getTemplateTableRows,
   renderFixture,
   STATEMENT_TEMPLATE_KEYS,
@@ -608,14 +609,14 @@ async function assertStatementSpecificTwentyCellTemplates() {
   const appendLinesOf = state.templateConfig.templates.APPEND_LINES_OF;
   assert(appendLinesOf, "Expected a dedicated APPEND_LINES_OF template config.");
   assert.strictEqual(appendLinesOf.A1.text, "APPEND LINES OF");
-  assert.strictEqual(appendLinesOf.U1.text, "{extras.append.source.finalDesc}");
+  assert.strictEqual(appendLinesOf.U1.text, "{extras.append.source.decl.finalDesc}");
   assert.strictEqual(appendLinesOf.A6.text, "TO");
-  assert.strictEqual(appendLinesOf.U6.text, "{extras.append.target.finalDesc}");
+  assert.strictEqual(appendLinesOf.U6.text, "{extras.append.target.decl.finalDesc}");
 
   const assignment = state.templateConfig.templates.ASSIGNMENT;
   assert.strictEqual(assignment.A1.text, "Đích");
   assert.strictEqual(assignment.U1.text, "Nguồn");
-  assert.strictEqual(assignment.A2.text, "{values.target.finalDesc}");
+  assert.strictEqual(assignment.A2.text, "{values.target.decl.finalDesc}");
   assert.strictEqual(assignment.U2.text, "{values.expr.finalDesc}");
   for (const rangeKey of ["A1:T1", "U1:AN1", "A2:T2", "U2:AN2"]) {
     assert(assignment[rangeKey], `Expected ASSIGNMENT range ${rangeKey}.`);
@@ -870,6 +871,125 @@ async function assertLoopStatementCommentStaysAtObjectLevel() {
   dom.window.close();
 }
 
+async function assertDataOperandDefaultsUseDeclarationDescriptions() {
+  const source = [
+    "DATA lv_target TYPE string.",
+    "DATA gt_source TYPE STANDARD TABLE OF string.",
+    "DATA gt_target TYPE STANDARD TABLE OF string.",
+    "lv_target = 'literal source'.",
+    "lv_missing = 'unresolved source'.",
+    "APPEND LINES OF gt_source FROM 1 TO 2 TO gt_target."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
+  const declarations = Array.isArray(state.data && state.data.decls) ? state.data.decls : [];
+  const setDescription = (name, description) => {
+    const decl = declarations.find((item) => String(item && item.name || "").toLowerCase() === name.toLowerCase());
+    assert(decl, `Expected declaration ${name}.`);
+    const key = getDeclOverrideStorageKeyFromRuntime(window, decl);
+    assert(key, `Expected a description key for ${name}.`);
+    state.descOverrides[key] = description;
+  };
+  setDescription("lv_target", "Target description");
+  setDescription("gt_source", "Source table description");
+  setDescription("gt_target", "Target table description");
+
+  const appendLinesOf = state.templateConfig.templates.APPEND_LINES_OF;
+  const assignment = state.templateConfig.templates.ASSIGNMENT;
+  assert.strictEqual(assignment.A2.text, "{values.target.decl.finalDesc}");
+  assert.strictEqual(assignment.U2.text, "{values.expr.finalDesc}");
+  assert.strictEqual(appendLinesOf.U1.text, "{extras.append.source.decl.finalDesc}");
+  assert.strictEqual(appendLinesOf.U2.text, "{extras.append.range.from.finalDesc}");
+  assert.strictEqual(appendLinesOf.U3.text, "{extras.append.range.to.finalDesc}");
+  assert.strictEqual(appendLinesOf.U4.text, "{extras.append.range.step.finalDesc}");
+  assert.strictEqual(appendLinesOf.U5.text, "{extras.append.range.usingKey.value}");
+  assert.strictEqual(appendLinesOf.U6.text, "{extras.append.target.decl.finalDesc}");
+
+  runtime.api.renderTemplatePreview();
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const assignmentTables = Array.from(els.templatePreviewOutput.querySelectorAll(
+    '.template-preview-table[data-object-type="ASSIGNMENT"]'
+  ));
+  assert.strictEqual(assignmentTables.length, 2, "Expected bound and unresolved assignment blocks.");
+  assert.deepStrictEqual(getTemplateTableRows(assignmentTables[0]), [
+    ["Đích", "Nguồn"],
+    ["Target description", "'literal source'"]
+  ]);
+  assert(
+    getTemplateTableRows(assignmentTables[1]).flat().join(" ").toLowerCase().includes("lv_missing"),
+    "Expected an unresolved assignment target to retain its technical identifier."
+  );
+
+  const appendTable = els.templatePreviewOutput.querySelector(
+    '.template-preview-table[data-object-type="APPEND"][data-template-key="APPEND_LINES_OF"]'
+  );
+  assert.deepStrictEqual(getTemplateTableRows(appendTable), [
+    ["APPEND LINES OF", "Source table description"],
+    ["FROM", "1"],
+    ["TO", "2"],
+    ["TO", "Target table description"]
+  ]);
+
+  dom.window.close();
+}
+
+async function assertInlineFieldSymbolPathDoesNotInventKeywordDecl() {
+  const malformedDom = await renderFixture([
+    "DATA gt_items TYPE STANDARD TABLE OF i.",
+    "LOOP AT gt_items ASSIGNING FIELD-SYMBOL(ls_item).",
+    "ENDLOOP."
+  ].join("\n"));
+  const malformedWindow = malformedDom.window;
+  const malformedBlock = Array.from(malformedWindow.AbapViewerRuntime.els.templatePreviewOutput.querySelectorAll(".template-block"))
+    .find((block) => block.textContent.includes("LOOP_AT_ITAB"));
+  assert(malformedBlock, "Expected the malformed LOOP statement to render.");
+  malformedBlock.querySelector('[data-template-action="paths"]').click();
+  const malformedModal = Array.from(malformedWindow.document.querySelectorAll(".modal"))
+    .find((modal) => modal.textContent.includes("Template Paths"));
+  const malformedDump = malformedModal && malformedModal.querySelector("pre")
+    ? malformedModal.querySelector("pre").textContent
+    : "";
+  assert(
+    !malformedDump.includes("values.assigning.decl.name = FIELD-SYMBOL"),
+    "Expected invalid FIELD-SYMBOL(ls_item) syntax not to create a synthetic FIELD-SYMBOL declaration."
+  );
+  assert(
+    !malformedDump.includes("values.assigning.decl.desc = FIELD-SYMBOL"),
+    "Expected invalid FIELD-SYMBOL(ls_item) syntax not to expose FIELD-SYMBOL as a description."
+  );
+  assert(malformedDump.includes("values.assigning.finalDesc = FIELD-SYMBOL(ls_item)"));
+  malformedDom.window.close();
+
+  const validDom = await renderFixture([
+    "DATA gt_items TYPE STANDARD TABLE OF i.",
+    "LOOP AT gt_items ASSIGNING FIELD-SYMBOL(<ls_item>).",
+    "ENDLOOP."
+  ].join("\n"));
+  const validWindow = validDom.window;
+  const validBlock = Array.from(validWindow.AbapViewerRuntime.els.templatePreviewOutput.querySelectorAll(".template-block"))
+    .find((block) => block.textContent.includes("LOOP_AT_ITAB"));
+  assert(validBlock, "Expected the valid LOOP statement to render.");
+  validBlock.querySelector('[data-template-action="paths"]').click();
+  const validModal = Array.from(validWindow.document.querySelectorAll(".modal"))
+    .find((modal) => modal.textContent.includes("Template Paths"));
+  const validDump = validModal && validModal.querySelector("pre")
+    ? validModal.querySelector("pre").textContent
+    : "";
+  assert(validDump.includes("values.assigning.decl.name = <ls_item>"));
+  assert(validDump.includes("values.assigning.decl.desc = <ls_item>"));
+  assert(validDump.includes("values.assigning.decl.finalDesc = <ls_item>"));
+  assert(validDump.includes("values.assigning.decl.objectType = INLINE"));
+  validDom.window.close();
+}
+
+defineFocusedTest(test, "inline field-symbol template paths", ["inline-field-symbol-paths"], async () => {
+  await assertInlineFieldSymbolPathDoesNotInventKeywordDecl();
+});
+
 defineFocusedTest(test, "viewer config export contracts", ["config-export"], async (t) => {
 assertViewerFixtureDirectoriesStayInSync();
 
@@ -903,6 +1023,10 @@ assertViewerFixtureDirectoriesStayInSync();
 
   await t.test("statement specific twenty cell templates", async () => {
     await assertStatementSpecificTwentyCellTemplates();
+  });
+
+  await t.test("data operand defaults use declaration descriptions", async () => {
+    await assertDataOperandDefaultsUseDeclarationDescriptions();
   });
 
   await t.test("legacy template import adds missing specific configs", async () => {

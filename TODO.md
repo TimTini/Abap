@@ -13,6 +13,7 @@ This is a syntax-oriented reader and Viewer data producer, not an ABAP compiler:
 - [ ] Improve `DELETE FROM` / `MODIFY ... FROM` disambiguation where the source alone is ambiguous. Retain an explicit ambiguous node and diagnostic when table-symbol information is insufficient; do not guess SQL versus internal table.
 - [ ] Consider a real ABAP compiler or SAP syntax-check fixture as an external oracle for syntax validation when a supported environment becomes available. Keep it optional and offline-safe for normal Viewer use.
 - [ ] Add grammar families only when backed by project examples or an explicit new scope request; preserve the stable `parseAbapText` Viewer contract.
+- [ ] Add an opt-in Viewer analysis mode for ABAP include-source fragments: after parsing local `FORM` definitions with no reachable top-level `PERFORM`, let the user choose a `FORM` as the assumed trace root and build `PERFORM` source candidates from it. Label these bindings as assumed; do not infer entry points or imply runtime reachability. Keep automatic include expansion out of scope.
 
 ## Intentionally out of scope for this milestone
 

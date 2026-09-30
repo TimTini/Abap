@@ -123,6 +123,529 @@ async function assertStructFieldFinalDescNormalizesParentOnly() {
   dom.window.close();
 }
 
+async function assertTemplateInlineDeclarationsShowInnerFinalDesc() {
+  const source = [
+    "DATA gt_items TYPE STANDARD TABLE OF string.",
+    "LOOP AT gt_items INTO DATA(ls_data).",
+    "IF ls_data = 1.",
+    "ENDIF.",
+    "ENDLOOP.",
+    "LOOP AT gt_items ASSIGNING FIELD-SYMBOL(<ls_symbol>).",
+    "ENDLOOP.",
+    "DATA lv_result TYPE i.",
+    "lv_result = DATA(lv_inline_expr) + 1."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
+  const objects = Array.isArray(state.renderObjects) ? state.renderObjects : [];
+  const loops = objects.filter((object) => object && object.objectType === "LOOP_AT_ITAB");
+  const assignment = objects.find((object) => object && object.objectType === "ASSIGNMENT");
+  assert.strictEqual(loops.length, 2, "Expected separate DATA and FIELD-SYMBOL LOOP targets.");
+  assert(assignment && assignment.values && assignment.values.expr, "Expected an inline declaration in a larger expression.");
+  const conditionObject = (loops[0].children || []).find((object) => object && object.objectType === "IF");
+  const condition = conditionObject && conditionObject.extras && conditionObject.extras.ifCondition
+    && conditionObject.extras.ifCondition.conditions && conditionObject.extras.ifCondition.conditions[0];
+  assert(condition && condition.leftOperandDecl, "Expected the inline DATA declaration to resolve in its IF condition.");
+  condition.leftOperand = "DATA(ls_data)";
+
+  const dataDecl = loops[0].values.into.decl;
+  const fieldSymbolDecl = loops[1].values.assigning.decl;
+  const expressionDecl = assignment.values.expr.decl;
+  state.descOverrides[getDeclOverrideStorageKeyFromRuntime(window, dataDecl)] = "Data item";
+  state.descOverrides[getDeclOverrideStorageKeyFromRuntime(window, fieldSymbolDecl)] = "Field item";
+  state.descOverrides[getDeclOverrideStorageKeyFromRuntime(window, expressionDecl)] = "Expression item";
+
+  const options = {
+    hideEmptyRows: true,
+    hideRowsWithoutValues: false,
+    expandMultilineRows: true
+  };
+  state.templateConfig.templates.LOOP_AT_ITAB = {
+    _options: options,
+    A1: { text: "{values.into.finalDesc}" },
+    A2: { text: "{values.into.decl.finalDesc}" },
+    A3: { text: "{values.assigning.finalDesc}" },
+    A4: { text: "{values.assigning.decl.finalDesc}" },
+    A5: { text: "{rows.finalDesc}" },
+    A6: { text: "{values.into}" }
+  };
+  state.templateConfig.templates.IF = {
+    _options: options,
+    A1: { text: "{extras.ifCondition.conditions[0].leftOperandDecl.finalDesc}" },
+    A2: { text: "{rows.finalDesc}" }
+  };
+  state.templateConfig.templates.ASSIGNMENT = {
+    _options: options,
+    A1: { text: "{values.expr.finalDesc}" },
+    A2: { text: "{values.expr.decl.finalDesc}" }
+  };
+  runtime.api.renderTemplatePreview();
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const loopTables = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="LOOP_AT_ITAB"]'));
+  assert.strictEqual(loopTables.length, 2, "Expected both LOOP templates to render.");
+  const cellText = (table, key) => String(table.querySelector(`td[data-template-range-key="${key}"]`)?.textContent || "").trim();
+  const cellTexts = (table, key) => Array.from(table.querySelectorAll(`td[data-template-range-key="${key}"]`), (cell) => String(cell.textContent || "").trim());
+  const dataTable = loopTables[0];
+  const fieldSymbolTable = loopTables[1];
+  assert.strictEqual(cellText(dataTable, "A1"), "Data item");
+  assert.strictEqual(cellText(dataTable, "A2"), "Data item");
+  assert.strictEqual(cellText(fieldSymbolTable, "A3"), "Field item");
+  assert.strictEqual(cellText(fieldSymbolTable, "A4"), "Field item");
+  assert(cellTexts(dataTable, "A5").some((text) => text.includes("Data item")), "Expected rows.finalDesc to show the unwrapped DATA description.");
+  assert(cellTexts(fieldSymbolTable, "A5").some((text) => text.includes("Field item")), "Expected rows.finalDesc to show the unwrapped FIELD-SYMBOL description.");
+  assert.strictEqual(cellText(dataTable, "A6"), "Data item", "Expected a whole value-entry placeholder to use Template finalDesc.");
+  assert(!dataTable.textContent.includes("DATA("), "Expected Template cells to omit a whole-value DATA wrapper.");
+  assert(!fieldSymbolTable.textContent.includes("FIELD-SYMBOL("), "Expected Template cells to omit a whole-value FIELD-SYMBOL wrapper.");
+
+  const assignmentTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="ASSIGNMENT"]');
+  assert(assignmentTable, "Expected the inline expression assignment Template.");
+  assert.strictEqual(cellText(assignmentTable, "A1"), "DATA(Expression item) + 1");
+  assert.strictEqual(cellText(assignmentTable, "A2"), "DATA(Expression item) + 1");
+  const ifTable = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="IF"]');
+  assert(ifTable, "Expected the inline DATA condition Template.");
+  assert.strictEqual(cellText(ifTable, "A1"), "Data item");
+  assert(cellTexts(ifTable, "A2").some((text) => text.includes("Data item")), "Expected condition rows to use the unwrapped inline description.");
+  assert.strictEqual(loops[0].values.into.value, "DATA(ls_data)");
+  assert.strictEqual(loops[1].values.assigning.value, "FIELD-SYMBOL(<ls_symbol>)");
+  assert.strictEqual(assignment.values.expr.value, "DATA(lv_inline_expr) + 1");
+
+  const dataBlock = dataTable.closest(".template-block");
+  assert(dataBlock, "Expected a Template block for the DATA inline declaration.");
+  dataBlock.querySelector('[data-template-action="paths"]').click();
+  await waitForViewerUi(window);
+  const pathsModal = Array.from(window.document.querySelectorAll(".modal"))
+    .find((modal) => !modal.hidden && String(modal.textContent || "").includes("Template Paths"));
+  const pathDump = pathsModal && pathsModal.querySelector("pre")
+    ? pathsModal.querySelector("pre").textContent
+    : "";
+  assert(pathDump.includes("values.into.value = DATA(ls_data)"));
+  assert(pathDump.includes("values.into.finalDesc = Data item"));
+
+  const fieldSymbolBlock = fieldSymbolTable.closest(".template-block");
+  assert(fieldSymbolBlock, "Expected a Template block for the FIELD-SYMBOL inline declaration.");
+  fieldSymbolBlock.querySelector('[data-template-action="paths"]').click();
+  await waitForViewerUi(window);
+  const fieldSymbolPathsModal = Array.from(window.document.querySelectorAll(".modal"))
+    .find((modal) => !modal.hidden && String(modal.textContent || "").includes("Template Paths"));
+  const fieldSymbolPathDump = fieldSymbolPathsModal && fieldSymbolPathsModal.querySelector("pre")
+    ? fieldSymbolPathsModal.querySelector("pre").textContent
+    : "";
+  assert(fieldSymbolPathDump.includes("values.assigning.value = FIELD-SYMBOL(<ls_symbol>)"));
+  assert(fieldSymbolPathDump.includes("values.assigning.finalDesc = Field item"));
+
+  dom.window.close();
+}
+
+async function assertTemplatePathsFinalDescMatchPlaceholderValues() {
+  const source = [
+    "DATA gt_rows TYPE STANDARD TABLE OF string.",
+    "DATA lv_left TYPE i.",
+    "DATA lv_right TYPE i.",
+    "DATA lv_result TYPE i.",
+    "TYPES: BEGIN OF ty_order, item TYPE i, END OF ty_order.",
+    "DATA gs_order TYPE ty_order.",
+    "DATA gv_first TYPE string.",
+    "DATA gv_second TYPE string.",
+    "lv_result = lv_left + lv_right.",
+    "gs_order-item = lv_result.",
+    "LOOP AT gt_rows INTO DATA(ls_data).",
+    "ENDLOOP.",
+    "LOOP AT gt_rows ASSIGNING FIELD-SYMBOL(<ls_symbol>).",
+    "ENDLOOP.",
+    "PERFORM frm_clear USING gv_first.",
+    "PERFORM frm_clear USING gv_second.",
+    "FORM frm_clear USING iv_value TYPE string.",
+    "  CLEAR iv_value.",
+    "ENDFORM."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { els, state } = runtime;
+  const options = {
+    hideEmptyRows: true,
+    hideRowsWithoutValues: false,
+    expandMultilineRows: true
+  };
+  const pathTokenByType = {
+    ASSIGNMENT: ["values.expr.decl.finalDesc", "values.target.decl.finalDesc"],
+    LOOP_AT_ITAB: ["values.into.decl.finalDesc", "values.assigning.decl.finalDesc"],
+    CLEAR: ["values.target.decl.finalDesc"]
+  };
+  for (const [objectType, tokens] of Object.entries(pathTokenByType)) {
+    state.templateConfig.templates[objectType] = {
+      _options: options,
+      ...Object.fromEntries(tokens.map((token, index) => [`A${index + 1}`, { text: `{${token}}` }]))
+    };
+  }
+
+  const decls = Array.isArray(state.data && state.data.decls) ? state.data.decls : [];
+  const setDescription = (name, description) => {
+    const decl = decls.find((item) => String(item && item.name || "").toLowerCase() === name.toLowerCase());
+    assert(decl, `Expected declaration ${name}.`);
+    const key = getDeclOverrideStorageKeyFromRuntime(window, decl);
+    assert(key, `Expected a description key for ${name}.`);
+    state.descOverrides[key] = description;
+  };
+  setDescription("lv_left", "Left value");
+  setDescription("lv_right", "Right value");
+  setDescription("gs_order-item", "Order item");
+  setDescription("ls_data", "Data row");
+  setDescription("<ls_symbol>", "Symbol row");
+  setDescription("gv_first", "First source");
+  setDescription("gv_second", "Second source");
+
+  try {
+    Object.defineProperty(els.templatePreviewOutput, "clientHeight", { configurable: true, value: 100000 });
+  } catch {
+    // The fixture still renders with JSDOM's default virtual viewport.
+  }
+  runtime.api.renderTemplatePreview();
+  els.rightTabTemplateBtn.click();
+  await waitForViewerUi(window);
+
+  const assertPathMatchesCell = async (table, cellKey, pathExpression) => {
+    assert(table, `Expected a ${pathExpression} Template table.`);
+    const cell = table.querySelector(`td[data-template-range-key="${cellKey}"]`);
+    assert(cell, `Expected Template cell ${cellKey} for ${pathExpression}.`);
+    const expected = String(cell.textContent || "").trim();
+    const block = table.closest(".template-block");
+    assert(block, `Expected the Template block for ${pathExpression}.`);
+    block.querySelector('[data-template-action="paths"]').click();
+    await waitForViewerUi(window);
+    const pathsModal = els.jsonModal;
+    assert(pathsModal && !pathsModal.hidden, `Expected Paths modal for ${pathExpression}.`);
+    const prefix = `${pathExpression} = `;
+    const line = String(els.jsonPre.textContent || "").split(/\r?\n/).find((item) => item.startsWith(prefix));
+    assert(line, `Expected Paths dump to contain ${pathExpression}.`);
+    assert.strictEqual(line.slice(prefix.length), expected, `Expected Paths value for ${pathExpression} to equal its Template placeholder.`);
+    els.jsonCloseBtn.click();
+    await waitForViewerUi(window);
+  };
+
+  const assignmentTables = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="ASSIGNMENT"]'));
+  assert.strictEqual(assignmentTables.length, 2, "Expected expression and structure-field assignments.");
+  await assertPathMatchesCell(assignmentTables[0], "A1", "values.expr.decl.finalDesc");
+  await assertPathMatchesCell(assignmentTables[1], "A2", "values.target.decl.finalDesc");
+
+  const loopTables = Array.from(els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="LOOP_AT_ITAB"]'));
+  const renderedObjectTypes = Array.from(
+    els.templatePreviewOutput.querySelectorAll(".template-preview-table"),
+    (table) => table.dataset.objectType
+  );
+  assert.strictEqual(
+    loopTables.length,
+    2,
+    `Expected whole inline DATA and FIELD-SYMBOL operands. Found ${renderedObjectTypes.join(", ")}.`
+  );
+  await assertPathMatchesCell(loopTables[0], "A1", "values.into.decl.finalDesc");
+  await assertPathMatchesCell(loopTables[1], "A2", "values.assigning.decl.finalDesc");
+
+  const getClearTable = () => els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="CLEAR"]');
+  assert(getClearTable(), "Expected the FORM_PARAM CLEAR Template.");
+  const candidates = state.performSourceRegistry.candidatesByFormUpper.get("FRM_CLEAR") || [];
+  assert.strictEqual(candidates.length, 2, "Expected two selectable FORM_PARAM sources.");
+  for (const [index, expected] of [[0, "First source"], [1, "Second source"]]) {
+    runtime.api.selectPerformSourceCandidate("FRM_CLEAR", candidates[index].key);
+    await waitForViewerUi(window);
+    const clearTable = getClearTable();
+    assert(clearTable, `Expected the FORM_PARAM CLEAR Template after selecting source ${index + 1}.`);
+    assert.strictEqual(
+      String(clearTable.querySelector('td[data-template-range-key="A1"]')?.textContent || "").trim(),
+      expected,
+      `Expected FORM_PARAM Template placeholder for source ${index + 1}.`
+    );
+    await assertPathMatchesCell(clearTable, "A1", "values.target.decl.finalDesc");
+  }
+
+  dom.window.close();
+}
+
+async function getTemplateSuggestionLists(source, key, query) {
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  window.AbapViewerRuntime.services.template.openTemplateConfigModal();
+  await waitForViewerUi(window);
+
+  const page = Array.from(window.document.querySelectorAll(".template-dynamic-page"))
+    .find((node) => String(node.textContent || "").includes("Template Form"));
+  assert(page, "Expected Template Form page.");
+  const keySelect = page.querySelector(".template-builder-key-field select");
+  assert(keySelect, "Expected Template Key selector.");
+  keySelect.value = key;
+  keySelect.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await waitForViewerUi(window);
+
+  const pathSelect = page.querySelector(".template-builder-path-row select");
+  assert(pathSelect, "Expected Template path dropdown.");
+  const paths = Array.from(pathSelect.options, (option) => option.value);
+  const textArea = page.querySelector(".template-builder-textarea");
+  assert(textArea, "Expected Template placeholder editor.");
+  textArea.value = `{${query}`;
+  textArea.setSelectionRange(textArea.value.length, textArea.value.length);
+  textArea.dispatchEvent(new window.Event("input", { bubbles: true }));
+  await waitForViewerUi(window);
+  const tokenSuggestions = Array.from(
+    page.querySelectorAll(".template-config-token-option"),
+    (button) => String(button.textContent || "").trim()
+  );
+  return { dom, paths, tokenSuggestions };
+}
+
+async function assertTemplateSuggestionsPreferBoundDataDeclFinalDesc() {
+  const { dom, paths, tokenSuggestions } = await getTemplateSuggestionLists(
+    [
+      "DATA gv_target TYPE i.",
+      "DATA gv_source TYPE i.",
+      "gv_target = gv_source."
+    ].join("\n"),
+    "ASSIGNMENT",
+    "values.target"
+  );
+  const declarationPath = "values.target.decl.finalDesc";
+  const valuePath = "values.target.finalDesc";
+  const declarationPathIndex = paths.indexOf(declarationPath);
+  const valuePathIndex = paths.indexOf(valuePath);
+  assert(declarationPathIndex >= 0, `Expected dropdown suggestion ${declarationPath}.`);
+  assert(valuePathIndex >= 0, `Expected dropdown suggestion ${valuePath}.`);
+  assert(
+    declarationPathIndex < valuePathIndex,
+    `Expected ${declarationPath} before ${valuePath} in the path dropdown.`
+  );
+
+  const tokenDeclarationPathIndex = tokenSuggestions.indexOf(declarationPath);
+  const tokenValuePathIndex = tokenSuggestions.indexOf(valuePath);
+  assert(tokenDeclarationPathIndex >= 0, `Expected autocomplete suggestion ${declarationPath}.`);
+  assert(tokenValuePathIndex >= 0, `Expected autocomplete suggestion ${valuePath}.`);
+  assert(
+    tokenDeclarationPathIndex < tokenValuePathIndex,
+    `Expected ${declarationPath} before ${valuePath} in token autocomplete.`
+  );
+  dom.window.close();
+}
+
+async function assertAppendTemplateSuggestionsPreferBoundDataDeclFinalDesc() {
+  const source = [
+    "DATA lt_source TYPE STANDARD TABLE OF i.",
+    "DATA lt_target TYPE STANDARD TABLE OF i.",
+    "APPEND LINES OF lt_source TO lt_target."
+  ].join("\n");
+  const { dom, paths } = await getTemplateSuggestionLists(
+    source,
+    "APPEND_LINES_OF",
+    "extras.append"
+  );
+
+  for (const operand of ["source", "target"]) {
+    const declarationPath = `extras.append.${operand}.decl.finalDesc`;
+    const valuePath = `extras.append.${operand}.finalDesc`;
+    const declarationPathIndex = paths.indexOf(declarationPath);
+    const valuePathIndex = paths.indexOf(valuePath);
+    assert(declarationPathIndex >= 0, `Expected dropdown suggestion ${declarationPath}.`);
+    assert(valuePathIndex >= 0, `Expected dropdown suggestion ${valuePath}.`);
+    assert(
+      declarationPathIndex < valuePathIndex,
+      `Expected ${declarationPath} before ${valuePath} in the path dropdown.`
+    );
+  }
+  dom.window.close();
+
+  for (const operand of ["source", "target"]) {
+    const { dom: tokenDom, tokenSuggestions } = await getTemplateSuggestionLists(
+      source,
+      "APPEND_LINES_OF",
+      `extras.append.${operand}`
+    );
+    const declarationPath = `extras.append.${operand}.decl.finalDesc`;
+    const valuePath = `extras.append.${operand}.finalDesc`;
+    const tokenDeclarationPathIndex = tokenSuggestions.indexOf(declarationPath);
+    const tokenValuePathIndex = tokenSuggestions.indexOf(valuePath);
+    assert(tokenDeclarationPathIndex >= 0, `Expected autocomplete suggestion ${declarationPath}.`);
+    assert(tokenValuePathIndex >= 0, `Expected autocomplete suggestion ${valuePath}.`);
+    assert(
+      tokenDeclarationPathIndex < tokenValuePathIndex,
+      `Expected ${declarationPath} before ${valuePath} in token autocomplete.`
+    );
+    tokenDom.window.close();
+  }
+}
+
+async function assertConcatenateSuggestionsPreferBoundDataDeclFinalDesc() {
+  const source = [
+    "DATA lv_a TYPE string.",
+    "DATA lv_b TYPE string.",
+    "DATA lv_result TYPE string.",
+    "CONCATENATE lv_a lv_b INTO lv_result."
+  ].join("\n");
+  const { dom, paths, tokenSuggestions } = await getTemplateSuggestionLists(
+    source,
+    "CONCATENATE",
+    "values.target"
+  );
+  const concatenate = dom.window.AbapViewerRuntime.state.renderObjects.find((object) => object.objectType === "CONCATENATE");
+  assert.strictEqual(concatenate?.values?.target?.decl?.objectType, "DATA");
+
+  const declarationPath = "values.target.decl.finalDesc";
+  const valuePath = "values.target.finalDesc";
+  const declarationPathIndex = paths.indexOf(declarationPath);
+  const valuePathIndex = paths.indexOf(valuePath);
+  assert(declarationPathIndex >= 0, `Expected dropdown suggestion ${declarationPath}.`);
+  assert(valuePathIndex >= 0, `Expected dropdown suggestion ${valuePath}.`);
+  assert(
+    declarationPathIndex < valuePathIndex,
+    `Expected ${declarationPath} before ${valuePath} in the path dropdown.`
+  );
+
+  const tokenDeclarationPathIndex = tokenSuggestions.indexOf(declarationPath);
+  const tokenValuePathIndex = tokenSuggestions.indexOf(valuePath);
+  assert(tokenDeclarationPathIndex >= 0, `Expected autocomplete suggestion ${declarationPath}.`);
+  assert(tokenValuePathIndex >= 0, `Expected autocomplete suggestion ${valuePath}.`);
+  assert(
+    tokenDeclarationPathIndex < tokenValuePathIndex,
+    `Expected ${declarationPath} before ${valuePath} in token autocomplete.`
+  );
+  dom.window.close();
+}
+
+async function assertAutocompleteUnrelatedSuggestionsKeepDepthOrder() {
+  const { dom, paths, tokenSuggestions } = await getTemplateSuggestionLists(
+    [
+      "DATA lt_source TYPE STANDARD TABLE OF i.",
+      "DATA lt_target TYPE STANDARD TABLE OF i.",
+      "APPEND LINES OF lt_source TO lt_target."
+    ].join("\n"),
+    "APPEND_LINES_OF",
+    "finalDesc"
+  );
+  const preferredPaths = new Set([
+    "values.to.decl.finalDesc",
+    "values.source.decl.finalDesc",
+    "extras.append.source.decl.finalDesc",
+    "extras.append.target.decl.finalDesc"
+  ]);
+  for (const path of preferredPaths) {
+    assert(paths.includes(path), `Expected dropdown path ${path}.`);
+  }
+  const compareByDepthLengthName = (left, right) => {
+    const leftDepth = left.split(".").length;
+    const rightDepth = right.split(".").length;
+    if (leftDepth !== rightDepth) {
+      return leftDepth - rightDepth;
+    }
+    if (left.length !== right.length) {
+      return left.length - right.length;
+    }
+    return left.localeCompare(right);
+  };
+  const expectedSuggestions = paths
+    .concat(["rows[0].finalDesc", "rows[1].finalDesc", "rows[2].finalDesc"])
+    .filter((path) => /\.finalDesc$/i.test(path))
+    .filter((path, index, all) => all.indexOf(path) === index)
+    .sort((left, right) => {
+      const leftIsPreferred = preferredPaths.has(left);
+      const rightIsPreferred = preferredPaths.has(right);
+      if (leftIsPreferred !== rightIsPreferred) {
+        return leftIsPreferred ? -1 : 1;
+      }
+      return compareByDepthLengthName(left, right);
+    })
+    .slice(0, tokenSuggestions.length);
+  assert.deepStrictEqual(
+    tokenSuggestions,
+    expectedSuggestions,
+    "Expected autocomplete to prioritize only bound declaration finalDesc paths, then keep depth/length/name order for the rest."
+  );
+  dom.window.close();
+}
+
+async function assertTemplateSuggestionsDoNotPromoteSyntheticDeclFinalDesc() {
+  const cases = [
+    {
+      label: "literal",
+      source: "DATA gv_target TYPE i.\ngv_target = 1.",
+      key: "ASSIGNMENT",
+      query: "values.expr",
+      valuePath: "values.expr.finalDesc",
+      declarationPath: "values.expr.decl.finalDesc",
+      expectDeclarationPath: true
+    },
+    {
+      label: "keyword",
+      source: "DATA gv_target TYPE i.\ngv_target = INITIAL.",
+      key: "ASSIGNMENT",
+      query: "values.expr",
+      valuePath: "values.expr.finalDesc",
+      declarationPath: "values.expr.decl.finalDesc"
+    },
+    {
+      label: "unbound identifier",
+      source: "DATA gv_target TYPE i.\ngv_target = gv_missing.",
+      key: "ASSIGNMENT",
+      query: "values.expr",
+      valuePath: "values.expr.finalDesc",
+      declarationPath: "values.expr.decl.finalDesc",
+      expectDeclarationPath: true
+    },
+    {
+      label: "SYSTEM operand",
+      source: "DATA gv_target TYPE abap_bool.\ngv_target = abap_true.",
+      key: "ASSIGNMENT",
+      query: "values.expr",
+      valuePath: "values.expr.finalDesc",
+      declarationPath: "values.expr.decl.finalDesc",
+      expectDeclarationPath: true
+    },
+    {
+      label: "CONDITION_VALUE operand",
+      source: "IF gv_missing = 1.\nENDIF.",
+      key: "IF",
+      query: "extras.ifCondition.conditions[0].leftOperand",
+      valuePath: "extras.ifCondition.conditions[0].leftOperand",
+      declarationPath: "extras.ifCondition.conditions[0].leftOperandDecl.finalDesc",
+      expectDeclarationPath: true
+    }
+  ];
+
+  for (const item of cases) {
+    const { dom, paths, tokenSuggestions } = await getTemplateSuggestionLists(item.source, item.key, item.query);
+    if (item.label === "SYSTEM operand") {
+      const assignment = dom.window.AbapViewerRuntime.state.renderObjects.find((object) => object.objectType === "ASSIGNMENT");
+      assert.strictEqual(assignment?.values?.expr?.decl?.objectType, "SYSTEM");
+    }
+    if (item.label === "CONDITION_VALUE operand") {
+      const ifObject = dom.window.AbapViewerRuntime.state.renderObjects.find((object) => object.objectType === "IF");
+      assert.strictEqual(ifObject?.extras?.ifCondition?.conditions?.[0]?.leftOperandDecl?.objectType, "CONDITION_VALUE");
+    }
+    const valuePathIndex = paths.indexOf(item.valuePath);
+    const declarationPathIndex = paths.indexOf(item.declarationPath);
+    assert(valuePathIndex >= 0, `Expected value-level path for ${item.label}.`);
+    if (item.expectDeclarationPath) {
+      assert(declarationPathIndex >= 0, `Expected declaration path for ${item.label}.`);
+    }
+    if (declarationPathIndex >= 0) {
+      assert(
+        valuePathIndex < declarationPathIndex,
+        `Expected ${item.label} to keep ${item.valuePath} before ${item.declarationPath}.`
+      );
+    }
+
+    const tokenDeclarationPathIndex = tokenSuggestions.indexOf(item.declarationPath);
+    const tokenValuePathIndex = tokenSuggestions.indexOf(item.valuePath);
+    assert(tokenValuePathIndex >= 0, `Expected autocomplete to retain the value-level path for ${item.label}.`);
+    if (tokenDeclarationPathIndex >= 0) {
+      assert(
+        tokenValuePathIndex >= 0 && tokenValuePathIndex < tokenDeclarationPathIndex,
+        `Expected autocomplete not to promote ${item.declarationPath} for ${item.label}.`
+      );
+    }
+    dom.window.close();
+  }
+}
+
 async function assertConstantInitializersAndEmptyTableBodiesShapeFinalDesc() {
   const source = [
     "CONSTANTS gc_max TYPE i VALUE 20. \"Maximum rows",
@@ -1507,11 +2030,151 @@ async function assertMessageAndWriteViewerContracts() {
   dom.window.close();
 }
 
+async function assertInlineFieldSymbolDescriptionFlowsIntoAssignment() {
+  const source = [
+    "DATA gt_priority TYPE STANDARD TABLE OF string.",
+    "FORM frm_prepare_priority_list.",
+    "  READ TABLE gt_priority ASSIGNING FIELD-SYMBOL(<ls_first_priority>) INDEX 1.",
+    "  <ls_first_priority>-route_text = |{ <ls_first_priority>-route_text } (priority lead)|.",
+    "  <ls_first_priority>-route_text = |{ <ls_first_priority>-route_text } { <ls_first_priority>-carrier }|.",
+    "ENDFORM."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const { state, els } = runtime;
+  const form = state.renderObjects.find((object) => object.objectType === "FORM");
+  const read = form.children.find((object) => object.objectType === "READ_TABLE");
+  const assignment = form.children.find((object) => object.objectType === "ASSIGNMENT");
+  const inlineDecl = read.values.assigning.decl;
+  const overrideKey = getDeclOverrideStorageKeyFromRuntime(window, inlineDecl);
+  assert(overrideKey, "Expected an editable inline field symbol declaration.");
+  state.descOverrides[overrideKey] = "Priority lead";
+  runtime.api.renderTemplatePreview();
+  await waitForViewerUi(window);
+
+  const table = els.templatePreviewOutput.querySelector('.template-preview-table[data-object-type="ASSIGNMENT"]');
+  assert(table, "Expected the assignment Template block.");
+  const text = (key) => String(table.querySelector(`td[data-template-range-key="${key}"]`)?.textContent || "").trim();
+  assert.strictEqual(text("A2"), "Priority lead-route_text");
+  assert.strictEqual(text("U2"), "|{ Priority lead-route_text } (priority lead)|");
+  const tables = els.templatePreviewOutput.querySelectorAll('.template-preview-table[data-object-type="ASSIGNMENT"]');
+  assert.strictEqual(tables.length, 2);
+  assert.strictEqual(
+    String(tables[1].querySelector('td[data-template-range-key="U2"]')?.textContent || "").trim(),
+    "|{ Priority lead-route_text } { Priority lead-carrier }|"
+  );
+  assert.strictEqual(assignment.values.target.decl?.structName, inlineDecl.name);
+  assert.strictEqual(assignment.values.expr.decl, assignment.values.target.decl);
+  assert.strictEqual(
+    runtime.api.resolveValueLevelFinalDesc({
+      ...assignment.values.expr,
+      value: "|literal <ls_first_priority>-route_text \\{ <ls_first_priority>-route_text } { <ls_first_priority>-route_text }|"
+    }),
+    "|literal <ls_first_priority>-route_text \\{ <ls_first_priority>-route_text } { Priority lead-route_text }|",
+    "Expected only active string-template interpolations to use the description."
+  );
+  assert.strictEqual(
+    runtime.api.resolveValueLevelFinalDesc({
+      ...assignment.values.expr,
+      value: "|{ <ls_first_priority>-route_text } { <ls_first_priority>-carrier }|"
+    }),
+    "|{ Priority lead-route_text } { Priority lead-carrier }|",
+    "Expected every field of the same inline symbol to use its root description."
+  );
+  window.close();
+}
+
+async function assertInlineFieldSymbolDoesNotBindAcrossForms() {
+  const source = [
+    "FIELD-SYMBOLS <ls> TYPE any.",
+    "DATA gt_rows TYPE STANDARD TABLE OF string.",
+    "FORM frm_one.",
+    "  READ TABLE gt_rows ASSIGNING FIELD-SYMBOL(<ls>) INDEX 1.",
+    "ENDFORM.",
+    "FORM frm_two.",
+    "  <ls>-route_text = 1.",
+    "ENDFORM."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const { window } = dom;
+  const runtime = window.AbapViewerRuntime;
+  const globalDecl = runtime.state.data.decls.find((decl) => decl.name === "<ls>" && decl.scopeLabel === "GLOBAL");
+  const inlineDecl = runtime.state.data.decls.find((decl) => decl.name === "<ls>" && decl.scopeLabel === "FORM:FRM_ONE");
+  assert(globalDecl && inlineDecl, "Expected separate global and FORM field symbols.");
+  runtime.state.descOverrides[getDeclOverrideStorageKeyFromRuntime(window, globalDecl)] = "Global row";
+  runtime.state.descOverrides[getDeclOverrideStorageKeyFromRuntime(window, inlineDecl)] = "Local row";
+  const secondForm = runtime.state.renderObjects.find((object) => object.objectType === "FORM" && object.values.name.value === "frm_two");
+  const assignment = secondForm.children.find((object) => object.objectType === "ASSIGNMENT");
+  assert.strictEqual(assignment.values.target.decl?.scopeLabel, "GLOBAL");
+  assert.strictEqual(runtime.api.resolveValueLevelFinalDesc(assignment.values.target), "Global row-route_text");
+  window.close();
+}
+
+async function assertFieldNamesInLiteralsHaveNoDeclaration() {
+  const source = [
+    "DATA gt_rows TYPE STANDARD TABLE OF string.",
+    "DATA lv_text TYPE string.",
+    "FORM frm_text.",
+    "  READ TABLE gt_rows ASSIGNING FIELD-SYMBOL(<ls>) INDEX 1.",
+    "  lv_text = |literal <ls>-route_text|.",
+    "  lv_text = |\\{ <ls>-route_text }|.",
+    "  lv_text = '<ls>-route_text'.",
+    "  lv_text = `<ls>-route_text`.",
+    "ENDFORM."
+  ].join("\n");
+  const dom = await renderFixture(source);
+  const form = dom.window.AbapViewerRuntime.state.renderObjects.find((object) => object.objectType === "FORM");
+  const assignments = form.children.filter((object) => object.objectType === "ASSIGNMENT");
+  assert.strictEqual(assignments.length, 4);
+  for (const assignment of assignments) {
+    assert.strictEqual(assignment.values.expr.decl, undefined, "Literal text must not bind to the field symbol.");
+  }
+  dom.window.close();
+}
+
+defineFocusedTest(test, "viewer inline field symbol assignment description contract", ["inline-field-symbol-assignment"], async (t) => {
+  await t.test("inline field symbol description reaches both assignment operands", assertInlineFieldSymbolDescriptionFlowsIntoAssignment);
+  await t.test("inline field symbol does not bind in another FORM", assertInlineFieldSymbolDoesNotBindAcrossForms);
+  await t.test("field names in literal text do not create declarations", assertFieldNamesInLiteralsHaveNoDeclaration);
+});
+
 defineFocusedTest(test, "viewer struct field finalDesc contract", ["struct-field-finaldesc"], async (t) => {
 assertViewerFixtureDirectoriesStayInSync();
 
   await t.test("struct field final desc normalizes parent only", async () => {
     await assertStructFieldFinalDescNormalizesParentOnly();
+  });
+});
+
+defineFocusedTest(test, "viewer inline declaration Template finalDesc contract", ["template-inline-declarations"], async (t) => {
+  assertViewerFixtureDirectoriesStayInSync();
+
+  await t.test("whole inline declarations unwrap while expression tails and Paths stay intact", async () => {
+    await assertTemplateInlineDeclarationsShowInnerFinalDesc();
+  });
+});
+
+defineFocusedTest(test, "viewer Template Paths finalDesc consistency contract", ["template-decl-paths"], async (t) => {
+  assertViewerFixtureDirectoriesStayInSync();
+
+  await t.test("Paths values match rendered placeholders for bound decls", async () => {
+    await assertTemplatePathsFinalDescMatchPlaceholderValues();
+  });
+  await t.test("bound data declaration finalDesc ranks first in both suggestion surfaces", async () => {
+    await assertTemplateSuggestionsPreferBoundDataDeclFinalDesc();
+  });
+  await t.test("APPEND LINES OF extras prefer bound declaration finalDesc paths", async () => {
+    await assertAppendTemplateSuggestionsPreferBoundDataDeclFinalDesc();
+  });
+  await t.test("CONCATENATE target prefers its bound declaration finalDesc path", async () => {
+    await assertConcatenateSuggestionsPreferBoundDataDeclFinalDesc();
+  });
+  await t.test("autocomplete keeps depth order for unrelated paths", async () => {
+    await assertAutocompleteUnrelatedSuggestionsKeepDepthOrder();
+  });
+  await t.test("synthetic declaration finalDesc paths are not promoted", async () => {
+    await assertTemplateSuggestionsDoNotPromoteSyntheticDeclFinalDesc();
   });
 });
 

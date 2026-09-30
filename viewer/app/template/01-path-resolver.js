@@ -271,7 +271,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       return String(getFinalDeclDesc(decl) || operandText).trim() || undefined;
     }
 
-    const resolved = resolveValueLevelFinalDesc({
+    const resolved = resolveTemplateValueFinalDesc({
       value: operandText,
       userDesc: "",
       codeDesc: "",
@@ -279,6 +279,62 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       decl
     });
     return String(resolved || "").trim() || undefined;
+  }
+
+  function parseWholeTemplateInlineDeclaration(text, requireFieldSymbolName) {
+    const value = String(text || "").trim();
+    const match = value.match(/^@?\s*(DATA|FIELD-SYMBOL)\s*\(/i);
+    if (!match) {
+      return null;
+    }
+
+    const openIndex = value.indexOf("(", match[0].length - 1);
+    let depth = 0;
+    for (let index = openIndex; index < value.length; index += 1) {
+      if (value[index] === "(") {
+        depth += 1;
+        continue;
+      }
+      if (value[index] !== ")") {
+        continue;
+      }
+
+      depth -= 1;
+      if (depth !== 0) {
+        continue;
+      }
+      if (value.slice(index + 1).trim()) {
+        return null;
+      }
+
+      const name = value.slice(openIndex + 1, index).trim();
+      const kind = match[1].toUpperCase();
+      if (!name || (requireFieldSymbolName && kind === "FIELD-SYMBOL" && !/^<[^<>]+>$/.test(name))) {
+        return null;
+      }
+      return { kind, name };
+    }
+
+    return null;
+  }
+
+  function resolveTemplateValueFinalDesc(value) {
+    const finalDesc = String(resolveValueLevelFinalDesc(value) || "").trim();
+    const inlineValue = parseWholeTemplateInlineDeclaration(value && value.value, true);
+    const inlineDecl = value && value.decl;
+    if (
+      !inlineValue
+      || !inlineDecl
+      || String(inlineDecl.objectType || "").trim().toUpperCase() !== "INLINE"
+      || String(inlineDecl.name || "").trim().toUpperCase() !== inlineValue.name.toUpperCase()
+    ) {
+      return finalDesc;
+    }
+
+    const resolvedInlineValue = parseWholeTemplateInlineDeclaration(finalDesc, false);
+    return resolvedInlineValue && resolvedInlineValue.kind === inlineValue.kind
+      ? resolvedInlineValue.name
+      : finalDesc;
   }
 
   function resolveTemplatePathValue(root, pathExpression) {
@@ -338,7 +394,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
               continue;
             }
             if (hasValueLevelDescFields(item) || isDeclLikeObject(item.decl)) {
-              projected.push(resolveValueLevelFinalDesc(item));
+              projected.push(resolveTemplateValueFinalDesc(item));
               continue;
             }
           }
@@ -382,7 +438,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
             return conditionOperandFinalDesc;
           }
           if (parent && typeof parent === "object" && (hasValueLevelDescFields(parent) || isDeclLikeObject(parent.decl))) {
-            return resolveValueLevelFinalDesc(parent);
+            return resolveTemplateValueFinalDesc(parent);
           }
           return getFinalDeclDesc(current);
         }
@@ -392,7 +448,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
            return getFinalDeclDesc(current);
         }
         if (hasValueLevelDescFields(current) || isDeclLikeObject(current.decl)) {
-          return resolveValueLevelFinalDesc(current);
+          return resolveTemplateValueFinalDesc(current);
         }
       }
 
@@ -1235,7 +1291,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
 
   function resolveTemplateValueRowFinalDesc(entry) {
     if (typeof resolveValueLevelFinalDesc === "function") {
-      return String(resolveValueLevelFinalDesc(entry) || "").trim();
+      return resolveTemplateValueFinalDesc(entry);
     }
     return "";
   }
@@ -2548,7 +2604,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     }
     if (typeof value === "object") {
       if (hasValueLevelDescFields(value) || isDeclLikeObject(value.decl)) {
-        const finalDesc = resolveValueLevelFinalDesc(value);
+        const finalDesc = resolveTemplateValueFinalDesc(value);
         if (finalDesc) {
           return finalDesc;
         }
@@ -2625,6 +2681,10 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       out.set(key, formatTemplateDumpValue(value));
     };
 
+    const addResolvedFinalDesc = (path) => {
+      addEntry(path, resolveTemplatePathValue(root, path));
+    };
+
     const walk = (value, path) => {
       const currentPath = String(path || "");
       if (value === undefined) {
@@ -2662,10 +2722,10 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
 
       if (currentPath && isDeclLikeObject(value)) {
         addEntry(`${currentPath}.desc`, getEffectiveDeclDesc(value));
-        addEntry(`${currentPath}.finalDesc`, getFinalDeclDesc(value));
+        addResolvedFinalDesc(`${currentPath}.finalDesc`);
       }
       if (currentPath && (hasValueLevelDescFields(value) || isDeclLikeObject(value.decl))) {
-        addEntry(`${currentPath}.finalDesc`, resolveValueLevelFinalDesc(value));
+        addResolvedFinalDesc(`${currentPath}.finalDesc`);
       }
 
       const keys = Object.keys(value);
@@ -7238,10 +7298,12 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     const TEMPLATE_TOKEN_SUGGESTION_OBJECT_SAMPLE = 16;
     const TEMPLATE_TOKEN_CHAR_RE = /[A-Za-z0-9_.\[\]]/;
     const templateTokenSuggestionCache = new Map();
+    const templateTokenSuggestionPriorityPaths = new Map();
     let activeTokenSuggest = null;
 
     const clearTemplateTokenSuggestionCache = () => {
       templateTokenSuggestionCache.clear();
+      templateTokenSuggestionPriorityPaths.clear();
     };
     const hideTemplateTokenSuggest = (stateObj) => {
       const nextState = stateObj || activeTokenSuggest;
@@ -7271,6 +7333,44 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       }
       return out;
     };
+    const isTemplateSourceDataDecl = (decl) => {
+      const objectType = String(decl && decl.objectType || "").trim().toUpperCase();
+      return Boolean(
+        isDeclLikeObject(decl)
+        && !decl.synthetic
+        && !["PATH_DECL", "CONDITION_VALUE", "SYSTEM"].includes(objectType)
+      );
+    };
+    const collectTemplateDataDeclFinalDescPaths = (contextObj) => {
+      const out = new Set();
+      const visit = (value, path) => {
+        if (Array.isArray(value)) {
+          value.forEach((item, index) => visit(item, `${path}[${index}]`));
+          return;
+        }
+        if (!value || typeof value !== "object") {
+          return;
+        }
+        if (
+          isTemplateValueEntryLikeObject(value)
+          && isTemplateSourceDataDecl(value.decl)
+        ) {
+          out.add(`${path}.decl.finalDesc`);
+        }
+        for (const key of Object.keys(value)) {
+          if (key === "decl" || key === "children") {
+            continue;
+          }
+          visit(value[key], `${path}.${key}`);
+        }
+      };
+      for (const section of ["values", "extras"]) {
+        if (contextObj && contextObj[section] && typeof contextObj[section] === "object") {
+          visit(contextObj[section], section);
+        }
+      }
+      return out;
+    };
     const getTemplatePathSuggestionsForSelectedKey = () => {
       const activeKey = String(selKey || "").trim();
       if (!activeKey) {
@@ -7288,12 +7388,14 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         || typeof resolveTemplateMapForObject !== "function"
       ) {
         templateTokenSuggestionCache.set(activeKey, []);
+        templateTokenSuggestionPriorityPaths.set(activeKey, new Set());
         return [];
       }
 
       const items = getRenderableObjectListForTemplate({ includeHidden: true });
       const config = getTemplateAutocompleteConfig();
       const out = new Set();
+      const preferredDeclFinalDescPaths = new Set();
       let sampledCount = 0;
 
       for (let index = 0; index < items.length; index += 1) {
@@ -7308,6 +7410,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         }
 
         const contextObj = buildTemplateContextObject(obj, index + 1);
+        collectTemplateDataDeclFinalDescPaths(contextObj).forEach((path) => preferredDeclFinalDescPaths.add(path));
         const paths = collectTemplateDumpPaths(contextObj);
         for (const path of Array.isArray(paths) ? paths : []) {
           const normalized = String(path || "").trim();
@@ -7326,6 +7429,11 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       }
 
       const suggestions = Array.from(out).sort((left, right) => {
+        const leftIsPreferredDeclFinalDesc = preferredDeclFinalDescPaths.has(left);
+        const rightIsPreferredDeclFinalDesc = preferredDeclFinalDescPaths.has(right);
+        if (leftIsPreferredDeclFinalDesc !== rightIsPreferredDeclFinalDesc) {
+          return leftIsPreferredDeclFinalDesc ? -1 : 1;
+        }
         const leftLower = String(left || "").toLowerCase();
         const rightLower = String(right || "").toLowerCase();
         const leftRank = leftLower.startsWith("values.") ? 0 : (leftLower.startsWith("extras.") ? 1 : 2);
@@ -7343,6 +7451,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         }
         return String(left || "").localeCompare(String(right || ""));
       });
+      templateTokenSuggestionPriorityPaths.set(activeKey, preferredDeclFinalDescPaths);
       templateTokenSuggestionCache.set(activeKey, suggestions);
       return suggestions;
     };
@@ -7382,6 +7491,8 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     };
     const filterTemplateTokenSuggestions = (query, allSuggestions) => {
       const rawQuery = String(query || "").trim().toLowerCase();
+      const activeKey = String(selKey || "").trim();
+      const preferredDeclFinalDescPaths = templateTokenSuggestionPriorityPaths.get(activeKey) || new Set();
       const ranked = [];
       for (const suggestion of Array.isArray(allSuggestions) ? allSuggestions : []) {
         const value = String(suggestion || "").trim();
@@ -7407,6 +7518,11 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       ranked.sort((left, right) => {
         if (left.rank !== right.rank) {
           return left.rank - right.rank;
+        }
+        const leftIsPreferredDeclFinalDesc = preferredDeclFinalDescPaths.has(left.value);
+        const rightIsPreferredDeclFinalDesc = preferredDeclFinalDescPaths.has(right.value);
+        if (leftIsPreferredDeclFinalDesc !== rightIsPreferredDeclFinalDesc) {
+          return leftIsPreferredDeclFinalDesc ? -1 : 1;
         }
         const leftDepth = left.value.split(".").length;
         const rightDepth = right.value.split(".").length;

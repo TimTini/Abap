@@ -2126,12 +2126,12 @@ const els = {
       }
     };
     const rows = [
-      ["APPEND LINES OF", "{extras.append.source.finalDesc}"],
+      ["APPEND LINES OF", "{extras.append.source.decl.finalDesc}"],
       ["FROM", "{extras.append.range.from.finalDesc}"],
       ["TO", "{extras.append.range.to.finalDesc}"],
       ["STEP", "{extras.append.range.step.finalDesc}"],
       ["USING KEY", "{extras.append.range.usingKey.value}"],
-      ["TO", "{extras.append.target.finalDesc}"]
+      ["TO", "{extras.append.target.decl.finalDesc}"]
     ];
     rows.forEach(([label, token], index) => {
       const row = index + 1;
@@ -2161,7 +2161,7 @@ const els = {
     },
     "A2:T2": createTemplateBaseStyle("#ffffff"),
     A2: {
-      text: "{values.target.finalDesc}"
+      text: "{values.target.decl.finalDesc}"
     },
     "U2:AN2": createTemplateBaseStyle("#ffffff"),
     U2: {

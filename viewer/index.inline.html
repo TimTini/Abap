@@ -9,9 +9,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="abap-viewer-version" content="v2026.09.24-r90">
-  <meta name="abap-viewer-updated-at" content="2026-09-24 14:37:06">
-  <meta name="abap-viewer-updated-note" content="Preserve traced descriptions for DELETE TABLE operands.">
+  <meta name="abap-viewer-version" content="v2026.09.30-r96">
+  <meta name="abap-viewer-updated-at" content="2026-09-30 14:10:22">
+  <meta name="abap-viewer-updated-note" content="Prioritize declaration paths for bound data operands.">
   <title>ABAP Parser Viewer</title>
     <style>
 /* inlined from: ./styles/viewer.css */
@@ -12679,12 +12679,12 @@ const els = {
       }
     };
     const rows = [
-      ["APPEND LINES OF", "{extras.append.source.finalDesc}"],
+      ["APPEND LINES OF", "{extras.append.source.decl.finalDesc}"],
       ["FROM", "{extras.append.range.from.finalDesc}"],
       ["TO", "{extras.append.range.to.finalDesc}"],
       ["STEP", "{extras.append.range.step.finalDesc}"],
       ["USING KEY", "{extras.append.range.usingKey.value}"],
-      ["TO", "{extras.append.target.finalDesc}"]
+      ["TO", "{extras.append.target.decl.finalDesc}"]
     ];
     rows.forEach(([label, token], index) => {
       const row = index + 1;
@@ -12714,7 +12714,7 @@ const els = {
     },
     "A2:T2": createTemplateBaseStyle("#ffffff"),
     A2: {
-      text: "{values.target.finalDesc}"
+      text: "{values.target.decl.finalDesc}"
     },
     "U2:AN2": createTemplateBaseStyle("#ffffff"),
     U2: {
@@ -16639,6 +16639,16 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     );
   }
 
+  function extractInlineFieldSymbolName(text) {
+    const match = String(text || "").trim().match(/^FIELD-SYMBOL\s*\(\s*([^()]*)\s*\)\s*$/i);
+    if (!match) {
+      return null;
+    }
+
+    const candidate = String(match[1] || "").trim();
+    return /^<[^<>]+>$/.test(candidate) ? candidate : "";
+  }
+
   function extractIdentifierCandidate(text) {
     let raw = String(text || "").trim();
     if (!raw) {
@@ -16664,11 +16674,17 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       return sysMatch[0].toUpperCase();
     }
 
+    // An inline field symbol name must include ABAP's angle brackets. Do not
+    // mistake the FIELD-SYMBOL keyword for a hyphenated field path otherwise.
+    const inlineFieldSymbolName = extractInlineFieldSymbolName(raw);
+    if (inlineFieldSymbolName !== null) {
+      return inlineFieldSymbolName;
+    }
+
     // Inline decls before field-path: FIELD-SYMBOL(<fs>) looks like path FIELD-SYMBOL.
     const inlinePatterns = [
       /@?DATA\s*\(\s*([^)]+)\s*\)/i,
-      /@?FINAL\s*\(\s*([^)]+)\s*\)/i,
-      /FIELD-SYMBOL\s*\(\s*(<[^>]+>)\s*\)/i
+      /@?FINAL\s*\(\s*([^)]+)\s*\)/i
     ];
     for (const regex of inlinePatterns) {
       const match = regex.exec(raw);
@@ -16699,12 +16715,17 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       return "";
     }
 
+    const valueText = String(entry.value || "").trim();
+    const inlineFieldSymbolName = extractInlineFieldSymbolName(valueText);
+    if (inlineFieldSymbolName !== null) {
+      return inlineFieldSymbolName;
+    }
+
     const fromDeclRef = String(entry.declRef || "").trim();
     if (fromDeclRef) {
       return fromDeclRef;
     }
 
-    const valueText = String(entry.value || "").trim();
     const identifier = extractIdentifierCandidate(valueText);
     if (identifier) {
       return identifier;
@@ -17093,6 +17114,26 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     register(value.decl && value.decl.name);
     register(extractIdentifierCandidate(rawValueText));
 
+    const decl = value.decl;
+    const structName = decl.synthetic && String(decl.objectType || "").toUpperCase() === "STRUCT_FIELD"
+      ? String(decl.structName || "")
+      : "";
+    if (structName) {
+      const prefix = `${structName.toUpperCase()}-`;
+      for (const match of rawValueText.matchAll(VALUE_LEVEL_IDENTIFIER_REGEX)) {
+        const identifier = match[0];
+        if (!identifier.toUpperCase().startsWith(prefix)) {
+          continue;
+        }
+        const fieldPath = identifier.slice(structName.length + 1);
+        if (!/^[A-Za-z_][A-Za-z0-9_]*(?:-[A-Za-z_][A-Za-z0-9_]*)*$/.test(fieldPath)) {
+          continue;
+        }
+        const fieldDecl = { ...decl, name: identifier, fieldPath, comment: "" };
+        map[normalizeValueIdentifierKey(identifier)] = String(getFinalDeclDesc(fieldDecl) || identifier).trim();
+      }
+    }
+
     return Object.keys(map).length ? map : null;
   }
 
@@ -17115,31 +17156,66 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
       return token;
     });
 
+    const replaceTemplateExpressions = (template) => {
+      let result = "";
+      let start = 0;
+      for (let index = 0; index < template.length; index += 1) {
+        if (template[index] === "\\") {
+          index += 1;
+          continue;
+        }
+        if (template[index] !== "{") {
+          continue;
+        }
+        let end = index + 1;
+        while (end < template.length && template[end] !== "}") {
+          if (template[end] === "\\") {
+            end += 1;
+          }
+          end += 1;
+        }
+        if (end >= template.length) {
+          break;
+        }
+        result += template.slice(start, index + 1);
+        result += replaceIdentifiersOutsideLiterals(template.slice(index + 1, end), replacementMap);
+        result += "}";
+        start = end + 1;
+        index = end;
+      }
+      return result + template.slice(start);
+    };
+
     while (i < length) {
       const ch = text[i];
 
-      if (ch === "'" || ch === "|") {
+      if (ch === "'" || ch === "`" || ch === "|") {
         const quote = ch;
         const start = i;
         i += 1;
         while (i < length) {
+          if (quote === "|" && text[i] === "\\" && i + 1 < length) {
+            i += 2;
+            continue;
+          }
           if (text[i] !== quote) {
             i += 1;
             continue;
           }
-          if (quote === "'" && i + 1 < length && text[i + 1] === "'") {
+          if ((quote === "'" || quote === "`") && i + 1 < length && text[i + 1] === quote) {
             i += 2;
             continue;
           }
           i += 1;
           break;
         }
-        out += text.slice(start, i);
+        const literal = text.slice(start, i);
+        out += quote === "|" ? replaceTemplateExpressions(literal) : literal;
         continue;
       }
 
       const start = i;
-      while (i < length && text[i] !== "'" && text[i] !== "|") {
+      while (i < length && text[i] !== "'" && text[i] !== "`" && text[i] !== "|") {
         i += 1;
       }
       out += replaceSegment(text.slice(start, i));
@@ -17213,6 +17289,7 @@ function collectConditionDeclsFromClauses(clauses, addDecl) {
     ensureConditionClauseDeclsWithSynthetic,
     isDeclLikeObject,
     hasValueLevelDescFields,
+    replaceIdentifiersOutsideLiterals,
     resolveValueLevelFinalDesc
   });
 })(window);
@@ -19520,7 +19597,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       return String(getFinalDeclDesc(decl) || operandText).trim() || undefined;
     }
 
-    const resolved = resolveValueLevelFinalDesc({
+    const resolved = resolveTemplateValueFinalDesc({
       value: operandText,
       userDesc: "",
       codeDesc: "",
@@ -19528,6 +19605,62 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       decl
     });
     return String(resolved || "").trim() || undefined;
+  }
+
+  function parseWholeTemplateInlineDeclaration(text, requireFieldSymbolName) {
+    const value = String(text || "").trim();
+    const match = value.match(/^@?\s*(DATA|FIELD-SYMBOL)\s*\(/i);
+    if (!match) {
+      return null;
+    }
+
+    const openIndex = value.indexOf("(", match[0].length - 1);
+    let depth = 0;
+    for (let index = openIndex; index < value.length; index += 1) {
+      if (value[index] === "(") {
+        depth += 1;
+        continue;
+      }
+      if (value[index] !== ")") {
+        continue;
+      }
+
+      depth -= 1;
+      if (depth !== 0) {
+        continue;
+      }
+      if (value.slice(index + 1).trim()) {
+        return null;
+      }
+
+      const name = value.slice(openIndex + 1, index).trim();
+      const kind = match[1].toUpperCase();
+      if (!name || (requireFieldSymbolName && kind === "FIELD-SYMBOL" && !/^<[^<>]+>$/.test(name))) {
+        return null;
+      }
+      return { kind, name };
+    }
+
+    return null;
+  }
+
+  function resolveTemplateValueFinalDesc(value) {
+    const finalDesc = String(resolveValueLevelFinalDesc(value) || "").trim();
+    const inlineValue = parseWholeTemplateInlineDeclaration(value && value.value, true);
+    const inlineDecl = value && value.decl;
+    if (
+      !inlineValue
+      || !inlineDecl
+      || String(inlineDecl.objectType || "").trim().toUpperCase() !== "INLINE"
+      || String(inlineDecl.name || "").trim().toUpperCase() !== inlineValue.name.toUpperCase()
+    ) {
+      return finalDesc;
+    }
+
+    const resolvedInlineValue = parseWholeTemplateInlineDeclaration(finalDesc, false);
+    return resolvedInlineValue && resolvedInlineValue.kind === inlineValue.kind
+      ? resolvedInlineValue.name
+      : finalDesc;
   }
 
   function resolveTemplatePathValue(root, pathExpression) {
@@ -19587,7 +19720,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
               continue;
             }
             if (hasValueLevelDescFields(item) || isDeclLikeObject(item.decl)) {
-              projected.push(resolveValueLevelFinalDesc(item));
+              projected.push(resolveTemplateValueFinalDesc(item));
               continue;
             }
           }
@@ -19631,7 +19764,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
             return conditionOperandFinalDesc;
           }
           if (parent && typeof parent === "object" && (hasValueLevelDescFields(parent) || isDeclLikeObject(parent.decl))) {
-            return resolveValueLevelFinalDesc(parent);
+            return resolveTemplateValueFinalDesc(parent);
           }
           return getFinalDeclDesc(current);
         }
@@ -19641,7 +19774,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
            return getFinalDeclDesc(current);
         }
         if (hasValueLevelDescFields(current) || isDeclLikeObject(current.decl)) {
-          return resolveValueLevelFinalDesc(current);
+          return resolveTemplateValueFinalDesc(current);
         }
       }
 
@@ -20484,7 +20617,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
 
   function resolveTemplateValueRowFinalDesc(entry) {
     if (typeof resolveValueLevelFinalDesc === "function") {
-      return String(resolveValueLevelFinalDesc(entry) || "").trim();
+      return resolveTemplateValueFinalDesc(entry);
     }
     return "";
   }
@@ -21797,7 +21930,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     }
     if (typeof value === "object") {
       if (hasValueLevelDescFields(value) || isDeclLikeObject(value.decl)) {
-        const finalDesc = resolveValueLevelFinalDesc(value);
+        const finalDesc = resolveTemplateValueFinalDesc(value);
         if (finalDesc) {
           return finalDesc;
         }
@@ -21874,6 +22007,10 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       out.set(key, formatTemplateDumpValue(value));
     };
 
+    const addResolvedFinalDesc = (path) => {
+      addEntry(path, resolveTemplatePathValue(root, path));
+    };
+
     const walk = (value, path) => {
       const currentPath = String(path || "");
       if (value === undefined) {
@@ -21911,10 +22048,10 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
 
       if (currentPath && isDeclLikeObject(value)) {
         addEntry(`${currentPath}.desc`, getEffectiveDeclDesc(value));
-        addEntry(`${currentPath}.finalDesc`, getFinalDeclDesc(value));
+        addResolvedFinalDesc(`${currentPath}.finalDesc`);
       }
       if (currentPath && (hasValueLevelDescFields(value) || isDeclLikeObject(value.decl))) {
-        addEntry(`${currentPath}.finalDesc`, resolveValueLevelFinalDesc(value));
+        addResolvedFinalDesc(`${currentPath}.finalDesc`);
       }
 
       const keys = Object.keys(value);
@@ -26487,10 +26624,12 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     const TEMPLATE_TOKEN_SUGGESTION_OBJECT_SAMPLE = 16;
     const TEMPLATE_TOKEN_CHAR_RE = /[A-Za-z0-9_.\[\]]/;
     const templateTokenSuggestionCache = new Map();
+    const templateTokenSuggestionPriorityPaths = new Map();
     let activeTokenSuggest = null;
 
     const clearTemplateTokenSuggestionCache = () => {
       templateTokenSuggestionCache.clear();
+      templateTokenSuggestionPriorityPaths.clear();
     };
     const hideTemplateTokenSuggest = (stateObj) => {
       const nextState = stateObj || activeTokenSuggest;
@@ -26520,6 +26659,44 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       }
       return out;
     };
+    const isTemplateSourceDataDecl = (decl) => {
+      const objectType = String(decl && decl.objectType || "").trim().toUpperCase();
+      return Boolean(
+        isDeclLikeObject(decl)
+        && !decl.synthetic
+        && !["PATH_DECL", "CONDITION_VALUE", "SYSTEM"].includes(objectType)
+      );
+    };
+    const collectTemplateDataDeclFinalDescPaths = (contextObj) => {
+      const out = new Set();
+      const visit = (value, path) => {
+        if (Array.isArray(value)) {
+          value.forEach((item, index) => visit(item, `${path}[${index}]`));
+          return;
+        }
+        if (!value || typeof value !== "object") {
+          return;
+        }
+        if (
+          isTemplateValueEntryLikeObject(value)
+          && isTemplateSourceDataDecl(value.decl)
+        ) {
+          out.add(`${path}.decl.finalDesc`);
+        }
+        for (const key of Object.keys(value)) {
+          if (key === "decl" || key === "children") {
+            continue;
+          }
+          visit(value[key], `${path}.${key}`);
+        }
+      };
+      for (const section of ["values", "extras"]) {
+        if (contextObj && contextObj[section] && typeof contextObj[section] === "object") {
+          visit(contextObj[section], section);
+        }
+      }
+      return out;
+    };
     const getTemplatePathSuggestionsForSelectedKey = () => {
       const activeKey = String(selKey || "").trim();
       if (!activeKey) {
@@ -26537,12 +26714,14 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         || typeof resolveTemplateMapForObject !== "function"
       ) {
         templateTokenSuggestionCache.set(activeKey, []);
+        templateTokenSuggestionPriorityPaths.set(activeKey, new Set());
         return [];
       }
 
       const items = getRenderableObjectListForTemplate({ includeHidden: true });
       const config = getTemplateAutocompleteConfig();
       const out = new Set();
+      const preferredDeclFinalDescPaths = new Set();
       let sampledCount = 0;
 
       for (let index = 0; index < items.length; index += 1) {
@@ -26557,6 +26736,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         }
 
         const contextObj = buildTemplateContextObject(obj, index + 1);
+        collectTemplateDataDeclFinalDescPaths(contextObj).forEach((path) => preferredDeclFinalDescPaths.add(path));
         const paths = collectTemplateDumpPaths(contextObj);
         for (const path of Array.isArray(paths) ? paths : []) {
           const normalized = String(path || "").trim();
@@ -26575,6 +26755,11 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       }
 
       const suggestions = Array.from(out).sort((left, right) => {
+        const leftIsPreferredDeclFinalDesc = preferredDeclFinalDescPaths.has(left);
+        const rightIsPreferredDeclFinalDesc = preferredDeclFinalDescPaths.has(right);
+        if (leftIsPreferredDeclFinalDesc !== rightIsPreferredDeclFinalDesc) {
+          return leftIsPreferredDeclFinalDesc ? -1 : 1;
+        }
         const leftLower = String(left || "").toLowerCase();
         const rightLower = String(right || "").toLowerCase();
         const leftRank = leftLower.startsWith("values.") ? 0 : (leftLower.startsWith("extras.") ? 1 : 2);
@@ -26592,6 +26777,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         }
         return String(left || "").localeCompare(String(right || ""));
       });
+      templateTokenSuggestionPriorityPaths.set(activeKey, preferredDeclFinalDescPaths);
       templateTokenSuggestionCache.set(activeKey, suggestions);
       return suggestions;
     };
@@ -26631,6 +26817,8 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     };
     const filterTemplateTokenSuggestions = (query, allSuggestions) => {
       const rawQuery = String(query || "").trim().toLowerCase();
+      const activeKey = String(selKey || "").trim();
+      const preferredDeclFinalDescPaths = templateTokenSuggestionPriorityPaths.get(activeKey) || new Set();
       const ranked = [];
       for (const suggestion of Array.isArray(allSuggestions) ? allSuggestions : []) {
         const value = String(suggestion || "").trim();
@@ -26656,6 +26844,11 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       ranked.sort((left, right) => {
         if (left.rank !== right.rank) {
           return left.rank - right.rank;
+        }
+        const leftIsPreferredDeclFinalDesc = preferredDeclFinalDescPaths.has(left.value);
+        const rightIsPreferredDeclFinalDesc = preferredDeclFinalDescPaths.has(right.value);
+        if (leftIsPreferredDeclFinalDesc !== rightIsPreferredDeclFinalDesc) {
+          return leftIsPreferredDeclFinalDesc ? -1 : 1;
         }
         const leftDepth = left.value.split(".").length;
         const rightDepth = right.value.split(".").length;
@@ -29508,6 +29701,7 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
   const normalizeParsedJson = runtime.requireServiceMethod("output", "normalizeParsedJson");
   const rebuildInputGutter = runtime.requireServiceMethod("output", "rebuildInputGutter");
   const renderDeclDescPanelUi = runtime.requireServiceMethod("descriptions", "renderDeclDescPanelUi");
+  const replaceIdentifiersOutsideLiterals = runtime.requireServiceMethod("descriptions", "replaceIdentifiersOutsideLiterals");
   const migrateScopedDescriptionOverrides = runtime.requireServiceMethod("descriptions", "migrateScopedDescriptionOverrides");
   const rebuildConstantInitializerIndex = runtime.requireServiceMethod("descriptions", "rebuildConstantInitializerIndex");
   const saveDescOverrides = runtime.requireServiceMethod("runtimeState", "saveDescOverrides");
@@ -29552,12 +29746,18 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
       return null;
     }
 
-    const match = text.match(/(^|[^A-Za-z0-9_<>])([A-Za-z_][A-Za-z0-9_]*-[A-Za-z_][A-Za-z0-9_]*(?:-[A-Za-z_][A-Za-z0-9_]*)*)/);
-    if (!match || !match[2]) {
+    const matches = text.matchAll(/(^|[^A-Za-z0-9_<>])((?:<[^<>]+>|[A-Za-z_][A-Za-z0-9_]*)-[A-Za-z_][A-Za-z0-9_]*(?:-[A-Za-z_][A-Za-z0-9_]*)*)/g);
+    let fullRef = "";
+    for (const match of matches) {
+      const candidate = String(match[2] || "").trim();
+      if (candidate && replaceIdentifiersOutsideLiterals(text, { [candidate.toUpperCase()]: "" }) !== text) {
+        fullRef = candidate;
+        break;
+      }
+    }
+    if (!fullRef) {
       return null;
     }
-
-    const fullRef = String(match[2] || "").trim();
     const dash = fullRef.indexOf("-");
     if (dash <= 0 || dash >= fullRef.length - 1) {
       return null;
@@ -29570,8 +29770,8 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     }
 
     const structUpper = normalizeDeclKeyTokenForSynthetic(structName);
-    // Skip ABAP system fields (SY-*) and field symbols (<fs>-*) in this synthetic flow.
-    if (structUpper === "SY" || structName.startsWith("<")) {
+    // System fields are not structure declarations in the Viewer catalog.
+    if (structUpper === "SY") {
       return null;
     }
 
@@ -29700,7 +29900,11 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
     const candidates = index.byNameUpper.get(candidate.structUpper) || [];
     const usableCandidates = candidates.filter((decl) => {
       const objectType = normalizeDeclKeyTokenForSynthetic(decl && decl.objectType);
-      return objectType !== "STRUCT_FIELD" && objectType !== "PATH_DECL" && objectType !== "SYSTEM";
+      const scopeId = Number(decl && decl.scopeId) || 0;
+      return objectType !== "STRUCT_FIELD"
+        && objectType !== "PATH_DECL"
+        && objectType !== "SYSTEM"
+        && (!scopeId || (context && context.scopeIds instanceof Set && context.scopeIds.has(scopeId)));
     });
     if (!usableCandidates.length) {
       return null;
@@ -29951,6 +30155,23 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
 
     const index = buildSyntheticDeclIndex(data);
     const createdDecls = [];
+    const objectsById = new Map();
+    walkObjects(data.objects, (obj) => {
+      if (obj && obj.id) {
+        objectsById.set(obj.id, obj);
+      }
+    });
+    const collectScopeIds = (obj) => {
+      const scopeIds = new Set([0]);
+      let current = obj;
+      while (current) {
+        if (["FORM", "METHOD", "CLASS"].includes(String(current.objectType || "").toUpperCase()) && current.id) {
+          scopeIds.add(Number(current.id));
+        }
+        current = current.parent ? objectsById.get(current.parent) : null;
+      }
+      return scopeIds;
+    };
 
     const processAssignSections = (container, sections, context) => {
       for (const sectionName of sections) {
@@ -29996,7 +30217,8 @@ var PERFORM_TRACE_META_KEY_TEMPLATE = "__abapPerformTraceBinding";
         const context = {
           file: String(obj.file || ""),
           lineStart: Number(obj.lineStart || 0) || 0,
-          scopeHints: collectScopeHintsFromObjectForSynthetic(obj)
+          scopeHints: collectScopeHintsFromObjectForSynthetic(obj),
+          scopeIds: collectScopeIds(obj)
         };
 
         const values = obj.values && typeof obj.values === "object" ? obj.values : null;
